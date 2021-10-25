@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCACLX4jQg2Lsre3DGyDvEFA1%3DdpPYoy_Gt-DrtkmeZ0UvLN75GQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000240.html">
+   <LINK REL="Next"  HREF="000223.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCACLX4jQg2Lsre3DGyDvEFA1%3DdpPYoy_Gt-DrtkmeZ0UvLN75GQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">yminsky at janestreet.com
+       </A><BR>
+    <I>Thu Feb  7 15:48:46 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000240.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000223.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#221">[ date ]</a>
+              <a href="thread.html#221">[ thread ]</a>
+              <a href="subject.html#221">[ subject ]</a>
+              <a href="author.html#221">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thanks Leo!  This is very helpful.  Maybe we should throw this up on a
+wiki page somewhere, and keep it up to date as proposals show up.
+
+A few notes of my own below.
+
+On Wed, Feb 6, 2013 at 1:11 PM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;<i> c) Sebastien Mondet suggested that run-time types or dyntype might be
+</I>&gt;<i> sufficient without ppx for many extensions.
+</I>&gt;<i>
+</I>&gt;<i> Markus Mottl pointed out that there are runtime performance
+</I>&gt;<i> implications for using those solutions.
+</I>
+I strongly agree with Markus on this.  Run-time types are lovely, but
+we really need something more efficient for the vast majority of our
+camlp4 needs.  Using a comparison function constructed with run-time
+types, for example, would be a disaster performance wise.  We've done
+experiments internally, and the performance hit is absolutely
+crushing.
+
+&gt;<i> d) Jeremy suggested that rather than implementing extensions as AST
+</I>&gt;<i> transformers that operate over the whole AST they might be implemented    as
+</I>&gt;<i> transformers only for the part of the AST that they were to operate    on.
+</I>&gt;<i> So an extension used like this:
+</I>&gt;<i>
+</I>&gt;<i>      (:perform
+</I>&gt;<i>          x &lt;-- m;
+</I>&gt;<i>          y &lt;-- n;
+</I>&gt;<i>          return (x y))
+</I>&gt;<i>
+</I>&gt;<i>    would be implemented as a function with type:
+</I>&gt;<i>
+</I>&gt;<i>      val perform : Parsetree.expression -&gt; Parsetree.expression
+</I>&gt;<i>
+</I>&gt;<i>    He suggests that this may help with scoping, safety and
+</I>&gt;<i> compositionality.
+</I>&gt;<i>
+</I>&gt;<i>    Alain pointed out that some legitimate uses of ppx don't work nicely
+</I>&gt;<i> with the constraint that they can operate only on a marked fragment. He
+</I>&gt;<i> also pointed out that handling extensions as those extensions are found
+</I>&gt;<i> within the source forces a top-down expansion order, which is not
+</I>&gt;<i> necessarily desirable.
+</I>
+I wonder if this is a place where we can have it both ways: have an
+underlying ppx mechanism that is a whole-AST transformation; and
+expose libraries that support more disciplined, scoped
+transformations.  We could strongly encourage the latter, but still
+allow the former when necessary.
+
+&gt;<i> e) I suggested an extension to Jeremy's proposal. This involves giving the
+</I>&gt;<i> expansion functions in their own kind of file (&quot;.mlq&quot; - compiled to
+</I>&gt;<i> &quot;.cmq&quot;), referring to them using a namespace mechanism, and then having
+</I>&gt;<i> the compiler itself perform the expansion of the extensions.
+</I>&gt;<i>
+</I>&gt;<i>    There are more details in my blog post:
+</I>&gt;<i>
+</I>&gt;<i>      <A HREF="http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html">http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html</A>
+</I>&gt;<i>
+</I>&gt;<i>    Since such a solution would take a while to implement, and since moving
+</I>&gt;<i> an extension from ppx to it would be trivial, I proposed using ppx for
+</I>&gt;<i> the short/medium term.
+</I>&gt;<i>
+</I>&gt;<i>    I suggested that such a mechanism might improving tooling and make it
+</I>&gt;<i> easier for average users to use extensions.
+</I>&gt;<i>
+</I>&gt;<i>    Both Gabriel and Alain suggested that the use of namespaces might be
+</I>&gt;<i> unnecessary and too heavyweight. Alain also questioned the need for
+</I>&gt;<i> special &quot;.mlq&quot; files.
+</I>
+I do like the idea of eventually getting to a name-spaced solution.
+In our world, there are really two cases: one, where we really just
+want to extend the language, and we're happy to specify which language
+we're using fairly broadly at the build-system level.  For such
+things, namespaces do not seem helpful.
+
+The other case is where you want to invoke a particular,
+special-purpose syntax extension for just one file.  There, having
+something that would allow the specification of the extension in the
+file, ideally with some integration with namespaces, seems lovely.
+That said, I think it's a less important use-case in the current
+world.
+
+I wonder, does anyone on the list of have much experience with
+Scheme's approach to macros?  There's been a lot of work there,
+covering everything from hygeine to integration with module systems.
+It would be great to leverage off of that experience.
+
+y
+</PRE>
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000240.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000223.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#221">[ date ]</a>
+              <a href="thread.html#221">[ thread ]</a>
+              <a href="subject.html#221">[ subject ]</a>
+              <a href="author.html#221">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

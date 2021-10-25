@@ -1,0 +1,186 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> File descriptor semantics in Core/Async?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20File%20descriptor%20semantics%20in%20Core/Async%3F&In-Reply-To=%3CCAK%3DfH%2Bg7OqR_j6bxS3r_k6k8dCAgE_PkYkPwsOF4ykXoxci4%2Bg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000651.html">
+   <LINK REL="Next"  HREF="000656.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>File descriptor semantics in Core/Async?</H1>
+    <B>David House</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20File%20descriptor%20semantics%20in%20Core/Async%3F&In-Reply-To=%3CCAK%3DfH%2Bg7OqR_j6bxS3r_k6k8dCAgE_PkYkPwsOF4ykXoxci4%2Bg%40mail.gmail.com%3E"
+       TITLE="File descriptor semantics in Core/Async?">dhouse at janestreet.com
+       </A><BR>
+    <I>Mon Oct 15 13:26:40 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000651.html">File descriptor semantics in Core/Async?
+</A></li>
+        <LI>Next message: <A HREF="000656.html">File descriptor semantics in Core/Async?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#652">[ date ]</a>
+              <a href="thread.html#652">[ thread ]</a>
+              <a href="subject.html#652">[ subject ]</a>
+              <a href="author.html#652">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Sorry, I was thinking of something else. Of course when one uses
+In_thread, you give away interruptability guarantees. (This is the
+whole point.)
+
+You're also not allowed to use async code inside In_thread.run. (It
+runs without the async lock.)
+
+In principle, it is just a matter of aping the code for
+Writer.open_file, but adding in a call to set_close_on_exec. So this
+is definitely possible, it just depends how much code you're willing
+to duplicate.
+
+I think it should be possible to just do this all the time on Writer
+and Reader; I'll see if I can push that through.
+
+On Mon, Oct 15, 2012 at 1:17 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+&gt;<i> How so?
+</I>&gt;<i>
+</I>&gt;<i> let make_writer file =
+</I>&gt;<i>   In_thread.run (fun () -&gt;
+</I>&gt;<i>     let out_chan = Out_channel.create file in
+</I>&gt;<i>     let fd = Fd.of_out_channel out_chan Fd.Kind.File in
+</I>&gt;<i>     Unix.set_close_on_exec fd;
+</I>&gt;<i>     Writer.create writer)
+</I>&gt;<i>
+</I>&gt;<i> The closure will run still without being interrupted.
+</I>&gt;<i>
+</I>&gt;<i> On Mon, Oct 15, 2012 at 1:15 PM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> That won't work for me because making an fd and setting it to close on
+</I>&gt;&gt;<i> exec would become non-atomic again.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Oct 15, 2012 at 2:07 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> It's very easy to make the blocking thing be non-blocking: throw the
+</I>&gt;&gt;&gt;<i> whole thing into an In_thread.run.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 12:55 PM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i> Many thanks David, at least in this case a blocking open will mean I
+</I>&gt;&gt;&gt;&gt;<i> have bigger problems.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 12:48 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;<i> You should not normally use the In_channel or Out_channel modules from
+</I>&gt;&gt;&gt;&gt;&gt;<i> async, preferring Reader and Writer. This is because, as blocking
+</I>&gt;&gt;&gt;&gt;&gt;<i> operations, they will kill all concurrency by blocking the main async
+</I>&gt;&gt;&gt;&gt;&gt;<i> thread.
+</I>&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;<i> But in this case, I guess its use is warranted.
+</I>&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;<i> Anyway, since {In,Out}_channel.create does not have a deferred result
+</I>&gt;&gt;&gt;&gt;&gt;<i> type (it's in core, so this is impossible!), they do not use binds.
+</I>&gt;&gt;&gt;&gt;&gt;<i> I.e. the following code should run without interruptions:
+</I>&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;<i>   let out_chan = Out_channel.create &quot;foo.txt&quot; in
+</I>&gt;&gt;&gt;&gt;&gt;<i>   let fd = Fd.of_out_channel out_chan Fd.Kind.File in
+</I>&gt;&gt;&gt;&gt;&gt;<i>   Unix.set_close_on_exec fd;
+</I>&gt;&gt;&gt;&gt;&gt;<i>   let writer = Writer.create writer in
+</I>&gt;&gt;&gt;&gt;&gt;<i>   ...
+</I>&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 10:53 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i> Does creating an out channel require a bind though?  If so, can I
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i> atomically create an out channel with close on exec set?
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i> Thanks
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 11:35 AM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> The context switch points in async are exactly the points where bind
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> appears. Blocks of code without a bind (or &gt;&gt;|, of course) inside them
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> are guaranteed to run uninterruptedly.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Looking at the source of Writer.with_file, it looks like you do not
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> have the guarantee that you want. It calls Unix.openfile, and then
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> there is a bind, so something else could run (depending, of course, on
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> the exact pattern of concurrency in your program).
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Writer.of_out_channel, however, will give you the guarantees you want.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> (It does not have a deferred return type so cannot be doing binds
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> internally.)
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 10:28 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Am I guaranteed that no code will run between Writer.with_file
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> creating the FD and my handler being run so I can set close on exec?
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 11:26 AM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Oh, there is an easier fix than that. One can either call
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Unix.set_close_on_exec on the underlying file descriptor (use
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Writer.fd), or use Writer.of_out_channel. (Similarly for Reader.)
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 10:19 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> One option I have is to write to a temporary filename then spawn a
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> 'cp' to copy the temp file to the actual file, but that seems less
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> than ideal.  The specific problem is I am writing shell scripts that
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> will be run, and I'm spawning shell scripts at the same time, so if I
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> spawn a shell script while writing a shell script, the written script
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> cannot be executed until the running one is completed.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 11:06 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> I'm using Writer.with_file in this case.  I poked around the source
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> code but my Unix knowledge isn't strong enough to know what's right or
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> wrong.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 11:01 AM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Hmm, how are you opening the files? Xavier in that thread claims that
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> if you use Pervasives.open_in or Pervasives.open_out, then
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> close-on-exec will be set for those file descriptors. The same is true
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> of Core.{In,Out}_channel.create.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> That being said, I'm not actually sure that Async's Reader and Writer
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> are doing this, which is a little embarrassing. It's quite possible
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> this is deliberate; let me follow up internally,
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> On Mon, Oct 15, 2012 at 9:01 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Hello, I'm wondering if Core or Async addresses this bug:
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> <A HREF="http://caml.inria.fr/mantis/view.php?id=5256">http://caml.inria.fr/mantis/view.php?id=5256</A>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> I have a situation where I'm reading/writing many files and spawning
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> subprocesses in Async and the subprocesses are inheriting the opened
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> FDs which is problematic for me.  I am using the ocaml stdlib
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> create_process for this as the Core version was causing segfaults for
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> me on OS X, but now I am mainly targeting Linux so I can switch batch
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> to Core's create_process if it solves this issue.  I poked around the
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> source code but didn't see anything in the comments about what happens
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> to open fd's after forking.
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> Thanks,
+</I>&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;&gt;<i> /M
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000651.html">File descriptor semantics in Core/Async?
+</A></li>
+	<LI>Next message: <A HREF="000656.html">File descriptor semantics in Core/Async?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#652">[ date ]</a>
+              <a href="thread.html#652">[ thread ]</a>
+              <a href="subject.html#652">[ subject ]</a>
+              <a href="author.html#652">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

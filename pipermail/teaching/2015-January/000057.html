@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Teaching] Getting opam's user-setup working cleanly
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:teaching%40lists.ocaml.org?Subject=Re%3A%20%5BTeaching%5D%20Getting%20opam%27s%20user-setup%20working%20cleanly&In-Reply-To=%3CCACLX4jRODcAS3Pc26T0JXoQdc5R6oPjxyr0gQCPThGSCqrfWDw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000056.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Teaching] Getting opam's user-setup working cleanly</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:teaching%40lists.ocaml.org?Subject=Re%3A%20%5BTeaching%5D%20Getting%20opam%27s%20user-setup%20working%20cleanly&In-Reply-To=%3CCACLX4jRODcAS3Pc26T0JXoQdc5R6oPjxyr0gQCPThGSCqrfWDw%40mail.gmail.com%3E"
+       TITLE="[Teaching] Getting opam's user-setup working cleanly">yminsky at janestreet.com
+       </A><BR>
+    <I>Sat Jan 24 03:05:00 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000056.html">[Teaching] Getting opam's user-setup working cleanly
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#57">[ date ]</a>
+              <a href="thread.html#57">[ thread ]</a>
+              <a href="subject.html#57">[ subject ]</a>
+              <a href="author.html#57">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>My apologies.  I just put up a post about all this on the platform
+list, so I've now split the discussion.  How about we move the
+conversation over there.  I think we probably shouldn't come back to
+the teaching list until we've resolved some more of these questions
+anyway.
+
+On Fri, Jan 23, 2015 at 10:02 PM, Louis Gesbert
+&lt;<A HREF="http://lists.ocaml.org/listinfo/teaching">louis.gesbert at ocamlpro.com</A>&gt; wrote:
+&gt;<i> user-setup doesn't handle yet the Mac-specific issue of Emacs load-paths, so that's probably what is bitting you here; I'll port the related code from your .emacs; getting a means to test on these ASAP.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On hardcoding the paths, I'm still not certain it is the best option, but I had a few reasons for doing so (open for discussion, obviously, this is still a prototype):
+</I>&gt;<i>
+</I>&gt;<i> * user-setup configures editors depending on what is installed in the current switch ; it may not make sense in other switches.
+</I>&gt;<i>
+</I>&gt;<i> * some tools are generally useful (tuareg, ocp-indent) and installing them in one switch should be enough. There is a clear distinction though for compiler-version dependent tools (merlin, ocp-index).
+</I>&gt;<i>
+</I>&gt;<i> * this is not focused on advanced users with multiple switches, etc. and it makes the configuration simpler to understand and edit.
+</I>&gt;<i>
+</I>&gt;<i> * this approach is guaranteed to be available for all editors.
+</I>&gt;<i>
+</I>&gt;<i> The alternatives would be (i) using packages supplied within the editor's ecosystems, when available (see the detailed discussion at [1]), which should clearly handle locations dynamically -- I think that best serves advanced users but has a purpose distinct enough to justify both approaches ; and (ii) dynamically generating configuration at editor run time (like ocp-edit does for emacs: it reads its own configuration and outputs elisp code that is evaluated at run time)
+</I>&gt;<i>
+</I>&gt;<i> Note that we still hit a consistency issue with this approach if installing user-setup in multiple switches. This also raises the question of handling &quot;global&quot; or &quot;multi-switch&quot; packages in OPAM.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On the feature of dynamically adapting to the latest `opam switch` in emacs, it could be achieved by running all external commands through `opam config exec -- &lt;command&gt;`. It doesn't extend to running different elisp files depending on the switch though, and you'd still need to manually update PATH etc. if you're running builds within emacs, similar to `eval $(opam config env)`. I do this using:
+</I>&gt;<i>
+</I>&gt;<i>     (defun opam-env ()
+</I>&gt;<i>       (interactive nil)
+</I>&gt;<i>       (dolist (var (car (read-from-string (shell-command-to-string &quot;opam config env --sexp&quot;))))
+</I>&gt;<i>         (setenv (car var) (cadr var))))
+</I>&gt;<i>
+</I>&gt;<i> opam-user-setup will set this statically, locally on caml/tuareg buffers, which may indeed not be the best idea.
+</I>&gt;<i>
+</I>&gt;<i> Thanks for the feedback, it'll help make this usable quick
+</I>&gt;<i> Louis
+</I>&gt;<i>
+</I>&gt;&gt;<i> - Yaron Minsky, 23/01/2015 20:48 -
+</I>&gt;&gt;<i> Hmm.  I'm still not able to get user-setup to work cleanly on my mac,
+</I>&gt;&gt;<i> though depext does install now, and I think correctly determines that
+</I>&gt;&gt;<i> there are no packages it needs to install.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> But here are the messages I get from emacs:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Loading paren...done
+</I>&gt;&gt;<i> Loading tuareg-site-file...done
+</I>&gt;&gt;<i> For information about GNU Emacs and the GNU system, type C-h C-a.
+</I>&gt;&gt;<i> Making completion list...
+</I>&gt;&gt;<i> Starting merlin instance: default (binary=ocamlmerlin).
+</I>&gt;&gt;<i> File mode specification error: (file-error &quot;Searching for program&quot; &quot;no
+</I>&gt;&gt;<i> such file or directory&quot; &quot;ocamlmerlin&quot;)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So it can't seem to find merlin.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I'm also a little troubled by the hard-coding of paths in the .emacs.
+</I>&gt;&gt;<i> Once nice thing about the dot-emacs file I shared with Greg is that it
+</I>&gt;&gt;<i> auto-updates where it points on every opam switch, without even
+</I>&gt;&gt;<i> needing to restart emacs, I believe.  It would be nice to have this
+</I>&gt;&gt;<i> for merlin, though I admit perhaps not with tuareg.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I tend to think that until we get this sorted, teachers should use
+</I>&gt;&gt;<i> manually put together dot-emacs files like the ones I emailed out.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Fri, Jan 23, 2015 at 12:39 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/teaching">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; Fixed; there was a minor typo in the `opam` file for the package;
+</I>&gt;&gt;<i> &gt; <A HREF="https://github.com/ocaml/opam-repository/pull/3441">https://github.com/ocaml/opam-repository/pull/3441</A>
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; -a
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;&gt; On 23 Jan 2015, at 04:33, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/teaching">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; Also, I can't seem to install depext, but the reason doesn't make sense:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; Kalessin:~ yminsky2$ opam install depext
+</I>&gt;&gt;<i> &gt;&gt; [ERROR] depext is not available because your system doesn't comply
+</I>&gt;&gt;<i> &gt;&gt; with opam-version &gt;= &quot;4.02&quot;.
+</I>&gt;&gt;<i> &gt;&gt; Kalessin:~ yminsky2$ opam --version
+</I>&gt;&gt;<i> &gt;&gt; 1.2.0
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; I'm running the latest opam available from homebrew.
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; y
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; On Thu, Jan 22, 2015 at 10:21 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/teaching">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt;&gt; Does depext do anything on a mac?  On redhat? Or is it Debian only?
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; On Jan 22, 2015 10:03 PM, &quot;Louis Gesbert&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/teaching">louis.gesbert at ocamlpro.com</A>&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; Just released 0.2 which should fix both issues (opam tuareg mode and
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; stalling with vim)
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; It would be good to know what we have there now.  It seems like a
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; minimum should be:
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; - tuareg
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; - merlin
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; - ocp-indent
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; - utop
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; all read to go in emacs.  Getting vim and sublime text support would
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; be lovely too, but I think less critical.  What does user-setup
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; already support?
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; Needs more testing, but we do have those ; vim support also, but it's more
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; lightly tested.
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; I didn't figure how to configure Sublime yet.
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; Interesting. Concretely, what would would depext do in this context?
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; I did a fresh install of a number of packages on my mac, and I didn't
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; need much else, but I may have already had the dependencies in place
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;&gt; via brew.
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; Not sure, but you can use `opam depext -l` to simply show the currently
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; required external packages.
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; The one that bites most often on .deb distributions is the lack of m4,
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; which is required by ocamlfind. It gets much more complicated as soon as you
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; want to install e.g. gtk stuff, of course (ocaml-top...).
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; Best,
+</I>&gt;&gt;<i> &gt;&gt;&gt;&gt; Louis
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;
+</I></PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000056.html">[Teaching] Getting opam's user-setup working cleanly
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#57">[ date ]</a>
+              <a href="thread.html#57">[ thread ]</a>
+              <a href="subject.html#57">[ subject ]</a>
+              <a href="author.html#57">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/teaching">More information about the Teaching
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C5149CE18.9050401%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000363.html">
+   <LINK REL="Next"  HREF="000367.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C5149CE18.9050401%40lexifi.com%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Wed Mar 20 14:56:24 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000363.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000367.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#366">[ date ]</a>
+              <a href="thread.html#366">[ thread ]</a>
+              <a href="subject.html#366">[ subject ]</a>
+              <a href="author.html#366">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/20/2013 01:38 PM, Leo White wrote:
+&gt;<i> I don't see any properties described that would be lost by the existance
+</I>&gt;<i> of simple namespaces. They are lost if you *use* simple namespaces, but
+</I>&gt;<i> they aren't lost simply because the compiler supports them.
+</I>
+If simple namespaces are available, people will use them and sometimes 
+encounter weird error messages or broken behavior (such as &quot;open 
+namespace Foo&quot; not complaining because of left-overs from an old 
+compilation).  It is important to design a system which reduces the risk 
+of errors.
+
+Moreover, even if you don't use simple namespaces, you will use tools 
+which need to support them.  Concretely, ocamlbuild and the omake 
+default rules for OCaml will have to be adapted to support them.  With 
+your semantics, omake for instance will have to do a non-trivial job to 
+implement the resolution strategy.  Also, the compilers will have to 
+scan the directories, preventing other kinds of build systems based on 
+capturing accesses to the file system to infer dependencies.   I have 
+the feeling to repeat myself...  I can understand that you consider 
+these drawbacks as minor, but do you agree they will apply even to users 
+not using simple namespaces?
+
+
+&gt;&gt;<i> Moreover, removing the feature will also reduce the risk of weird behaviors of the compiler and user misunderstandings.
+</I>&gt;&gt;<i> In particular, saying that &quot;open namespace Foo&quot; does not fail as soon as their is a &quot;foo-*.cmi&quot; file in one of the -I
+</I>&gt;&gt;<i> directories is fragile.
+</I>&gt;<i>
+</I>&gt;<i> This only affects whether a &quot;Unknown Namespace&quot; warning is
+</I>&gt;<i> emitted, and the situation isn't improved by using search path files.
+</I>
+With search path files only, there is no risk to have an old foo-*.cmi 
+staying around and changing the behavior of the compiler.  I really hate 
+the idea that the compiler behaves differently according to the presence 
+or absence on the filesystem of files which are not considered as 
+dependencies by the build system!  This is really calling for 
+non-reproducible behavior of your build system.
+
+&gt;&gt;<i> Concrete example: the library developers decides to change the name of one of his namespaces
+</I>&gt;&gt;<i> from Foo to Bar, but there are old foo-*.cmi files around, so the compiler does not complain upon a remaining &quot;open
+</I>&gt;&gt;<i> namespace Foo&quot; in one of the files.
+</I>&gt;<i>
+</I>&gt;<i> The same thing happens if I accidently leave an old mapping in my search
+</I>&gt;<i> path file, except that then the problem won't be fixed the next time I
+</I>&gt;<i> run &quot;make clean&quot; or equivalent.
+</I>
+Indeed, so at least you have a reproducible behavior, and the error will 
+be easy enough to understand and fix.  Aren't you shocked by the idea 
+that while dependencies are correct, you'd get a different behavior from 
+the compiler after a &quot;make clean&quot; or a fresh checkout?
+
+&gt;<i> When you use ocamldoc you are supposed to pass it the same arguments
+</I>&gt;<i> that you used to compile the program. This is not particularly
+</I>&gt;<i> difficult, and is the only way to handle syntax extensions anyway.
+</I>
+With &quot;-name&quot;, you can choose a different naming strategy for each file 
+in your project.  Ocamldoc is called once to generate the documentation 
+for many files.  How do you pass the required information?  With one 
+&quot;-name&quot; option for each module?
+
+&gt;<i> But the information is still hidden: Which .mlpath files were used and
+</I>&gt;<i> in what order? What &quot;-namespace&quot; argument was passed to the compiler?
+</I>
+As you say, we will need to pass the .mlpath arguments to the tools. 
+This is easier than passing a &quot;-name&quot; argument for each module.  And I 
+suggested to keep the &quot;-namespace&quot; argument in the generated units 
+precisely to avoid having to pass it again to tools.
+
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000363.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000367.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#366">[ date ]</a>
+              <a href="thread.html#366">[ thread ]</a>
+              <a href="subject.html#366">[ subject ]</a>
+              <a href="author.html#366">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

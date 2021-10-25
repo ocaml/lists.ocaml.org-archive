@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCANcqPu4wHE%2BPPLb5wfK%3DUM1_R2aLX2gzUE%2Bf48JwCOdHXfMHJQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000251.html">
+   <LINK REL="Next"  HREF="000254.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCANcqPu4wHE%2BPPLb5wfK%3DUM1_R2aLX2gzUE%2Bf48JwCOdHXfMHJQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] benchmarks">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Tue Feb 12 13:44:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000251.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000254.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#253">[ date ]</a>
+              <a href="thread.html#253">[ thread ]</a>
+              <a href="subject.html#253">[ subject ]</a>
+              <a href="author.html#253">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, Feb 12, 2013 at 6:57 AM, Thomas Gazagnaire &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">thomas at ocamlpro.com</A>&gt;
+wrote:
+&gt;<i> Hi Hongbo,
+</I>&gt;<i>
+</I>&gt;&gt;<i> For the user time
+</I>&gt;&gt;<i> ocamlbuild cold/FanDriver.native
+</I>&gt;&gt;<i> user  0m28.494s
+</I>&gt;&gt;<i> ocamlbuild src/FanDriver.native
+</I>&gt;&gt;<i> user  0m30.680s
+</I>&gt;&gt;<i> For the system time
+</I>&gt;&gt;<i> the cold directory takes
+</I>&gt;&gt;<i> sys   0m3.843s
+</I>&gt;&gt;<i> while the src directory takes
+</I>&gt;&gt;<i> sys   0m4.657s
+</I>&gt;<i>
+</I>&gt;<i> I'm not sure to understand what you are measuring exactly here (ie. I
+</I>don't know what magic your myocamlbuild.ml is doing) and how to interpret
+the results. Could you please elaborate a bit more ?
+
+For each file subdir/a.ml in src directory, there is a corresponding file
+subdir/a.ml in the cold directory, they have *the same Parsetree*, the only
+difference is that file in src should be preprocessed, while the file in
+cold is vanilla ocaml code that can be compiled without preprocessing.
+
+So here
+ocamlbuild src/FanDriver.native
+and
+ocamlbuild cold/FanDriver.native
+does exactly the samething except for each file, when
+compiling src/a.mo, it will compile as
+ocamlc.opt -c -pp fan src/a.ml
+while when compiing cold/a.ml, it works as normal
+ocamlc.opt -c cold/a.ml
+
+For our non-trivial code base, our output shows that when compiling with
+preprocessing by Fan, its performance is 30s compared with 28s without
+preprocessing, this means with good engineering effort, even preprocessing
+as powerful as camlp4(Fan provide more features than camlp4) should bring
+not too much overhead, I did some experiment before, my feeling is that
+typechecking is the bottleneck in most cases.
+
+The extra effort for Fan compared with compiling directly is a dumping
+process which dumps FanAst into Parsetree, since our output is already good
+enough in practice, I did not tune the GC for better performance.
+
+&gt;<i>
+</I>&gt;<i> Cheers,
+</I>&gt;<i> Thomas
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Feb 11, 2013 at 7:20 AM, Gabriel Scherer &lt;
+</I><A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+&gt;&gt;<i> On the other hand, build systems come and go (and ./configure is like
+</I>&gt;&gt;<i> the most horrible part to add logic to in most cases), while ocamlfind
+</I>&gt;&gt;<i> has proved a reliable tool as a basis for any OCaml ecosystem so far.
+</I>&gt;&gt;<i> If I can shelve some logic there without making the tool more complex
+</I>&gt;&gt;<i> or less elegant I think that would be better for everyone.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Feb 11, 2013 at 11:56 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt;
+</I>wrote:
+&gt;&gt;<i> &gt; On 11 Feb 2013, at 10:45, Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt;
+</I>wrote:
+&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;&gt; On Mon, Feb 11, 2013 at 11:31 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt;
+</I>wrote:
+&gt;&gt;<i> &gt;&gt;&gt; It should work just fine with ppx, and has the advantage of reducing
+</I>the number of ocamlfind calls per-file (which is a considerable overhead on
+large projects, since it has to scan the META directories on every
+invocation).
+&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; That's of course rather orthogonal to the present discussion, but have
+</I>&gt;&gt;<i> &gt;&gt; you been in contact with Gerd to see if some caching solution would be
+</I>&gt;&gt;<i> &gt;&gt; possible? Intuitively it feels like ocamlfind could easily maintain a
+</I>&gt;&gt;<i> &gt;&gt; cache in /var/run/blah and only clean it on install/remove commands.
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; (An external process invocation would still make some overhead so in
+</I>&gt;&gt;<i> &gt;&gt; you're case you'd still have to go all the way, but that could improve
+</I>&gt;&gt;<i> &gt;&gt; the threshold at which such ~hacks become interesting.)
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; I don't think it's necessary to put this in ocamlfind, which does the
+</I>job
+&gt;&gt;<i> &gt; it's designed to do very well. Just fix your build systems to run
+</I>ocamlfind
+&gt;&gt;<i> &gt; at configure time, save the results, and apply them to the compiler
+</I>flags
+&gt;&gt;<i> &gt; during the build phase.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; -anil
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> -- Regards, Hongbo
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130212/f4b4f8d0/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130212/f4b4f8d0/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000251.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000254.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#253">[ date ]</a>
+              <a href="thread.html#253">[ thread ]</a>
+              <a href="subject.html#253">[ subject ]</a>
+              <a href="author.html#253">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

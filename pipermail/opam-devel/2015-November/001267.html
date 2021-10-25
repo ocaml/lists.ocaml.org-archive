@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [ANN] opam-fmt 1.0
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BANN%5D%20opam-fmt%201.0&In-Reply-To=%3C07732A69-9841-4F65-A7CA-1575ED5C95EE%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001266.html">
+   <LINK REL="Next"  HREF="001268.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [ANN] opam-fmt 1.0</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BANN%5D%20opam-fmt%201.0&In-Reply-To=%3C07732A69-9841-4F65-A7CA-1575ED5C95EE%40recoil.org%3E"
+       TITLE="[opam-devel] [ANN] opam-fmt 1.0">anil at recoil.org
+       </A><BR>
+    <I>Sun Nov 22 19:09:59 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001266.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+        <LI>Next message: <A HREF="001268.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1267">[ date ]</a>
+              <a href="thread.html#1267">[ thread ]</a>
+              <a href="subject.html#1267">[ subject ]</a>
+              <a href="author.html#1267">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thanks for this Gabriel! Quick notes:
+
+- I would really like opam-fmt to be lossless, so preserving comments
+  seems like an extension that we should implement.  Ideally everyone
+  can just call it on their packages without thinking about it.
+
+- Having a bot regularly go through and reformat the entire repository
+  also seems quite legit.  The alternative would be to reformat at the
+  merge point, but this would require a staging branch.
+
+- Any chance you could use cmdliner instead of Arg?  Fairly minor, but
+  all the other plugins use it and it's nice to have the same behaviours
+  for OPAM plugins where possible.
+
+- How does this behave on pre-1.2 files?  I think it's about time that
+  we deprecate pre-1.2 so that we can have clean metadata standards
+  about the new fields such as dev-repo.
+
+regards,
+Anil
+
+&gt;<i> On 21 Nov 2015, at 21:53, Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> Hi opam-devel,
+</I>&gt;<i> 
+</I>&gt;<i> As part of the discussion in
+</I>&gt;<i> 
+</I>&gt;<i>  bulk addition of 'ocamlbuild {build}' dependencies
+</I>&gt;<i>  <A HREF="https://github.com/ocaml/opam-repository/pull/5140">https://github.com/ocaml/opam-repository/pull/5140</A>
+</I>&gt;<i> 
+</I>&gt;<i> it became apparent that performing bulk updates on opam-repository is
+</I>&gt;<i> made harder by the fact that the parse-print roundtrip does not
+</I>&gt;<i> preserve human-formatted opam files. For my proposed patch I tried to
+</I>&gt;<i> separate the reformatting of opam file (to follow the opam-lib printer
+</I>&gt;<i> convention) from the actual changes in two separate commits, but that
+</I>&gt;<i> means more work for script authors, and also creates patches that are
+</I>&gt;<i> harder to review. (If (re)formatting was controlled by the maintainer
+</I>&gt;<i> of the OPAM packages instead of authors of bulk updates, we would be
+</I>&gt;<i> more confident in its correctness.)
+</I>&gt;<i> 
+</I>&gt;<i> In order to move that discussion forward (how to maintain opam
+</I>&gt;<i> metadata in a way that is easy for both human and scripts to work
+</I>&gt;<i> with?), I propose the opam-fmt script that can be found at
+</I>&gt;<i>  <A HREF="https://github.com/gasche/opam-fmt/">https://github.com/gasche/opam-fmt/</A>
+</I>&gt;<i> 
+</I>&gt;<i> I wrote it in the last few days and there are probably some rough
+</I>&gt;<i> edges. Once I feel that it should work, I may try to package it on the
+</I>&gt;<i> opam-repo (in the meantime, clone then pin).
+</I>&gt;<i> 
+</I>&gt;<i> This suggests one possible way forward: publicize opam-fmt, encourage
+</I>&gt;<i> users to reformat their opam files using it, adapt the opam-repository
+</I>&gt;<i> QA to call `opam fmt --check` on opam files proposed in PR to enforce
+</I>&gt;<i> it, and after some time (once we trust it works as expected thanks to
+</I>&gt;<i> the human guinea pigs) reformat all older opam files to get a perfect
+</I>&gt;<i> round-trip on all files of the repository.
+</I>&gt;<i> It is not clear to me that this is the best way forward. (For example
+</I>&gt;<i> it means that, in the current state of the opam file parsing/printing
+</I>&gt;<i> code, comments in opam files would always be erased by reformatting.
+</I>&gt;<i> Should we remove comments from the valid syntax of opam files, or
+</I>&gt;<i> attach them to configuration lines to re-print them correctly later,
+</I>&gt;<i> or maybe refuse to work on files with comments?) Opam developers and
+</I>&gt;<i> repository maintainers may decide that the cost of caring about
+</I>&gt;<i> reformatting outweigh the benefits in terms of scriptability.
+</I>&gt;<i> 
+</I>&gt;<i> What do you think?
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i> 
+</I>
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001266.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+	<LI>Next message: <A HREF="001268.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1267">[ date ]</a>
+              <a href="thread.html#1267">[ thread ]</a>
+              <a href="subject.html#1267">[ subject ]</a>
+              <a href="author.html#1267">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

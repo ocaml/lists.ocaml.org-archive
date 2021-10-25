@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 2.0 features
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C13079077.OnIuBWAEKm%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001456.html">
+   <LINK REL="Next"  HREF="001458.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 2.0 features</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C13079077.OnIuBWAEKm%40maitake%3E"
+       TITLE="[opam-devel] OPAM 2.0 features">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon May 30 09:00:51 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001456.html">[opam-devel] OPAM 2.0 features
+</A></li>
+        <LI>Next message: <A HREF="001458.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1457">[ date ]</a>
+              <a href="thread.html#1457">[ thread ]</a>
+              <a href="subject.html#1457">[ subject ]</a>
+              <a href="author.html#1457">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le jeudi 26 mai 2016, 10:36:48 David Allsopp a &#233;crit :
+&gt;<i> Hi (Louis mainly, I expect!),
+</I>&gt;<i> 
+</I>&gt;<i> 	I've rebased work I've been very slowly doing onto the OPAM 2.0
+</I>&gt;<i> alpha release and have been starting to get opam switch to work. There are a
+</I>&gt;<i> few things which I need to be able to do for this, and I'm wondering if
+</I>&gt;<i> there any opinions (or even existing features I've missed) as to
+</I>&gt;<i> mechanisms...
+</I>
+Great! All feedback is very welcome at this stage.
+
+&gt;<i> 1. Downloading a package from several tarballs
+</I>&gt;<i> 	I've not finished delving into the full details, but I think I'm
+</I>&gt;<i> correct that the url file / section can only specify a single archive, even
+</I>&gt;<i> if it can be made available by multiple transports? Bootstrapping OCaml on
+</I>&gt;<i> Windows requires two tarballs, so I was going to extend the url system to
+</I>&gt;<i> allow multiple tarballs to be specified (with control over where in the
+</I>&gt;<i> overall tree they are extracted), rather than hackily including the second
+</I>&gt;<i> one in files and extracting it using a build command.
+</I>
+Some other compilers, e.g. metaOCaml, have the same requirement, since they 
+consist of the official OCaml tarball plus a huge patch, so I have added a way 
+to handle this.
+
+The `url` section or file still is a single source, and the commands are 
+executed from its root (after extraction if necessary). But there is now also 
+an opam field `extra-sources:` that you can use to download more files, 
+unextracted, to the build directory. The format is:
+
+    extra-sources: [ [ &quot;URL&quot; { &quot;target-filename&quot; } &quot;MD5&quot; ] ... ]
+
+The &quot;target-filename&quot; part being optional. See for example 
+<A HREF="http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam">http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam</A>
+
+&gt;<i> 2. Specifying package variables at opam switch install
+</I>&gt;<i> 	I've extended the ocaml package variables to include three new ones:
+</I>&gt;<i> ocaml-arch (which is exactly the architecture determined by OCaml's
+</I>&gt;<i> configure script), ocaml-cc (which is &quot;cl&quot; for a Microsoft C compiler based
+</I>&gt;<i> OCaml or &quot;cc&quot; for the rest of the world), and ocaml-libc (which is &quot;msvc&quot;
+</I>&gt;<i> for the four native Windows OCaml ports and &quot;libc&quot; for the rest of the
+</I>&gt;<i> world).
+</I>&gt;<i> 
+</I>&gt;<i> 	At OPAM switch time, one selects which Windows port you get by
+</I>&gt;<i> specifying these three variables. So, for example, mingw64 is
+</I>&gt;<i> ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is ocaml-arch=i386,
+</I>&gt;<i> ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is ocaml-arch=amd64, ocaml-cc=cc,
+</I>&gt;<i> ocaml-libc=libc.
+</I>&gt;<i> 
+</I>&gt;<i> 	My question is how to specify these - the concept of &quot;architecture&quot;,
+</I>&gt;<i> &quot;C compiler type&quot; and &quot;C runtime library&quot; is generic enough that it doesn't
+</I>&gt;<i> feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0 and have the
+</I>&gt;<i> package initialise ocaml-arch, etc. based on those globally available
+</I>&gt;<i> variables. However, is there any plan (or existing feature) for a more
+</I>&gt;<i> generic way of specifying package input variables? (discussed in
+</I>&gt;<i> <A HREF="https://github.com/ocaml/opam/issues/2247">https://github.com/ocaml/opam/issues/2247</A>).
+</I>
+a) for the _output_ variables, you can define them in your `PKG.config` 
+variable (automatically installed by opam if present in your build dir). Note 
+that, at the moment, variables defined by the compiler package get exported as 
+global variables (so you can access e.g. `ocaml-version` anywhere), but there 
+are limitations due to this and it is likely to disappear from the final 
+release (see <A HREF="https://github.com/ocaml/opam/issues/2537">https://github.com/ocaml/opam/issues/2537</A> for details). You can 
+always access them through `ocaml:VAR` inside the script parts though.
+
+b) nothing yet for _input_ variables, but #2247 is still something I need to 
+work on. You can define global variables through `opam config set`, though, so 
+an option in the meantime could be to use `opam switch install --empty`, set 
+the variables, then install the compiler (the option to install and mark as 
+compiler is missing at the moment, though, for that you'll have to edit 
+`SWITCH/.opam-switch/switch-state`)
+
+&gt;<i> 3. Upgrading dependent packages for the root
+</I>&gt;<i> 	Any Windows OCaml installation will depend upon FlexDLL objects
+</I>&gt;<i> compiled with the specific C compiler combination. Although in principle
+</I>&gt;<i> these could be shared between multiple switches (the object files vary
+</I>&gt;<i> according ocaml-cc, ocaml-libc and ocaml-arch; not ocaml-version), it makes
+</I>&gt;<i> sense to compile these two object files per-switch, rather than introduce
+</I>&gt;<i> yet another installation layer.
+</I>&gt;<i> 
+</I>&gt;<i> 	This means that in addition to the base packages, the Windows OCaml
+</I>&gt;<i> package depends on a flexdll package. Is there any philosophical reason for
+</I>&gt;<i> that not to be part of opam upgrade? Obviously, one doesn't want to be
+</I>&gt;<i> trying to upgrade the ocaml package, but why lock its dependencies at a
+</I>&gt;<i> given version? It would be quite nice if a new version of flexdll is
+</I>&gt;<i> released to be able to have opam upgrade notice that flexdll can be
+</I>&gt;<i> upgraded, determine that the root package must therefore be recompiled and
+</I>&gt;<i> so automatically recompile the entire switch.
+</I>&gt;<i> 
+</I>&gt;<i> 	Is it just for philosophical reasons that the dependencies of the
+</I>&gt;<i> root package are not considered for upgrade or is there a technical
+</I>&gt;<i> consideration?
+</I>
+Yes, just philosophical, there is no constraint here besides the arbitrary &quot;I 
+don't want to recompile the compiler, ever&quot;.
+
+Hope this helps,
+Louis
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001456.html">[opam-devel] OPAM 2.0 features
+</A></li>
+	<LI>Next message: <A HREF="001458.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1457">[ date ]</a>
+              <a href="thread.html#1457">[ thread ]</a>
+              <a href="subject.html#1457">[ subject ]</a>
+              <a href="author.html#1457">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%3D%3Futf-8%3Fq%3F%3D5BCaml-list%3D5D_%3D5BANN%3D5D_ppx%3D5Fprotobuf%3F%3D&In-Reply-To=%3C5c5c8af234151e7fdc529a63ce305dab%40whitequark.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000502.html">
+   <LINK REL="Next"  HREF="000505.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] [Caml-list] [ANN] ppx_protobuf</H1>
+    <B>Peter Zotov</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%3D%3Futf-8%3Fq%3F%3D5BCaml-list%3D5D_%3D5BANN%3D5D_ppx%3D5Fprotobuf%3F%3D&In-Reply-To=%3C5c5c8af234151e7fdc529a63ce305dab%40whitequark.org%3E"
+       TITLE="[wg-camlp4] [Caml-list] [ANN] ppx_protobuf">whitequark at whitequark.org
+       </A><BR>
+    <I>Tue May  6 05:59:48 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000502.html">[wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+</A></li>
+        <LI>Next message: <A HREF="000505.html">[wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#504">[ date ]</a>
+              <a href="thread.html#504">[ thread ]</a>
+              <a href="subject.html#504">[ subject ]</a>
+              <a href="author.html#504">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2014-05-06 08:29, Alain Frisch wrote:
+&gt;<i> On 5/2/2014 4:29 PM, Peter Zotov wrote:
+</I>&gt;&gt;<i> I have just released the first version of ppx_protobuf, a complete
+</I>&gt;&gt;<i> Protocol Buffers implementation.
+</I>&gt;<i> 
+</I>&gt;<i> This is a very cool project, and a good first public use of extension 
+</I>&gt;<i> points!
+</I>
+Thanks!
+
+&gt;<i> 
+</I>&gt;<i> An aspect of attributes that is not fully settled is how to use
+</I>&gt;<i> namespacing in order to ensure that multiple tools interact nicely.
+</I>&gt;<i> This topic will hopefully be explored by the community to reach a good
+</I>&gt;<i> consensus.
+</I>&gt;<i> 
+</I>&gt;<i> (a suggestion to recognize both [@x] and [@protobuf.x])
+</I>
+I have designed ppx_protobuf's usage of attributes with exactly this in 
+mind;
+[@default] especially would be useful for a wide range of type-driven 
+code
+generators.
+
+I actually intended to release it with the support for namespaced 
+attribute
+variants ([@protobuf.key]), it has simply been forgotten. I'll include 
+it
+in the next release.
+
+&gt;<i> 
+</I>&gt;<i> Another point: for record fields, you interpret attributes at the
+</I>&gt;<i> toplevel of their type. I did not look precisely at the semantics of
+</I>&gt;<i> ppx_protobuf, but it seems that it might be more logical to attach
+</I>&gt;<i> them to the field directly (do you confirm?):
+</I>&gt;<i> 
+</I>&gt;<i>   type defaults = {
+</I>&gt;<i>      results [@key 1] [@default 10]: int;
+</I>&gt;<i>   } [@@protobuf]
+</I>&gt;<i> 
+</I>&gt;<i> I understand that this form is syntactically &quot;more intrusive&quot; in the
+</I>&gt;<i> non-decorated type definition.  Is it the reason to use:
+</I>&gt;<i> 
+</I>&gt;<i>   type defaults = {
+</I>&gt;<i>      results : int [@key 1] [@default 10];
+</I>&gt;<i>   } [@@protobuf]
+</I>&gt;<i> 
+</I>&gt;<i> ?
+</I>&gt;<i> 
+</I>&gt;<i> I don't see anything wrong with doing so, although it might be worth
+</I>&gt;<i> supporting both forms.
+</I>
+The issue here is that I want to support &quot;immediate tuples&quot; (i.e.
+&quot;field : int * int&quot;, or, more importantly, &quot;A of int * int&quot;, which
+are semantically equivalent to and represented as a Protobuf message.
+As such, I felt it would be only consistent to have the same syntax
+for specifying options on an immediate tuple of several elements:
+
+   results : int [@encoding zigzag] * int [@encoding bits32]
+
+and for specifying options on a &quot;tuple of one element&quot;:
+
+   results : int [@encoding zigzag]
+
+I'm not entirely happy with this scheme; the way it gives rise to the 
+message
+structure is at best confusing, as adding or removing a tuple element 
+can
+add or remove nesting and thus break protocol compatibility. In 
+addition,
+the [@key] attribute on, for example, a field itself would currently be 
+ignored.
+While this behavior can be fixed for the most common misplacements, I 
+feel like
+it's a drawback intrinsic to the extension points mechanism: misplaced 
+or misnamed
+attributes are going to be silently ignored.
+
+Do you have any ideas for a solution? I have toyed with an idea of
+a &quot;verifier extension&quot; which would ascertain the lack of attributes 
+after
+all the rewriter passes have presumably removed the attributes known
+to them, but it wouldn't work  with generic attributes like [@default] 
+that
+must be shared between extensions.
+
+&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> -- Alain
+</I>
+-- 
+Peter Zotov
+sip:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">whitequark at sipnet.ru</A>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000502.html">[wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+</A></li>
+	<LI>Next message: <A HREF="000505.html">[wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#504">[ date ]</a>
+              <a href="thread.html#504">[ thread ]</a>
+              <a href="subject.html#504">[ subject ]</a>
+              <a href="author.html#504">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

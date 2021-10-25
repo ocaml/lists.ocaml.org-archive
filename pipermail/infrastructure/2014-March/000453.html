@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-infra] Staging Build and Deployment of ocaml.org
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20Staging%20Build%20and%20Deployment%20of%20ocaml.org&In-Reply-To=%3C2283EA67-CFF5-43A2-B81F-8AF5C0FEB8F7%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000452.html">
+   <LINK REL="Next"  HREF="000454.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-infra] Staging Build and Deployment of ocaml.org</H1>
+    <B>Philippe Wang</B> 
+    <A HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20Staging%20Build%20and%20Deployment%20of%20ocaml.org&In-Reply-To=%3C2283EA67-CFF5-43A2-B81F-8AF5C0FEB8F7%40gmail.com%3E"
+       TITLE="[ocaml-infra] Staging Build and Deployment of ocaml.org">philippe.wang at gmail.com
+       </A><BR>
+    <I>Fri Mar 21 04:16:02 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000452.html">[ocaml-infra] Staging Build and Deployment of ocaml.org
+</A></li>
+        <LI>Next message: <A HREF="000454.html">[ocaml-infra] Dealing with incompatible releases in opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#453">[ date ]</a>
+              <a href="thread.html#453">[ thread ]</a>
+              <a href="subject.html#453">[ subject ]</a>
+              <a href="author.html#453">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 17 Mar 2014, at 11:49 am, David Sheets &lt;<A HREF="http://lists.ocaml.org/listinfo/infrastructure">sheets at alum.mit.edu</A>&gt; wrote:
+
+&gt;<i> Our present deployment workflow unnecessarily relies on a single build
+</I>&gt;<i> environment running on the same (?) machine as the serving system.
+</I>&gt;<i> 
+</I>&gt;<i> ocaml.org is entirely static with a refresh on the order of minutes. I
+</I>&gt;<i> propose we take advantage of this feature to move to a fully staged
+</I>&gt;<i> build and deployment solution.
+</I>&gt;<i> 
+</I>&gt;<i> Specifically, I'd like to see:
+</I>&gt;<i> 
+</I>&gt;<i> 1. Generated assets and build logs publicly accessible
+</I>&gt;<i> 2. Build environment specification (e.g. &quot;this stock Ubuntu image&quot;).
+</I>&gt;<i> 3. History
+</I>&gt;<i> 
+</I>&gt;<i> I'd like to suggest the following design from back-to-front:
+</I>&gt;<i> 
+</I>&gt;<i> 1. Travis CI builds ocaml.org on commit hook to source repository
+</I>&gt;<i> 2. Travis CI pushes successful builds to static asset repository
+</I>&gt;<i> 3. Server checks out static asset repository on commit hook
+</I>&gt;<i> 
+</I>&gt;<i> If we would like to stage development and production, the following may satisfy:
+</I>&gt;<i> 
+</I>&gt;<i> 1. Travis CI builds ocaml.org on commit hook to source repository
+</I>&gt;<i> 2. Travis CI pushes successful builds to static assets
+</I>&gt;<i> 3. beta.ocaml.org checks out static asset repository on commit hook to
+</I>&gt;<i> static assets
+</I>&gt;<i> 4. ocaml.org checks out static asset repository on special commit hook
+</I>&gt;<i> to static assets
+</I>&gt;<i> 
+</I>&gt;<i> Where &quot;special commit hook&quot; is a commit by a non-Travis user which
+</I>&gt;<i> contains as its commit message a human/machine-readable description of
+</I>&gt;<i> the deployment. These commits can themselves be consumed to generate a
+</I>&gt;<i> site change log which is exposed on the site.
+</I>&gt;<i> 
+</I>&gt;<i> This approach should help us achieve faster iteration on the
+</I>&gt;<i> mechanical components of the site, ease build debugging, ease build
+</I>&gt;<i> reproduction, and offer a pre-built image of the site's assets.
+</I>&gt;<i> 
+</I>&gt;<i> What do you think?
+</I>&gt;<i> 
+</I>&gt;<i> David
+</I>
+
+Basically I agree with all this. :-)
+
+If we don&#8217;t want the builds to take &#8220;forever&#8221;, we need to think of caching the .opam folder (because the packages take quite some time to build, especially since we use opam2web which brings a lot of dependencies) and the built version of ocaml.org (it&#8217;s sort of mandatory to cache some data anyway, e.g., RSS feeds in case the remote server&#8217;s unavailable).
+
+
+Philippe
+
+P.S. 
+
+&gt;<i> $ opam install opam2web
+</I>&gt;<i> The following actions will be performed:
+</I>&gt;<i>  - install ocamlfind.1.4.0 [required by opam2web]
+</I>&gt;<i>  - install cmdliner.0.9.4 [required by opam2web]
+</I>&gt;<i>  - install extlib-compat.1.6.1 [required by opam2web]
+</I>&gt;<i>  - install lwt.2.4.4 [required by opam2web]
+</I>&gt;<i>  - install menhir.20130912 [required by opam2web]
+</I>&gt;<i>  - install ocamlgraph.1.8.3 [required by opam2web]
+</I>&gt;<i>  - install omd.0.9.7 [required by opam2web]
+</I>&gt;<i>  - install ounit.2.0.0 [required by opam2web]
+</I>&gt;<i>  - install re.1.2.1 [required by opam2web]
+</I>&gt;<i>  - install type_conv.109.60.01 [required by opam2web]
+</I>&gt;<i>  - install typerex.1.99.6-beta [required by opam2web]
+</I>&gt;<i>  - install ulex.1.1 [required by opam2web]
+</I>&gt;<i>  - install xmlm.1.2.0 [required by opam2web]
+</I>&gt;<i>  - install js_of_ocaml.1.4.0 [required by opam2web]
+</I>&gt;<i>  - install dyntype.0.9.0 [required by opam2web]
+</I>&gt;<i>  - install sexplib.111.03.00 [required by opam2web]
+</I>&gt;<i>  - install ocp-build.1.99.6-beta [required by opam2web]
+</I>&gt;<i>  - install uri.1.4.0 [required by opam2web]
+</I>&gt;<i>  - install cudf.0.6.3 [required by opam2web]
+</I>&gt;<i>  - install cow.0.8.1 [required by opam2web]
+</I>&gt;<i>  - install dose.3.1.2 [required by opam2web]
+</I>&gt;<i>  - install opam-lib.1.1.1 [required by opam2web]
+</I>&gt;<i>  - install opamfu.0.1.1 [required by opam2web]
+</I>&gt;<i>  - install opam2web.1.3.1
+</I>&gt;<i> 24 to install | 0 to reinstall | 0 to upgrade | 0 to downgrade | 0 to remove
+</I>&gt;<i> Do you want to continue ? [Y/n] 
+</I>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000452.html">[ocaml-infra] Staging Build and Deployment of ocaml.org
+</A></li>
+	<LI>Next message: <A HREF="000454.html">[ocaml-infra] Dealing with incompatible releases in opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#453">[ date ]</a>
+              <a href="thread.html#453">[ thread ]</a>
+              <a href="subject.html#453">[ subject ]</a>
+              <a href="author.html#453">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/infrastructure">More information about the Infrastructure
+mailing list</a><br>
+</body></html>

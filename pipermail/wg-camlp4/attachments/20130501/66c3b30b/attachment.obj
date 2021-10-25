@@ -1,0 +1,57 @@
+(* matches keyword.
+  * Copyright (C) 2008 Red Hat Inc., Richard W.M. Jones
+  * Copyright (C) 2013 Gabriel Scherer
+  *
+  * This library is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU Lesser General Public
+  * License as published by the Free Software Foundation; either
+  * version 2 of the License, or (at your option) any later version.
+  *
+  * This library is distributed in the hope that it will be useful,
+  * but WITHOUT ANY WARRANTY; without even the implied warranty of
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  * Lesser General Public License for more details.
+  *
+  * You should have received a copy of the GNU Lesser General Public
+  * License along with this library; if not, write to the Free Software
+  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
+  *
+  * Example : List.filter (matches 'a' .. 'z') text
+  * Output : List.filter
+  *            (function 'a' .. 'z' when true -> true | _ -> false) text
+  * 
+  *
+  * Compile with:
+  *   ocamlfind ocamlc -package camlp4 -pp camlp4of -c pa_matches.ml
+  * Test with:
+  *   camlp4o pa_matches.cmo test_pa.ml
+  * or
+  *   ocamlfind ocamlc -pp "camlp4o pa_matches.cmo" test_pa.ml -o test
+  *)
+ 
+open Camlp4
+ 
+module Id : Sig.Id = struct
+  let name = "Matches"
+  let version = "0.3"
+end
+
+module Make (Syntax : Sig.Camlp4Syntax) = struct
+  include Syntax
+
+  let output_matches _loc patt guard =
+    let guard = match guard with
+      | None -> <:expr< true >>
+        (* NB: "when true" avoids the warning "this match case is unused" *)
+      | Some e -> e in
+    <:expr< function $patt$ when $guard$ -> true | _ -> false >>
+      
+  EXTEND Gram
+    expr: LEVEL ";"[[
+      "matches"; p = patt; guard = OPT [ "when"; e = expr -> e ] ->
+        output_matches _loc p guard
+    ]];
+  END
+end
+
+let module M = Register.OCamlSyntaxExtension(Id)(Make) in ()

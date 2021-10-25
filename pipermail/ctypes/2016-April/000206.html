@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Lifetime of Ctypes allocation
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCALKV4kqi%3DG0EAYAHxjqwf_bBnR3NqKjh%3Do%3DDzmsWAaUU1o_PxQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000207.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Lifetime of Ctypes allocation</H1>
+    <B>Markus M&#252;ller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCALKV4kqi%3DG0EAYAHxjqwf_bBnR3NqKjh%3Do%3DDzmsWAaUU1o_PxQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Lifetime of Ctypes allocation">llmarkvm at gmail.com
+       </A><BR>
+    <I>Sat Apr 16 13:44:37 BST 2016</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000207.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#206">[ date ]</a>
+              <a href="thread.html#206">[ thread ]</a>
+              <a href="subject.html#206">[ subject ]</a>
+              <a href="author.html#206">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I'm having some trouble on how to properly control the lifetime of an
+OCaml allocated Ctypes &quot;data structure&quot;. Consider the following simple
+C function.
+
+#include &lt;stdio.h&gt;
+void f(int * * p)
+{
+  printf(&quot;%d %d\n&quot;, *(p[0]), *(p[1]));
+}
+
+Using f in the way shown below is wrong since the memory pointed to by
+the inner pointers is freed by Gc.full_major.
+
+open Ctypes
+open Foreign
+let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+let _ =
+  let v = allocate_n (ptr int) ~count:2 in
+  let _ = v &lt;-@ (allocate int 0); (v +@ 1) &lt;-@ (allocate int 1) in
+    f v ; Gc.full_major () ; f v
+
+The following crude attempt to fix it does not work either even though
+some references to the pointers are bound to global values.
+
+open Ctypes
+open Foreign
+let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+let a = ref null
+let b = ref null
+let _ =
+  let v = allocate_n (ptr int) ~count:2 in
+  let _ = v &lt;-@ (allocate int 0); (v +@ 1) &lt;-@ (allocate int 1) ; a :=
+(to_voidp (!@ v)) ; b := (to_voidp (!@ (v +@ 1))) in
+    f v ; Gc.full_major () ; f v
+
+How can the allocated memory be properly protected from being freed before time?
+Thanks for your help.
+
+Best regards,
+Markus
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000207.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#206">[ date ]</a>
+              <a href="thread.html#206">[ thread ]</a>
+              <a href="subject.html#206">[ subject ]</a>
+              <a href="author.html#206">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

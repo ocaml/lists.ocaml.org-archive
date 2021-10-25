@@ -1,0 +1,441 @@
+From thomas.braibant at gmail.com  Mon Mar  9 21:14:36 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Mon, 9 Mar 2015 22:14:36 +0100
+Subject: [ocaml-ctypes] Abstract 'a typ
+Message-ID: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+
+Hi list,
+
+I am working on some new bindings for a library which hides the
+declaration of a struct. Basically, all the public header defines is
+
+typedef struct foo foo;
+
+All functions of the library return pointers to `foo` or consume
+pointers to `foo`.  I reckon that it prevents users of the library to
+copy the structure or mess with its members.
+
+I do not know what's the preferred way to handle this situation in
+ctypes. I would really like to use `abstract`, but in that particular
+case, I should really not be able to provide the size nor the
+alignement of the struct. I could use void pointers to implement foo
+pointers, but this seem a bit error prone (minor variation: use magic
+to expose `unit ptr typ` as `foo ptr typ` with `foo` a fresh type).
+
+Any pointers welcome!
+
+Best,
+Thomas
+
+From daniel.buenzli at erratique.ch  Mon Mar  9 21:37:20 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 9 Mar 2015 22:37:20 +0100
+Subject: [ocaml-ctypes] Abstract 'a typ
+In-Reply-To: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+References: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+Message-ID: <A5D7086DCE7E468B996CA60B770D9698@erratique.ch>
+
+
+
+Le lundi, 9 mars 2015 ? 22:14, Thomas Braibant a ?crit :
+
+> I do not know what's the preferred way to handle this situation in
+> ctypes. I would really like to use `abstract`, but in that particular
+> case, I should really not be able to provide the size nor the
+> alignement of the struct. I could use void pointers to implement foo
+> pointers, but this seem a bit error prone (minor variation: use magic
+> to expose `unit ptr typ` as `foo ptr typ` with `foo` a fresh type).
+
+If your bindings are thin you should just use an OCaml abstract type that denotes pointers to void pointers. The only place where you need to be careful is in the bindings themselves but that should be trivial.
+
+For example in tsdl:
+
+https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.mli#L727
+https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.ml#L1093-L1095
+
+Best,
+
+Daniel
+
+
+
+From thomas.braibant at gmail.com  Tue Mar 10 12:10:00 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Tue, 10 Mar 2015 13:10:00 +0100
+Subject: [ocaml-ctypes] Abstract 'a typ
+In-Reply-To: <A5D7086DCE7E468B996CA60B770D9698@erratique.ch>
+References: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+ <A5D7086DCE7E468B996CA60B770D9698@erratique.ch>
+Message-ID: <CAHR=Vky0us1DHusAapTqeMUy++A9ty9T496PVz9K_PGxwnCQmg@mail.gmail.com>
+
+On Mon, Mar 9, 2015 at 10:37 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> If your bindings are thin you should just use an OCaml abstract type that denotes pointers to void pointers. The only place where you need to be careful is in the bindings themselves but that should be trivial.
+>
+> For example in tsdl:
+>
+> https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.mli#L727
+> https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.ml#L1093-L1095
+>
+
+Thanks. This is what I had in mind with void pointers. I will go
+forward with that solution. (And refrain myself from trying to be
+pedantic inside these particular bindings.)
+
+Best,
+Thomas
+
+From daniel.buenzli at erratique.ch  Tue Mar 10 12:29:04 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 10 Mar 2015 13:29:04 +0100
+Subject: [ocaml-ctypes] Abstract 'a typ
+In-Reply-To: <CAHR=Vky0us1DHusAapTqeMUy++A9ty9T496PVz9K_PGxwnCQmg@mail.gmail.com>
+References: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+ <A5D7086DCE7E468B996CA60B770D9698@erratique.ch>
+ <CAHR=Vky0us1DHusAapTqeMUy++A9ty9T496PVz9K_PGxwnCQmg@mail.gmail.com>
+Message-ID: <6D6F44F39F784742932CFD83C7943FD5@erratique.ch>
+
+Le mardi, 10 mars 2015 ? 13:10, Thomas Braibant a ?crit :
+> Thanks. This is what I had in mind with void pointers. I will go
+> forward with that solution. (And refrain myself from trying to be
+> pedantic inside these particular bindings.)
+
+I don't remember exactly but maybe you can be pedantic with views.  
+
+Best,
+
+Daniel
+
+
+
+From yallop at gmail.com  Tue Mar 10 14:34:36 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 10 Mar 2015 14:34:36 +0000
+Subject: [ocaml-ctypes] Abstract 'a typ
+In-Reply-To: <CAHR=Vky0us1DHusAapTqeMUy++A9ty9T496PVz9K_PGxwnCQmg@mail.gmail.com>
+References: <CAHR=Vkxv-wrvcsyjJg0SEXPCoHQsB6yuPAxkpxNyYyuOEQbRDg@mail.gmail.com>
+ <A5D7086DCE7E468B996CA60B770D9698@erratique.ch>
+ <CAHR=Vky0us1DHusAapTqeMUy++A9ty9T496PVz9K_PGxwnCQmg@mail.gmail.com>
+Message-ID: <CAAxsn=HnHv1Xymg+3F_Swz8z58hkW7B-fwDNYr=aQ4sq56Px+A@mail.gmail.com>
+
+On 10 March 2015 at 12:10, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> On Mon, Mar 9, 2015 at 10:37 PM, Daniel B?nzli
+> <daniel.buenzli at erratique.ch> wrote:
+>> If your bindings are thin you should just use an OCaml abstract type that denotes pointers to void pointers. The only place where you need to be careful is in the bindings themselves but that should be trivial.
+>>
+>> For example in tsdl:
+>>
+>> https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.mli#L727
+>> https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.ml#L1093-L1095
+>>
+>
+> Thanks. This is what I had in mind with void pointers. I will go
+> forward with that solution. (And refrain myself from trying to be
+> pedantic inside these particular bindings.)
+
+You can use the module system to distinguish different types of
+pointers within your library.  For example:
+
+   module Foo :
+   sig
+      type t
+      val t : t typ
+   end =
+   struct
+      type t = unit
+      let t = void
+   end
+
+Now 'ptr Foo.t' and 'ptr void' have the same representation but
+different types, so you can't accidentally mix them up.
+
+It's also possible to write something that corresponds quite closely
+to your C definition:
+
+   typedef struct foo foo;
+
+There are two parts to this definition.  First, there's an incomplete
+struct type "struct foo".  In ctypes you can create an incomplete
+struct by calling Ctypes.structure without calling Ctypes.seal:
+
+   let struct_foo = structure "foo"
+
+Once again, you can use the module system to ensure that Ctypes.seal
+is never called.
+
+The other part of the definition is the typedef.  In trunk there's a
+function Ctypes.typedef that's just a thin wrapper around a view,
+changing only the printing behaviour:
+
+  val typedef : 'a typ -> string -> 'a typ
+
+Putting these together gives you the following:
+
+  module Foo :
+  sig
+    type t
+    val t : t typ
+  end =
+  struct
+    type t = unit structure
+    let t = typedef (structure "foo") "foo"
+  end;;
+
+This has the following properties: (1) It's distinguished from other
+incomplete/"abstract" types in the OCaml type system; (2) it has the
+correct representation (i.e. as a structure type with no fields); (3)
+it has the correct printing behaviour, e.g.:
+
+  # ptr (ptr Foo.t);;
+  - : Foo.t ptr ptr typ = foo**
+
+The printing behaviour is useful for development and debugging, but
+should also give you better types in generated stub code.
+
+From yallop at gmail.com  Sat Mar 14 19:17:57 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 14 Mar 2015 19:17:57 +0000
+Subject: [ocaml-ctypes] ANN: ocaml-ctypes 0.4.0,
+ a library for calling C functions directly from OCaml
+Message-ID: <CAAxsn=HFp-8ohEBsbi__oOyCnz8R5A=zHRqbtb9sW60Er8D7Sw@mail.gmail.com>
+
+I'm happy to announce the release of ocaml-ctypes 0.4.0, which is now
+available on OPAM.
+
+== About ocaml-ctypes ==
+
+The ocaml-ctypes library makes it possible to call C functions from
+OCaml without writing any C code.  The core of the library is a set of
+combinators for describing C types -- scalars, functions, structs,
+unions, arrays, and pointers to values and functions.  Type
+descriptions can then be used to bind native functions and values.
+Here's a simple example:
+
+    # let puts = foreign "puts" (string @-> returning int);;
+    val puts : string -> int = <fun>
+    # puts "Hello, world!";;
+    Hello, world!
+
+Ctypes includes many more features, including functions for retrieving
+constants, values and details about object layout from C, a way of
+building C libraries from OCaml modules, and a variety of binding
+strategies such as dynamic linking and static stub generation.
+Further information is available at the links below:
+
+  Tutorial: https://github.com/ocamllabs/ocaml-ctypes/wiki/ctypes-tutorial
+  Examples: https://github.com/ocamllabs/ocaml-ctypes/tree/master/examples
+  Some packages using ctypes:
+http://opam.ocaml.org/packages/ctypes/ctypes.0.3.4/
+  API documentation: http://ocamllabs.github.io/ocaml-ctypes/
+  Github repository: https://github.com/ocamllabs/ocaml-ctypes
+  Direct download:
+https://github.com/ocamllabs/ocaml-ctypes/archive/0.4.0.tar.gz
+
+== New features in 0.4.0 ==
+
+* Windows support (A. Hauptmann)
+
+  32-bit and 64-bit builds on MinGW, and continuous integration using Appveyor.
+
+* Xen support (Thomas Leonard)
+
+* Add the C99 bool type (Ramkumar Ramachandra)
+
+  The type representation
+
+    val bool : bool typ
+
+  supports passing bools to (and returning bools from) functions,
+using them as struct members, etc.
+
+* Typedef support (Edwin T?r?k)
+
+  A new function
+
+    val typedef 'a typ -> string -> 'a typ
+
+  supports defining type aliases that are used in top-level printing
+and in stub generation.
+
+* Enum types
+
+  The new function
+
+    val enum : string -> ?unexpected:(int64 -> 'a) -> ('a * int64
+const) list -> 'a typ
+
+  supports defining types representations that appear as OCaml types
+(typically variants) on the OCaml side and C enums on the C side.
+
+* Accessing C globals with foreign_value in generated stubs
+
+  A new function
+
+     val foreign_value : string -> 'a typ -> 'a ptr fn
+
+  supports accessing C global values from OCaml programs.
+
+* Retrieving #define and enum constants from C
+
+  A new function
+
+     val constant : string -> 'a typ -> 'a const
+
+  supports retrieving compile-time constant values from C.
+
+* Releasing the runtime lock in C calls
+
+  The Foreign.foreign function now accepts an additional optional argument
+
+     ?release_runtime_lock:bool
+
+  that indicates whether the runtime lock should be released for the
+duration of the C call.
+
+* Acquiring the runtime lock in callbacks
+
+  The Foreign.funptr function now accepts an additional optional argument
+
+     ?runtime_lock:bool
+
+  that indicates whether the runtime lock should be acquired for the
+duration of the OCaml call.
+
+* Passing 'bytes' values directly to C (Peter Zotov)
+
+  The new function
+
+    val ocaml_bytes_start : bytes -> bytes ocaml
+
+  supports passing bytes values directly to C in situations where
+performance is critical.
+
+* Custom printers in views (Thomas Braibant)
+
+  The view function now accepts an additional argument
+
+     format:(Format.formatter -> 'b -> unit)
+
+  which supports custom printing for values of a view type.
+
+* Optionally obtain struct and union layout from C
+
+  The new module Cstubs.Types supports retrieving struct and union
+layouts from C as an alternative to computing them based on
+programmer-supplied information
+
+* string_opt wraps char *, not void *.
+
+* Remove some poorly-supported POSIX types
+
+  Several of the types in the PosixTypes module are no longer available.
+
+* Use nativeint to represent pointers
+
+  See "Incompatibilities" below.
+
+* Support zero-argument callbacks
+
+* A function for retrieving field names (Thomas Braibant)
+
+  The new function
+
+    val field_name : (_, _) field -> string
+
+  retrieves the name of a struct or union field.
+
+* Better exception handling when using RTLD_NOLOAD (A. Hauptmann)
+
+* RTLD_LOCAL support for Dl.dlopen
+
+* Changed the #include path to $(ocamlfind query ctypes)
+
+  See "Incompatibilities" below.
+
+* Renamed some internal modules to avoid name clashes
+
+== Incompatibilities ==
+
+This release introduces a number of minor incompatibilities.
+
+* Include path
+
+  The path to the headers installed by ctypes has changed from
+
+     $(ocamlfind query ctypes)/..
+
+  to
+
+     $(ocamlfind query ctypes)
+
+  You can set things up to work with both ctypes 0.4.0 and previous
+versions by configuring your build system to use both paths.
+
+* Pointer representation
+
+  The functions ptr_of_raw_address and raw_address_of_ptr previously
+operated on int64 values, but now operate on nativeint values.
+
+* Opam packages
+
+  There are now two OPAM packages, ctypes and ctypes-foreign.  Only
+the latter depends on libffi, so if your package uses only the ctypes
+stub generation backend then users of your library need not install
+libffi.  If you use the dynamic (Foreign) backend then you should
+depend on both packages.
+
+Existing OPAM packages that depend on ctypes have been updated accordingly.
+
+== Thanks ==
+
+Thanks to A. Hauptmann, David Sheets, Maverick Woo, Peter Zotov, David
+Kaloper, Ramkumar Ramachandra, Thomas Braibant, Hugo Heuzard, Edwin
+T?r?k, Thomas Leonard and Yakov Zaytsev for contributions to this
+release.
+
+From daniel.buenzli at erratique.ch  Sun Mar 15 13:45:23 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 15 Mar 2015 14:45:23 +0100
+Subject: [ocaml-ctypes] [Caml-list] ANN: ocaml-ctypes 0.4.0,
+ a library for calling C functions directly from OCaml
+In-Reply-To: <CAAxsn=HFp-8ohEBsbi__oOyCnz8R5A=zHRqbtb9sW60Er8D7Sw@mail.gmail.com>
+References: <CAAxsn=HFp-8ohEBsbi__oOyCnz8R5A=zHRqbtb9sW60Er8D7Sw@mail.gmail.com>
+Message-ID: <C46A890B930E49FBAF2F3152A427B21A@erratique.ch>
+
+Le samedi, 14 mars 2015 ? 20:17, Jeremy Yallop a ?crit :
+> API documentation: http://ocamllabs.github.io/ocaml-ctypes/
+
+Jeremy, this seems outdated. I don't see the new signatures for the runtime lock in Foreign.  
+
+Best,
+
+Daniel
+
+https://github.com/ocamllabs/ocaml-ctypes/issues/284
+
+From yallop at gmail.com  Tue Mar 17 15:00:55 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 17 Mar 2015 15:00:55 +0000
+Subject: [ocaml-ctypes] [Caml-list] ANN: ocaml-ctypes 0.4.0,
+ a library for calling C functions directly from OCaml
+In-Reply-To: <C46A890B930E49FBAF2F3152A427B21A@erratique.ch>
+References: <CAAxsn=HFp-8ohEBsbi__oOyCnz8R5A=zHRqbtb9sW60Er8D7Sw@mail.gmail.com>
+ <C46A890B930E49FBAF2F3152A427B21A@erratique.ch>
+Message-ID: <CAAxsn=F6xAo_NicSFyKLEbiOPVdEPK9c4rxEOqza6PZ=nJBBtg@mail.gmail.com>
+
+On 15 March 2015 at 13:45, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Le samedi, 14 mars 2015 ? 20:17, Jeremy Yallop a ?crit :
+>> API documentation: http://ocamllabs.github.io/ocaml-ctypes/
+>
+> Jeremy, this seems outdated. I don't see the new signatures for the runtime lock in Foreign.
+
+Thanks for letting me know.  I've updated the online documentation
+now.  Here's the documentation for Foreign.foreign, complete with the
+new ?release_runtime_lock argument:
+
+    http://ocamllabs.github.io/ocaml-ctypes/Foreign.html#VALforeign
+
+Kind regards,
+
+Jeremy.
+

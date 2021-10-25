@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Request for feedback
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Request%20for%20feedback&In-Reply-To=%3CCAPFanBFTvmCugwvom_fdhs-2W7BHuYpamWQpFH3AHG8WMoTyQA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000324.html">
+   <LINK REL="Next"  HREF="000327.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Request for feedback</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Request%20for%20feedback&In-Reply-To=%3CCAPFanBFTvmCugwvom_fdhs-2W7BHuYpamWQpFH3AHG8WMoTyQA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Request for feedback">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Mar  7 17:07:18 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000324.html">[wg-camlp4] Request for feedback
+</A></li>
+        <LI>Next message: <A HREF="000327.html">[wg-camlp4] Request for feedback
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#325">[ date ]</a>
+              <a href="thread.html#325">[ thread ]</a>
+              <a href="subject.html#325">[ subject ]</a>
+              <a href="author.html#325">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> It is true that there could be some discontinuity: at some point, you can
+</I>&gt;<i> shoehorn your &quot;DSL&quot; in the syntax of OCaml expressions, but when you extend
+</I>&gt;<i> it, you might not find a nice way to continue doing so and you might be
+</I>&gt;<i> forced to switch to a very different embedding.
+</I>
+I was thinking of changes to the extension mechanism itself. There
+have been sparse but regular calls to a more structured representation
+of annotations (eg. using a few literal categories to do some form of
+structure-checking uniformly on all annotations), and if we found out
+in the future we really want that, that could be disruptive to
+existing quotation usages. In the discussion you suggested a dedicated
+{{...}} syntax for quotations, something like that seems less likely
+to want to evolve and forbid previous precious use cases.
+
+(Don't jump implementing {{...}} yet! There are equally compelling
+reasons to limit the number of new concepts and appreciate the
+expressivity of the core you have, so it's more thinking out loud
+about possible arguments and counter-arguments.)
+
+&gt;<i> Do you mean:
+</I>&gt;<i>
+</I>&gt;<i> [%bit ... %bit]
+</I>&gt;<i> or:
+</I>&gt;<i> [%bit ... bit%]
+</I>&gt;<i> or:
+</I>&gt;<i> [%bit ... %]
+</I>&gt;<i>
+</I>&gt;<i> or something else?
+</I>
+I was thinking of [%bit ... %]. On the other hand, it's not clear we
+would want to have two syntaxes, one for &quot;short annotations&quot; and one
+for &quot;long annotations&quot;, while one suffices semantically. Also, for
+extensions that are really quotations, that is of the form
+
+  [%name
+     ...long expr...
+  ]
+
+we could use the following pattern by convention
+
+[%name(
+   ... long expr ...
+)]
+
+or even
+
+[%name begin
+   ... long expr ...
+end]
+
+
+In a perfect world, I would dream of a long-syntax with symmetric
+delimiters [% foo bar %], and a short-syntax *without delimiters*
+reserved to the specific cases where the extension is attached to a
+keyword: for%lwt, let%monad, etc., so we can have both convenient
+short-scale marks and readable, structured, symmetric larger-scale
+delimiters. However, non-delimited syntaxes such as for%lwt open a new
+parsing can of worms, so it's reasonable to choose [% foo bar ] as an
+awkward compromise that is not too painful at small scale, even if
+maybe not optimal at large scale.
+
+
+On Thu, Mar 7, 2013 at 5:55 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 03/07/2013 05:23 PM, Gabriel Scherer wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I'm wondering how much I should trust them :p Have you actually tried
+</I>&gt;&gt;<i> to parse the most daring ones with your parser? If you have a
+</I>&gt;&gt;<i> testsuite, it may be interesting to add them to it.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Yes, I've tried most of them.  Most of them work. A few number are rejected,
+</I>&gt;<i> but only because more work is needed on the parser (e.g. for[@id] is not yet
+</I>&gt;<i> supported, even though it would have taken less time to add support than to
+</I>&gt;<i> write this sentence; and class expressions do not yet support extension
+</I>&gt;<i> nodes).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> While I admire the cleverness of using the fact that attributes are
+</I>&gt;&gt;<i> OCaml syntax to get the &quot;quotation&quot; use cases for free, it also gives
+</I>&gt;&gt;<i> me mixed feelings:
+</I>&gt;&gt;<i> - I'm not sure how robust it is to future design changes
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> It is true that there could be some discontinuity: at some point, you can
+</I>&gt;<i> shoehorn your &quot;DSL&quot; in the syntax of OCaml expressions, but when you extend
+</I>&gt;<i> it, you might not find a nice way to continue doing so and you might be
+</I>&gt;<i> forced to switch to a very different embedding.  I don't believe that this
+</I>&gt;<i> will be a serious problem in practice, in particular because one can always
+</I>&gt;<i> use an extension node with a string literal content  in order to use custom
+</I>&gt;<i> concrete syntax locally in most syntactic categories (or directly a string
+</I>&gt;<i> if the category accept it, i.e. expressions and patterns).  As an example,
+</I>&gt;<i> let's have a look at the bitstring example:
+</I>&gt;<i>
+</I>&gt;<i> let bits = Bitstring.bitstring_of_file &quot;/bin/ls&quot; in
+</I>&gt;<i> [%bit match bits with
+</I>&gt;<i> | [ 0x7f, 8; &quot;ELF&quot;, 24, string;  (* ELF magic number *)
+</I>&gt;<i>     e_ident, Mul(12,8), bitstring;    (* ELF identifier *)
+</I>&gt;<i>     e_type, 16, littleendian;    (* object file type *)
+</I>&gt;<i>     e_machine, 16, littleendian  (* architecture *)
+</I>&gt;<i>   ] -&gt;
+</I>&gt;<i>   printf &quot;This is an ELF binary, type %d, arch %d\n&quot;
+</I>&gt;<i>     e_type e_machine
+</I>&gt;<i> ]
+</I>&gt;<i>
+</I>&gt;<i> One can imagine that in an early version, the size field could only be
+</I>&gt;<i> specified as an int literal.  When the author decides to let his users write
+</I>&gt;<i> &quot;12*8&quot;, he can decide between:
+</I>&gt;<i>
+</I>&gt;<i>  - Creating some &quot;DSL&quot; to describe those formulas, with a syntax compatible
+</I>&gt;<i> with patterns, as I did in the example above (Mul(12, 8))
+</I>&gt;<i>
+</I>&gt;<i>   e_ident, Mul(12,8), bitstring;    (* ELF identifier *)
+</I>&gt;<i>
+</I>&gt;<i>  - Using a string to represent the formula (but then one must create a new
+</I>&gt;<i> parser... or call the OCaml parser!):
+</I>&gt;<i>
+</I>&gt;<i>   e_ident, &quot;12 * 8&quot;, bitstring;
+</I>&gt;<i>
+</I>&gt;<i>  - Using an extension node to allow injecting an expression without
+</I>&gt;<i> requiring a parser:
+</I>&gt;<i>
+</I>&gt;<i>   e_ident, [%sz 12 * 8], bitstring;
+</I>&gt;<i>
+</I>&gt;<i>   (Here we don't care about the &quot;id&quot; of the extension node.  It is worth
+</I>&gt;<i> creating a syntax for name-less extension nodes?)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> - For multi-line quotations, I would appreciate a slightly more
+</I>&gt;&gt;<i> explicit syntax (possibly the symmetric delimiter to help users see
+</I>&gt;&gt;<i> where the quotation end).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Do you mean:
+</I>&gt;<i>
+</I>&gt;<i> [%bit ... %bit]
+</I>&gt;<i> or:
+</I>&gt;<i> [%bit ... bit%]
+</I>&gt;<i> or:
+</I>&gt;<i> [%bit ... %]
+</I>&gt;<i>
+</I>&gt;<i> or something else?
+</I>&gt;<i>
+</I>&gt;<i> Note than one can also write:
+</I>&gt;<i>
+</I>&gt;<i> begin[@bit]
+</I>&gt;<i> ....
+</I>&gt;<i> end
+</I>&gt;<i>
+</I>&gt;<i> The only difference is that if we compile without the &quot;bitstring expander&quot;,
+</I>&gt;<i> we will probably get a type-error which might be a little harder to
+</I>&gt;<i> understand.  I was thinking about supporting:
+</I>&gt;<i>
+</I>&gt;<i> begin[%bit]
+</I>&gt;<i> ....
+</I>&gt;<i> end
+</I>&gt;<i>
+</I>&gt;<i> as an equivalent to:
+</I>&gt;<i>
+</I>&gt;<i> [%bit ....]
+</I>&gt;<i>
+</I>&gt;<i> but this would be ambiguous (function appliction with [%bit] in function
+</I>&gt;<i> position).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000324.html">[wg-camlp4] Request for feedback
+</A></li>
+	<LI>Next message: <A HREF="000327.html">[wg-camlp4] Request for feedback
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#325">[ date ]</a>
+              <a href="thread.html#325">[ thread ]</a>
+              <a href="subject.html#325">[ subject ]</a>
+              <a href="author.html#325">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,196 @@
+1 patch for repository https://forge.ocamlcore.org/anonscm/darcs/utop/utop:
+
+Sun Oct 14 23:02:59 PDT 2012  anil@recoil.org
+  * async-autorun
+  Detect statements that have an Async Deferred type and run them in a
+  separate thread that blocks the top-level until completed.  This is
+  similar to the Lwt patch, except that the Deferred types may have a
+  few more type aliases, and must be wrapped into a unit closure.
+
+New patches:
+
+[async-autorun
+anil@recoil.org**20121015060259
+ Ignore-this: d1d8552acc992f5825101d2a81d29e13
+ Detect statements that have an Async Deferred type and run them in a
+ separate thread that blocks the top-level until completed.  This is
+ similar to the Lwt patch, except that the Deferred types may have a
+ few more type aliases, and must be wrapped into a unit closure.
+] hunk ./src/lib/uTop.ml 70
+ let syntax, get_syntax, set_syntax = make_variable Normal
+ let phrase_terminator, get_phrase_terminator, set_phrase_terminator = make_variable ";;"
+ let auto_run_lwt, get_auto_run_lwt, set_auto_run_lwt = make_variable true
++let auto_run_async, get_auto_run_async, set_auto_run_async = make_variable true
+ 
+ (* +-----------------------------------------------------------------+
+    | Keywords                                                        |
+hunk ./src/lib/uTop.mli 91
+ val set_auto_run_lwt : bool -> unit
+   (** Modifies {!auto_run_lwt}. *)
+ 
++val auto_run_async : bool signal
++  (** If [true] (the default) toplevel Async expressions are
++      automatically run with in a separate thread with 
++      [Thread_safe.block_on_async_exn]. i.e. if you type:
++
++      {[
++        after (Time.Span.of_s 1.0)
++      ]}
++
++      this will be replaced by:
++
++      {[
++        Thread_safe.block_on_async_exn (fun () -> after (Time.Span.of_s 1.0))
++      ]}
++  *)
++
++val get_auto_run_async : unit -> bool
++  (** Returns the value of {!auto_run_async}. *)
++
++val set_auto_run_async : bool -> unit
++  (** Modifies {!auto_run_async}. *)
++
+ (** {6 History} *)
+ 
+ val history : LTerm_history.t
+hunk ./src/lib/uTop_main.ml 230
+ #endif
+ 
+ let longident_lwt_main_run = Longident.Ldot (Longident.Lident "Lwt_main", "run")
++let longident_async_main_run = Longident.parse "Async.Std.Thread_safe.block_on_async_exn"
++let longident_unit = Longident.Lident "()"
+ 
+ let is_eval = function
+   | { Parsetree.pstr_desc = Parsetree.Pstr_eval _ } -> true
+hunk ./src/lib/uTop_main.ml 246
+     | _ ->
+         false
+ 
++let rec is_async_t typ =
++  match typ.Types.desc with
++    | Types.Tlink typ ->
++        is_async_t typ
++    | Types.Tconstr (path, _, _) ->
++        let n = Path.name path in
++        (n = "Async_core.Deferred.t") || (n = "Async.Std.Deferred.t")
++    | _ ->
++        false
++
+ #if ocaml_version >= (4, 0, 0)
+ let str_items_of_typed_structure tstr = tstr.Typedtree.str_items
+ let str_desc_of_typed_str_item tstr = tstr.Typedtree.str_desc
+hunk ./src/lib/uTop_main.ml 307
+     | Parsetree.Ptop_dir _ ->
+         phrase
+ 
++let insert_async_main_run phrase =
++  let wrap_unit loc e =
++    let open Parsetree in
++    let i = with_loc loc longident_unit in
++    let p = { ppat_desc = Ppat_construct (i, None, false); ppat_loc=loc } in
++    { pexp_desc=Pexp_function ("", None, [p,e]); pexp_loc=loc } in
++  match phrase with
++    | Parsetree.Ptop_def pstr ->
++        let env = !Toploop.toplevel_env in
++        let async_main_run_is_the_real_one =
++          try
++            let path, _ = Env.lookup_value longident_async_main_run env in
++            let rec is_persistent = function
++             | Path.Pident id -> Ident.persistent id
++             | Path.Pdot(t, _, _) -> is_persistent t
++             | Path.Papply(_, p) -> is_persistent p
++            in
++            is_persistent path
++          with Not_found ->
++            false
++        in
++        if async_main_run_is_the_real_one && List.exists is_eval pstr then
++          let tstr, _, _ = Typemod.type_structure env pstr Location.none in
++          let tstr = str_items_of_typed_structure tstr in
++          Parsetree.Ptop_def
++            (List.map2
++               (fun pstr_item tstr_item ->
++                  match pstr_item, str_desc_of_typed_str_item tstr_item with
++                    | { Parsetree.pstr_desc = Parsetree.Pstr_eval e; Parsetree.pstr_loc = loc },
++                      Typedtree.Tstr_eval { Typedtree.exp_type = typ } when is_async_t typ ->
++                        {
++                          Parsetree.pstr_desc =
++                            Parsetree.Pstr_eval {
++                              Parsetree.pexp_desc =
++                                Parsetree.Pexp_apply
++                                  ({ Parsetree.pexp_desc = Parsetree.Pexp_ident (with_loc loc longident_async_main_run);
++                                     Parsetree.pexp_loc = loc },
++                                   [("", (wrap_unit loc e))]);
++                              Parsetree.pexp_loc = loc;
++                            };
++                          Parsetree.pstr_loc = loc;
++                        }
++                    | _ ->
++                        pstr_item)
++               pstr tstr)
++        else
++          phrase
++    | Parsetree.Ptop_dir _ ->
++        phrase
++
+ (* +-----------------------------------------------------------------+
+    | Main loop                                                       |
+    +-----------------------------------------------------------------+ *)
+hunk ./src/lib/uTop_main.ml 410
+     | Some phrase ->
+         (* Add Lwt_main.run to toplevel evals. *)
+         let phrase = if UTop.get_auto_run_lwt () then insert_lwt_main_run phrase else phrase in
++        (* Add Async execution to toplevel evals. *)
++        let phrase = if UTop.get_auto_run_async () then insert_async_main_run phrase else phrase in
+         (* Set the margin of standard formatters. *)
+         let cols = (LTerm.size term).cols in
+         update_margin Format.std_formatter cols;
+hunk ./src/lib/uTop_main.ml 631
+           if add_to_history then LTerm_history.add UTop.history input;
+           (* Add Lwt_main.run to toplevel evals. *)
+           let phrase = if UTop.get_auto_run_lwt () then insert_lwt_main_run phrase else phrase in
++          let phrase = if UTop.get_auto_run_async () then insert_async_main_run phrase else phrase in
+           try
+             ignore (Toploop.execute_phrase true Format.std_formatter phrase)
+           with exn ->
+
+Context:
+
+[Showing type of an identifier at point
+wojciech.meyer@gmail.com**20120801020653
+ Ignore-this: 40b69923375d0ccdf6b1a98891b1bca6
+] 
+[Allow C-j to eval with auto-end
+wojciech.meyer@gmail.com**20120801001337
+ Ignore-this: 8cd09eabbc6b9d5483a5aa380e2cb278
+] 
+[Print only OCaml preprocessor message loaded if it was really loaded
+wojciech.meyer@gmail.com**20120731235343
+ Ignore-this: b96ea788d929cf7dbb853adfa59e4213
+] 
+[car $ cdr -> cadr
+wojciech.meyer@gmail.com**20120731235124
+ Ignore-this: 2b5aa46e42282ee30710daaf8d735116
+] 
+[Add also pre-processor to file local variables in uTop_main as a proof of concept
+wojciech.meyer@gmail.com**20120731235039
+ Ignore-this: 930ca27ff89052f1d8d42e0f7d01fd88
+] 
+[utop-ocaml-preprocessor - allow loading also pre-procesor from local file variables
+wojciech.meyer@gmail.com**20120731234941
+ Ignore-this: 50e32972f422612675d47fd9ce33fc43
+] 
+[Factor out code to utop-eval-string
+wojciech.meyer@gmail.com**20120731234841
+ Ignore-this: 42d0ac92ee18eb0a7865743fe5058a5c
+] 
+[Improvements for loading packages from the file local variables
+wojciech.meyer@gmail.com**20120731231800
+ Ignore-this: 8795ff387135ceb2b99ff8ae7f322875
+] 
+[TAG 1.2.1
+Jeremie Dimino <jeremie@dimino.org>**20120731151400
+ Ignore-this: b37e03453d373a82012af2c952bd4e9b
+] 
+Patch bundle hash:
+23dacb839bcb7c28c4f15be4f98fcfc1e401cdcf

@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5Bwg-windows%5D%20Identifying%20windows%20ports%20for%20build%0A%20systems%20%26%20cross%20compiling%20distinctions&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9D4915E%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001153.html">
+   <LINK REL="Next"  HREF="001155.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5Bwg-windows%5D%20Identifying%20windows%20ports%20for%20build%0A%20systems%20%26%20cross%20compiling%20distinctions&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9D4915E%40Remus.metastack.local%3E"
+       TITLE="[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions">dra-news at metastack.com
+       </A><BR>
+    <I>Fri Jul 24 11:58:57 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001153.html">[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+        <LI>Next message: <A HREF="001155.html">[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1154">[ date ]</a>
+              <a href="thread.html#1154">[ thread ]</a>
+              <a href="subject.html#1154">[ subject ]</a>
+              <a href="author.html#1154">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Daniel B&#252;nzli wrote:
+&gt;<i> Le jeudi, 23 juillet 2015 &#224; 19:55, David Allsopp a &#233;crit :
+</I>&gt;<i> &gt; utils/config.mlp shows that the output will be the CCOMPTYPE variable
+</I>&gt;<i> OCaml was configured with; config/Makefile.{msvc,msvc64,mingw,mingw64}
+</I>&gt;<i> show that is &quot;msvc&quot; for the first two and &quot;cc&quot; for the second two.
+</I>&gt;<i> 
+</I>&gt;<i> Thanks very much, that's useful information on where to look at things.
+</I>&gt;<i> 
+</I>&gt;<i> &gt; Additionally, while new code out there may be taking advantage of
+</I>&gt;<i> &gt; Sys.win32, I expect there's a lot of code still reasonably expecting that
+</I>&gt;<i> &gt; Sys.os_type = &quot;Win32&quot; will work forever.
+</I>&gt;<i> I'm not suggesting to change that in OCaml I'm suggesting that for the
+</I>&gt;<i> *opam* os variable so that build systems can condition on it an behave
+</I>&gt;<i> accordingly. The opam os variable is already quite different from
+</I>&gt;<i> Sys.os_type which is not precise enough, see [1].
+</I>
+Sorry - poor context-switching on my part! However, my comment still stands - mingw and msvc are not operating (sub-)systems &#8211; even the sub-splitting in that function still gives you operating systems. Having something akin to the comp_type seems better to me than (ab)using the notion of os.
+
+This may play differently in an OPAM which fully supports cross-compilation, but would you expect that os variable to be the same across all switches? One thing that is certainly interesting (and which I'm doing in my Windows port of OPAM[*]) is being able to use all four native Windows ports in the same OPAM installation.
+
+&lt;snip&gt;
+
+&gt;<i> &gt; I'm not sure what you're getting at here - what build system differences
+</I>&gt;<i> are you referring to?
+</I>&gt;<i> 
+</I>&gt;<i> Well the build system needs to adapt file extensions for one thing (which
+</I>&gt;<i> is quite annoying). Hence my question is it *only this* that differs in
+</I>&gt;<i> the mingw and msvc ports or are there also other differences at the build
+</I>&gt;<i> level (e.g. build rules) as if this is the case it would make sense to
+</I>&gt;<i> distinguish the ports using the os variable in order to have a good bulk
+</I>&gt;<i> variable to condition on, otherwise, if it's only the file extensions I
+</I>&gt;<i> don't think it's worth it.
+</I>
+Oh, I see - yes, the way the compilers and linkers are invoked is totally different (I for some reason thought you were meaning were different build systems themselves required). In GNU make, I use a function and $(call ...) to differentiate them - see, for example, <A HREF="https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/configure.ac#L85-L100">https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/configure.ac#L85-L100</A> and <A HREF="https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/src/Makefile#L276.">https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/src/Makefile#L276.</A>
+
+If you have comparch = cc on virtually everything (Cygwin, Mingw, most/all Unices) and comparch = msvc for the Microsoft compilers and also os being Win32, Cygwin or a variety of Unices then you have:
+
+comparch = msvc -&gt; immediately .obj, .lib, .dll, .exe (and Microsoft invocation rules)
+comparch = cc -&gt; immediately gives you .o and .a and then os &lt;&gt; Win32 gives you .so or .dll+.exe (and CC/GCC invocation rules)
+
+Best,
+
+
+D
+
+
+[*] which is, of course, a) not finished and b) not necessarily going to be merged!
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001153.html">[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+	<LI>Next message: <A HREF="001155.html">[opam-devel] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1154">[ date ]</a>
+              <a href="thread.html#1154">[ thread ]</a>
+              <a href="subject.html#1154">[ subject ]</a>
+              <a href="author.html#1154">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

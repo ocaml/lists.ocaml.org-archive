@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Converting from int to file_descr
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Converting%20from%20int%20to%20file_descr&In-Reply-To=%3CCAAWM5TxK1AT2HedVXf%2BMwn12SbgQ%2BPe2jhxieck3Cjto0MJ4sA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000090.html">
+   <LINK REL="Next"  HREF="000092.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Converting from int to file_descr</H1>
+    <B>David Sheets</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Converting%20from%20int%20to%20file_descr&In-Reply-To=%3CCAAWM5TxK1AT2HedVXf%2BMwn12SbgQ%2BPe2jhxieck3Cjto0MJ4sA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Converting from int to file_descr">sheets at alum.mit.edu
+       </A><BR>
+    <I>Fri Jun  6 11:30:41 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000090.html">[ocaml-ctypes] Converting from int to file_descr
+</A></li>
+        <LI>Next message: <A HREF="000092.html">[ocaml-ctypes] ctypes 0.2.3 in debian sid
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#91">[ date ]</a>
+              <a href="thread.html#91">[ thread ]</a>
+              <a href="subject.html#91">[ subject ]</a>
+              <a href="author.html#91">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Jun 5, 2014 at 8:20 PM, Costel Person &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">costel.person at gmail.com</A>&gt; wrote:
+&gt;<i> I am trying to call forkpty
+</I>&gt;<i> pid_t forkpty(int *amaster, char *name, const struct termios *termp, const
+</I>&gt;<i> struct winsize *winp);
+</I>&gt;<i>
+</I>&gt;<i> Only care about file descriptor 'amaster' and result : pid_t
+</I>&gt;<i>
+</I>&gt;<i> All is good:
+</I>&gt;<i>   let forkpty = foreign &quot;forkpty&quot; (ptr int @-&gt; ptr void @-&gt; ptr void @-&gt; ptr
+</I>&gt;<i> void @-&gt; returning int)
+</I>&gt;<i>
+</I>&gt;<i>     let amaster : int ptr = allocate int -1 in
+</I>&gt;<i>     let pid = forkpty amaster null null null in
+</I>&gt;<i>     let pipefd = !@ amaster
+</I>&gt;<i>
+</I>&gt;<i> Do not understand how to convert the int representing file descriptor to
+</I>&gt;<i> Unix.file_descr
+</I>&gt;<i>
+</I>&gt;<i> Or use a view to pass a Unix.file_descr as an int to forkpty ?
+</I>&gt;<i>
+</I>&gt;<i> Any help appreciated ...
+</I>
+Hi Costel,
+
+I use the fd-send-recv package in opam for this coercion. The function
+to use is Fd_send_recv.int_of_fd. You can easily create a ctypes view
+for Unix.file_descr with
+
+Ctypes.view ~read:Fd_send_recv.fd_of_int ~write:Fd_send_recv.int_of_fd
+Ctypes.int
+
+Internally, file descriptors are just OCaml ints as you can see from
+&lt;<A HREF="https://github.com/djs55/ocaml-fd-send-recv/blob/master/lib/fd_send_recv.ml#L22">https://github.com/djs55/ocaml-fd-send-recv/blob/master/lib/fd_send_recv.ml#L22</A>&gt;.
+Because of this, you could also easily implement this coercion
+yourself. I prefer to adopt the tiny fd-send-recv dependency and
+abstract this dirty Obj.magic business.
+
+Hope this helps,
+
+David Sheets
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000090.html">[ocaml-ctypes] Converting from int to file_descr
+</A></li>
+	<LI>Next message: <A HREF="000092.html">[ocaml-ctypes] ctypes 0.2.3 in debian sid
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#91">[ date ]</a>
+              <a href="thread.html#91">[ thread ]</a>
+              <a href="subject.html#91">[ subject ]</a>
+              <a href="author.html#91">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

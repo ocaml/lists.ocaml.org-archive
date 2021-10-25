@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] How to know whether a package archive is already in	the cache?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20How%20to%20know%20whether%20a%20package%20archive%20is%20already%20in%0A%09the%20cache%3F&In-Reply-To=%3CCAPFanBH%2BrUQcGBSyYipUxAkj8e-KYE-UMvaZixt%2B%2B4MNcvEbHw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001262.html">
+   <LINK REL="Next"  HREF="001264.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] How to know whether a package archive is already in	the cache?</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20How%20to%20know%20whether%20a%20package%20archive%20is%20already%20in%0A%09the%20cache%3F&In-Reply-To=%3CCAPFanBH%2BrUQcGBSyYipUxAkj8e-KYE-UMvaZixt%2B%2B4MNcvEbHw%40mail.gmail.com%3E"
+       TITLE="[opam-devel] How to know whether a package archive is already in	the cache?">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Nov 12 17:47:38 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001262.html">[opam-devel] OPAM for ubuntu 15.10
+</A></li>
+        <LI>Next message: <A HREF="001264.html">[opam-devel] How to know whether a package archive is already	in the cache?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1263">[ date ]</a>
+              <a href="thread.html#1263">[ thread ]</a>
+              <a href="subject.html#1263">[ subject ]</a>
+              <a href="author.html#1263">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi opam-devel,
+
+I'm currently hacking on a script to do a bulk update of OPAM
+metadata, adding &quot;ocamlbuild&quot; as an explicit dependency of all
+packages my killer heuristic decides certainly use ocamlbuild (right
+now: there is a _tags or myocamlbuild.ml somewhere, but I'm soon going
+to integrate the fact that an _oasis file explicitly lists ocamlbuild
+as the relied-upon build system).
+
+This is rather simple, with most of the time spent browsing through
+the rich opam-library API.
+- iterate over all packages in the repository (using the nice
+Opam_admin_top.iter_packages function)
+- for each package download the archive (I used
+OpamAction.download_package for this, although it requires an
+OpamState.t argument that I wasn't sure how to build&#185;)
+- extract each archive (OpamFilename.extract_generic_file, under some
+OpamFilename.with_tmp_dir call to get automatic cleanup)
+- walk the archive to test ocamlbuild usage
+
+Caching downloaded archive works very well, so re-running the script
+(during my test-refine feedback loops) does not re-download those as
+well. Unfortunately, for a handful of packages, download fails, and it
+only fails after a rather long timeout has expired, so just
+re-iterating on those failed packages make a process that should be
+instantaneous takes several minutes.
+
+So here is my question: how can I test whether a package archive is
+already in the cache? Because I know now that all packages that won't
+time out have been cached by previous runs of my script, I could
+iterate only on those. But I didn't find a clear way to do that (this
+seems to be available internally in some OpamHTTP backend, but I
+haven't seen this exported).
+
+A way to cache not only the successfully downloaded archives, but also
+the &quot;did not work&quot; last time decision would also fit the bill. In the
+worst case I could store that information in an independent table that
+I would (de)serialize across invocations of my script.
+
+(Opam seems to have fancy download functions designed to download a
+lot of stuff in parallel, but that seems incompatible with the
+sequential workflow imposed by `iter_packages`. I could first iterate
+to build a list of URLs, then download everything in parallel, then
+re-iterate but then again I need to only access the archives whose
+download actually succeeded.)
+
+While we're at it: is there a simple way to get a pretty string from a
+Package.t value? I use
+          Printf.sprintf &quot;%s.%s&quot;
+            (OpamPackage.name_to_string package)
+            (OpamPackage.version_to_string package)
+but would expect this to be available already.
+
+The complete code of the current prototype script (it is not editing
+any metada so far, just printing out the results that seem reasonable,
+except that the _oasis part of the heuristic needs to be implemented
+to get realistic results) is available at
+
+  <A HREF="https://github.com/gasche/opam/blob/2badfa0810e25ded1495b28b2ec8ff53f03a90cc/admin-scripts/add_ocamlbuild_dependency.ml">https://github.com/gasche/opam/blob/2badfa0810e25ded1495b28b2ec8ff53f03a90cc/admin-scripts/add_ocamlbuild_dependency.ml</A>
+
+Any comment or advice is warmly welcome. In particular there is a
+question in a comment about: what is the right way to build a
+OpamState.t value?
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001262.html">[opam-devel] OPAM for ubuntu 15.10
+</A></li>
+	<LI>Next message: <A HREF="001264.html">[opam-devel] How to know whether a package archive is already	in the cache?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1263">[ date ]</a>
+              <a href="thread.html#1263">[ thread ]</a>
+              <a href="subject.html#1263">[ subject ]</a>
+              <a href="author.html#1263">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

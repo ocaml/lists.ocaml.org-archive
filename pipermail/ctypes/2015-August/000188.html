@@ -1,0 +1,257 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DFxTtC55YhdEQ-kZ5jW3jYMgPypgyDE6GnJ_%2Bqk8LviEg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000187.html">
+   <LINK REL="Next"  HREF="000189.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DFxTtC55YhdEQ-kZ5jW3jYMgPypgyDE6GnJ_%2Bqk8LviEg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?">yallop at gmail.com
+       </A><BR>
+    <I>Mon Aug 17 11:20:34 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000187.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+        <LI>Next message: <A HREF="000189.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#188">[ date ]</a>
+              <a href="thread.html#188">[ thread ]</a>
+              <a href="subject.html#188">[ subject ]</a>
+              <a href="author.html#188">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 14/08/2015, Andi McClure &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andi.m.mcclure at gmail.com</A>&gt; wrote:
+&gt;<i> With help from people on IRC, I have a working version of this now. You can
+</I>&gt;<i> find it here:
+</I>&gt;<i> <A HREF="https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default">https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default</A>
+</I>&gt;<i> And a demo of the code running:
+</I>&gt;<i> <A HREF="https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large">https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large</A>
+</I>
+Thanks for the update!  It's great to see the foreign call working end-to-end.
+
+&gt;<i> What I have is a module FfiSupport. It is based around functions
+</I>&gt;<i> cToValueFor and a valueToCFor, which given a type name can spit out a
+</I>&gt;<i> converter from any specified C type to my &quot;value&quot; variant, or a converter
+</I>&gt;<i> from my &quot;value&quot; variant to any specified C type. The 'ctype-&gt;value (or vice
+</I>&gt;<i> versa) &quot;converter&quot; function comes paired with a ctypes typ, so I can pass
+</I>&gt;<i> that directly into 'foreign'. The key part is:
+</I>&gt;<i>
+</I>&gt;<i>       let ValueToCFn (argType, argConvert) = valueToCFor argTypeName in
+</I>&gt;<i>       let CToValueFn (retType, retConvert) = cToValueFor retTypeName in
+</I>&gt;<i>       let ffi_binding = foreign name (argType @-&gt; returning retType) in
+</I>&gt;<i>       fun arg -&gt; retConvert (ffi_binding (argConvert arg))
+</I>
+This looks like a sensible scheme.
+
+&gt;<i> So that is very satisfying, but there is an obvious problem, which is that
+</I>&gt;<i> this only works for unary functions. I need it to work for functions of any
+</I>&gt;<i> arity.
+</I>
+I think that should be possible.
+
+&gt;<i> I have an intuition about how to do this, but a couple of days of tinkering
+</I>&gt;<i> have gotten me nowhere and I am very concerned about whether, if I
+</I>&gt;<i> completed my implementation, OCaml could type it. I'd like to describe this
+</I>&gt;<i> possibly-unworkable solution, and then ask a question.
+</I>&gt;<i>
+</I>&gt;<i> My thought is this: If I have for example a 2-ary function, I feel like I
+</I>&gt;<i> need to construct two things, an ocaml-ctypes type spec ('a typ @-&gt; 'b typ
+</I>&gt;<i> @-&gt; returning 'c typ), and a function ('a -&gt; 'b -&gt;
+</I>&gt;<i> 'c)-&gt;(value-&gt;value-&gt;value).
+</I>
+Yes, except that things will become easier if you give the second thing the type
+
+   ('a -&gt; 'b -&gt; 'c) -&gt; value
+
+by applying the BuiltinFunctionValue constructor at appropritate
+points, since then every bound function will have the same type,
+regardless of arity.
+
+&gt;<i> So maybe the way I achieve this is I construct a base function ('a -&gt;
+</I>&gt;<i> 'b)-&gt;(value-&gt;value), and then I construct a &quot;successor&quot; function which
+</I>&gt;<i> transforms
+</I>&gt;<i> ('b typ @-&gt; ... @-&gt; returning 'z typ) and ('b -&gt; ... -&gt;
+</I>&gt;<i> 'z)-&gt;(value-&gt;...-&gt;value)
+</I>&gt;<i> into
+</I>&gt;<i> ('a typ @-&gt; 'b typ @-&gt; ... @-&gt; returning 'z typ) and ('a-&gt;'b -&gt; ... -&gt;
+</I>&gt;<i> 'z)-&gt;(value-&gt;value-&gt;...-&gt;value).
+</I>
+Right.  So, more concretely, if you're building a binding to a C
+function of type
+
+   void(float, int)
+
+you want to build a Ctypes type representation
+
+   float @-&gt; int @-&gt; returning void
+
+and a conversion function of type
+
+   (float -&gt; int -&gt; unit) -&gt; value
+
+for turning the function returned from Foreign.foreign into an Emily
+value, like this:
+
+   let ffi_binding = foreign name (argType @-&gt; returning retType) in
+   convert ffi_binding
+
+So the &quot;successor&quot; function should turn the type representation from this
+
+   int @-&gt; returning void
+
+into this
+
+   float @-&gt; int @-&gt; returning void
+
+and it should turn the OCaml-to-Emily conversion function from
+something of this type
+
+  (int -&gt; unit) -&gt; value
+
+into something of this type
+
+  (float -&gt; int -&gt; unit) -&gt; value
+
+Converting the type representation is the easy part, since you can
+just use '@-&gt;' to add the new argument type:
+
+  let unary = int @-&gt; returning void in
+    float @-&gt; unary
+
+Converting the OCaml-to-Emily function involves writing something of type
+
+  ((int -&gt; unit) -&gt; value) -&gt; (float -&gt; int -&gt; unit) -&gt; value
+
+i.e. something that looks like this:
+
+  fun
+   (f : ((int -&gt; unit) -&gt; value))
+   (g : (float -&gt; int -&gt; unit)) -&gt;
+      (... : value)
+
+where the '...' is somehow built from 'f' and 'g' and has type
+'value'.  Of course, filling in the '...' is the tricky part, but the
+types help quite a bit.  First, since you're extending the conversion
+function to take an extra argument you know that the result should be
+constructed using BuiltinFunctionValue:
+
+  fun
+   (f : ((int -&gt; unit) -&gt; value))
+   (g : (float -&gt; int -&gt; unit)) -&gt;
+      (BuiltinFunctionValue
+        (fun (x : value) -&gt; (... : value)))
+
+Next, you know that x should hold a float, so you can unpack it:
+
+  let float_of_value = function
+    Value.FloatValue y -&gt; y
+  | _ -&gt; failwith &quot;type error&quot;
+
+  fun
+   (f : ((int -&gt; unit) -&gt; value))
+   (g : (float -&gt; int -&gt; unit)) -&gt;
+      (BuiltinFunctionValue
+         (fun (x : value) -&gt;
+            let y = float_of_value x in
+               (... : value)))
+
+What can you do with 'y'?  There's only one function around that takes
+a float, namely 'g', so you can pass 'y' to 'g'. (Thinking through
+this decision a little more carefully reveals that it is actually the
+right thing to do, since 'g' is the function returned from
+'Foreign.foreign', and 'y' is the argument passed in to that function
+from an Emily program.)
+
+  fun
+   (f : ((int -&gt; unit) -&gt; value))
+   (g : (float -&gt; int -&gt; unit)) -&gt;
+      (BuiltinFunctionValue
+         (fun (x : value) -&gt;
+            let y = float_of_value x in
+            let h : int -&gt; unit = g y in
+               (... : value)))
+
+Finally, we have a value, 'h', of type 'int -&gt; unit', and there's
+exactly one obvious thing to do with it (which once again also turns
+out to be the correct thing): pass it to 'f' to build a 'value':
+
+  fun
+   (f : ((int -&gt; unit) -&gt; value))
+   (g : (float -&gt; int -&gt; unit)) -&gt;
+      (BuiltinFunctionValue
+         (fun (x : value) -&gt;
+            let y = float_of_value x in
+            let h : int -&gt; unit = g y in
+              (f h : value)))
+
+This is sufficient to support this particular example ('float -&gt; int
+-&gt; unit'), and it's not difficult to generalise it to handle extending
+functions of any arity and type by removing the type ascriptions and
+turning the 'float_of_value' function into a parameter:
+
+  let extend_fn =
+     fun of_value f g -&gt;
+      (BuiltinFunctionValue
+         (fun x -&gt;
+            let y = of_value x in
+            let h = g y in
+              f h))
+
+which can be written more simply as
+
+   let extend_fn of_value f g = BuiltinFunctionValue (fun x -&gt; f (g
+(of_value x)))
+
+Now 'extend_fn' can be used to build conversions between functions of
+arbitrary arity.  For example:
+
+   # extend_fn float_of_value value_of_string;;
+   - : (float -&gt; string) -&gt; value = &lt;fun&gt;
+   # extend_fn string_of_value (extend_fn float_of_value value_of_string);;
+   - : (string -&gt; float -&gt; string) -&gt; value = &lt;fun&gt;
+   # extend_fn string_of_value (extend_fn string_of_value (extend_fn
+float_of_value value_of_string));;
+   - : (string -&gt; string -&gt; float -&gt; string) -&gt; value = &lt;fun&gt;
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000187.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+	<LI>Next message: <A HREF="000189.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#188">[ date ]</a>
+              <a href="thread.html#188">[ thread ]</a>
+              <a href="subject.html#188">[ subject ]</a>
+              <a href="author.html#188">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] How Jane Street uses camlp4
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20How%20Jane%20Street%20uses%20camlp4&In-Reply-To=%3CCACLX4jRa6rp1LxiUPA7fgq4pUdEJBBq5y1JRgj7J_jvsELfg4A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000031.html">
+   <LINK REL="Next"  HREF="000074.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] How Jane Street uses camlp4</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20How%20Jane%20Street%20uses%20camlp4&In-Reply-To=%3CCACLX4jRa6rp1LxiUPA7fgq4pUdEJBBq5y1JRgj7J_jvsELfg4A%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] How Jane Street uses camlp4">yminsky at janestreet.com
+       </A><BR>
+    <I>Mon Jan 28 18:29:19 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000031.html">[wg-camlp4] Improvements to the OCaml Parsetree
+</A></li>
+        <LI>Next message: <A HREF="000074.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#55">[ date ]</a>
+              <a href="thread.html#55">[ thread ]</a>
+              <a href="subject.html#55">[ subject ]</a>
+              <a href="author.html#55">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Let me rattle a few off:
+
+- type-conv style extensions.
+
+  These include bin-prot, sexplib, fieldslib, variantslib, pa_compare...
+
+  A few things to note about these:
+
+  - generators may take argument, like [type t = ... with
+    typehash(abstract)]. The generator is one that specifies how to
+    parse the arguments (although they have to be well
+    parenthesized). In the examples I can think of, either a few
+    identifiers are accepted or, in a couple of cases, arbitrary
+    expressions are accepted.
+  - there can be generators (with optional argument too) on record
+    field:
+
+         type t =
+           { a : int with default(2), sexp_drop_if(fun x -&gt; x = 2);
+           } with sexp
+
+  - We also have some that rely only on quotations. The inside of
+    quotations are usually types, sometimes expressions.
+
+- pa_ounit: this gives a lightweight syntax for unit-testing.  You can
+  write:
+
+      TEST = &lt;some expression&gt;
+
+  and it does a bunch of camlp4 magic, including capturing the text
+  and location of the expression, as part of reporting a unit test
+  failure effectively.  A test that runs the code is registered, but
+  the actual code isn't run except when unit tests are run.
+
+  You can also do:
+
+      TEST_MODULE = struct ... end
+
+  to create a whole module that won't be instantiated except within
+  the running of a unit test.
+
+- pa_nonrec: this is a small extension that adds the ability to
+  define a type non-recursively.  Thus, you can write:
+
+      type t
+      module M = struct type nonrec t = t list end
+
+  rather than the more annoying:
+
+      type t
+      module M = struct type z = t type t = z list end
+
+- pa_pipebang: this converts
+
+     &lt;expr1&gt; |! &lt;expr2&gt;
+
+  into
+
+    &lt;expr2&gt; (expr1)
+
+  which is faster than a naively implemented |! operator
+
+- pa_here: this converts the string _here_ to a source-code location.
+
+- pa_custom_printf: If you put ! before a format string, it allows the
+  use of a spec like &quot;%{&lt;Module&gt;}&quot; in the format string.  For example,
+  using &quot;%{Time}&quot; wraps [Time.to_string] around the appropriate
+  argument.
+
+  It also allows different formats for a given type:
+  &quot;%{&lt;Module&gt;.&lt;identifier&gt;}&quot; wraps &lt;Module&gt;.Format.&lt;identifier&gt; around
+  the appropriate argument.  For example, &quot;%{Float.pretty}&quot; would wrap
+  [Float.Format.pretty] around the appropriate argument.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000031.html">[wg-camlp4] Improvements to the OCaml Parsetree
+</A></li>
+	<LI>Next message: <A HREF="000074.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#55">[ date ]</a>
+              <a href="thread.html#55">[ thread ]</a>
+              <a href="subject.html#55">[ subject ]</a>
+              <a href="author.html#55">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

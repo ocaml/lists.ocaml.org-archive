@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302221406220.21772%40hermes-1.csi.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000061.html">
+   <LINK REL="Next"  HREF="000081.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302221406220.21772%40hermes-1.csi.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Fri Feb 22 14:06:22 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000061.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000081.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#74">[ date ]</a>
+              <a href="thread.html#74">[ thread ]</a>
+              <a href="subject.html#74">[ subject ]</a>
+              <a href="author.html#74">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i>  - Performance:  looking up and opening files takes time, especially 
+</I>&gt;<i>under bad OS such as Windows.
+</I>
+There are a number of possible solutions to spurious opens. The simplest of 
+which is to only look for &quot;Core.Std.Mutex&quot; in directories which contain the 
+special &quot;Core.Std&quot; .cmi file (mentioned previously as a solution to typos 
+in open statements). These special .cmi files could also be extended to 
+include a list of modules that have that namespace within the current 
+directory which would prevent spurious reads entirely.
+
+&gt;<i>  - It prevents from putting .cmi files from many libraries in the same 
+</I>&gt;<i>directory, which is sometimes useful (to simplify deployment; to control 
+</I>&gt;<i>precisely the set of .cmi available for a given file; to improve 
+</I>&gt;<i>performance by avoiding repeated lookups in many directories).
+</I>
+I think that this ability is of dubious value and not really a big loss.
+
+&gt;<i>  - Spurious dependencies: technically, since the compiler will open 
+</I>&gt;<i>them, all x.cmi files in the search path should be considered as 
+</I>&gt;<i>dependencies for a module which refers to X.  This is necessary to have 
+</I>&gt;<i>a correct notion of dependency for the build system (formally, each 
+</I>&gt;<i>x.cmi could become the &quot;correct one&quot; if its namespace changes in the 
+</I>&gt;<i>source file; and since all these files are opened, they should not be 
+</I>&gt;<i>overwritten in parallel).  This complexifies the build system, 
+</I>&gt;<i>especially for parallel builds, and creates a risk of dependency cycles.
+</I>
+The solutions above should solve this problem.
+
+Even without those solutions, there is no need for a proper dependency, 
+since changing the namespace would cause there to be two filenames with the 
+same name and namespace. This is basically an error, so dependencies should 
+not be expected to be correct. It would not be difficult for an OCaml 
+specific build system to detect the existence of two files with the same 
+name and namespace and raise an error.
+
+There is possibly the need for some kind of partial dependency for parallel 
+builds. This is more like a lock than a dependency, so there should be no 
+question of circular dependencies. I'm not really familiar with how 
+parallel file accesses work on different file systems, but perhaps the 
+compiler could lock &quot;.cmi&quot; files before reading and writing. This might be 
+a good idea more generally for cases where dependencies have not been 
+correctly calculated.
+
+&gt;<i>That's why I've proposed to allow specifying mapping between references 
+</I>&gt;<i>to external modules in dedicated files.  We could have a file 
+</I>&gt;<i>core_std.ns (probably shipped with Core) with this content:
+</I>&gt;<i>
+</I>&gt;<i>Mutex = Core_std_mutex
+</I>&gt;<i>Thread = Core_std_thread
+</I>&gt;<i>Date = Core_std_date
+</I>&gt;<i>
+</I>&gt;<i>and just a reference in the source code (or on the command-line):
+</I>&gt;<i>
+</I>&gt;<i>   open namespace Core_std
+</I>&gt;<i>
+</I>&gt;<i>which would load core_std.ns and use the corresponding module renaming 
+</I>&gt;<i>in the rest of the module.
+</I>
+There is very little difference between that suggestion and having 
+a core_std.ns file containing:
+
+  Mutex;
+  Thread;
+  Date;
+
+and using that as a (partial) declaration of a Core_std namespaces, except 
+that you have to give every file a unique long filename. So I don't really 
+see the particular benefit of using long filenames.
+
+There is also a more general problem with any solution like this, which 
+tries to define namespaces (or sets of aliases) in a single file. It is 
+difficult to use the namespace from inside the modules that are within the 
+namespace. For example, if I use:
+
+  open namespace Core_std
+
+from within mutex.ml then it will attempt to open itself.
+
+This is particularly problematic for language extensions, because they want 
+to generate code like:
+
+Core_Std.Mutex.lock
+
+but if they are used within another module in Core_Std then it breaks.
+
+The solution to these problems is to have membership of a namespace encoded 
+in the module itself.
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000061.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000081.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#74">[ date ]</a>
+              <a href="thread.html#74">[ thread ]</a>
+              <a href="subject.html#74">[ subject ]</a>
+              <a href="author.html#74">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

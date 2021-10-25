@@ -1,0 +1,165 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3C1841141.qX6PJhxGz6%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001443.html">
+   <LINK REL="Next"  HREF="001445.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3C1841141.qX6PJhxGz6%40maitake%3E"
+       TITLE="[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Fri Apr 15 03:28:46 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001443.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+        <LI>Next message: <A HREF="001445.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1444">[ date ]</a>
+              <a href="thread.html#1444">[ thread ]</a>
+              <a href="subject.html#1444">[ subject ]</a>
+              <a href="author.html#1444">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le jeudi 14 avril 2016, 14:30:19 Daniel B&#252;nzli a &#233;crit :
+&gt;<i> Le jeudi, 14 avril 2016 &#224; 10:04, Louis Gesbert a &#233;crit :
+</I>&gt;<i> &gt; Yup, 2.0~alpha is getting rolled out. I'll be grateful if you are ready to
+</I>&gt;<i> &gt; take the risk, as you have been most helpful with your reports on previous
+</I>&gt;<i> &gt; releases.
+</I>&gt;<i> 
+</I>&gt;<i> What kind of time frame to envision ? Should I write topkg directly against
+</I>&gt;<i> 2.0 ? For example the existence of x-fields may have an impact on the
+</I>&gt;<i> actual package description API (I'd like to specify the location of the
+</I>&gt;<i> readme, change log and license files there rather than in the topkg package
+</I>&gt;<i> description as this may be useful to other consumers, e.g. doc indexers)
+</I>&gt;<i> and topkg's description API should not be changed too often.
+</I>
+This sounds nice.
+I would release the alpha just now, but since I'm taking a few days off 
+(sunday-thursday), I'll wait until I am back. As for the final version, it's 
+hard to predict, but I'd say it should be ready by the summer.
+
+&gt;<i> Also depending on what 2.0 the tool provides some aspects of topkg may be
+</I>&gt;<i> simplified. Namely I need #2446 (opam query) to avoid an ipc call from the
+</I>&gt;<i> package description to topkg the tool on pinned topkg packages (see note
+</I>&gt;<i> [1] if you are interested why).
+</I>
+The work on 2.0 so far has been focused on the heavy-lifting, API rehauls, and 
+feature-enabling design changes; the alpha is _not_  a feature freeze, and I 
+expect to spend most of my time adding the smaller, but most useful features 
+in the coming weeks (besides the inevitable bug fixing of course).
+
+`opam query` is not here yet but it's nothing difficult and will be added.
+
+&gt;<i> I think it would be nice to have an independent library with simple deps
+</I>&gt;<i> that handles the data formats (e.g. opam-installer should use this). Anil
+</I>&gt;<i> suggested somewhere else that opam-lib as it stands is not so easy to
+</I>&gt;<i> install due to the dependency cone.
+</I>
+Yes, I have had requests for this already. For now the dependencies for 
+building `opam-lib.format` are:
+- unix
+- re
+- ocamlgraph
+- jsonm
+
+Jsonm is not used per se, but we bind it in our set and map functors. 
+ocamlgraph is only needed by the parallel processing engine, which could be 
+moved to a different lib (it's bound in OpamPackage.Graph, but that can 
+probably be easily changed as well).
+The main problem may actually be that there is no separate opam package ?
+
+&gt;<i> &gt; - opam now puts all its metadata into a .opam-switch/ subdir below the
+</I>&gt;<i> &gt; switch prefix. This is cleaner.
+</I>&gt;<i> 
+</I>&gt;<i> Why is the directory hidden ?
+</I>
+No strong opinion on this, it's just how is commonly done for metadata dirs, 
+and makes the prefix look like a standard one. It could also actually be 
+outside the prefix. Side-note: switch prefixes are still by default directly 
+below ~/.opam, which means you can't e.g. name a switch &quot;repo&quot; since that name 
+is used by opam...
+
+&gt;<i> If I'm not mistaken these two things do not help me at all with the request
+</I>&gt;<i> which is to be able to handle non opam-managed scenarios. Basically the
+</I>&gt;<i> workflow I see for for OS package managers and topkg packages is the
+</I>&gt;<i> following:
+</I>&gt;<i> 
+</I>&gt;<i> 1) Download the distribution archive of the package.
+</I>&gt;<i> 2) Build the package according to the build instructions of the OPAM file
+</I>&gt;<i> present in the archive 3) Process the generated OPAM install file for
+</I>&gt;<i> installing the package (e.g. using opam-installer).
+</I>&gt;<i> 
+</I>&gt;<i> Now 3) should install the OPAM file present in the archive aswell so that
+</I>&gt;<i> tooling external to opam can easily access package metadata stored in OPAM
+</I>&gt;<i> files.
+</I>
+I see. There is not much required from opam then, maybe just automatic 
+installation (or linking) of the opam files to a standard location.
+
+&gt;<i> &gt; Unless you use overlay files (`files/xxx` that get added to the archive),
+</I>&gt;<i> &gt; which should really only be used for hot-patching in the repo and not on
+</I>&gt;<i> &gt; development packages, you can now put everything within a single opam
+</I>&gt;<i> &gt; file:
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; - For the description, use a `descr:` field, and a simple string. The new
+</I>&gt;<i> &gt; `&quot;&quot;&quot;`-delimited syntax for strings makes this more convenient.
+</I>&gt;<i> 
+</I>&gt;<i> Would it please be possible to split `descr` into `synopsis` (the one-line
+</I>&gt;<i> tagline) and `descr` (the long description) ?
+</I>
+That might be more explicit indeed, but makes descr-file and opam-included 
+descr further apart (both are still supported at the moment, with a logged 
+warning if both are present). 
+
+&gt;<i> &gt; &gt; Build tool link helpers, documentation indexer, finder and viewers, etc.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; The repository maintainers will probably have to put some guidelines on
+</I>&gt;<i> &gt; what should or should not be within these files, when they are part of
+</I>&gt;<i> &gt; the official repository ?
+</I>&gt;<i> 
+</I>&gt;<i> Which files are you talking about ?
+</I>
+Sorry, I was speaking about the `x-*` fields in the package definition 
+(&quot;opam&quot;) files.
+
+Best,
+Louis
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001443.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+	<LI>Next message: <A HREF="001445.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1444">[ date ]</a>
+              <a href="thread.html#1444">[ thread ]</a>
+              <a href="subject.html#1444">[ subject ]</a>
+              <a href="author.html#1444">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

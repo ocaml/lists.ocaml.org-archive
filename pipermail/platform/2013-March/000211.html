@@ -1,0 +1,214 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5130CA3F.7070009%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000209.html">
+   <LINK REL="Next"  HREF="000213.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5130CA3F.7070009%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Fri Mar  1 15:33:19 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000209.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000213.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#211">[ date ]</a>
+              <a href="thread.html#211">[ thread ]</a>
+              <a href="subject.html#211">[ subject ]</a>
+              <a href="author.html#211">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> The content of a namespace files is a mapping between references and
+</I>&gt;<i> compilation units.
+</I>
+&gt;<i>   Core
+</I>&gt;<i>    |
+</I>&gt;<i>    |---&gt;  (List =&gt; Core_list)
+</I>&gt;<i>    |---&gt;  (String =&gt; Core_string)
+</I>
+This describes the content of the file, not a namespace.
+These are commands in a very simple namespace language that creates a
+namespace by action on the current OCaml compilation environment.
+After execution of these commands you would rather get something like
+
+&gt;<i>   Core
+</I>&gt;<i>    |
+</I>&gt;<i>    |---&gt;  List =&gt;  &lt;Core_list&gt;
+</I>&gt;<i>    |---&gt;  String ==&gt; &lt;Core_string&gt;
+</I>
+where &lt;Internal_name&gt; is the module object that has Internal_name as its
+long name.  This is a indeed one-level name space.
+
+&gt;<i>  If one wants to see this as a tree, one would draw something like:
+</I>
+One reason to see it as a tree is that you may use several namespaces in the
+same compilation step.  In your compilation environment, you now have
+namespace file names mapping to level-1 namespaces.  This defines a 2-level
+namespace, which can be represented as:
+
+     ROOT
+       |
+       |---&gt;  Core
+       |         |
+       |         |---&gt;  (List =&gt; Core_list)
+       |         |---&gt;  (String =&gt; Core_string)
+       |         |---&gt;  (Unix =&gt; Core_unix)
+       |
+       |---&gt;   UCore
+              |
+              |---&gt;  (List =&gt; Core_list)
+              |---&gt;  (String =&gt; Core_string)
+
+
+&gt;<i> But I don't really see the value of considering this as a tree: there can only
+</I>&gt;<i> be two levels
+</I>
+Understood, but it is now easy to add another level such as JaneStreet
+between Root and Core. (I know you don't think it is useful, but
+if we do so, then you just have hierachical namespaces.)
+
+&gt;<i> and they are of a very different nature (nodes of the first level
+</I>&gt;<i> are names; nodes of the second level are pairs of names).
+</I>
+Now, the second level are no more pair of names but mapping from names to
+module object. So its exaectly a hierachical namespace where leaves are
+module objects.
+
+&gt;<i> To be noted: the same
+</I>&gt;<i> reference name (List, String) can be appear in several leaves, of course, but so
+</I>&gt;<i> do unit names (Core_list, Core_string).  You could have for instance:
+</I>
+Yes, indeed.  This would also be the case with hierachical namespaces since
+these names are under different prefix.
+
+(The only reason to rule this out would be that edges 1-level below would be
+&quot;auto-open&quot; and unorered, but for comparisson, let's say we don't have
+auto-open edges, since you don't.)
+
+&gt;<i> How does this fit into the hierarchical model?
+</I>
+I think it does very much.  At this point I am not trying to say that the
+model should be hierachical, just that our two models are compatible
+similar.
+
+The misunderstanding was I think that a namespace file is for you a
+sequence of (your unique) namespace command.
+
+         List =&gt; Core_list
+         String =&gt; Core_string
+         ...
+
+For us (Gabriel and i) a namespace is a small program that builds a
+namespace.  A name space object is the result of executing this program
+in the current environment.
+
+I can see your command
+
+         List =&gt; Core_list
+
+as
+         let x = &lt;Core_list&gt; in    (1)
+         List -&gt; x                 (2)
+
+(1) find the module object with the internal name Core_listl binds it to x.
+(2) map List to x
+
+Then each line is a merge, and you end up building the namespace I described
+above. Then, because you do not combine existing namespaces, you may not
+need to have a model of what a namespace object is, and just reason at the
+program (sequence of namespace command) level.
+
+One simplification in your 2-level model that makes it look as a 1-level
+model is that you use the name of the namespace file as name of the
+namespace it defines, while for us the name of a namespace file
+would just be used to lead the file and the nema of the namespace would
+have to be written in the file itself.  This is really a minor difference.
+
+                               ----------------
+
+I think making this connection helps understanding one another.  In
+particular, I now see that your proposal to add open commands in namespace
+files is the same as mine, and they both avoid the need for auto-opens.
+(Whether this is a good thing is another question---but the answer should be
+the same in both cases.)
+
+It also helps understanding how your 2-level model could be later extended
+to an arbitrary level model if need be.
+
+It should helps transfer ideas from one view to the other:
+
+For exemple, in the hierachical model, a namespace can be defined in a
+single namespace file, because the syntax of our namespace files is not
+restricted to building 1-level only namespaces.  So even if we restrict our
+model to 2-level namespaces, we could keep the freedom to build either
+1-level or 2-level namespaces in namespace files.  On the contrary, in your
+setting, a source file using dozens of libraries will have to use dozens of
+namespace files, either imported in the header or passed on the command
+line, while we can concatenate them into a single namespace file.  Probably
+a minor difference, but good enough for illustration.
+
+         Didier
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000209.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000213.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#211">[ date ]</a>
+              <a href="thread.html#211">[ thread ]</a>
+              <a href="subject.html#211">[ subject ]</a>
+              <a href="author.html#211">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

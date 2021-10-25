@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Caml-list] Unix.getlogin () fails when stdin is redirected
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3C5389E853-E7F1-4AE3-AD97-E47300575B44%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001166.html">
+   <LINK REL="Next"  HREF="000282.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Caml-list] Unix.getlogin () fails when stdin is redirected</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3C5389E853-E7F1-4AE3-AD97-E47300575B44%40recoil.org%3E"
+       TITLE="[Caml-list] Unix.getlogin () fails when stdin is redirected">anil at recoil.org
+       </A><BR>
+    <I>Wed Mar 21 12:37:11 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001166.html">[Caml-list] Unix.getlogin () fails when stdin is redirected
+</A></li>
+        <LI>Next message: <A HREF="000282.html">[Caml-list] Unix.getlogin () fails when stdin is redirected
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1170">[ date ]</a>
+              <a href="thread.html#1170">[ thread ]</a>
+              <a href="subject.html#1170">[ subject ]</a>
+              <a href="author.html#1170">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I agree with Till; the least surprising thing is to pass through the underlying {g}libc library call.  Any higher-level replacement can just have a different name (for example, a version that goes through the password database and returns *all* logins associated with the {e}uid might be the safest thing).
+
+Xen thing making good progress. Soon! :-)
+
+-Anil
+
+On 21 Mar 2012, at 11:47, Yaron Minsky wrote:
+
+&gt;<i> I'm not sure how bad I feel about having surprising results in that degenerate case!
+</I>&gt;<i> 
+</I>&gt;<i> Anil, do you have a view as to what Core should do for getlogin?  I'm still not sure we should change anything, or if we should, what change to make...
+</I>&gt;<i> 
+</I>&gt;<i> I am sure that I hate Unix, though.  That Xen client thing is sounding better every day...
+</I>&gt;<i> 
+</I>&gt;<i> On Mar 21, 2012 7:35 AM, &quot;Anil Madhavapeddy&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+</I>&gt;<i> Bear in mind that getpwuid(getuid()) can return unexpected results if you have multiple usernames mapped to the same numeric id (bad idea, but it does happen, for example with the toor account often used for an alternative root shell).
+</I>&gt;<i> 
+</I>&gt;<i> The only reliable, portable results are the numeric ids from getuid/geteuid.
+</I>&gt;<i> 
+</I>&gt;<i> -anil
+</I>&gt;<i> 
+</I>&gt;<i> On 21 Mar 2012, at 02:29, Yaron Minsky wrote:
+</I>&gt;<i> 
+</I>&gt;&gt;<i> I have to say, the manpage on this is downright hilarious:
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Unfortunately, it is often rather easy to fool getlogin(). Sometimes it does
+</I>&gt;&gt;<i> not work at all, because some program messed up the utmp file. Often, it
+</I>&gt;&gt;<i> gives only the first 8 characters of the login name. The user currently
+</I>&gt;&gt;<i> logged in on the controlling tty of our program need not be the user who
+</I>&gt;&gt;<i> started it. Avoid getlogin() for security-related purposes.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Note that glibc does not follow the POSIX specification and uses stdin instead
+</I>&gt;&gt;<i> of /dev/tty. A bug. (Other recent systems, like SunOS 5.8 and HP-UX 11.11
+</I>&gt;&gt;<i> and FreeBSD 4.8 all return the login name also when stdin is redirected.)
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Nobody knows precisely what cuserid() does; avoid it in portable programs. Or
+</I>&gt;&gt;<i> avoid it altogether: use getpwuid(geteuid()) instead, if that is what you
+</I>&gt;&gt;<i> meant. Do not use cuserid().
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> So, on Linux getlogin returns mangled usernames sometimes, and should not be used for any &quot;security&quot; purposes.  getpwuid(getuid()) is sounding better and better...
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> On Tue, Mar 20, 2012 at 10:10 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> Looping in ocaml-core list.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> On Tue, Mar 20, 2012 at 8:51 PM, Gerd Stolpmann &lt;<A HREF="http://lists.ocaml.org/listinfo/core">info at gerd-stolpmann.de</A>&gt; wrote:
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> I second this. There is one OS where getlogin does not follow POSIX and is
+</I>&gt;&gt;<i> maybe insecure, and the fix cannot be to hide the function for all other
+</I>&gt;&gt;<i> OS. IMHO, these differences should be handled on a higher level, and not
+</I>&gt;&gt;<i> in the module providing the bindings.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Semantically, there is a big difference between getlogin and getuid:
+</I>&gt;&gt;<i> getlogin shall also work when the user calls a setuid program which in
+</I>&gt;&gt;<i> turn invokes a script. These script commands can then use getlogin to
+</I>&gt;&gt;<i> identify the original user (which is defined as the user of the session =
+</I>&gt;&gt;<i> the user of the controlling terminal). In contrast, getuid would return
+</I>&gt;&gt;<i> the uid to which setuid switched (for the script).
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> So, I'd say, you cannot repair getlogin with getuid. The best fix is
+</I>&gt;&gt;<i> probably to just run `/usr/bin/logname &lt;/dev/tty` and read the printed
+</I>&gt;&gt;<i> name.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> I can think of a few solutions here:
+</I>&gt;&gt;<i> We can use getuid only on platforms where getlogin is busted
+</I>&gt;&gt;<i> We can name our function something other than &quot;getlogin&quot;, to avoid confusion.
+</I>&gt;&gt;<i> We can shell-out, in the way you suggest, to implement getlogin on Linux.  My only worry is that this is also going to be somewhat fragile in its own way.  Does calling out to logname with the suggested redirect always work?  
+</I>&gt;&gt;<i> I'm open to other suggestions.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i> 
+</I>&gt;<i> 
+</I>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120321/b98d8ba5/attachment-0001.html">http://lists.ocaml.org/pipermail/core/attachments/20120321/b98d8ba5/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001166.html">[Caml-list] Unix.getlogin () fails when stdin is redirected
+</A></li>
+	<LI>Next message: <A HREF="000282.html">[Caml-list] Unix.getlogin () fails when stdin is redirected
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1170">[ date ]</a>
+              <a href="thread.html#1170">[ thread ]</a>
+              <a href="subject.html#1170">[ subject ]</a>
+              <a href="author.html#1170">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

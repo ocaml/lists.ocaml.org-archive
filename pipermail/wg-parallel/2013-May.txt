@@ -1,0 +1,570 @@
+From daniel.buenzli at erratique.ch  Wed May  1 01:26:35 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 1 May 2013 01:26:35 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+ <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+Message-ID: <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+
+Le mardi, 30 avril 2013 ? 22:15, Yaron Minsky a ?crit :
+> It's a beautiful dream, but it sounds implausible to me.  
+
+I don't dream, I write code. But, glancing over the discussion, I guess there are factors at that play that are not purely technical here.  
+  
+> I think one might as well propose writing programs in a way that is independent of
+> the programming language. This is doable in some small ways on the
+> margin, but it's not a practical approach.
+
+I don't think that's the point. I guess when you read/use code that you are not happy with it's just sane to not depend too much on it. That may be painful in the short term but more rewarding in the long term (which is what I'm interested in).  
+  
+
+
+> But this represents only a small part of the concurrent code that one writes, and so only
+> solves a small part of the problem.
+
+The question is which amount of the concurrent code you write is really application independent. I don't have the answer but my bet on that is that it's actually quite few. You may have a few concurrency patterns but I don't see how this couldn't be provided the asynchronous libraries themselves using the asynchronously "agnostic" primitive libraries.
+
+But that may require a different mindset (especially one that is not tied to the application one is currently writing).
+
+Best,
+
+Daniel
+
+
+
+From yminsky at janestreet.com  Wed May  1 01:42:35 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 30 Apr 2013 20:42:35 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+ <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+ <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+Message-ID: <CACLX4jQ9y7oQM0HO_0JioMGqz=CTXT-w1cYwPj6Vtuso1DhOvg@mail.gmail.com>
+
+On Tue, Apr 30, 2013 at 8:26 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le mardi, 30 avril 2013 ? 22:15, Yaron Minsky a ?crit :
+>> It's a beautiful dream, but it sounds implausible to me.
+>
+> I don't dream, I write code. But, glancing over the discussion, I
+> guess there are factors at that play that are not purely technical
+> here.
+
+For sure.  For example, the size of the community that already knows
+and uses a given library or toolchain plays an important role, which
+is more than a purely technical questions.
+
+That said, my objection to your proposal is essentially technical.
+Writing a layer that abstracts over Lwt and Async seems highly
+problematic.  I think it's hard to build such an abstraction that is
+performant, reliable, easy to reason about, and flexible enough to
+attach to a wide variety of applications.
+
+That said, this is the kind of objection that is easily overcome by
+code!  I'd be very curious to see what such an abstraction looked
+like.  I'm sure such a thing is not impossible --- after all, Async
+and Lwt both abstract over multiple other concurrency primitives, like
+select, libev and epoll.
+
+>> I think one might as well propose writing programs in a way that is
+>> independent of the programming language. This is doable in some
+>> small ways on the margin, but it's not a practical approach.
+>
+> I don't think that's the point. I guess when you read/use code that
+> you are not happy with it's just sane to not depend too much on
+> it. That may be painful in the short term but more rewarding in the
+> long term (which is what I'm interested in).
+>
+>> But this represents only a small part of the concurrent code that
+>> one writes, and so only solves a small part of the problem.
+>
+> The question is which amount of the concurrent code you write is
+> really application independent. I don't have the answer but my bet
+> on that is that it's actually quite few. You may have a few
+> concurrency patterns but I don't see how this couldn't be provided
+> the asynchronous libraries themselves using the asynchronously
+> "agnostic" primitive libraries.
+>
+> But that may require a different mindset (especially one that is not
+> tied to the application one is currently writing).
+
+I don't understand what you mean by "application independent".  There
+are of course lots of application-independent libraries written in
+Async (and Lwt too), from communication mechanisms like Async-RPC to
+code for setting up TCP servers and clients in the Tcp module, to
+logging facilities like Async's Log library.  But these libraries all
+depend on the error handling, concurrency and performance semantics of
+Async.
+
+y
+
+From yminsky at janestreet.com  Wed May  1 01:48:02 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 30 Apr 2013 20:48:02 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+ <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+ <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+Message-ID: <CACLX4jQvYsB344L4DuebRzgCpL6tL0Fcj_Nixeu2iqBFrQsgFQ@mail.gmail.com>
+
+Jeremie, I have another thought about trying to bring Lwt and Async
+together: knowing the two engines well as you do, do you think it
+makes any technical sense to basically bolt an Lwt skin on top of
+Async?  i.e., create an alternate version of the Lwt module where 'a
+Lwt.t = 'a Or_exn.t Deferred.t, so as to let one share the core
+scheduler.  This could allow code written to Lwt to run on top of
+Async's engine.
+
+I suspect it would be quite a large effort, and perhaps the Lwt
+community would have no interest in using the result of it, so I'm not
+saying it's worth doing.  I'm just wondering if you think it's a
+technically feasible project.
+
+y
+
+On Tue, Apr 30, 2013 at 8:58 AM, Yaron Minsky <yminsky at gmail.com> wrote:
+> On Tue, Apr 30, 2013 at 8:43 AM, Vincent Balat
+> <vincent.balat at univ-paris-diderot.fr> wrote:
+>> Hi,
+>>
+>> I want to thank very much Yaron and all of you for taking time to try to find
+>> a solution to this problem. I also want to remind the position of the Ocsigen
+>> project on this list (and make it clear that we do not plan to switch to
+>> Async).
+>>
+>>> I'm not sure that the right goal is "to make them evolve so they are
+>>> close enough".  If we're going to end up with just one implementation,
+>>> it's hard for me to see how it's not going to be Async, because Jane
+>>> Street is not going to be able to move away from Async as a practical
+>>> matter.
+>>
+>> I understand but I think it is even worse for Lwt, because it is used by many
+>> projects (representing several hundreds of thousand of lines, written by many
+>> people). Ending up with one implementation is unfortunately a very unlikely
+>> hypothesis. That's why I proposed, not to drop one of the implementation, but
+>> to try to converge in term of features and semantics, in order to make it
+>> easier to adapt libraries for one or the other, and thus limit the impact of
+>> the schism Async is creating.
+>
+> Unfortunately, I don't see how having two libraries with different
+> implementations and similar semantics is much of an improvement over
+> the current state of affairs.  Using functors for making libraries
+> portable over the two is no way to live!
+>
+> I understand your reluctance to switch away from Lwt --- surely,
+> dealing with the migration would be disruptive and would take
+> significant time and effort.  Indeed, our own situation is that we
+> have a few million lines of code using Async, 100 or so active
+> developers internally, and many mission-critical applications that
+> depend on the details of Async's semantics and performance, so moving
+> away from it is a non-starter for us as well.
+>
+> In any case, I think the question of how to maximize interoperatbility
+> between Async and Lwt seems on topic.  Beyond that, we're interested
+> in understanding what can be done to make Async more broadly useful to
+> people outside of Jane Street.
+>
+> y
+>
+>> It is not possible to ask Lwt projects to switch to the current implementation
+>> of Async, because there are too many projects and most of them will probably
+>> just do nothing.The Ocsigen Web framework itself is a large piece of code,
+>> relying a lot on very precise details of the semantics of Lwt. We are
+>> currently working on ambititous projects that have a much higher level of
+>> priority. Besides, we cannot take this decision for all our users.
+>>
+>> If Jane Street does not want to switch to Lwt (which would be the best
+>> solution for the community but I understand that it is not easy), the only
+>> possibility I see to end up with one implementation is to make Async evolve so
+>> that it could really be used in some way as an exact replacement for Lwt.
+>>
+>> In the current state of things, I want to make it clear that Ocsigen will not
+>> switch to Async, and will not abandon Lwt users, and continue to encourage
+>> people using Lwt rather than Async, in order to keep a consistency between
+>> libraries.
+>>
+>> But we would be happy if Jane Street could help avoid a split of the OCaml
+>> community ... The solutions you propose are a very good first step, and we
+>> appreciate it.
+>>
+>> Vincent
+>>
+> _______________________________________________
+> wg-parallel mailing list
+> wg-parallel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-parallel
+
+From daniel.buenzli at erratique.ch  Wed May  1 02:54:46 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 1 May 2013 02:54:46 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CACLX4jQ9y7oQM0HO_0JioMGqz=CTXT-w1cYwPj6Vtuso1DhOvg@mail.gmail.com>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+ <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+ <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+ <CACLX4jQ9y7oQM0HO_0JioMGqz=CTXT-w1cYwPj6Vtuso1DhOvg@mail.gmail.com>
+Message-ID: <5EAC34FD03C547579C5E6DC1B4FCF9A4@erratique.ch>
+
+Le mercredi, 1 mai 2013 ? 01:42, Yaron Minsky a ?crit :
+> That said, my objection to your proposal is essentially technical.
+> Writing a layer that abstracts over Lwt and Async seems highly
+> problematic.  
+
+We agree on that, I don't like the functor approach. My take on that is to turn the problem upside down and instead of abstracting over the asynchronous primitives, provide libraries that are asynchronous in their own mode of operation independently of monadic concurrency libraries, and hence usable by any of them (or whatever asynchronous mechanism that may become prevalent in the future).   
+
+For me the idea is that we can afford *library* programmers to suffer that pain --- basically hand made cps progamming, it's fun bun can be odd? However *application* (or end-user) programmers should not have to suffer and use the monadic programming library of their choice.  
+
+Now the point to which that idea can be brought is unknown to me. One thing that is certain to me is that at least for codecs (which is not a small amount of libraries in my opinion), this can be done and should be done.
+  
+> I think it's hard to build such an abstraction that is performant,
+
+Regarding codecs, the pattern I mention allows you to use a unique, fixed size, buffer for input and output -- perfect for Unix.{read,write}. There may however be a cost for cps that I'm not really able to assert -- but I guess you also pay that price if you work directly with a monadic library.
+
+  
+> reliable, easy to reason about,  
+
+In fact the whole point of my wip on Fut [1] was to attach a clear denotational semantics to its values and primitives. But since some combinators have side effects (cancellation) it hinders equational reasoning. Still I think it's nice to have a clear semantics attached your combinators, something I find really lacking in both async and lwt. Maybe I'm special but I like to understand my abstractions, especially having a clear concurrency model of the runtime is important to me (and a simple one aswell, hence Fut's fifo queues).
+
+> I don't understand what you mean by "application independent".  
+By application *dependent* I mean related to the software architecture, design and constraints you choose to try to solve your specific problem -- maybe that's just non obviously reusable code.  
+  
+> There
+> are of course lots of application-independent libraries written in
+> Async (and Lwt too), from communication mechanisms like Async-RPC to
+> code for setting up TCP servers and clients in the Tcp module, to
+> logging facilities like Async's Log library. But these libraries all
+> depend on the error handling, concurrency and performance semantics of
+> Async.
+
+These would be for me in the "concurrency patterns" I mentioned. So the question is how far can we go here by just plugin asynchronous agnostic libraries, and how painful it is (or not) for the end-user. I was actually intending to work on these questions beyond codecs (which is a solved problem for me) in my work on webs [2], but I'm on other things right now.
+
+Best,
+
+Daniel  
+
+[1]  
+http://erratique.ch/tmp/fut/Fut.html
+https://github.com/dbuenzli/fut/blob/master/src/fut.mli
+
+[2]
+https://github.com/dbuenzli/webs
+
+
+From yminsky at janestreet.com  Wed May  1 04:15:52 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 30 Apr 2013 23:15:52 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <5EAC34FD03C547579C5E6DC1B4FCF9A4@erratique.ch>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+ <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+ <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+ <CACLX4jQ9y7oQM0HO_0JioMGqz=CTXT-w1cYwPj6Vtuso1DhOvg@mail.gmail.com>
+ <5EAC34FD03C547579C5E6DC1B4FCF9A4@erratique.ch>
+Message-ID: <CACLX4jTAGFfLPVfa4whs5PAp-qyZ4inzjE8D=AxRFikhEZfCww@mail.gmail.com>
+
+Is the code to Fut available somewhere?  I couldn't find it on your page.
+
+>From a glance, Fut looks more like a third monadic concurrency
+library, parallel to Async and Lwt, rather than an abstraction layer
+above such libraries.  Am I missing something here?
+
+y
+
+On Tue, Apr 30, 2013 at 9:54 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le mercredi, 1 mai 2013 ? 01:42, Yaron Minsky a ?crit :
+>> That said, my objection to your proposal is essentially technical.
+>> Writing a layer that abstracts over Lwt and Async seems highly
+>> problematic.
+>
+> We agree on that, I don't like the functor approach. My take on that is to turn the problem upside down and instead of abstracting over the asynchronous primitives, provide libraries that are asynchronous in their own mode of operation independently of monadic concurrency libraries, and hence usable by any of them (or whatever asynchronous mechanism that may become prevalent in the future).
+>
+> For me the idea is that we can afford *library* programmers to suffer that pain --- basically hand made cps progamming, it's fun bun can be odd? However *application* (or end-user) programmers should not have to suffer and use the monadic programming library of their choice.
+>
+> Now the point to which that idea can be brought is unknown to me. One thing that is certain to me is that at least for codecs (which is not a small amount of libraries in my opinion), this can be done and should be done.
+>
+>> I think it's hard to build such an abstraction that is performant,
+>
+> Regarding codecs, the pattern I mention allows you to use a unique, fixed size, buffer for input and output -- perfect for Unix.{read,write}. There may however be a cost for cps that I'm not really able to assert -- but I guess you also pay that price if you work directly with a monadic library.
+>
+>
+>> reliable, easy to reason about,
+>
+> In fact the whole point of my wip on Fut [1] was to attach a clear denotational semantics to its values and primitives. But since some combinators have side effects (cancellation) it hinders equational reasoning. Still I think it's nice to have a clear semantics attached your combinators, something I find really lacking in both async and lwt. Maybe I'm special but I like to understand my abstractions, especially having a clear concurrency model of the runtime is important to me (and a simple one aswell, hence Fut's fifo queues).
+>
+>> I don't understand what you mean by "application independent".
+> By application *dependent* I mean related to the software architecture, design and constraints you choose to try to solve your specific problem -- maybe that's just non obviously reusable code.
+>
+>> There
+>> are of course lots of application-independent libraries written in
+>> Async (and Lwt too), from communication mechanisms like Async-RPC to
+>> code for setting up TCP servers and clients in the Tcp module, to
+>> logging facilities like Async's Log library. But these libraries all
+>> depend on the error handling, concurrency and performance semantics of
+>> Async.
+>
+> These would be for me in the "concurrency patterns" I mentioned. So the question is how far can we go here by just plugin asynchronous agnostic libraries, and how painful it is (or not) for the end-user. I was actually intending to work on these questions beyond codecs (which is a solved problem for me) in my work on webs [2], but I'm on other things right now.
+>
+> Best,
+>
+> Daniel
+>
+> [1]
+> http://erratique.ch/tmp/fut/Fut.html
+> https://github.com/dbuenzli/fut/blob/master/src/fut.mli
+>
+> [2]
+> https://github.com/dbuenzli/webs
+>
+
+From jdimino at janestreet.com  Wed May  1 08:13:06 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Wed, 1 May 2013 08:13:06 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CACLX4jQvYsB344L4DuebRzgCpL6tL0Fcj_Nixeu2iqBFrQsgFQ@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+ <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+ <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+ <CACLX4jQvYsB344L4DuebRzgCpL6tL0Fcj_Nixeu2iqBFrQsgFQ@mail.gmail.com>
+Message-ID: <CANhEzE4eCus4aQECqNwjC05uzN-kwS2rBO=ThauciREOGRM2ig@mail.gmail.com>
+
+I had thought about that a bit.  So yes it is technically possible,
+here is what would need to be done:
+
+- write a Lwt module on top of async: doable
+- write an engine for lwt.unix using the async scheduler: should be trivial
+- adapt a little bit Lwt_unix for signal handling
+- add a few things to async (immediate bind, local storage)
+
+Though in the end there the result will be less efficient than the
+default lwt, for instance because there is one more level of boxing
+for each thread due to the Or_error.t.
+
+Also just that will provide very basic integration, for example if a
+part of your program uses async and another part uses lwt you cannot
+pass file descriptors from one to another since the type will still be
+different.  With more work it would be possible to get more
+integration and to use async's file descriptors in Lwt_unix for
+instance.
+
+Anyway I think the first part shouldn't be too much work, it could be
+an intern project.
+
+On Wed, May 1, 2013 at 1:48 AM, Yaron Minsky <yminsky at janestreet.com> wrote:
+> Jeremie, I have another thought about trying to bring Lwt and Async
+> together: knowing the two engines well as you do, do you think it
+> makes any technical sense to basically bolt an Lwt skin on top of
+> Async?  i.e., create an alternate version of the Lwt module where 'a
+> Lwt.t = 'a Or_exn.t Deferred.t, so as to let one share the core
+> scheduler.  This could allow code written to Lwt to run on top of
+> Async's engine.
+>
+> I suspect it would be quite a large effort, and perhaps the Lwt
+> community would have no interest in using the result of it, so I'm not
+> saying it's worth doing.  I'm just wondering if you think it's a
+> technically feasible project.
+
+From daniel.buenzli at erratique.ch  Wed May  1 08:38:07 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 1 May 2013 08:38:07 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CACLX4jTAGFfLPVfa4whs5PAp-qyZ4inzjE8D=AxRFikhEZfCww@mail.gmail.com>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+ <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+ <910F0F81D8AC41FDBFCE86AFA7DA03AA@erratique.ch>
+ <CACLX4jQ9y7oQM0HO_0JioMGqz=CTXT-w1cYwPj6Vtuso1DhOvg@mail.gmail.com>
+ <5EAC34FD03C547579C5E6DC1B4FCF9A4@erratique.ch>
+ <CACLX4jTAGFfLPVfa4whs5PAp-qyZ4inzjE8D=AxRFikhEZfCww@mail.gmail.com>
+Message-ID: <54BC74327EDF42DBAFD8DC141EF2458E@erratique.ch>
+
+Le mercredi, 1 mai 2013 ? 04:15, Yaron Minsky a ?crit :
+> Is the code to Fut available somewhere?
+It's here https://github.com/dbuenzli/fut/ but be warned that this is unfinished and unreleased software.  
+
+> From a glance, Fut looks more like a third monadic concurrency
+> library, parallel to Async and Lwt, rather than an abstraction layer
+> above such libraries. Am I missing something here?
+
+No, that's correct, I don't know where you got the idea that it was an abstraction layer.  
+
+Best,
+
+Daniel
+
+
+
+From jdimino at janestreet.com  Wed May  1 09:32:25 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Wed, 1 May 2013 09:32:25 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+Message-ID: <CANhEzE78QemdoXtJf+taaPDaVhSLQbuZGyc_o9sciN+ptdeRVA@mail.gmail.com>
+
+On Tue, Apr 30, 2013 at 6:25 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> To be honest I'm neither content with either lwt nor async. I actually toyed with my own implementation of these concepts, that may, or not, be released in the future. A few hints of what lead me to that are given here [1].
+
+I am not surprised that not everybody is happy with lwt or async, you
+are not the first one I know of to try his own implementation.  Also I
+am always interested in feedback, so it is interesting to see
+different ones.
+
+> That being said I would like to stress that a lot of foundational libraries can avoid making a choice *without* functorizing as Yaron (doesn't) suggest.
+>
+> Notably codecs can be made both lwt and async friendly by following this pattern [2] (the repo has a toy example, see the readme), which I already implemented for Unicode and JSON decoding [3,4]; xmlm will adopt it once I get time to work on the library again; the Vg library on which I'm currently working on [5] also uses that pattern.
+
+Well that works to some extent.  If you are doing no IO or just using
+sockets it is easy to provide the user with what he needs to hook into
+the asynchronous mechanism of his choice.  But the more you need from
+the OS and the harder it gets.
+
+> Given the positions on both sides, I actually think we should take that "schism" as a chance rather than a curse. Striving for independence from the concrete asynchronous programming mechanism (with or without functorizing) and cutting down on dependencies in foundational libraries may actually lead to software that is more composable, adaptable and reusable in the long term.
+>
+> My opinion is that most of the time choosing a particular asynchronous programming library should be a choice left to the developer of *applications* not to the developer of libraries --- but I have a bias towards small and focused libraries rather than "solve everything frameworks".
+
+I guess the good thing about big integrated frameworks is that it is
+quicker to develop applications with them.  You can just import them
+and start using what you need without having to worry about
+inter-component integration.
+
+That said I agree with you that small independent libraries like yours
+are a good thing.
+
+From dave.scott at eu.citrix.com  Wed May  1 14:00:36 2013
+From: dave.scott at eu.citrix.com (David Scott)
+Date: Wed, 1 May 2013 14:00:36 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE4eCus4aQECqNwjC05uzN-kwS2rBO=ThauciREOGRM2ig@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+ <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+ <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+ <CACLX4jQvYsB344L4DuebRzgCpL6tL0Fcj_Nixeu2iqBFrQsgFQ@mail.gmail.com>
+ <CANhEzE4eCus4aQECqNwjC05uzN-kwS2rBO=ThauciREOGRM2ig@mail.gmail.com>
+Message-ID: <518111F4.7040800@eu.citrix.com>
+
+
+Hi,
+
+In the XenServer part of Citrix we're starting to use Core for some 
+projects (and no doubt we'll incorporate Async into those soon) and 
+we're also using Lwt, mainly via mirage. We haven't invested so much in 
+either that it would be impossible to switch, although it will take a 
+while: shipping code will often be maintained for around 5 years.
+
+I had a quick look at our development opam repo[1] and, at the package 
+level at least, our stuff breaks down roughly into
+
+   * 25% C bindings for bits of Unix; traditional style; potentially 
+blocking operations.
+   * 25% protocol implementations / format converters. These are a mix 
+of traditional style, with some lwt creeping in (often kept separate 
+using ocamlfind subpackages)
+   * 50% apps / services / tools. I'm expecting both Async and Lwt to 
+start creeping in here.
+
+Our apps usually talk to each other via RPC so we can live with a 
+mixture of Async apps and Lwt apps but it would obviously be simpler if 
+we were able to standardise (eventually) on one API.
+
+The simple Lwt shim on top of Async Jeremie described would potentially 
+be useful for us: in some of our less performance-critical apps we could 
+clearly live with a bit of extra boxing. We're also not using very much 
+of the Lwt library so even a very basic integration would still be useful.
+
+Our performance critical apps will use mirage and its ecosystem of 
+libraries, all based on Lwt. If it were possible to port the kernel of 
+Async to mirage then we could use the Async engine everywhere, and
+slowly port everything over to it.
+
+Cheers,
+Dave
+
+[1] https://github.com/xen-org/opam-repo-dev
+
+From yminsky at janestreet.com  Wed May  1 16:36:05 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Wed, 1 May 2013 11:36:05 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <518111F4.7040800@eu.citrix.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+ <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+ <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+ <CACLX4jQvYsB344L4DuebRzgCpL6tL0Fcj_Nixeu2iqBFrQsgFQ@mail.gmail.com>
+ <CANhEzE4eCus4aQECqNwjC05uzN-kwS2rBO=ThauciREOGRM2ig@mail.gmail.com>
+ <518111F4.7040800@eu.citrix.com>
+Message-ID: <CACLX4jRf3A83ZR5jVX7tVenvoSDHC5NwyFhhWqEUfdV_a6oaLg@mail.gmail.com>
+
+On Wed, May 1, 2013 at 9:00 AM, David Scott <dave.scott at eu.citrix.com> wrote:
+>
+> Hi,
+>
+> In the XenServer part of Citrix we're starting to use Core for some projects
+> (and no doubt we'll incorporate Async into those soon) and we're also using
+> Lwt, mainly via mirage. We haven't invested so much in either that it would
+> be impossible to switch, although it will take a while: shipping code will
+> often be maintained for around 5 years.
+>
+> I had a quick look at our development opam repo[1] and, at the package level
+> at least, our stuff breaks down roughly into
+>
+>   * 25% C bindings for bits of Unix; traditional style; potentially blocking
+> operations.
+>   * 25% protocol implementations / format converters. These are a mix of
+> traditional style, with some lwt creeping in (often kept separate using
+> ocamlfind subpackages)
+>   * 50% apps / services / tools. I'm expecting both Async and Lwt to start
+> creeping in here.
+>
+> Our apps usually talk to each other via RPC so we can live with a mixture of
+> Async apps and Lwt apps but it would obviously be simpler if we were able to
+> standardise (eventually) on one API.
+>
+> The simple Lwt shim on top of Async Jeremie described would potentially be
+> useful for us: in some of our less performance-critical apps we could
+> clearly live with a bit of extra boxing. We're also not using very much of
+> the Lwt library so even a very basic integration would still be useful.
+>
+> Our performance critical apps will use mirage and its ecosystem of
+> libraries, all based on Lwt. If it were possible to port the kernel of Async
+> to mirage then we could use the Async engine everywhere, and
+> slowly port everything over to it.
+>
+> Cheers,
+> Dave
+>
+> [1] https://github.com/xen-org/opam-repo-dev
+
+I believe Anil is interested in moving Mirage to Async (Anil, can you
+confirm?), and Jeremie and Stephen are going to do the reorganization
+of Core so that there is a Core_kernel that's more portable than the
+full Core, and Async's core (which we're going to rename to
+Async_kernel) is going to depend only on Core_kernel.
+
+As Jeremie said, the Lwt shim seems doable, and we'll look into that
+as an intern project this summer.
+
+I should say: I very much endorse Daniel's suggestion that codecs
+should when possible be written in such a way as to be adaptible
+between multiple engines.
+
+As a side note, it looks like we're not the only community with this
+problem.  There are some interesting discussions in the Scala
+community about the mismatch between Akka futures and Finagle
+futures.  It's all very reminisicent.
+
+https://groups.google.com/forum/#!topic/akka-user/eXiBV5V7ZzE
+
+We're also contemplating having an intern look as to whether Libuv
+would be a reasonable way of getting Async to be more portable to
+other places, including Windows.
+
+y
+

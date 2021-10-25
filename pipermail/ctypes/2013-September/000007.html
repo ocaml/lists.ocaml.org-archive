@@ -1,0 +1,108 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Variadic Functions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Variadic%20Functions&In-Reply-To=%3CCAAxsn%3DH_JJV3yX3LruMddAcDKX_nmv-dUgb8B9ekXDgPMGx1Xg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000005.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Variadic Functions</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Variadic%20Functions&In-Reply-To=%3CCAAxsn%3DH_JJV3yX3LruMddAcDKX_nmv-dUgb8B9ekXDgPMGx1Xg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Variadic Functions">yallop at gmail.com
+       </A><BR>
+    <I>Mon Sep 30 14:31:01 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000005.html">[ocaml-ctypes] Variadic Functions
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 24 September 2013 12:43, Florian Pichlmeier
+&lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">florian.pichlmeier at mytum.de</A>&gt; wrote:
+&gt;<i> Some of these functions are variadic functions, like this one
+</I>&gt;<i>
+</I>&gt;<i> //  Create new poller
+</I>&gt;<i> CZMQ_EXPORT zpoller_t *
+</I>&gt;<i>     zpoller_new (void *reader, ...);
+</I>&gt;<i>
+</I>&gt;<i> Is there a way with ctypes to emulate this signature?
+</I>
+The short answer, unfortunately, is &quot;no&quot;.  This type of function is
+rather tricky to wrap.  This isn't due to a limitation of ctypes; it's
+because there isn't a way to write wrappers for variadic functions in
+standard C [0, 1]
+
+Ideally the C library interface should provide a more wrappable
+interface in addition to the variadic function, e.g.
+
+    zpoller_t *zpoller_new_vec(void **readers);    /* argument is a
+null-terminated array of pointers */
+
+or
+
+    zpoller_t *zpoller_new_vec(void **readers, size_t nreaders);
+
+It might be worth sending a pull request to the czmq maintainers to
+modify the interface.
+
+If you're not too concerned by portability you can use the fact that
+some C implementations (e.g. GCC on Linux) have the same calling
+convention for variadic and regular functions.  Here ctypes offers an
+advantage over handwritten bindings: since C types are exposed as
+OCaml values you can construct a signature dynamically according to
+the number of arguments you want to pass to  the function.  For
+example, you might call the function using any of the signatures
+
+    ptr void @-&gt; returning (ptr (zpoller_t))
+
+    ptr void @-&gt; ptr void @-&gt; returning (ptr (zpoller_t))
+
+    ptr void @-&gt; ptr void @-&gt; ptr void @-&gt; returning (ptr (zpoller_t))
+
+and so on.  In fact, it ought to be possible (but probably not easy)
+to write a function which accepts a list of pointers, constructs a
+suitable signature for zpoller_new and calls the function.
+
+Jeremy.
+
+[0] <A HREF="http://c-faq.com/varargs/handoff.html">http://c-faq.com/varargs/handoff.html</A>
+[1] <A HREF="http://c-faq.com/varargs/invvarargs.html">http://c-faq.com/varargs/invvarargs.html</A>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000005.html">[ocaml-ctypes] Variadic Functions
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,790 @@
+From louis.gesbert at ocamlpro.com  Mon Jun  3 09:31:49 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 3 Jun 2013 10:31:49 +0200
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+Message-ID: <201306031031.49884.louis.gesbert@ocamlpro.com>
+
+For what it's worth, I just released ocp-indent 1.2.1 solving the specific issue.
+
+Le jeudi 30 mai 2013 16:35:24, Daniel B?nzli a ?crit :
+> Le jeudi, 30 mai 2013 ? 14:45, Anil Madhavapeddy a ?crit :
+> > That's precisely what it's intended to do. It's easy to extend the pin to add version numbers too (which may already be in trunk). i.e.
+> >  
+> > $ opam pin atdgen.1.2.3 git://github.com/mjambon/atdgen (http://github.com/mjambon/atdgen)
+> >  
+> > which would ensure that the 1.2.3 constraints are used with the source from the git remote.
+> 
+> If that's what its intended to do why not. I still think that it is quite confusing since the whole system will tell you that you installed 1.2.3 while it's not and as witnessed in my first email, it doesn't seem to work well in practice.  
+>    
+> > What you want sounds like the job for an OPAM remote such as:
+> > https://github.com/xen-org/opam-repo-dev
+> 
+> Actually what I want at the moment is an easy way to install the repo version of ocp-indent. I guess since it doesn't install at the moment with pin the package description will have to be updated anyway. The idea is to avoid these things of becoming desynchronized.
+> 
+>   
+> > Why not just use the existing OPAM facility for multiple package repositories (including local ones) instead of complicating the core?
+> 
+> Because it's overkill for what I want to do now. And in fact I think these ideas could have lead to simpler workflows (to distribute your software just tell people to `opam add-pkg url-to-git-repo`) and a simpler design for opam (suppress the notion of opam repository, leaving only the notion of package and if your package descriptions differ from what upstream provides you fork the package with an automatic rebase on pull).  
+> 
+> Daniel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+From anil at recoil.org  Mon Jun  3 09:38:36 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 3 Jun 2013 09:38:36 +0100
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <36FD71F1-B5E8-4E17-9708-295098BC28AB@recoil.org>
+ <C9C2BFCD7CC147F2818578A547AF33CB@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+Message-ID: <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+
+On 30 May 2013, at 15:35, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Le jeudi, 30 mai 2013 ? 14:45, Anil Madhavapeddy a ?crit :
+>> That's precisely what it's intended to do. It's easy to extend the pin to add version numbers too (which may already be in trunk). i.e.
+>> 
+>> $ opam pin atdgen.1.2.3 git://github.com/mjambon/atdgen (http://github.com/mjambon/atdgen)
+>> 
+>> which would ensure that the 1.2.3 constraints are used with the source from the git remote.
+> 
+> If that's what its intended to do why not. I still think that it is quite confusing since the whole system will tell you that you installed 1.2.3 while it's not and as witnessed in my first email, it doesn't seem to work well in practice.  
+> 
+>> What you want sounds like the job for an OPAM remote such as:
+>> https://github.com/xen-org/opam-repo-dev
+> 
+> Actually what I want at the moment is an easy way to install the repo version of ocp-indent. I guess since it doesn't install at the moment with pin the package description will have to be updated anyway. The idea is to avoid these things of becoming desynchronized.
+
+I wonder if an upstream opam-repository-unstable makes sense here, which always points to the bleeding-edge version of a package.  This would also be useful for OCamlot to test, although very prone to breakage.  @dsheets, any thoughts on this?
+
+The issue is that adding that remote would pull in every single bleeding edge package, without having a apt-style pin to only pull in a selected one.
+
+On the other hand, it's quite common for bleeding-edge packages to depend on other unreleased packages, so this is necessary in the general case.
+
+> 
+> Because it's overkill for what I want to do now. And in fact I think these ideas could have lead to simpler workflows (to distribute your software just tell people to `opam add-pkg url-to-git-repo`) and a simpler design for opam (suppress the notion of opam repository, leaving only the notion of package and if your package descriptions differ from what upstream provides you fork the package with an automatic rebase on pull).  
+
+I agree with the desire for simpler workflows.  For the moment though (given that the core of OPAM's design is unlikely to change drastically), it would be good to assemble these over what's already in OPAM 1.0.
+
+For instance, you can create an opam-add-pkg shell script that creates a local filesystem hierarchy with just one package entry.   That maps to 'opam add-pkg <args>' if it's on your PATH when you invoke the opam binary.
+
+-anil
+
+From daniel.buenzli at erratique.ch  Mon Jun  3 10:38:17 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 3 Jun 2013 10:38:17 +0100
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <36FD71F1-B5E8-4E17-9708-295098BC28AB@recoil.org>
+ <C9C2BFCD7CC147F2818578A547AF33CB@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+ <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+Message-ID: <7D5957D92AA74204846420873FD94A72@erratique.ch>
+
+Le lundi, 3 juin 2013 ? 09:38, Anil Madhavapeddy a ?crit :
+> > Actually what I want at the moment is an easy way to install the repo version of ocp-indent. I guess since it doesn't install at the moment with pin the package description will have to be updated anyway. The idea is to avoid these things of becoming desynchronized.
+>  
+> I wonder if an upstream opam-repository-unstable makes sense here, which always points to the bleeding-edge version of a package. This would also be useful for OCamlot to test, although very prone to breakage. @dsheets, any thoughts on this?
+
+I don't think that would really help as long as there is no mechanism by which a package can somehow auto-update its own description when it changes. That's the problem, not accessing the bleeding edge source, opam pin handles that very well.
+
+I think there's a use case that is not well covered here, which is pre-release/blocking bug in a package. What you really want is pin a package to the git repo but maybe only for a few days (like I wanted with ocp-indent), but of course the repos may not have the correct build instructions, so you want a lightweight way of being able to specify the new ones. For me it seems natural to try to lookup that in the repo itself.  
+
+Best,
+
+Daniel
+
+P.S. Just for the record that's the way I handled the ocp-indent problem, I'm sure it could be simpler:
+
+1. opam pin ocp-indent git://
+2. edit description in ./opam/repo/opam-repository to remove useless patch that was making the build fail.
+3. rm ~/.opam/state.cache
+4. opam install ocp-indent
+5. opam update, will tell you that ocp-indent updated (a new (the old) description was detected)
+6. opam upgrade --fake
+
+
+
+
+
+
+
+From anil at recoil.org  Mon Jun  3 11:59:01 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 3 Jun 2013 11:59:01 +0100
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <7D5957D92AA74204846420873FD94A72@erratique.ch>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <36FD71F1-B5E8-4E17-9708-295098BC28AB@recoil.org>
+ <C9C2BFCD7CC147F2818578A547AF33CB@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+ <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+ <7D5957D92AA74204846420873FD94A72@erratique.ch>
+Message-ID: <1BCD5AFA-845B-46A2-B40D-820DD08B9E2C@recoil.org>
+
+On 3 Jun 2013, at 10:38, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Le lundi, 3 juin 2013 ? 09:38, Anil Madhavapeddy a ?crit :
+>>> Actually what I want at the moment is an easy way to install the repo version of ocp-indent. I guess since it doesn't install at the moment with pin the package description will have to be updated anyway. The idea is to avoid these things of becoming desynchronized.
+>> 
+>> I wonder if an upstream opam-repository-unstable makes sense here, which always points to the bleeding-edge version of a package. This would also be useful for OCamlot to test, although very prone to breakage. @dsheets, any thoughts on this?
+> 
+> I don't think that would really help as long as there is no mechanism by which a package can somehow auto-update its own description when it changes. That's the problem, not accessing the bleeding edge source, opam pin handles that very well.
+
+The unstable repository I'm thinking of also has its OPAM description, url and information file.  The only difference from unstable to stable is that git:// URLs are allowed in the unstable repository.
+
+This is similar to the xen-org repository at http://github.com/xen-org/opam-repo-dev, which they use for cutting-edge packages.  The danger of such a repository is that people neglect to test their stable tree, but OCamlot should help with that when it goes live.
+
+> I think there's a use case that is not well covered here, which is pre-release/blocking bug in a package. What you really want is pin a package to the git repo but maybe only for a few days (like I wanted with ocp-indent), but of course the repos may not have the correct build instructions, so you want a lightweight way of being able to specify the new ones. For me it seems natural to try to lookup that in the repo itself.
+
+In general, it's preferable to separate the packaging from the sources since they change at different rates.  For instance, Debian packages recommend the same thing:
+https://github.com/OCamlPro/opam/issues/149#issuecomment-16041625
+
+But the point remains that you can't just blindly pin a git repo to the bleeding edge in many cases, as it has some other dependencies that are also pulled in.  Why not just make it easier to apply a local patch to one (stable) package description?  That way you guarantee that you have all the prerequisites.
+
+A script could do this easily: grab the latest stable description for a particular package, and create a remote with a slightly bumped version number (e.g. -local1 suffixed) and add a patch to the files/ directory.  When the upstream package is released, its higher version number will naturally take precedence.  No pinning required.
+
+(Either way, I'd record your use case as a bug on the OPAM tracker to ensure we don't forget this conversation).
+
+-anil
+
+From daniel.buenzli at erratique.ch  Mon Jun  3 14:22:32 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 3 Jun 2013 14:22:32 +0100
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <1BCD5AFA-845B-46A2-B40D-820DD08B9E2C@recoil.org>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <36FD71F1-B5E8-4E17-9708-295098BC28AB@recoil.org>
+ <C9C2BFCD7CC147F2818578A547AF33CB@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+ <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+ <7D5957D92AA74204846420873FD94A72@erratique.ch>
+ <1BCD5AFA-845B-46A2-B40D-820DD08B9E2C@recoil.org>
+Message-ID: <F3C831ADA45F4596BD8556B902FDDB8B@erratique.ch>
+
+
+
+Le lundi, 3 juin 2013 ? 11:59, Anil Madhavapeddy a ?crit :
+
+> In general, it's preferable to separate the packaging from the sources since they change at different rates. For instance, Debian packages recommend the same thing:
+> https://github.com/OCamlPro/opam/issues/149#issuecomment-16041625
+
+
+I'm not sure I'm really convinced by that argument for me a package manager like debian (end-user oriented) is still something quite different from opam (developer oriented).  
+
+Besides it's not because they are in the git repo that they need to be tied to the corresponding version checkout (keep in the repo a map from versions to checkout that have the correct metadata for the version). I quite like this idea of self-describing repos that you can navigate by following references to commits, it looks a lot like the web where you gradually follows references that are returned in the representations you ask.  Anyways.
+
+> (Either way, I'd record your use case as a bug on the OPAM tracker to ensure we don't forget this conversation).
+
+Tried to do that here:
+
+https://github.com/OCamlPro/opam/issues/637
+
+Initially I was planning to have an erratique-unstable repo with git package of all my software with special opam files to build them from a checkout. So that I could easily point to that for people to try the HEAD of one of my packages. I now realize that, as you mentioned before it's a little bit problematic, as it would force them to use the HEAD of all my packages.
+
+I think I'll now change the strategy and make an opam file that automatically detect if it's a checkout or not and performs whatever is needed to build the thing, so that people can simply pin the git repos instead of adding a new opam repository.
+
+Daniel
+
+
+
+
+
+
+From anil at recoil.org  Mon Jun  3 14:39:02 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 3 Jun 2013 14:39:02 +0100
+Subject: [opam-devel] Does pin git:// really make sense ?
+In-Reply-To: <F3C831ADA45F4596BD8556B902FDDB8B@erratique.ch>
+References: <B453B22B585A4C8086BABF63C8DE632D@erratique.ch>
+ <36FD71F1-B5E8-4E17-9708-295098BC28AB@recoil.org>
+ <C9C2BFCD7CC147F2818578A547AF33CB@erratique.ch>
+ <15D319DA-87B0-4312-AB26-8743524FB2C6@recoil.org>
+ <33FC631BC6DA4434972E0ADC9652117F@erratique.ch>
+ <3060DA93-D7A3-46DA-B11E-FA076FF10307@recoil.org>
+ <7D5957D92AA74204846420873FD94A72@erratique.ch>
+ <1BCD5AFA-845B-46A2-B40D-820DD08B9E2C@recoil.org>
+ <F3C831ADA45F4596BD8556B902FDDB8B@erratique.ch>
+Message-ID: <26A03747-0014-43B5-9205-941AC4DBCCE0@recoil.org>
+
+On 3 Jun 2013, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> Le lundi, 3 juin 2013 ? 11:59, Anil Madhavapeddy a ?crit :
+> 
+>> In general, it's preferable to separate the packaging from the sources since they change at different rates. For instance, Debian packages recommend the same thing:
+>> https://github.com/OCamlPro/opam/issues/149#issuecomment-16041625
+> 
+> 
+> I'm not sure I'm really convinced by that argument for me a package manager like debian (end-user oriented) is still something quite different from opam (developer oriented).  
+> 
+> Besides it's not because they are in the git repo that they need to be tied to the corresponding version checkout (keep in the repo a map from versions to checkout that have the correct metadata for the version). I quite like this idea of self-describing repos that you can navigate by following references to commits, it looks a lot like the web where you gradually follows references that are returned in the representations you ask.  Anyways.
+
+Note that you can already do this if you really want. 
+
+You just need the OPAM files in your repository in a packages/<version> directory, and you can just add the repo as a remote.  It used to work in early OPAM, but I stopped doing that a while back, and so haven't tested it recently.  Reports welcome...
+
+> 
+>> (Either way, I'd record your use case as a bug on the OPAM tracker to ensure we don't forget this conversation).
+> 
+> Tried to do that here:
+> 
+> https://github.com/OCamlPro/opam/issues/637
+> 
+> Initially I was planning to have an erratique-unstable repo with git package of all my software with special opam files to build them from a checkout. So that I could easily point to that for people to try the HEAD of one of my packages. I now realize that, as you mentioned before it's a little bit problematic, as it would force them to use the HEAD of all my packages.
+
+It's still quite useful to have this around for the automatic testing system though.  We could easily configure OCamlot to 'subscribe' to your bleeding edge repo and attempt package builds whenever it has spare resources.  This way you get early notification of breakage rather than waiting for a release.
+
+On the other hand, we need to be careful not to spam the hell out of people when they deliberately break interfaces :-)
+
+-anil
+
+
+From agarwal1975 at gmail.com  Wed Jun  5 18:51:05 2013
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Wed, 5 Jun 2013 19:51:05 +0200
+Subject: [opam-devel] next opam release
+Message-ID: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+
+Just wondering if another opam release is expected? The latest official one
+is still 1.0.0, and I just got hit by a bug fixed in master a long time ago.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130605/b08268e6/attachment.html>
+
+From amc79 at cam.ac.uk  Wed Jun  5 19:00:25 2013
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Wed, 5 Jun 2013 19:00:25 +0100
+Subject: [opam-devel] next opam release
+In-Reply-To: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+References: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+Message-ID: <74525A27-75F9-4B9A-BED1-1BC595417859@cam.ac.uk>
+
+I moved to HEAD after I hit a bug a while ago. 
+
+Thomas, Is there something blocking a 1.0.1 release?
+
+Best wishes,
+Amir
+
+--
+sent via mobile
+
+On 5 Jun 2013, at 18:51, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+
+> Just wondering if another opam release is expected? The latest official one is still 1.0.0, and I just got hit by a bug fixed in master a long time ago.
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130605/fc93df81/attachment.html>
+
+From yminsky at gmail.com  Thu Jun  6 02:05:58 2013
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Wed, 5 Jun 2013 21:05:58 -0400
+Subject: [opam-devel] A feature request: building specific compiler revs
+Message-ID: <CADKNfh+KvNj=kOLYW2LV=Y7NodeLJxc8zS0pXUw59p43N640MQ@mail.gmail.com>
+
+One thing that would be very nice would be to have a flag in opam switch
+where you could just specify a subversion revision (or, failing that, a
+github one) of trunk to build.  It would make it easier and simpler for
+people to try out things at specific patchlevels and report bugs based on
+them.  I was thinking about this because of some recent feedback I gave on
+mantis that was a bit vague on the specific compiler version in question,
+because I didn't really know.
+
+Also, it would be nice that when you build a floating config like
+4.01.0dev+trunk, if it recorded which version it was built against so one
+could figure it out after the fact.
+
+y
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130605/51cbefad/attachment.html>
+
+From anil at recoil.org  Thu Jun  6 10:58:20 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 6 Jun 2013 10:58:20 +0100
+Subject: [opam-devel] A feature request: building specific compiler revs
+In-Reply-To: <CADKNfh+KvNj=kOLYW2LV=Y7NodeLJxc8zS0pXUw59p43N640MQ@mail.gmail.com>
+References: <CADKNfh+KvNj=kOLYW2LV=Y7NodeLJxc8zS0pXUw59p43N640MQ@mail.gmail.com>
+Message-ID: <7617B21E-67E3-4D6C-96F9-21D316626121@recoil.org>
+
+On 6 Jun 2013, at 02:05, Yaron Minsky <yminsky at gmail.com> wrote:
+
+> One thing that would be very nice would be to have a flag in opam switch where you could just specify a subversion revision (or, failing that, a github one) of trunk to build.  It would make it easier and simpler for people to try out things at specific patchlevels and report bugs based on them.  I was thinking about this because of some recent feedback I gave on mantis that was a bit vague on the specific compiler version in question, because I didn't really know.
+> 
+> Also, it would be nice that when you build a floating config like 4.01.0dev+trunk, if it recorded which version it was built against so one could figure it out after the fact.
+> 
+
+Yeah, this would be useful.  The current compiler specs could do this with a little bit of environment variable or macro help. I've moved this to:
+https://github.com/OCamlPro/opam/issues/640
+
+-anil
+
+
+From anil at recoil.org  Thu Jun  6 11:03:14 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 6 Jun 2013 11:03:14 +0100
+Subject: [opam-devel] next opam release
+In-Reply-To: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+References: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+Message-ID: <41C0711E-BF62-45A0-BA9C-CD208A1C1262@recoil.org>
+
+A couple of weeks or so.  Thomas is on vacation, and then we need to do a big chunk of testing on the trunk version.
+
+Shouldn't be longer than that, as the assert bug in 1.0.0 is indeed quite annoying on upgrade.
+
+cheers,
+Anil
+
+On 5 Jun 2013, at 18:51, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+
+> Just wondering if another opam release is expected? The latest official one is still 1.0.0, and I just got hit by a bug fixed in master a long time ago.
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From markus.mottl at gmail.com  Thu Jun  6 16:25:30 2013
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 6 Jun 2013 11:25:30 -0400
+Subject: [opam-devel] Parallel builds
+Message-ID: <CAP_800qnFkSgCDHzyAV9dWBpPK8HJML0pu0=NP7decD3WFx-dQ@mail.gmail.com>
+
+Many packages seem to use Oasis for building, but I couldn't find any
+package specification that calls the build process in a way that
+allows for parallel builds.
+
+E.g. I might want to specify this in an OPAM package (i.e. use up to 4 CPUs):
+
+  ["ocaml" "setup.ml" "-build" "-j 4"]
+
+Does anybody have objections to parallel builds?  Any suggestions
+concerning their number?  I think it should generally work fine and
+give a typical speedup of maybe around 20%.
+
+Regards,
+Markus
+
+--
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From gabriel.scherer at gmail.com  Sat Jun 15 13:07:51 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Sat, 15 Jun 2013 14:07:51 +0200
+Subject: [opam-devel] [Caml-list] Setting up OPAM in emacs
+In-Reply-To: <878v2qj57l.fsf@kingston.cl.cam.ac.uk>
+References: <87li6z8x0m.fsf@ieee.org>
+ <20130528.102112.1182989008075506917.Christophe.Troestler@umons.ac.be>
+ <wf4ndlsbxh.fsf@gmail.com> <878v2qj57l.fsf@kingston.cl.cam.ac.uk>
+Message-ID: <CAPFanBGLkwnSOKZbVNTonHuwEiONPXPQzAtwznRqM=k4PaHW+w@mail.gmail.com>
+
+I don't (want to) understand the details of why opam switches don't
+work well with Emacs right now, or of any of the proposed solutions.
+Is there a solution integrated in OPAM by now? If not, is there a
+consensus on what simple users like me should use to solve the
+problem? Could you (the thread participants) decide on something, and
+send that to the OPAM upstream, so that future versions solve this
+issue?
+
+(The immediate problem I observe is that compile-command does not use
+the OCaml versions I would expect it to, in general defaulting to my
+system OCaml -- that may depend on the way Emacs is launched. More
+sophisticated things such as being able to call "opam switch" from
+inside Emacs are probably secondary needs, and I would be fine with a
+basic integration not supporting that, and letting people hone their
+emacs-lisp skills for that.)
+
+On Tue, Jun 4, 2013 at 4:55 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+> My personal solution for Tuareg mode is to put:
+>
+>   ;; Use OPAM's ocaml
+>   (setq tuareg-interactive-program "opam config exec ocaml")
+>
+> in my .emacs.
+>
+> Regards,
+>
+> Leo
+>
+> Wojciech Meyer <wojciech.meyer at gmail.com> writes:
+>
+>> Christophe's function hook is probably much better and elegant solution,
+>> but this works for me:
+>>
+>>>>
+>> (defun dm-opam-switch-root (ocaml-version opam-root)
+>>   (interactive "sOCaml version: \nsOPAM root: ")
+>>   (let* ((path (if (string-match "\\.opam" (car exec-path)) (cdr exec-path) exec-path))
+>>          (entry
+>>           (replace-regexp-in-string
+>>            "\n" ""
+>>            (shell-command-to-string
+>>             (format "opam switch --root %s %s > /dev/null && opam config env | sed -n 's/^PATH=\\([^:]\\+\\):.*$/\\1/p'" opam-root ocaml-version))))
+>>          (env-path (replace-regexp-in-string "\n" "" (shell-command-to-string (format "opam config env --root %s | sed -n 's/^PATH=\\(.*\\)/\\1/p'" opam-root)))))
+>>     (setq exec-path (cons entry path))
+>>     (setenv "PATH" env-path)))
+>>
+>> (defun dm-opam-switch (ocaml-version)
+>>   (interactive "sOCaml version: ")
+>>   (dm-opam-switch-root ocaml-version "~/.opam"))
+>> <<
+>>
+>> I wouldn't say myself it's a perfect script, but it works. Note that I
+>> use a lot of shell trickery instead of Emacs buffers, which is probably
+>> not a good idea.
+>>
+>> You just say M-x dm-opam-switch, and indicate which version you would
+>> like.
+>>
+>> Best,
+>> Wojciech
+>>
+>> Christophe TROESTLER <Christophe.Troestler at umons.ac.be> writes:
+>>
+>>> On Tue, 28 May 2013 09:59:53 +0400, Ivan Gotovchits wrote:
+>>>>
+>>>> 2. Use ?eval `opam env config`? in the begining of a compile-command.
+>>>>    This works fine when you switch compiler, but other commands, such as
+>>>>    ?C-c C-s? doesn't use new environment.
+>>>
+>>> I use this for the compilation:
+>>>
+>>>     ;; OPAM compilation ? one must update to the current compiler
+>>>     ;; before launching the compilation.
+>>>     (defadvice compile (before compile-opam activate)
+>>>       "Run opam to update environment variables"
+>>>       (set (make-local-variable 'compilation-environment)
+>>>         (with-temp-buffer
+>>>           (ignore-errors (call-process "opam" nil t nil "config" "-env"))
+>>>           (goto-char (point-min))
+>>>           (while (re-search-forward "; *export.*$" nil t)
+>>>             (replace-match "" nil nil))
+>>>           (split-string (buffer-substring 1 (point-max)))
+>>>           )))
+>>>
+>>> For the toplevel, I am afraid one needs to restart it.  I guess a
+>>> similar trick is possible to automatically select the right one.
+>>>
+>>> Hope it helps,
+>>> C.
+>
+> --
+> Caml-list mailing list.  Subscription management and archives:
+> https://sympa.inria.fr/sympa/arc/caml-list
+> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+> Bug reports: http://caml.inria.fr/bin/caml-bugs
+
+From anil at recoil.org  Sat Jun 15 16:14:35 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 15 Jun 2013 16:14:35 +0100
+Subject: [opam-devel] [Caml-list] Setting up OPAM in emacs
+In-Reply-To: <CAPFanBGLkwnSOKZbVNTonHuwEiONPXPQzAtwznRqM=k4PaHW+w@mail.gmail.com>
+References: <87li6z8x0m.fsf@ieee.org>
+ <20130528.102112.1182989008075506917.Christophe.Troestler@umons.ac.be>
+ <wf4ndlsbxh.fsf@gmail.com> <878v2qj57l.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBGLkwnSOKZbVNTonHuwEiONPXPQzAtwznRqM=k4PaHW+w@mail.gmail.com>
+Message-ID: <E462B10B-15FA-4C33-BC78-233BE6A7A448@recoil.org>
+
+I don't use Emacs, but OPAM has several global command-line options that
+may make your OS^H^Heditor integration easier.
+
+* --root will set the home directory of OPAM (~/.opam by default)
+
+* --switch will explicitly run the command under a compiler switch that
+  isn't the default one, but without performing a global switch.
+
+* "opam config exec" will run the sub-command with the right environment
+  variables set to the selected switch.  So:
+
+    $ opam config exec "ocamlc -version"
+
+  will get the version of the current OPAM switch ocaml, irrespective
+  of your PATH settings. (This is what Leo is doing for his interactive
+  shell below, but I'm not sure how this interacts with the rest of 
+  Tuareg).
+
+I would appreciate an Emacs user summarising best practises here and
+letting me know so that I can include a short summary in Real World OCaml.
+
+best,
+Anil
+
+On 15 Jun 2013, at 13:07, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+
+> I don't (want to) understand the details of why opam switches don't
+> work well with Emacs right now, or of any of the proposed solutions.
+> Is there a solution integrated in OPAM by now? If not, is there a
+> consensus on what simple users like me should use to solve the
+> problem? Could you (the thread participants) decide on something, and
+> send that to the OPAM upstream, so that future versions solve this
+> issue?
+> 
+> (The immediate problem I observe is that compile-command does not use
+> the OCaml versions I would expect it to, in general defaulting to my
+> system OCaml -- that may depend on the way Emacs is launched. More
+> sophisticated things such as being able to call "opam switch" from
+> inside Emacs are probably secondary needs, and I would be fine with a
+> basic integration not supporting that, and letting people hone their
+> emacs-lisp skills for that.)
+> 
+> On Tue, Jun 4, 2013 at 4:55 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+>> My personal solution for Tuareg mode is to put:
+>> 
+>>  ;; Use OPAM's ocaml
+>>  (setq tuareg-interactive-program "opam config exec ocaml")
+>> 
+>> in my .emacs.
+>> 
+>> Regards,
+>> 
+>> Leo
+>> 
+>> Wojciech Meyer <wojciech.meyer at gmail.com> writes:
+>> 
+>>> Christophe's function hook is probably much better and elegant solution,
+>>> but this works for me:
+>>> 
+>>>>> 
+>>> (defun dm-opam-switch-root (ocaml-version opam-root)
+>>>  (interactive "sOCaml version: \nsOPAM root: ")
+>>>  (let* ((path (if (string-match "\\.opam" (car exec-path)) (cdr exec-path) exec-path))
+>>>         (entry
+>>>          (replace-regexp-in-string
+>>>           "\n" ""
+>>>           (shell-command-to-string
+>>>            (format "opam switch --root %s %s > /dev/null && opam config env | sed -n 's/^PATH=\\([^:]\\+\\):.*$/\\1/p'" opam-root ocaml-version))))
+>>>         (env-path (replace-regexp-in-string "\n" "" (shell-command-to-string (format "opam config env --root %s | sed -n 's/^PATH=\\(.*\\)/\\1/p'" opam-root)))))
+>>>    (setq exec-path (cons entry path))
+>>>    (setenv "PATH" env-path)))
+>>> 
+>>> (defun dm-opam-switch (ocaml-version)
+>>>  (interactive "sOCaml version: ")
+>>>  (dm-opam-switch-root ocaml-version "~/.opam"))
+>>> <<
+>>> 
+>>> I wouldn't say myself it's a perfect script, but it works. Note that I
+>>> use a lot of shell trickery instead of Emacs buffers, which is probably
+>>> not a good idea.
+>>> 
+>>> You just say M-x dm-opam-switch, and indicate which version you would
+>>> like.
+>>> 
+>>> Best,
+>>> Wojciech
+>>> 
+>>> Christophe TROESTLER <Christophe.Troestler at umons.ac.be> writes:
+>>> 
+>>>> On Tue, 28 May 2013 09:59:53 +0400, Ivan Gotovchits wrote:
+>>>>> 
+>>>>> 2. Use ?eval `opam env config`? in the begining of a compile-command.
+>>>>>   This works fine when you switch compiler, but other commands, such as
+>>>>>   ?C-c C-s? doesn't use new environment.
+>>>> 
+>>>> I use this for the compilation:
+>>>> 
+>>>>    ;; OPAM compilation ? one must update to the current compiler
+>>>>    ;; before launching the compilation.
+>>>>    (defadvice compile (before compile-opam activate)
+>>>>      "Run opam to update environment variables"
+>>>>      (set (make-local-variable 'compilation-environment)
+>>>>        (with-temp-buffer
+>>>>          (ignore-errors (call-process "opam" nil t nil "config" "-env"))
+>>>>          (goto-char (point-min))
+>>>>          (while (re-search-forward "; *export.*$" nil t)
+>>>>            (replace-match "" nil nil))
+>>>>          (split-string (buffer-substring 1 (point-max)))
+>>>>          )))
+>>>> 
+>>>> For the toplevel, I am afraid one needs to restart it.  I guess a
+>>>> similar trick is possible to automatically select the right one.
+>>>> 
+>>>> Hope it helps,
+>>>> C.
+>> 
+>> --
+>> Caml-list mailing list.  Subscription management and archives:
+>> https://sympa.inria.fr/sympa/arc/caml-list
+>> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+>> Bug reports: http://caml.inria.fr/bin/caml-bugs
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From lpw25 at cam.ac.uk  Wed Jun 19 17:24:58 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Wed, 19 Jun 2013 17:24:58 +0100
+Subject: [opam-devel] [Caml-list] Setting up OPAM in emacs
+In-Reply-To: <E462B10B-15FA-4C33-BC78-233BE6A7A448@recoil.org> (Anil
+ Madhavapeddy's message of "Sat, 15 Jun 2013 16:14:35 +0100")
+References: <87li6z8x0m.fsf@ieee.org>
+ <20130528.102112.1182989008075506917.Christophe.Troestler@umons.ac.be>
+ <wf4ndlsbxh.fsf@gmail.com> <878v2qj57l.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBGLkwnSOKZbVNTonHuwEiONPXPQzAtwznRqM=k4PaHW+w@mail.gmail.com>
+ <E462B10B-15FA-4C33-BC78-233BE6A7A448@recoil.org>
+Message-ID: <87k3lqyso5.fsf@kingston.cl.cam.ac.uk>
+
+
+The development version of OPAM now has a "--sexp" option for "opam
+config env". So after the next release putting the following in your
+".emacs" file should be sufficient for most users:
+
+  ; Set OPAM environment variables
+  (dolist (var (car (read-from-string (shell-command-to-string "opam config env --sexp"))))
+    (setenv (car var) (cadr var)))
+
+Regards,
+
+Leo
+
+Anil Madhavapeddy <anil at recoil.org> writes:
+
+> I don't use Emacs, but OPAM has several global command-line options that
+> may make your OS^H^Heditor integration easier.
+>
+> * --root will set the home directory of OPAM (~/.opam by default)
+>
+> * --switch will explicitly run the command under a compiler switch that
+>   isn't the default one, but without performing a global switch.
+>
+> * "opam config exec" will run the sub-command with the right environment
+>   variables set to the selected switch.  So:
+>
+>     $ opam config exec "ocamlc -version"
+>
+>   will get the version of the current OPAM switch ocaml, irrespective
+>   of your PATH settings. (This is what Leo is doing for his interactive
+>   shell below, but I'm not sure how this interacts with the rest of 
+>   Tuareg).
+>
+> I would appreciate an Emacs user summarising best practises here and
+> letting me know so that I can include a short summary in Real World OCaml.
+>
+> best,
+> Anil
+>
+> On 15 Jun 2013, at 13:07, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+>
+>> I don't (want to) understand the details of why opam switches don't
+>> work well with Emacs right now, or of any of the proposed solutions.
+>> Is there a solution integrated in OPAM by now? If not, is there a
+>> consensus on what simple users like me should use to solve the
+>> problem? Could you (the thread participants) decide on something, and
+>> send that to the OPAM upstream, so that future versions solve this
+>> issue?
+>> 
+>> (The immediate problem I observe is that compile-command does not use
+>> the OCaml versions I would expect it to, in general defaulting to my
+>> system OCaml -- that may depend on the way Emacs is launched. More
+>> sophisticated things such as being able to call "opam switch" from
+>> inside Emacs are probably secondary needs, and I would be fine with a
+>> basic integration not supporting that, and letting people hone their
+>> emacs-lisp skills for that.)
+>> 
+>> On Tue, Jun 4, 2013 at 4:55 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+>>> My personal solution for Tuareg mode is to put:
+>>> 
+>>>  ;; Use OPAM's ocaml
+>>>  (setq tuareg-interactive-program "opam config exec ocaml")
+>>> 
+>>> in my .emacs.
+>>> 
+>>> Regards,
+>>> 
+>>> Leo
+>>> 
+>>> Wojciech Meyer <wojciech.meyer at gmail.com> writes:
+>>> 
+>>>> Christophe's function hook is probably much better and elegant solution,
+>>>> but this works for me:
+>>>> 
+>>>>>> 
+>>>> (defun dm-opam-switch-root (ocaml-version opam-root)
+>>>>  (interactive "sOCaml version: \nsOPAM root: ")
+>>>>  (let* ((path (if (string-match "\\.opam" (car exec-path)) (cdr exec-path) exec-path))
+>>>>         (entry
+>>>>          (replace-regexp-in-string
+>>>>           "\n" ""
+>>>>           (shell-command-to-string
+>>>>            (format "opam switch --root %s %s > /dev/null && opam config env | sed -n 's/^PATH=\\([^:]\\+\\):.*$/\\1/p'" opam-root ocaml-version))))
+>>>>         (env-path (replace-regexp-in-string "\n" "" (shell-command-to-string (format "opam config env --root %s | sed -n 's/^PATH=\\(.*\\)/\\1/p'" opam-root)))))
+>>>>    (setq exec-path (cons entry path))
+>>>>    (setenv "PATH" env-path)))
+>>>> 
+>>>> (defun dm-opam-switch (ocaml-version)
+>>>>  (interactive "sOCaml version: ")
+>>>>  (dm-opam-switch-root ocaml-version "~/.opam"))
+>>>> <<
+>>>> 
+>>>> I wouldn't say myself it's a perfect script, but it works. Note that I
+>>>> use a lot of shell trickery instead of Emacs buffers, which is probably
+>>>> not a good idea.
+>>>> 
+>>>> You just say M-x dm-opam-switch, and indicate which version you would
+>>>> like.
+>>>> 
+>>>> Best,
+>>>> Wojciech
+>>>> 
+>>>> Christophe TROESTLER <Christophe.Troestler at umons.ac.be> writes:
+>>>> 
+>>>>> On Tue, 28 May 2013 09:59:53 +0400, Ivan Gotovchits wrote:
+>>>>>> 
+>>>>>> 2. Use ?eval `opam env config`? in the begining of a compile-command.
+>>>>>>   This works fine when you switch compiler, but other commands, such as
+>>>>>>   ?C-c C-s? doesn't use new environment.
+>>>>> 
+>>>>> I use this for the compilation:
+>>>>> 
+>>>>>    ;; OPAM compilation ? one must update to the current compiler
+>>>>>    ;; before launching the compilation.
+>>>>>    (defadvice compile (before compile-opam activate)
+>>>>>      "Run opam to update environment variables"
+>>>>>      (set (make-local-variable 'compilation-environment)
+>>>>>        (with-temp-buffer
+>>>>>          (ignore-errors (call-process "opam" nil t nil "config" "-env"))
+>>>>>          (goto-char (point-min))
+>>>>>          (while (re-search-forward "; *export.*$" nil t)
+>>>>>            (replace-match "" nil nil))
+>>>>>          (split-string (buffer-substring 1 (point-max)))
+>>>>>          )))
+>>>>> 
+>>>>> For the toplevel, I am afraid one needs to restart it.  I guess a
+>>>>> similar trick is possible to automatically select the right one.
+>>>>> 
+>>>>> Hope it helps,
+>>>>> C.
+>>> 
+>>> --
+>>> Caml-list mailing list.  Subscription management and archives:
+>>> https://sympa.inria.fr/sympa/arc/caml-list
+>>> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+>>> Bug reports: http://caml.inria.fr/bin/caml-bugs
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+

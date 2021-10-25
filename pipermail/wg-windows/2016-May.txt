@@ -1,0 +1,71 @@
+From dra-news at metastack.com  Sun May 29 10:25:58 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Sun, 29 May 2016 10:25:58 +0100
+Subject: [wg-windows] Removing the OPAM system switch on Windows
+Message-ID: <001f01d1b98c$1c248350$546d89f0$@metastack.com>
+
+My attempts to produce a full port of OPAM for native Windows continue, even
+if out-paced by the progress of a snail! I'm at present implementing support
+required for opam switch (bootstrapping/installing FlexDLL, etc.).
+
+For anyone who hasn't had the pleasure of using OPAM yet, by default OPAM
+creates one compiler switch called "system" representing the OCaml compiler
+already installed on your system (usually by your OS's package manager).
+OPAM can install libraries for this switch, but it does not build a compiler
+(because it's already there) and there's a certain amount of trickery
+associated with things like ocamlfind (which may, or may not, be installed
+using an OS package).
+
+Given the lack of a single "official" way to install OCaml on Windows, and
+the fact that several organisations already have home-grown methods to have
+multiple compiler installations co-existing, I'm wondering in the Windows
+case if the "system" switch is far more effort than it's worth. My feeling
+is that it would be better for opam init to switch to the latest version of
+OCaml. So, at present, that would mean opam init were equivalent to opam
+init --bare && opam switch 4.03.0. OPAM would never pay any attention to or
+alter an installed system compiler, flexlink, etc. A keen user could choose
+to install the system switch by manually creating it and installing the
+ocaml.system package as its root.
+
+Does anyone have any thoughts and/or opinions on why having the system
+switch would be useful for native Windows too? It makes sense to keep it for
+the Cygwin build of OPAM (naturally, since Cygwin has an OCaml package). The
+only downside I can see at the moment is the delay it adds to opam init,
+because building the compiler takes a while. 
+
+
+David
+
+
+From louis.gesbert at ocamlpro.com  Mon May 30 11:17:44 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 30 May 2016 12:17:44 +0200
+Subject: [wg-windows] Removing the OPAM system switch on Windows
+In-Reply-To: <001f01d1b98c$1c248350$546d89f0$@metastack.com>
+References: <001f01d1b98c$1c248350$546d89f0$@metastack.com>
+Message-ID: <4608005.8tPCLeiKKn@maitake>
+
+Le dimanche 29 mai 2016, 10:25:58 David Allsopp a ?crit :
+>  I'm wondering in the Windows case if the "system" switch is far more effort 
+than it's worth. My feeling is that it would be better for opam init to switch 
+to the latest version of OCaml.
+
+We are actually having the same question on Linux at the moment (due to the 
+conflicting constraints "we don't want specific OCaml detection code in opam" 
+and "we don't want dynamic packages"), and might fall back to having one pre-
+defined "system" compiler per OCaml version, defined in the repository, and 
+that you need to select manually (like for e.g. llvm). The current alpha 
+provides a semi-dynamic `ocaml.system` package defined in its repository, that 
+polls the system; but this has some drawbacks, mainly due to the fact that the 
+variable `ocaml-version` (i.e. `4.03.0`) can't be known in advance and is 
+different from the version of the `ocaml` package (i.e. `system`), so we can't 
+properly resolve full installations including the compiler.
+
+>  So, at present, that would mean opam init were equivalent to opam
+> init --bare && opam switch 4.03.0. OPAM would never pay any attention to or
+> alter an installed system compiler, flexlink, etc.
+
+Or just `opam init --compiler=ocaml.4.03.0` ;  a discussion is ongoing to make 
+that the default on Linux too, see once again the issue discussion at 
+https://github.com/ocaml/opam/issues/2537
+

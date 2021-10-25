@@ -1,0 +1,389 @@
+From ssp.mryau at gmail.com  Thu May  4 18:50:23 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Thu, 4 May 2017 23:50:23 +0600
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+Message-ID: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+
+Hello,
+
+I'm write program which uses C library with main event loop. So, I call
+init function of this library from ocaml code, register callback and call
+main loop of this library. After that monent, ocaml code will be called
+only from this library.
+
+Here is some relevant lines of code:
+
+let bus_handler = ptr void @-> size_t @-> ptr (ptr void) @-> ptr size_t @->
+returning int
+
+type handlers
+let handlers: handlers structure typ = structure "handlers_t"
+
+let topic_name = field handlers "topic_name" string
+let topic_handler = field handlers "topic_handler" (funptr
+~thread_registration:true bus_handler)
+let topic_type = field handlers "topic_type" int
+let () = seal handlers
+
+let bus_init = foreign "bus_init" (int @-> ptr (ptr void) @-> returning int)
+let loop = foreign "loop" (ptr void @-> returning int)
+let register_server = foreign "register_server" (ptr void @-> string @->
+ptr handlers @-> size_t @-> returning int)
+
+let floop fhandler name () =
+        let handler = make handlers in
+        let () = (
+                setf handler topic_name name;
+                setf handler topic_handler fhandler;
+                setf handler topic_type 0
+        ) in
+        let () = (
+                (* Gc.compact (); #1 *)
+                let r = bus_init 1 bus_ptr in
+                Printf.printf "bus_init: %d\n" r
+        ) in
+        let r1 = register_server (!@ bus_ptr) name (addr handler) (of_int
+1) in
+        (* let () = Gc.compact () in #2 *)
+        loop (!@ bus_ptr)
+
+In case I comment out both calls to Gc.compact I see
+
+Cannot find handler (Resource temporarily unavailable)
+Cannot get address handler item (Resource temporarily unavailable)
+
+after 100-200 test calls on x86 and I get CallToExpiredClosure on ARM just
+on the first test call.
+In case I uncomment #1 or #2 code line with Gc.compact call I got same
+error (Cannot find handler ...) on first test call on x86 too. I've added
+
+        let addr1 = Root.create fhandler in
+        let addr2 = Root.create handler in
+
+to begin of floop function but nothing changed on program behaviour under
+tests.
+How can I protect struct handler and fhandler function pointer from garbage
+collection?
+
+WBR, ssp
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170504/8ca7f899/attachment.html>
+
+From daniel.buenzli at erratique.ch  Thu May  4 19:24:11 2017
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 4 May 2017 20:24:11 +0200
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+Message-ID: <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+
+On Thursday, 4 May 2017 at 19:50, Serge Sivkov wrote:
+> How can I protect struct handler and fhandler function pointer from garbage collection?
+
+I recently struggled with this on test code aswell. One thing that seems to work quite well is to store them in a toplevel  reference. 
+
+let fhandler = ref fhandler 
+
+Best,
+
+Daniel
+
+
+
+From ssp.mryau at gmail.com  Thu May 11 10:20:44 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Thu, 11 May 2017 14:20:44 +0500
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+ <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+Message-ID: <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+
+Hello,
+
+thank for your reply, it allow me partially resolve problem: code works on
+x86 without any problems (yet with Gc.compact() calls insert after each
+line of code). But ARM version allways raises CallToExpiredClosure on the
+first call to callback.
+I've tried next variants to store callback if struct field:
+- existing toplevel function by name
+- store function name to toplevel ref and save it to struct field by
+!ref_name
+- by register closure to function (fun a b c d -> top_level_function a b c
+d) with Ctypes.Root.create
+- by store same closure to Hashtbl.
+- by register finaliser with Gc.finalise for closure (and it has not been
+called)
+All this variants work on x86 and do not work on ARM, i.e. first call to
+OCaml callback from C raises CallToExpiredClosure.
+It seems I don't understand problem at all.
+
+So here is base questions:
+- in case I store in C struct field existing toplevel function by name, may
+it be GC'ed?
+-what may cause CallToExpiredClosure raise too if I has only one callback
+to call and at C side this struct in GDB seems to be correct?
+
+WBR, ssp
+
+2017-05-04 23:24 GMT+05:00 Daniel B?nzli <daniel.buenzli at erratique.ch>:
+
+> On Thursday, 4 May 2017 at 19:50, Serge Sivkov wrote:
+> > How can I protect struct handler and fhandler function pointer from
+> garbage collection?
+>
+> I recently struggled with this on test code aswell. One thing that seems
+> to work quite well is to store them in a toplevel  reference.
+>
+> let fhandler = ref fhandler
+>
+> Best,
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170511/2735eabe/attachment.html>
+
+From yallop at gmail.com  Thu May 11 12:37:46 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 11 May 2017 12:37:46 +0100
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+ <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+ <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+Message-ID: <CAAxsn=EjK6aukFW5GWSfrBTqDTAWxRKsE2VpHNVtHQd0tqbV2g@mail.gmail.com>
+
+On 11 May 2017 at 10:20, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> thank for your reply, it allow me partially resolve problem: code works on
+> x86 without any problems (yet with Gc.compact() calls insert after each line
+> of code). But ARM version allways raises CallToExpiredClosure on the first
+> call to callback.
+> I've tried next variants to store callback if struct field:
+> - existing toplevel function by name
+> - store function name to toplevel ref and save it to struct field by
+> !ref_name
+> - by register closure to function (fun a b c d -> top_level_function a b c
+> d) with Ctypes.Root.create
+> - by store same closure to Hashtbl.
+> - by register finaliser with Gc.finalise for closure (and it has not been
+> called)
+> All this variants work on x86 and do not work on ARM, i.e. first call to
+> OCaml callback from C raises CallToExpiredClosure.
+> It seems I don't understand problem at all.
+>
+> So here is base questions:
+> - in case I store in C struct field existing toplevel function by name, may
+> it be GC'ed?
+
+Yes.  The only way to prevent a value from being collected is to
+ensure that it's visible to the GC, which requires keeping a reference
+to it in an OCaml object.  The GC doesn't scan C memory, such as
+struct fields, so storing a function in a struct field won't stop it
+being collected.
+
+> -what may cause CallToExpiredClosure raise too if I has only one callback to
+> call and at C side this struct in GDB seems to be correct?
+
+If there's an OCaml reference to the function passed to C then
+CallToExpiredClosure should never occur.  But it has to be exactly the
+same function -- for example, storing a function in a struct field,
+then reading from the struct field will create a new copy of the
+function, which won't prevent the original from being collected.
+
+If you have a (smallish) running example somewhere of the code that's
+causing problems I'd be happy to take a look.
+
+Kind regards,
+
+Jeremy.
+
+From ssp.mryau at gmail.com  Fri May 12 10:46:07 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Fri, 12 May 2017 14:46:07 +0500
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <CAAxsn=EjK6aukFW5GWSfrBTqDTAWxRKsE2VpHNVtHQd0tqbV2g@mail.gmail.com>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+ <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+ <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+ <CAAxsn=EjK6aukFW5GWSfrBTqDTAWxRKsE2VpHNVtHQd0tqbV2g@mail.gmail.com>
+Message-ID: <CAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH=+4qihiLgt0A@mail.gmail.com>
+
+Hello,
+
+here is minimal example, which works without any problems on x86 and raises
+CallToExpiredClosure on ARM:
+https://github.com/mryau/ctypes-mintest
+
+WBR, ssp
+
+2017-05-11 16:37 GMT+05:00 Jeremy Yallop <yallop at gmail.com>:
+
+> On 11 May 2017 at 10:20, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> > thank for your reply, it allow me partially resolve problem: code works
+> on
+> > x86 without any problems (yet with Gc.compact() calls insert after each
+> line
+> > of code). But ARM version allways raises CallToExpiredClosure on the
+> first
+> > call to callback.
+> > I've tried next variants to store callback if struct field:
+> > - existing toplevel function by name
+> > - store function name to toplevel ref and save it to struct field by
+> > !ref_name
+> > - by register closure to function (fun a b c d -> top_level_function a b
+> c
+> > d) with Ctypes.Root.create
+> > - by store same closure to Hashtbl.
+> > - by register finaliser with Gc.finalise for closure (and it has not been
+> > called)
+> > All this variants work on x86 and do not work on ARM, i.e. first call to
+> > OCaml callback from C raises CallToExpiredClosure.
+> > It seems I don't understand problem at all.
+> >
+> > So here is base questions:
+> > - in case I store in C struct field existing toplevel function by name,
+> may
+> > it be GC'ed?
+>
+> Yes.  The only way to prevent a value from being collected is to
+> ensure that it's visible to the GC, which requires keeping a reference
+> to it in an OCaml object.  The GC doesn't scan C memory, such as
+> struct fields, so storing a function in a struct field won't stop it
+> being collected.
+>
+> > -what may cause CallToExpiredClosure raise too if I has only one
+> callback to
+> > call and at C side this struct in GDB seems to be correct?
+>
+> If there's an OCaml reference to the function passed to C then
+> CallToExpiredClosure should never occur.  But it has to be exactly the
+> same function -- for example, storing a function in a struct field,
+> then reading from the struct field will create a new copy of the
+> function, which won't prevent the original from being collected.
+>
+> If you have a (smallish) running example somewhere of the code that's
+> causing problems I'd be happy to take a look.
+>
+> Kind regards,
+>
+> Jeremy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170512/e842a84c/attachment.html>
+
+From yallop at gmail.com  Wed May 17 17:21:15 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 17 May 2017 17:21:15 +0100
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <CAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH=+4qihiLgt0A@mail.gmail.com>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+ <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+ <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+ <CAAxsn=EjK6aukFW5GWSfrBTqDTAWxRKsE2VpHNVtHQd0tqbV2g@mail.gmail.com>
+ <CAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH=+4qihiLgt0A@mail.gmail.com>
+Message-ID: <CAAxsn=EW_9k5QdAJX8jyxGjKeShpBU787y_TRbM=3c08o4-gig@mail.gmail.com>
+
+On 12 May 2017 at 10:46, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> here is minimal example, which works without any problems on x86 and raises
+> CallToExpiredClosure on ARM:
+> https://github.com/mryau/ctypes-mintest
+
+Thanks for the example.  Which ctypes release are you using?  Could
+you give the latest (0.11.4) a try, if you haven't already?
+
+I didn't spot anything obviously wrong in your code, so if it's still
+broken on Arm with 0.11.4 it'd be good to have an issue open to track
+the problem (https://github.com/ocamllabs/ocaml-ctypes/issues).
+
+Kind regards,
+
+Jeremy
+
+From ssp.mryau at gmail.com  Mon May 22 14:31:56 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Mon, 22 May 2017 18:31:56 +0500
+Subject: [ocaml-ctypes] ocaml as callback to C code with event loop
+In-Reply-To: <CAAxsn=EW_9k5QdAJX8jyxGjKeShpBU787y_TRbM=3c08o4-gig@mail.gmail.com>
+References: <CAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ=-gFXg@mail.gmail.com>
+ <DD0C32B6ADBF406B802684994895E94B@erratique.ch>
+ <CAOUGqWwXzExRomiMNZKPCjRwuJPn27QcQWD=Rg7jM3dSTEnUDw@mail.gmail.com>
+ <CAAxsn=EjK6aukFW5GWSfrBTqDTAWxRKsE2VpHNVtHQd0tqbV2g@mail.gmail.com>
+ <CAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH=+4qihiLgt0A@mail.gmail.com>
+ <CAAxsn=EW_9k5QdAJX8jyxGjKeShpBU787y_TRbM=3c08o4-gig@mail.gmail.com>
+Message-ID: <CAOUGqWwMeNGak6_3XjYzhVSVubXgr-GuSn5ZrCD1OktJVUeaxQ@mail.gmail.com>
+
+Hello,
+
+thank for your reply. I'm use CTypes 0.11.3.
+For now I wrote bindings via native OCaml mechanics and they work as for
+x86 as with same cross-compiler x86-ARM suit, so it really seems as CTypes
+issue.
+I will try 0.11.4 version too.
+
+WBR, ssp
+
+2017-05-17 21:21 GMT+05:00 Jeremy Yallop <yallop at gmail.com>:
+
+> On 12 May 2017 at 10:46, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> > here is minimal example, which works without any problems on x86 and
+> raises
+> > CallToExpiredClosure on ARM:
+> > https://github.com/mryau/ctypes-mintest
+>
+> Thanks for the example.  Which ctypes release are you using?  Could
+> you give the latest (0.11.4) a try, if you haven't already?
+>
+> I didn't spot anything obviously wrong in your code, so if it's still
+> broken on Arm with 0.11.4 it'd be good to have an issue open to track
+> the problem (https://github.com/ocamllabs/ocaml-ctypes/issues).
+>
+> Kind regards,
+>
+> Jeremy
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170522/4938ec3b/attachment.html>
+
+From yallop at gmail.com  Tue May 23 12:07:16 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 23 May 2017 12:07:16 +0100
+Subject: [ocaml-ctypes] ANN: ctypes 0.12.0
+Message-ID: <CAAxsn=F3coiORfPS-2D1DUkUSODmj_37S8rd0vutu-+dQGLmPw@mail.gmail.com>
+
+I'm happy to announce a new release of ctypes, 0.12.0, available for
+installation via OPAM.
+
+Ctypes 0.12.0 contains a number of changes, some of which introduce
+small incompatibilities with previous releases:
+
+ * Support for Fortran-layout bigarrays
+
+   Recently discussed here:
+    http://lambda-diode.com/software/ocaml/scientific/fortran
+    https://www.reddit.com/r/ocaml/comments/6azyv3/interfacing_fortran_with_ocaml/
+    https://github.com/ocamllabs/ocaml-ctypes/issues/509
+
+   The design is described here:
+    https://github.com/ocamllabs/ocaml-ctypes/pull/523
+
+ * Use the 'integers' package to provide signed and unsigned types
+
+    https://github.com/ocamllabs/ocaml-ctypes/issues/446
+    https://github.com/ocamllabs/ocaml-ctypes/pull/515
+
+In both cases the types have changed slightly, but the behaviour is
+unchanged, so code that continues to build with the new release should
+be unaffected.
+
+The release notes have further details of the changes in this release
+and in recent point releases:
+
+   https://github.com/ocamllabs/ocaml-ctypes/blob/0.12.0/CHANGES.md
+

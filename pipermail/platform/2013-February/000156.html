@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTnYba1Ofrb1NKD_%2BCriLf2Ty10KNpSbptdhj4qiwYGcQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000153.html">
+   <LINK REL="Next"  HREF="000168.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTnYba1Ofrb1NKD_%2BCriLf2Ty10KNpSbptdhj4qiwYGcQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Feb 26 19:54:55 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000153.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000168.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#156">[ date ]</a>
+              <a href="thread.html#156">[ thread ]</a>
+              <a href="subject.html#156">[ subject ]</a>
+              <a href="author.html#156">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, Feb 26, 2013 at 1:33 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 2/26/2013 6:03 PM, Leo White wrote:
+</I>&gt;&gt;<i> 2. Alain's proposal provides no means of aliasing namespaces. Similar to
+</I>&gt;&gt;<i>     opening a namespace, it would be useful to be able to say &quot;open
+</I>&gt;&gt;<i> Core.Std as CS&quot; and then refer to Core_Std_Mutex as &quot;CS#Mutex&quot;
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I believe that aliasing modules is what matters.  Since I don't understand
+</I>&gt;<i> the need for a dedicated notion of namespace yet (with some operations on
+</I>&gt;<i> namespaces) I also don't see the need for aliasing them.
+</I>
+Within Jane Street, we alias modules quite a bit (and it would be nice
+if this was lighter weight than it is, but that's another story!).  I
+think you'd want to alias namespaces for the same reason.
+
+The intuition is this: by default, you want long descriptive
+identifiers.  But for a small scope, you're happy to either make the
+identifier disappear entirely (as in, [open namespace
+Super_awesome_openGL_renderer]) or make it small (as in, [alias
+namespace Render = Super_awesome_openGL_renderer).
+
+
+&gt;&gt;<i> 2. A module's name depends on other files. A module's name (by which I
+</I>&gt;&gt;<i>     mean its namespaced name) depends on the &quot;.ns&quot; file, this could
+</I>&gt;&gt;<i> definitely be confusing.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I don't agree with this interpretation: the name of the module depends only
+</I>&gt;<i> on its file name, and we provide a convenient way for client code to refer
+</I>&gt;<i> to these modules with shorter names, locally.  It is a big advantage, for
+</I>&gt;<i> me, that client code could always be written without &quot;namespaces&quot;, if
+</I>&gt;<i> required.
+</I>
+I understand why you view this as an advantage, but I think of this as
+roughly a disadvantage.  The &quot;namespace&quot; names I think will be far
+more usable and convenient, and those I think should be the primary
+ones.  I believe the fully-qualified names should be viewed as a
+second-class, low-level feature.  For one thing, having both of them
+be primary things that are presented to the user is going to be
+awfully confusing.
+
+&gt;&gt;<i> 3. They require you to manage an &quot;.ns&quot; file. Not a major burden, but it
+</I>&gt;&gt;<i> is    one more place to look for errors. It also must be included in all
+</I>&gt;&gt;<i>     calls to the compiler.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> For any serious use of the compiler with some third-party libraries, the
+</I>&gt;<i> command-line is not built by hand, but by your build system and/or
+</I>&gt;<i> ocamlfind.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> 4. To me they put the namespace information in the wrong place. A
+</I>&gt;&gt;<i> component should define its own names, it should also not have to open
+</I>&gt;&gt;<i>     its own namespace.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I guess this is a matter of taste, and corresponds to a conception of what
+</I>&gt;<i> namespaces should be as an identified notion, rather than solving an actual
+</I>&gt;<i> need or addressing a concrete problem with my proposal (correct me if I'm
+</I>&gt;<i> wrong).
+</I>
+I think it addresses usability of the overall system.  Your approach
+of making the flat names priomary maximizes continuity with toolchains
+of the past, but also maximizes the confusion of the system to new
+users.  I think we should largely present one way of naming things to
+users, and making the namespace-names the primary ones seems like a
+clear usability win.
+
+&gt;&gt;<i> As a side note, if people are okay with long filenames, why not support
+</I>&gt;&gt;<i> having filenames like &quot;core-std-mutex.mli&quot; and then allow &quot;open
+</I>&gt;&gt;<i> namespace Core&quot; and &quot;open namespace Core#Std&quot;.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> These could be treated as if there were automatically a &quot;core.ns&quot;:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> namespace Std = &quot;core-std.ns&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and &quot;core-std.ns&quot;:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> module Mutex = &quot;core-std-mutex.mli&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> that were passed to any compiler invocation that had such files on its
+</I>&gt;&gt;<i> search path.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I don't like this implicitness: how can we infer dependencies?  If ocamldep
+</I>&gt;<i> sees a reference to &quot;List&quot; in scope where &quot;open namespace Core&quot; and &quot;open
+</I>&gt;<i> namespace Bar&quot; are both active, it would have to look for both core-list and
+</I>&gt;<i> bar-list files (and there will be a combinatorial explosion in the
+</I>&gt;<i> resolution if you allow opening nested namespaces). Worse: if we use
+</I>&gt;<i> &quot;ocamldep -modules&quot;, this resolution has to be done by the build system, so
+</I>&gt;<i> this complex logic (which depends on the location in the source file) will
+</I>&gt;<i> have to be re-implemented in omake and other build systems around.  It is an
+</I>&gt;<i> important property that &quot;ocamldep -modules&quot; does not need to look for the
+</I>&gt;<i> existence of compiled units on the current tree.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000153.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000168.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#156">[ date ]</a>
+              <a href="thread.html#156">[ thread ]</a>
+              <a href="subject.html#156">[ subject ]</a>
+              <a href="author.html#156">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,175 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C20130226.232604.1596589063095261139.Christophe.Troestler%40umons.ac.be%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000129.html">
+   <LINK REL="Next"  HREF="000163.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Christophe TROESTLER</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C20130226.232604.1596589063095261139.Christophe.Troestler%40umons.ac.be%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Christophe.Troestler at umons.ac.be
+       </A><BR>
+    <I>Tue Feb 26 22:26:04 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000129.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000163.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#162">[ date ]</a>
+              <a href="thread.html#162">[ thread ]</a>
+              <a href="subject.html#162">[ subject ]</a>
+              <a href="author.html#162">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, 26 Feb 2013 12:30:15 +0000, Leo White wrote:
+&gt;<i> 
+</I>&gt;<i> Ignoring the implementation issues for now, consider the run-time
+</I>&gt;<i> semantics of the module system.
+</I>
+Thanks for that explanation.  I have some questions though.
+
+&gt;<i> At run-time a module is a record. Initialising a module involves
+</I>&gt;<i> initialising every component of the module and placing them in this
+</I>&gt;<i> record. Initialising these components can involve executing arbitrary
+</I>&gt;<i> code; in fact the execution of an OCaml program is simply the
+</I>&gt;<i> initialisation of all its modules.
+</I>
+How about doing that initialization in a more lazy fashion?
+Initializing a module would only create the top level components:
+toplevel values and modules&#185;, the modules being only &quot;pointers to
+NULL&quot;.  when accessing a submodule, the compiler would take note to
+initialize that submodule (and link the corresponding cmo/cmx for
+packed modules&#178;).  If the modules is used in a functor or as a first
+class value, then all submodules present in the signature are
+initialized (this could be on the spot &#8212; especially for the toplevel &#8212;
+or moved to the place where the module is initialized if that makes a
+difference).  To avoid runtime checks, some static analysis is
+required to make sure that, when a value is used, the corresponding
+submodule has been properly initialized but that may not be too hard.
+
+There are two problems that I can see with this but I think namespaces
+have the same ones if they are to be convenient.  The first is about
+the initialization code in submodules.  As you say, loading a library
+should execute the &quot;toplevel code&quot; of each submodule.  Since this is
+rather infrequent, when building the module record, one may add all
+module paths containing submodules with initialization code.  That way
+the current semantics are preserved and for huge packed modules many
+components should still go away.  However, one could argue that if one
+does not reference the module at all, its initialization code should
+not be executed (alike the behavior one gets when adding cm[x]a on the
+command line).
+
+The second problem is that some toplevel value may need some sumodules
+to be initialized (because they use these submodules).  Some analysis
+is thus required to add these submodules during the record
+initialization.  The same is true when one initialize a submodule that
+was &quot;NULL&quot; before &#8212; other submodules may need to be initialized first.
+This analysis may not be too had to do &#8212; indeed it is already
+basically present in ocamldep.
+
+&#185; As an added bonus, one does not have to load the entire module
+signature (&#8776;4Mb for Core) &#8212; only keep pointers to the signatures of
+submodules &#8212; which should speed up compilation.  This is mostly an
+orthogonal issue but it could benefit from the same laziness framework.
+
+&#178; This could be done almost for free if packing would rename the
+modules to some internal names, gather them in a cm[x]a (and not a
+cmo/cmx as of now) and add a module aliasing these internal names to
+the desired names for the outside world.
+
+&gt;<i> Any attempt to overcome the problems with pack, whilst still
+</I>&gt;<i> maintaining the illusion that the &quot;pack&quot; is a normal module, would
+</I>&gt;<i> result (at the very least) in one of the following unhealthy
+</I>&gt;<i> situations:
+</I>&gt;<i> 
+</I>&gt;<i> - The module type of the &quot;pack&quot; module would depend on which of its
+</I>&gt;<i>   components were accessed by the program.
+</I>&gt;<i> 
+</I>&gt;<i> - Any use of the &quot;pack&quot; module other than as a simple container
+</I>&gt;<i>   (e.g. &quot;module CS = Core.Std&quot;) could have a dramatic effect on what was
+</I>&gt;<i>   linked into the program and potentially on the semantics of the
+</I>&gt;<i>   program.
+</I>
+Maybe one of these problems occurs with the rough proposal described
+above but it is not immediately clear to me.  May you tell?
+
+&gt;<i> Namespaces are basically modules that can only be used as a simple
+</I>&gt;<i> container. This means that they do not need a corresponding record at
+</I>&gt;<i> run-time (or any other run-time representation). This avoids the
+</I>&gt;<i> problems with pack as well as enabling other useful features
+</I>&gt;<i> (e.g. open definitions).
+</I>
+I agree that openness may be a desired feature.  Gabriel however said
+that it is not essential.  Moreover, one could imagine that a module
+wanting to be added to a hierarchy (say &quot;Data&quot;) could be repacked at
+in the module Data at installation time.  Granted this is not very
+nice but this is just intended to show that there are short term
+possibilities.
+
+Best,
+C.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000129.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000163.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#162">[ date ]</a>
+              <a href="thread.html#162">[ thread ]</a>
+              <a href="subject.html#162">[ subject ]</a>
+              <a href="author.html#162">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C871ubj8h0f.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000270.html">
+   <LINK REL="Next"  HREF="000277.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C871ubj8h0f.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 13 15:18:56 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000270.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000277.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#276">[ date ]</a>
+              <a href="thread.html#276">[ thread ]</a>
+              <a href="subject.html#276">[ subject ]</a>
+              <a href="author.html#276">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> I think what you've come around to is pretty similar to what I had
+</I>&gt;<i> intended in the first place when I was saying &quot;auto-open modules&quot;.  In
+</I>&gt;<i> particular, you're proposing having a module &quot;Core&quot; associated with
+</I>&gt;<i> the namespace &quot;Core&quot;, and that the two are automatically opened
+</I>&gt;<i> together.  My thought was to do something that is only slightly
+</I>&gt;<i> different from that: to be able to associated a list of modules L with
+</I>&gt;<i> a namespace N, such that opening N automatically opens L.  That seems
+</I>&gt;<i> broadly speaking less confusing and more flexible, rather than relying
+</I>&gt;<i> on name collisions.
+</I>
+The problem with having a list of auto-opens is that definitions in one
+open may conflict with definitions in another open. This forces us to
+give an ordering to the list. If the namespace is defined across
+multiple parts of the search path then this ordering will be quite
+fragile. The fragility of this ordering will probably go unnoticed until
+there is a mysterious bug/compilation error. By relying on name
+collisions, it makes it clear to people that there should only be a
+single such module (just like other modules), and any conflict is likely
+to become apparent immediately.
+
+&gt;<i> I think this specifies the role of modules in &quot;open namespace N&quot; and
+</I>&gt;<i> &quot;let open namespace N in expr&quot;.  What seems to be in contention is the
+</I>&gt;<i> semantics of N#M.  I think Leo and Alain are proposing that this be
+</I>&gt;<i> limited to M being another module or namespace, and that it would
+</I>&gt;<i> ignore the module opens.  I would have thought it more natural for N#M
+</I>&gt;<i> to translate to &quot;let open namespace N in M&quot;, so that M could be either
+</I>&gt;<i> a module or a value, and could be present in the namespace N or in the
+</I>&gt;<i> list of modules that is auto-opened with N.
+</I>&gt;<i>
+</I>&gt;<i> What is the argument in favor of the semantic distinction between N#M
+</I>&gt;<i> and &quot;let open namespace N in M&quot;?
+</I>
+I'd think of it more as keeping the distinction between &quot;N#M&quot; and
+&quot;N.M&quot;. 
+
+If you allow the M in N#M to be a value or type then namespaces go from
+being a simple system for naming compilation units to being a partial
+replacement for modules. This overlap will cause confusion, users should
+never be in a position of wondering whether they should make something a
+module or a namespace; it should be obvious from what that thing
+contains.
+
+Currently, given an environment and a module expression (e.g. N#M or
+N.M) the compiler knows exactly where to find the module (e.g. as member
+M of the N namespace). If you allow N#M to mean both a sub-module of an
+auto-opened module in N and a member of N then the compiler must look
+inside any auto-opened modules of N to figure out where the module
+is. This also adds a dependency on the auto-opened module even if it
+isn't used.
+
+Another possible benefit of using name collisions to associate the
+&quot;Core&quot; module with the &quot;Core&quot; namespace, is that it could be used to do
+&quot;auto-opens&quot; as syntactic sugar. For example we could allow something
+equivalent to:
+
+  open Core   (* opens the Core module *)
+
+  open namespace Core (* opens the Core namespace *)
+
+  open namespace and module Core  
+             (* equivalent to open namespace Core;; open Core *)
+
+Obviously the syntax should be less verbose, but the point is that this
+could make the &quot;auto-open&quot; explicit in the source while still keeping a
+convenient syntax.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000270.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000277.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#276">[ date ]</a>
+              <a href="thread.html#276">[ thread ]</a>
+              <a href="subject.html#276">[ subject ]</a>
+              <a href="author.html#276">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

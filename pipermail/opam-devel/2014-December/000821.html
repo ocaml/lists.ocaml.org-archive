@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] global installation with opam
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20global%20installation%20with%20opam&In-Reply-To=%3C20141210131622.GE29376%40emmental.inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000843.html">
+   <LINK REL="Next"  HREF="000825.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] global installation with opam</H1>
+    <B>Simon Cruanes</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20global%20installation%20with%20opam&In-Reply-To=%3C20141210131622.GE29376%40emmental.inria.fr%3E"
+       TITLE="[opam-devel] global installation with opam">simon.cruanes.2007 at m4x.org
+       </A><BR>
+    <I>Wed Dec 10 13:16:22 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000843.html">[opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+</A></li>
+        <LI>Next message: <A HREF="000825.html">[opam-devel] global installation with opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#821">[ date ]</a>
+              <a href="thread.html#821">[ thread ]</a>
+              <a href="subject.html#821">[ subject ]</a>
+              <a href="author.html#821">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+Is there a blessed way to install packages system-wide using Opam? I
+suspect there isn't, so I attached a document [1] that describes my
+use-cases and what I'm thinking of (of course I know you opam
+developers are busy).
+
+Thanks!
+
+Best,
+
+-- 
+Simon
+
+[1] <A HREF="http://cedeela.fr/~simon/files/opam_system.html">http://cedeela.fr/~simon/files/opam_system.html</A>
+or joined file
+
+<A HREF="http://weusepgp.info/">http://weusepgp.info/</A>
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+# Global installation with Opam
+
+I have a few use cases in which I would like to use opam to install libraries
+or programs written in OCaml (with non-trivial dependencies) on a GNU/Linux
+system.
+
+- I share a machine with several colleagues, and
+  developed [a few tools](<A HREF="https://github.com/c-cube/frog-utils">https://github.com/c-cube/frog-utils</A>) to make it
+  easy to parallelize jobs without stepping on one another's toes. I would
+  like a &quot;global&quot; opam switch that would install the binaries and libraries
+  in `/usr/local/bin` and `/usr/local/lib` so that everyone can use the same
+  version easily (and make upgrade easier).
+- When developing a web application, CGI program, or other Unix daemon (a
+  server, basically), it's better to use the system's init program to
+  start/stop the daemon. It is possible (although, imho, ugly) to compile
+  and install the daemon in `~/.opam/&lt;switch&gt;/bin` and use this path from the
+  init script. However, the daemon should not fail if the user
+  were to suddenly &quot;opam switch&quot; to an experimental compiler just at the
+  wrong moment. A much cleaner solution is to install those kinds of binaries
+  to `/usr/local/bin/` or something similar.
+- for teaching, it would be nice to install (on a network filesystem?) the
+  libraries and tools required for a course (especially if they eat up
+  a lot of disk space quotas, or take time to compile. Example: Coq). The
+  students could then all use the same libraries, already installed,
+  in the same version as every other student. Headache--.
+
+I'm not aware of a clean way to do it currently, so here's how I would like
+things to work (please, Santa):
+
+There would be a special switch (maybe `system`, I'm not sure how it works
+currently), let's call it `global`. This switch assumes that OCaml **and**
+ocamlfind are already installed by whatever package manager the distribution
+provides. Everything installed with this switch would be installed in
+`/usr/local/bin/` and `/usr/local/lib/` (and `/usr/local/share/doc/` etc.) so
+that it can be used without opam. Other switches (`4.02.1`, `4.03-PR-123`, etc.)
+would behave exactly the same as they do currently.
+
+Security issues: to limit the potential impact of evil opam packages, here are
+a few possibilities when compiling/installing with the `global` switch:
+
+- compilation as a user, only installation as root (use `sudo`, or require
+  root rights, and fork+drop privilege to run the &quot;build&quot; target)
+- compilation within a chroot in `/tmp/` (no possibility for `make install`
+  to erase stuff as a root,
+  see [this fail](<A HREF="https://github.com/MrMEEE/bumblebee-Old-and-abbandoned/commit/a047be85247755cdbe0acce6f1dafc8beb84f2ac">https://github.com/MrMEEE/bumblebee-Old-and-abbandoned/commit/a047be85247755cdbe0acce6f1dafc8beb84f2ac</A>)),
+  then copy files to their right location. Also allows to track what files a
+  package has copied so that un-installation can get rid of them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20141210/7defe94f/attachment.sig">http://lists.ocaml.org/pipermail/opam-devel/attachments/20141210/7defe94f/attachment.sig</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000843.html">[opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+</A></li>
+	<LI>Next message: <A HREF="000825.html">[opam-devel] global installation with opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#821">[ date ]</a>
+              <a href="thread.html#821">[ thread ]</a>
+              <a href="subject.html#821">[ subject ]</a>
+              <a href="author.html#821">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

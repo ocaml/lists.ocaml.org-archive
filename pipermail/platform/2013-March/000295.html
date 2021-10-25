@@ -1,0 +1,348 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] On &quot;lowercase names&quot; as part of namespaces, &quot;open module&quot; in namespace descriptions, and unordered mappings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20On%20%22lowercase%20names%22%20as%20part%20of%20namespaces%2C%0A%20%22open%20module%22%20in%20namespace%20descriptions%2C%20and%20unordered%20mappings&In-Reply-To=%3CCAPFanBEiG1yiL--42n8AZn57igBnceyMz-oiM0JA%2Bg213r%3DO4A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000299.html">
+   <LINK REL="Next"  HREF="000304.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] On &quot;lowercase names&quot; as part of namespaces, &quot;open module&quot; in namespace descriptions, and unordered mappings</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20On%20%22lowercase%20names%22%20as%20part%20of%20namespaces%2C%0A%20%22open%20module%22%20in%20namespace%20descriptions%2C%20and%20unordered%20mappings&In-Reply-To=%3CCAPFanBEiG1yiL--42n8AZn57igBnceyMz-oiM0JA%2Bg213r%3DO4A%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] On &quot;lowercase names&quot; as part of namespaces, &quot;open module&quot; in namespace descriptions, and unordered mappings">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Mar 15 10:20:30 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000299.html">[ocaml-platform] OPAM 1.0.0 released !
+</A></li>
+        <LI>Next message: <A HREF="000304.html">[ocaml-platform] A small script for compiler hackers: create short-lived opam switches out of any git branch
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#295">[ date ]</a>
+              <a href="thread.html#295">[ thread ]</a>
+              <a href="subject.html#295">[ subject ]</a>
+              <a href="author.html#295">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Yesterday I had a discussion with Didier R&#233;my around the question of
+how to deal with &quot;open module&quot; as part of a &quot;namespace language&quot; to
+describe the compilation environment of OCaml programs.
+
+# &quot;open&quot; explained through the namespace description language
+
+In the model of <A HREF="http://gallium.inria.fr/~scherer/namespaces/spec.pdf,">http://gallium.inria.fr/~scherer/namespaces/spec.pdf,</A>
+&quot;compilation environments&quot; are maps from compilation unit names to
+compilation units (as paths in the filesystem) or, in a hierarchical
+setting, to subenvironments with the same structure.
+
+As we have already remarked on this list, `open namespace Foo` can be
+understood in terms of the corresponding namespace description
+language. If the current environment is `E`, the environment after the
+action of `open namespace Foo` is `E merge right E#Foo`; it is only
+accepted if `Foo` is a subenvironment, and adds all its children to
+the current mapping `E`, giving precedence over the new bindings in
+case of conflict (to mimic the silent shadowing rule).
+
+In a similar vein, one could wish to explain `open module M`
+(the usual `open M` of OCaml, written `open module` to
+avoid ambiguities) under the same light, turning `E` into `E merge
+right E#M`.
+
+But our specification only defines (sub)environments with
+(sub)environments, not environments with modules. To model `open` in
+this way we should extend the semantics of `merge`, by defining which
+kind of semantic environment value the term `E merge right E#M` will
+reduce to.
+
+Methodology remark:
+
+  There has been a discussion of how to treat &quot;open module&quot;
+  information as part of namespace descriptions. Just having &quot;open
+  Foo&quot; lines in the description and saying nothing else about it that
+  &quot;this means the type-checker will have to perform this open before
+  running on the program&quot; means that they are handled as
+  *side-effects* of namespace descriptions. On the contrary, our
+  previous models of namespaces described namespace *values*: a file
+  foo.ns is semantically interpreted as building a datastructure that
+  represents the namespace. I insist that this &quot;value&quot; model is better
+  than mixing environment values (hierarchies, aliases, etc.) with
+  side-effects, as this latter choice raises unpleasant design
+  questions (if you include a namespace description file, does that
+  also trigger its side-effects?). We're looking for a model of what
+  the &quot;environment value&quot; are that takes `open module` seriously.
+
+  The previous proposal was to enrich our current notion of
+  environment values, namely map from names to either compunits or
+  subenvironments, with &quot;flat access&quot; marks on some of the
+  children. But then you need to have ordered mapping, or at least
+  order the flat-access marks, and none of those solutions feel right.
+
+# Values-inside-environments as a &quot;transparent&quot; model with some problems
+
+A possible direction is to extend compilation environments to whole
+typing environments, that can not only associate compilation unit
+names to compilation units, but also usual value names (prefixed by
+a compunit name) to OCaml values (or their types), types to type
+definitions, etc. This has been suggested by a few people on the list
+already.
+
+For example, `Stdlib merge Stdlib#List` would result in a namespace
+value of the following form
+
+    { Array =&gt; &quot;+array&quot;,
+      List =&gt; &quot;+list&quot;,
+      ...
+      ('a list) =&gt; type,
+      (@) =&gt; ('a list -&gt; 'a list -&gt; 'a list),
+      ...
+    }
+
+However, this direction appears to be in contradiction with a design
+choice we made early in our work on namespaces: we will explain
+namespaces as mapping to compilation units, but no further, and in
+particular, it will never be necessary to &quot;look into&quot; .cmi files to
+understand and analyze a namespace description, or reduce it to
+a &quot;value&quot; (for some notion of environment value). In our example, we
+have to inspect &quot;+list.cmi&quot; to even be able to list the set of names
+exported by the namespace description `Stdlib merge Stdlib#List`.
+
+This restriction is valuable in particular for tooling purposes: not
+looking into the .cmi content also means that you can designate
+compilation units that do not exist yet, and have a single namespace
+description that ranges over both already-existing units and
+yet-to-be-compiled ones.
+
+One particular kind of tooling that does not yet exists but we took
+into account in our design is tools to interpret and analyse the
+namespace descriptions themselves. You want to be able to tell wether
+two distinct namespace descriptions risk shadowing each other, to
+reason on whether a change you made kept the namespace description
+equivalent (eg. changing the order of two merges), get the list of all
+names exported by a given namespace description, etc.
+
+In this respect, the namespace description language described in
+spec.pdf or much others proposals made in the thread or elsewhere are
+fairly simple to analyse statically, by themselves -- except for the
+&quot;scan&quot; primitive that explicitly depends on the state of the
+filesystem at a given time, and surely its use should be considered
+prudently.
+
+Adding lowercase names to the domain of compilation environments would
+(partially) break those toolability properties. If you assume you
+cannot access the relevant .cmi files or want to be resilient to any
+of their change, you can still tell about compilation unit name
+conflicts, but basically have no idea of which lowercase names are
+exported by any given namespace description that uses `open
+module`. You can define fine-grained semantic operations
+(restricting the set of names added by the `open`, removing some
+of them), but will not be able to check for conflicts or their
+absence.
+
+We therefore think it is a dangerous direction to move towards to,
+that should be discouraged. Namespaces are planned for large-scale
+organization of big software systems, being able to manipulate and
+analyze them *independently* of the underlying type system details is
+likely to be important for robustness.
+
+We call this model (of semantic values for namespace descriptions) the
+&quot;transparent model&quot;, because it looks through .cmi files to
+incorporate values of the language into the compilation environment.
+
+
+# An &quot;opaque&quot; model that is simpler
+
+We propose a simpler model that can be seen as an abstraction of the
+&quot;transparent model&quot;: instead of having values be mappings with rich
+domain (both compilation unit names and in-language names), we suggest
+a pair of:
+  - an unordered mapping of compilation unit names to compilation
+units, as before
+  - an ordered list of compilation units, denoting the &quot;opened&quot;
+modules; the &quot;open list&quot;
+
+The namespace descrition `Stdlib merge Stdlib#List` would for example
+reduce to the following value:
+
+    { Array =&gt; &quot;+array&quot;,
+      List =&gt; &quot;+list&quot;,
+      ...
+    }, [ &quot;+list&quot; ]
+
+In a sense, we went away from the distasteful &quot;ordered mapping&quot; model
+by separating the two concerns, with a pair of the (unordered) mapping
+structure and the ordered-by-nature list of module to open.
+
+We can then define two *asymetric* merge operations:
+
+- `(M1, O1) merge (M2, O2)` merges two (sub)environments into the
+  expected `(Map.union M1 M2, O1 @ O2)`, concatenating the open lists
+  (opens of the left-hand-side will be performed first, and therefore
+  shadowed by opens of the right-hand-side)
+
+- `(M, O) merge U` merge an environment and a compilation unit into
+  `(M, O @ [U])`
+
+This gives a robust semantics to both `open namespace` and `open
+module` in term of transformation of environment values. When
+beginning to process a given compilation unit, the type-checker has
+built a compilation environment, first from the filesystem by
+convention, then by possible compilation parameters, finally possibly
+by inspecting the source file headers containing namespace
+information, and it enters the type-checking world where opening .cmi
+is a given, and can translate this compilation environment value into
+an initial type-checking environment just by doing the open in
+sequence, in the order you expect. If allowed by the final design,
+local `open namespace` or `open module` would be understood in the
+same way.
+
+We call this the &quot;opaque&quot; model because, semantically, it doesn't look
+into the .cmi content before type-checking time, which allows to
+reason on the environment values of namespace description involving
+not-yet-existing or rapidly changing compilation units. Of course, it
+won't be able to tell you anything about shadowing at the value level
+in the open-list part (only name conflicts and shadowing among
+*compilation units*), and this is very explicit in the semantic model.
+
+# Open lists in subenvironments
+
+Note that subenvironments also have this pair structure, so children
+of a tree may have open lists. For example, if Core provides me with
+a namespace description &quot;core.ns&quot;, and Batteries with another
+&quot;batteries.ns&quot;, and I decide to build the namespace
+
+   { Core =&gt; include &quot;core.ns&quot;,
+     Batteries =&gt; include &quot;batteries.ns&quot; }
+
+to talk about both worldviews in an explicit way, this will reduce to
+a environment value of the form
+
+   { Core =&gt; { Std =&gt; .., List =&gt; ... }, [ &quot;.../std&quot; ]
+     Batteries =&gt; { ... }, [ &quot;.../batPervasives&quot; ] },
+   []
+
+Setting this as the compilation environment of a program will not
+automaticaly open the &quot;std&quot; compilation unit provided by core: the
+root open-list is empty. However, calling &quot;open namespace Core&quot; in
+this setting will do that (as indicated by our semantics for `merge`).
+
+
+# Operations on the open list
+
+It may make sense to add some operations besides &quot;merge&quot; to manipulate
+the open lists of namespaces, for example to empty it (I may want to
+be able to denote the modules provided by Core with a short name, yet
+avoid opening Std automatically, as the current -nopervasives
+command-line option allows for the standard library), or explicitly
+restrict its content by whitelisting or blacklisting.
+
+Whatever choice we make in this design space, it is interesting to
+consider how they project into the &quot;transparent&quot; semantics: we can
+have a look at what in means in term of those rich, ideal but painful
+to work with &quot;transparent&quot; environments, to make sure that all we're
+doing really makes sense.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000299.html">[ocaml-platform] OPAM 1.0.0 released !
+</A></li>
+	<LI>Next message: <A HREF="000304.html">[ocaml-platform] A small script for compiler hackers: create short-lived opam switches out of any git branch
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#295">[ date ]</a>
+              <a href="thread.html#295">[ thread ]</a>
+              <a href="subject.html#295">[ subject ]</a>
+              <a href="author.html#295">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

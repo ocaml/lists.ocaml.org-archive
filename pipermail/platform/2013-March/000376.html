@@ -1,0 +1,152 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C878v5hm2w2.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000374.html">
+   <LINK REL="Next"  HREF="000377.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C878v5hm2w2.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Thu Mar 21 11:02:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000374.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000377.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#376">[ date ]</a>
+              <a href="thread.html#376">[ thread ]</a>
+              <a href="subject.html#376">[ subject ]</a>
+              <a href="author.html#376">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> So the &quot;good&quot; mode for using ocamldep would be to have the build system generate a big search path file for each call to
+</I>&gt;<i> ocamldep?
+</I>
+I would have thought that it would reuse the same search path file.
+
+&gt;<i>   - How does the build system generate this search path file?  I guess it has to know about the &quot;simple namespaces&quot;
+</I>&gt;<i> convention.  Does it?  And does it know about the &quot;-name&quot; arguments scattered around in many subdirectories.
+</I>
+Yes, the build system should now about the &quot;simple namespaces&quot;
+convention, although it is a very simple convention (&quot;Foo#Bar :
+foo-bar.cmi&quot;). If the build system provides support for alternative
+naming conventions then it must also know about them.
+
+&gt;<i>   - How this would work for non-namespaced modules?  Can you represent them with searh path files as in your proposal.
+</I>&gt;<i> I thought that search path files only defined namespaced names.
+</I>
+Search path files are allowed for any compilation unit. The whole idea
+is that the &quot;search path files&quot; extension is completely independent of
+the other extensions in my proposal (and vice-versa).
+
+&gt;<i>   - If you assume that the build system can generate a search path file to avoid calling ocamldep (and thus the compiler
+</I>&gt;<i> as well) with any -I 
+</I>&gt;<i> directory, what's the point of supporting -I directories any more in the compiler and tools?
+</I>
+For backwards compatibility and convenience. For most projects, the
+search path file would simply be a list of the contents of a directory
+anyway.
+
+
+&gt;&gt;<i> As a side note, I think that &quot;ocamldep -modules&quot; should continue to be a
+</I>&gt;&gt;<i> purely syntactic version that ignores the search path. It is regular
+</I>&gt;&gt;<i> ocamldep that should be used for this purpose.
+</I>&gt;<i>
+</I>&gt;<i> I propose that &quot;ocamldep -modules&quot; ignores the search path directories, but knows about the definition of namespaces.
+</I>&gt;<i> Otherwise, you need to invent a new convention to report possible namespaces together with each module dependency.
+</I>&gt;<i>
+</I>
+I think that &quot;ocamldep -modules&quot; should return possible namespaces with
+each module dependency. A tool that returns every possible compilation
+unit mentioned in a file independent of its search path is probably
+useful in general, not just for dependency generation. We can always add
+a new mode that is half-way between &quot;ocamldep&quot; and &quot;ocamldep -modules&quot;
+(i.e. uses the search path but still returns module names instead of
+file names). An &quot;ocamldep -namespaces&quot; that returns all namespaces
+mentioned might also be useful.
+
+
+&gt;<i> And as said, even if you don't believe that is a viable approach for a robust build system, the same approach can be
+</I>&gt;<i> used to add extra checks to existing build system that they don't miss dependencies.
+</I>&gt;<i>
+</I>
+You could still use such a tool on your own code base, just make sure
+that you always use search path files instead of directories (which is
+what you are proposing anyway).
+
+
+&gt;&gt;<i> This kind of behaviour already exists in OCaml. Consider this piece of code:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      type t = Bar.t (* Bar only contains type definitions *)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> If you rename bar.mli to baz.mli but don't remove bar.cmi then it will
+</I>&gt;&gt;<i> continue to compile until you run &quot;make clean&quot;.
+</I>&gt;<i>
+</I>&gt;<i> Yes, and I see it as a problem.  I would actually prefer a system where one must pass explicitly to the compiler the
+</I>&gt;<i> list of files it can use, but this is not possible because of backward compatibility.  Since namespaces change the way
+</I>&gt;<i> OCaml interact with the file system anyway and we have this nice notion of explicitly listing available units in
+</I>&gt;<i> well-defined files (which can be used by other tools), I think it's a good opportunity to fix the existing problems
+</I>&gt;<i> (partially).
+</I>
+My point is that since you are only fixing it partially, it is not a
+good reason for excluding a feature. Especially when there is a clear
+way to avoid the problem in your own code: always use search path
+files.
+
+Note that using an external library that uses &quot;simple namespaces&quot; will
+not cause your own builds to have this problem.
+
+
+&gt;<i> The average user who creates a library to be used by others will need to pick a good namespace
+</I>&gt;<i> name and list which files constitute the library.  
+</I>
+This is not the case. I do not currently have to write a list of files
+in my libraries. As I said, it depends on which build system you use.
+
+&gt;<i> At this point, writing an explicit .mlpath file does not add any
+</I>&gt;<i> burden (the same source of information can be used to define the
+</I>&gt;<i> content of the library).
+</I>
+Note that you don't just have to write these files after you have
+finished the library, you must maintain them throughout development.
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000374.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000377.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#376">[ date ]</a>
+              <a href="thread.html#376">[ thread ]</a>
+              <a href="subject.html#376">[ subject ]</a>
+              <a href="author.html#376">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBEbtXgXOE%2Bi%2BNb_oxonkXTK-_7Y2jKuZ6U6hSP91sQUWg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000075.html">
+   <LINK REL="Next"  HREF="000080.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBEbtXgXOE%2Bi%2BNb_oxonkXTK-_7Y2jKuZ6U6hSP91sQUWg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Feb 22 14:39:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000075.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000080.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#76">[ date ]</a>
+              <a href="thread.html#76">[ thread ]</a>
+              <a href="subject.html#76">[ subject ]</a>
+              <a href="author.html#76">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> It's not evident to me that namespaces actually solve the problem either,
+</I>they just seem to push the problem in the build system. The actual problem
+seems very related to the problem of hygienic macros (accidental name
+capture).
+
+Indeed.
+
+What you really want of Camlp4 extensions is not &quot;namespaces&quot;, but
+*hygiene*. Hygiene in hygenic macro systems means two things:
+  1. having binders in macros not capture bound variables in expanded
+user-provided code (unless explicitly desired, to implement a new binding
+structure as macro)
+  2. having bound variables in macros not be captured by user-provided
+binders
+
+None of those two distinct aspects are specifically accounted for in the
+current OCaml+Camlp4 combination. The lack of the first can be worked
+around by being careful in extension code (preserve the scope of
+user-provided code and not expand it under extension binders, which is
+possible thanks to OCaml expressive &quot;let ... and ..&quot; feature), the lack of
+the second is more problematic as it would require the extension *user* to
+be careful (not happening in practice).
+
+This is related to this bug report by Hongbo:
+  <A HREF="http://caml.inria.fr/mantis/view.php?id=5849">http://caml.inria.fr/mantis/view.php?id=5849</A>
+
+Namespaces are only an attempt to workaround the problem by adding an
+indirection in naming that would make lack of hygiene less visible. It's a
+reasonable side-effect of a namespace proposal, but that cannot reasonably
+be the main motivation for adding namespaces. &quot;Let's add this new feature
+so that this problem with that ugly tool can be partially fixed in this
+ugly way&quot; is not going to fly.
+
+(Note that Lisp languages solve this by embedding the macro facility in the
+language itself, instead of having an up-front AST-generation model. This
+allows macro expansion to elaborate internal unique names instead of
+surface names, which solves this hygiene problem. An OCaml equivalent would
+be to give a way to address a module by its internal compilation unit name.)
+
+On Fri, Feb 22, 2013 at 3:33 PM, Daniel B&#252;nzli
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">daniel.buenzli at erratique.ch</A>&gt;wrote:
+
+&gt;<i> Le vendredi, 22 f&#233;vrier 2013 &#224; 14:52, Malcolm Matalka a &#233;crit :
+</I>&gt;<i> &gt; So would a syntax extension always have to store the modules it wants to
+</I>&gt;<i> &gt; be sure to access at the beginning of a file it requires, making sure
+</I>&gt;<i> &gt; not to choose overlapping names?
+</I>&gt;<i>
+</I>&gt;<i> Why not ? Each extension could have its own module against which you have
+</I>&gt;<i> to link to use the extension that has the module it uses in it
+</I>&gt;<i> (MyExt.List&#8230;).
+</I>&gt;<i>
+</I>&gt;<i> It's not evident to me that namespaces actually solve the problem either,
+</I>&gt;<i> they just seem to push the problem in the build system. The actual problem
+</I>&gt;<i> seems very related to the problem of hygienic macros (accidental name
+</I>&gt;<i> capture).
+</I>&gt;<i>
+</I>&gt;<i> Besides I'm not sure the example Anil gave is as widespread as it seems,
+</I>&gt;<i> it feels like a corner case that could be avoided, as he suggested, by
+</I>&gt;<i> having the ability to refer to stdlib's modules under a toplevel name
+</I>&gt;<i> (OCaml.List) and this still seems in the realm of the module system (and
+</I>&gt;<i> could be realized via something like cmia).
+</I>&gt;<i>
+</I>&gt;<i> Daniel
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/platform/attachments/20130222/bbdfb83d/attachment.html">http://lists.ocaml.org/pipermail/platform/attachments/20130222/bbdfb83d/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000075.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000080.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#76">[ date ]</a>
+              <a href="thread.html#76">[ thread ]</a>
+              <a href="subject.html#76">[ subject ]</a>
+              <a href="author.html#76">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

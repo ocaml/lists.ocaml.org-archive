@@ -1,0 +1,263 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with strings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C57BB673D-C1F1-42EA-8B65-6DF54E290E88%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000247.html">
+   <LINK REL="Next"  HREF="000252.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with strings</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C57BB673D-C1F1-42EA-8B65-6DF54E290E88%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] Help with strings">skaller at internode.on.net
+       </A><BR>
+    <I>Tue Dec 26 23:45:23 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000247.html">[ocaml-ctypes] Help with strings
+</A></li>
+        <LI>Next message: <A HREF="000252.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#248">[ date ]</a>
+              <a href="thread.html#248">[ thread ]</a>
+              <a href="subject.html#248">[ subject ]</a>
+              <a href="author.html#248">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+&gt;<i> On 27 Dec. 2017, at 10:04, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> Dear John,
+</I>
+Hi! Sorry for the email mixuo, i&#8217;m subscribed twice now,
+once at sourceforge and once at internode.
+
+I have another question: what&#8217;s the best way to bind an &#8220;enum&#8221;?
+If the codes are sequential is there a builtin way to map the enum
+into an Ocaml variant?
+
+I guess that would use a ppx thing&#8230;
+
+&gt;<i> I have another question: what&#8217;s the best way to bind an &#8220;enum&#8221;?
+</I>&gt;<i> If the codes are sequential is there a builtin way to map the enum
+</I>&gt;<i> into an Ocaml variant?
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> On 25/12/2017, john skaller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at internode.on.net</A>&gt; wrote:
+</I>&gt;&gt;<i> So roughly .. when is it safe to use &#8220;string&#8221;?
+</I>&gt;&gt;<i> At the moment the answer for me is &#8220;never&#8221; because I don&#8217;t understand the
+</I>&gt;&gt;<i> memory management protocol.
+</I>&gt;<i> 
+</I>&gt;<i> It works like this:
+</I>&gt;<i> 
+</I>&gt;<i>  * passing a string using 'string' makes a copy in either direction.
+</I>&gt;<i> Furthermore,
+</I>&gt;<i> 
+</I>&gt;<i>    - the copy created when passing a string from OCaml to C lives for
+</I>&gt;<i> the lifetime of the C call.
+</I>&gt;<i>      (It's possible this will be strengthened in the future:
+</I>&gt;<i> <A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/556">https://github.com/ocamllabs/ocaml-ctypes/issues/556</A>)
+</I>&gt;<i> 
+</I>&gt;<i>    - the copy created when passing a string from C to OCaml is a
+</I>&gt;<i> regular OCaml string, subject to usual GC behaviour.  Ctypes makes no
+</I>&gt;<i> attempt to deallocate the memory used by the original C string.
+</I>
+Right, thanks! That&#8217;s a definite spec, perhaps please you could add those
+comments to the documentation?
+
+
+&gt;<i> 
+</I>&gt;<i> So, for your three examples
+</I>&gt;<i> 
+</I>&gt;&gt;<i>        char const *get_version();
+</I>&gt;&gt;<i>        char *get_buffer();
+</I>&gt;&gt;<i>        char *strdup(char *);
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> The first function returns a pointer to an immutable global object.
+</I>&gt;<i> 
+</I>&gt;<i> It's fine, and probably the best choice, to use 'string' for
+</I>&gt;<i> 'get_version'.  Each call to the function will create a fresh OCaml
+</I>&gt;<i> string.
+</I>
+Heh .. happily that&#8217;s the one function I have actually implemented and tested.
+
+&gt;<i> 
+</I>&gt;&gt;<i> The second to a mutable part of a buffer.
+</I>&gt;<i> 
+</I>&gt;<i> Mutability means that it's probably not useful to use `string` here,
+</I>&gt;<i> since 'string' will create a copy that won't track changes.  It would
+</I>&gt;<i> be better to write
+</I>&gt;<i> 
+</I>&gt;<i>   let get_buffer = foreign &quot;get_buffer&quot;
+</I>&gt;<i>      (void @-&gt; returning (ptr char))
+</I>
+Gotcha!
+
+&gt;<i> 
+</I>&gt;&gt;<i> The third to a freshly malloc()ed copy of a NTBS.
+</I>&gt;<i> 
+</I>&gt;<i> Here 'string' is not the right thing for the *return type*, since (as
+</I>&gt;<i> you say) it prevents access to the pointer needed to free the returned
+</I>&gt;<i> memory.  Again, 'ptr char' is probably the best starting point.  On
+</I>&gt;<i> the other hand, &#8216;string' is a reasonable choice for the *argument*,
+</I>
+Right.
+
+I may have some more questions, hope you don&#8217;t mind.
+Perhaps the answers will be useful to others starting out.
+
+BTW: some of the code appears in  several places.
+Why is that?
+(Ctypes vs Ctypes_types.TYPE)
+
+
+&gt;<i> since Ctypes will automatically deallocate the copy of the string
+</I>&gt;<i> after the call.  So the following binding is reasonable:
+</I>&gt;<i> 
+</I>&gt;<i>    let strdup = foreign &quot;strdup&quot;
+</I>&gt;<i>      (string @-&gt; returning (ptr char))
+</I>&gt;<i> 
+</I>&gt;<i> In this case it's possible to do a little better.  The 'ocaml_string'
+</I>&gt;<i> type description is an alternative to 'string' that avoids the copy:
+</I>&gt;<i> 
+</I>&gt;<i>    let strdup = foreign &quot;strdup&quot;
+</I>&gt;<i>      (ocaml_string @-&gt; returning (ptr char))
+</I>&gt;<i> 
+</I>&gt;<i> In the general case, where the C function can call back into OCaml,
+</I>&gt;<i> 'ocaml_string' is not safe.  But it's safe in the common (first-order)
+</I>&gt;<i> case, which includes &#8216;strdup'.
+</I>
+Ok, so that&#8217;s a pointer to the live Ocaml string, and we&#8217;re relying
+on the string not being modified or moved during the C call.
+
+Current rules say Ocaml strings are immutable, use bytes instead.
+However, if several threads are running, normally Ocaml is using
+a global lock to serialise them. However the lock is normally
+released when calling C code. That would not be safe in this
+case, using ocaml_string, so presumably in this case the lock
+is not released. Is that correct?
+
+
+&gt;<i> 
+</I>&gt;&gt;<i> So roughly, if you wanted to do it right, Ctypes &#8220;type&#8221; system is inadequate.
+</I>&gt;&gt;<i> The &#8220;types&#8221; must contain mutablility and ownership information.
+</I>&gt;&gt;<i> For example
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>        immutable_lend_noincrementable_nonnull_pointer_char
+</I>&gt;<i> 
+</I>&gt;<i> You're quite right, both that Ctypes doesn't capture these properties
+</I>&gt;<i> in the type system, and that it's quite challenging to do so, since C
+</I>&gt;<i> is so flexible.  (For example, the 'realpath' function can return
+</I>&gt;<i> either a malloc-allocated buffer or a caller-supplied buffer,
+</I>&gt;<i> depending on the value of its second argument!)
+</I>
+Yeah. And what&#8217;s worse is that many libraries describe functionality
+in the documentation and fail to describe the &#8220;ownership&#8221; rules.
+Ctypes could do with a bit more of that IMHO.
+
+EG:
+
+val string : string typ
+&#8230;
+&#8220;To avoid problems with the garbage collector, values passed using Ctypes_types.TYPE.string 
+are copied into immovable C-managed storage before being passed to C.&#8221;
+
+That would best contain your explanation above regarding lifetimes.
+It reads like &#8220;you just leaked the copy&#8221; since &#8220;C managed store&#8221; means
+the C heap and malloc(), which requires a called to free() which isn&#8217;t
+what happens.
+
+&gt;<i> 
+</I>&gt;<i> Regarding mutability, the 4.06.0 release of OCaml distinguishes
+</I>&gt;<i> mutable from immutable strings.  When Ctypes drops support for older
+</I>&gt;<i> OCaml versions it's likely that string mutability will be more clearly
+</I>&gt;<i> marked in Ctypes bindings, too.
+</I>
+I&#8217;m using 4.05 at the moment and already you get a complaint
+using mutabile operations on string instead of bytes.
+[IMHO the way of doing this changes was poorly thought out]
+
+&gt;<i> 
+</I>&gt;&gt;<i> Of course I can do that by passing a char ptr manually created
+</I>&gt;&gt;<i> (C types can do that I think),
+</I>&gt;<i> 
+</I>&gt;<i> Indeed (see above).
+</I>&gt;<i> 
+</I>&gt;&gt;<i> copying Ocaml string contents manually (how?),
+</I>&gt;<i> 
+</I>&gt;<i> A quick way is to use the 'coerce' function, which can convert between
+</I>&gt;<i> 'ptr char' and 'string' because 'string' is a view for 'ptr char'.
+</I>&gt;<i> Here's an example using the 'strdup' binding above.
+</I>&gt;<i> 
+</I>&gt;<i>    # let p = strdup &quot;hello, world&quot;;;
+</I>&gt;<i>    val p : char Ctypes_static.ptr = (char*) 0x5601c2a90130
+</I>&gt;<i>    # coerce (ptr char) string p;;
+</I>&gt;<i>    - : string = &quot;hello, world&quot;
+</I>&gt;<i> 
+</I>&gt;<i> More generally the 'ocaml-memcpy' package provides functions that can
+</I>&gt;<i> copy between several different representations
+</I>&gt;<i> (<A HREF="https://github.com/yallop/ocaml-memcpy">https://github.com/yallop/ocaml-memcpy</A>).
+</I>
+Thanks!
+
+&gt;<i> 
+</I>&gt;&gt;<i> and then manually free-ing it (C types can do that?)
+</I>&gt;<i> 
+</I>&gt;<i> A simple way is to bind 'free'!  Here's an example, freeing the memory
+</I>&gt;<i> returned from the call to 'strdup' above.
+</I>&gt;<i> 
+</I>&gt;<i>    # let free = foreign &quot;free&quot; (ptr char @-&gt; returning void);;
+</I>&gt;<i>    val free : char Ctypes_static.ptr -&gt; unit = &lt;fun&gt;
+</I>&gt;<i>    # free p;;
+</I>&gt;<i>    - : unit = ()
+</I>&gt;<i> 
+</I>&gt;<i> Kind regards,
+</I>&gt;<i> 
+</I>&gt;<i> Jeremy
+</I>
+
+Thanks heaps!
+
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000247.html">[ocaml-ctypes] Help with strings
+</A></li>
+	<LI>Next message: <A HREF="000252.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#248">[ date ]</a>
+              <a href="thread.html#248">[ thread ]</a>
+              <a href="subject.html#248">[ subject ]</a>
+              <a href="author.html#248">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,649 @@
+From Andre.OLIVEIRAMARONEZE at cea.fr  Wed Jul  6 19:45:41 2016
+From: Andre.OLIVEIRAMARONEZE at cea.fr (Andre Maroneze)
+Date: Wed, 6 Jul 2016 20:45:41 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+Message-ID: <577D51D5.8070607@cea.fr>
+
+I've been successfully using Andreas Hauptmann's MinGW OPAM repository 
+to install somewhat tricky OPAM packages, such as Frama-C, using Cygwin 
+and the MinGW-based OCaml provided with it.
+
+However, a constant problem that I have (due to the package itself) is 
+Windows' limit of 8k (or 32k, according to the application) characters 
+in the command line, which results in the error "input line is too long".
+
+That limit means that, if I compile my package (frama-c) using a short 
+path (e.g. C:\Ocaml32\user\frama-c), everything works (thanks to 
+Andreas' patches). However, if I try a longer path (at least 60 
+characters), there are several calls to "ocamlfind ocamlopt" in my 
+Makefile that fail with "input line is too long".
+
+Most of these command lines have less than 6000 characters, which is 
+below both limits. Furthermore, I am able to run simple commands such as 
+"ocamlfind ocamlopt t1.ml t2.ml t3.ml ...", with up to 32k characters, 
+without hitting any limits. But my actual command line is much shorter, 
+yet it triggers this error, most certainly due to the flags it uses. 
+This makes me think that it may be some internal command executed by 
+ocamlfind or ocamlopt that is triggering the limit, e.g. after expanding 
+some arguments, but I don't how to get Windows or Cygwin to give me more 
+detailed information about this error.
+
+The only hint I've got so far is that the "-shared" flag in my command 
+line contributes significantly to the error: I can either trim my 
+command to less than 4000 characters while keeping -shared and still 
+have the error, or I can keep it over 5000 characters and remove 
+"-shared", and the command line parsing error disappears (but then 
+ocamlopt does not produce what I need, so this is not a solution).
+
+Has someone else also encountered this problem when compiling on Windows 
+with a MinGW-based OCaml? Suggestions on how to avoid it are welcome, 
+preferably that do not require modifying the entire compilation process.
+
+(I've tried a few hacks, such as using Python's subprocess module to 
+pass the arguments as a list instead of a string, but it didn't work.)
+
+For information, I'm using OCaml 4.02.3+mingw32 on a Windows 8.1.
+
+-- 
+Andr? Maroneze
+Ing?nieur-chercheur CEA/LIST
+Laboratoire S?ret? et S?curit? des Logiciels
+
+
+From andreashauptmann at t-online.de  Wed Jul  6 21:00:48 2016
+From: andreashauptmann at t-online.de (Andreas Hauptmann)
+Date: Wed, 6 Jul 2016 22:00:48 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <577D51D5.8070607@cea.fr>
+References: <577D51D5.8070607@cea.fr>
+Message-ID: <nljo1h$u8f$1@ger.gmane.org>
+
+Hi,
+
+On Wed, 6 Jul 2016 20:45:41 +0200
+Andre Maroneze wrote:
+> Has someone else also encountered this problem when compiling on
+> Windows with a MinGW-based OCaml?
+
+It's probably not your own command, that is too long, but a command
+that is internally created by flexlink (or ocamlopt)
+(See for example: https://github.com/alainfrisch/flexdll/issues/7 )
+
+Compile it with:
+
+export FLEXLINKFLAGS='-v -v -v'
+export OCAMLPARAM='_,verbose=1'
+ocamlfind ocamlopt ...
+
+then ocamlopt/ocamlc should print, which external commands they call to
+stderr. And flexlink will also print some debug output.
+With this information we can hopefully locate the point at which the
+wrong command is generated.
+
+
+
+From Andre.OLIVEIRAMARONEZE at cea.fr  Thu Jul  7 08:18:09 2016
+From: Andre.OLIVEIRAMARONEZE at cea.fr (Andre Maroneze)
+Date: Thu, 7 Jul 2016 09:18:09 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <nljo1h$u8f$1@ger.gmane.org>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+Message-ID: <577E0231.6010705@cea.fr>
+
+Thanks, using those flags it shows useful information:
+
+- A call to i686-w64-mingw32-as, with a short command line, that succeeds;
+- A call to flexlink, also with a short command line, using a response 
+file (@C:\cygwin32\tmp\camlresp0050ba);
+- And then several lines:
+
+** Use cygpath: true
+** Search path: .... (lots of directories, one per line)
+** Default libraries: ... (some -l<lib> followed by corresponding lines 
+"** open: .../lib/<lib>.a")
++ i686-w64-mingw32-gcc -mconsole -shared -Wl,-e_FlexDLLiniter at 12  ... 
+(lots of -I and -L, plus some extra flags, and this line is slightly 
+larger than 8k characters)
+La ligne de commande est trop longue.
+** Fatal error: Error during linking
+
+So it's that call to i686-w64-mingw32-gcc that fails. Is there a way to 
+use a response file for that command as well?
+
+
+Regards,
+
+
+On 07/06/2016 10:00 PM, Andreas Hauptmann wrote:
+> Hi,
+>
+> On Wed, 6 Jul 2016 20:45:41 +0200
+> Andre Maroneze wrote:
+>> Has someone else also encountered this problem when compiling on
+>> Windows with a MinGW-based OCaml?
+> It's probably not your own command, that is too long, but a command
+> that is internally created by flexlink (or ocamlopt)
+> (See for example: https://github.com/alainfrisch/flexdll/issues/7 )
+>
+> Compile it with:
+>
+> export FLEXLINKFLAGS='-v -v -v'
+> export OCAMLPARAM='_,verbose=1'
+> ocamlfind ocamlopt ...
+>
+> then ocamlopt/ocamlc should print, which external commands they call to
+> stderr. And flexlink will also print some debug output.
+> With this information we can hopefully locate the point at which the
+> wrong command is generated.
+>
+>
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+
+-- 
+Andr? Maroneze
+Ing?nieur-chercheur CEA/LIST
+Laboratoire S?ret? et S?curit? des Logiciels
+
+
+From dra-news at metastack.com  Thu Jul  7 11:22:24 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Thu, 7 Jul 2016 10:22:24 +0000
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <577E0231.6010705@cea.fr>
+References: <577D51D5.8070607@cea.fr>
+ <nljo1h$u8f$1@ger.gmane.org>,<577E0231.6010705@cea.fr>
+Message-ID: <61F93E417BAD022A.187EDB2B-9865-4D21-B5CE-1A64AF2ABD9F@mail.outlook.com>
+
+Cygwin executables support @response files when invoked by a native process (it's not relevant when they're invoked by q Cygwin process, as the limit doesn't exist).
+
+I thought flexlink could already do this, but it's not a major patch to flexlink if it can't.
+
+
+David
+
+
+
+
+
+On Thu, Jul 7, 2016 at 8:18 AM +0100, "Andre Maroneze" <Andre.OLIVEIRAMARONEZE at cea.fr<mailto:Andre.OLIVEIRAMARONEZE at cea.fr>> wrote:
+
+Thanks, using those flags it shows useful information:
+
+- A call to i686-w64-mingw32-as, with a short command line, that succeeds;
+- A call to flexlink, also with a short command line, using a response
+file (@C:\cygwin32\tmp\camlresp0050ba);
+- And then several lines:
+
+** Use cygpath: true
+** Search path: .... (lots of directories, one per line)
+** Default libraries: ... (some -l<lib> followed by corresponding lines
+"** open: .../lib/<lib>.a")
++ i686-w64-mingw32-gcc -mconsole -shared -Wl,-e_FlexDLLiniter at 12  ...
+(lots of -I and -L, plus some extra flags, and this line is slightly
+larger than 8k characters)
+La ligne de commande est trop longue.
+** Fatal error: Error during linking
+
+So it's that call to i686-w64-mingw32-gcc that fails. Is there a way to
+use a response file for that command as well?
+
+
+Regards,
+
+
+On 07/06/2016 10:00 PM, Andreas Hauptmann wrote:
+> Hi,
+>
+> On Wed, 6 Jul 2016 20:45:41 +0200
+> Andre Maroneze wrote:
+>> Has someone else also encountered this problem when compiling on
+>> Windows with a MinGW-based OCaml?
+> It's probably not your own command, that is too long, but a command
+> that is internally created by flexlink (or ocamlopt)
+> (See for example: https://github.com/alainfrisch/flexdll/issues/7 )
+>
+> Compile it with:
+>
+> export FLEXLINKFLAGS='-v -v -v'
+> export OCAMLPARAM='_,verbose=1'
+> ocamlfind ocamlopt ...
+>
+> then ocamlopt/ocamlc should print, which external commands they call to
+> stderr. And flexlink will also print some debug output.
+> With this information we can hopefully locate the point at which the
+> wrong command is generated.
+>
+>
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+
+--
+Andr? Maroneze
+Ing?nieur-chercheur CEA/LIST
+Laboratoire S?ret? et S?curit? des Logiciels
+
+_______________________________________________
+wg-windows mailing list
+wg-windows at lists.ocaml.org
+http://lists.ocaml.org/listinfo/wg-windows
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20160707/cd6700cb/attachment.html>
+
+From andreashauptmann at t-online.de  Thu Jul  7 11:27:46 2016
+From: andreashauptmann at t-online.de (Andreas Hauptmann)
+Date: Thu, 7 Jul 2016 12:27:46 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr>
+Message-ID: <nllar2$ugo$1@ger.gmane.org>
+
+On Thu, 7 Jul 2016 09:18:09 +0200
+Andre Maroneze wrote:
+> ** Use cygpath: true
+> ** Search path: .... (lots of directories, one per line)
+[....]
+> (lots of -I and -L, plus some extra flags, and this line is slightly 
+> larger than 8k characters)
+> La ligne de commande est trop longue.
+> ** Fatal error: Error during linking
+> 
+> So it's that call to i686-w64-mingw32-gcc that fails. Is there a way
+> to use a response file for that command as well?
+
+Ok, I think I've identified the problem. Flexlink already writes the
+command to a file and execute this file with bash, if the command line
+is too long. Since both bash and gcc are linked against cygwin-1.dll,
+there aren't any limits beside your main memory (cygwin programs use
+shared memory to pass command line arguments and environment variables
+around, if they hit a limit imposed by windows).
+
+However there are at least two problems:
+- the decision to use bash or not is based on a gross estimation, not
+the real command line length (It looks at your object files, not your
+include directories)
+- The wrong quote function is used to write the shell script
+(Filename.quote quotes for cmd, not a unix shell,...)
+
+Try:
+https://www.dropbox.com/s/570bs4205llxqwt/flexlink32.exe
+or
+https://www.dropbox.com/s/ki1bvfdld27vlwb/flexlink64.exe
+
+as replacement for your current flexlink.exe. 
+
+I?m not sure, if my guess (and patch) is correct. When I?ve tried to
+use a opam switch under a location with long filenames, I fail much
+earlier because of the filename length limit of 260 - not because of
+flexlink. (If you want to use more than 260 chars, you have to use the
+unicode api and always use absolute paths ? of course no commonly used
+build system can deal with such limitations.)
+
+
+
+From alain.frisch at lexifi.com  Thu Jul  7 11:37:47 2016
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 7 Jul 2016 12:37:47 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <nllar2$ugo$1@ger.gmane.org>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+Message-ID: <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+
+On 07/07/2016 12:27, Andreas Hauptmann wrote:
+> However there are at least two problems:
+> - the decision to use bash or not is based on a gross estimation, not
+> the real command line length (It looks at your object files, not your
+> include directories)
+
+Indeed, and this is now fixed in the development version.
+
+https://github.com/alainfrisch/flexdll/commit/2bac9b8153b2e98880545f86c43590f905afe427
+
+> - The wrong quote function is used to write the shell script
+> (Filename.quote quotes for cmd, not a unix shell,...)
+
+Do you have a reproduction case for this one?
+
+
+-- Alain
+
+From dra-news at metastack.com  Thu Jul  7 12:19:17 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Thu, 7 Jul 2016 11:19:17 +0000
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+ <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9011E9C7385@Remus.metastack.local>
+
+Alain Frisch wrote:
+> On 07/07/2016 12:27, Andreas Hauptmann wrote:
+> > However there are at least two problems:
+> > - the decision to use bash or not is based on a gross estimation, not
+> > the real command line length (It looks at your object files, not your
+> > include directories)
+> 
+> Indeed, and this is now fixed in the development version.
+> 
+> https://github.com/alainfrisch/flexdll/commit/2bac9b8153b2e98880545f86c435
+> 90f905afe427
+> 
+> > - The wrong quote function is used to write the shell script
+> > (Filename.quote quotes for cmd, not a unix shell,...)
+> 
+> Do you have a reproduction case for this one?
+
+The full story is even more involved than just argument quoting (I did a lot of forensic digging in the code for cygwin1.dll in May). Handling of double-quotes is different from the standard Windows mechanism (described in the somewhat obscurely-named CommandLineToArgvW function in MSDN: https://msdn.microsoft.com/en-us/library/windows/desktop/bb776391(v=vs.85).aspx).
+
+The final result of digging (and fruitless requests on the Cygwin list) was:
+  1. When invoking a Cygwin process, it is necessary to go via the win_create_process C primitive from the Unix module (in order to bypass OCaml's correct implementation of CommandLineToArgvW escaping)
+  2. It is necessary to escape the arguments also taking into Cygwin's noglob setting (two entirely different escaping code paths).
+
+For OPAM, which does not need any globbing assistance, this resulted in https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L17-L202. It's working for me so far, but it's clearly going to need @response support implementing soon, as noted in the comments! That code also permits the effect of being able to execute #! scripts directly: https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L369-L421.
+
+
+David
+
+From andreashauptmann at t-online.de  Thu Jul  7 12:26:52 2016
+From: andreashauptmann at t-online.de (Andreas Hauptmann)
+Date: Thu, 7 Jul 2016 13:26:52 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+ <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+Message-ID: <nlle9s$ugo$2@ger.gmane.org>
+
+On Thu, 7 Jul 2016 12:37:47 +0200
+Alain Frisch wrote:
+
+> On 07/07/2016 12:27, Andreas Hauptmann wrote:
+> > However there are at least two problems:
+> > - the decision to use bash or not is based on a gross estimation,
+> > not the real command line length (It looks at your object files,
+> > not your include directories)  
+> 
+> Indeed, and this is now fixed in the development version.
+> 
+> https://github.com/alainfrisch/flexdll/commit/2bac9b8153b2e98880545f86c43590f905afe427
+
+Thanks,
+it still needs to be fixed at least here:
+https://github.com/alainfrisch/flexdll/blob/2aa2c0e22aa37515617245065cdbfee7108fc172/reloc.ml#L164
+
+> > - The wrong quote function is used to write the shell script
+> > (Filename.quote quotes for cmd, not a unix shell,...)  
+> 
+> Do you have a reproduction case for this one?
+
+Yes, I know, it probably won't happen in practice, because everybody
+uses 'normal' filenames. But as soon as your string contains something,
+that is interpreted by bash.....
+
+let cmd = "mkdir -p " ^ (Filename.quote "fo${PATH}bar") in
+let ch = open_out_bin "foo" in
+let () = output_string ch cmd in
+let () = close_out ch in
+let res = Sys.command "bash foo" in
+assert ( res = 0 )
+
+
+From alain.frisch at lexifi.com  Thu Jul  7 12:41:30 2016
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 7 Jul 2016 13:41:30 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <nlle9s$ugo$2@ger.gmane.org>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+ <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+ <nlle9s$ugo$2@ger.gmane.org>
+Message-ID: <33db5145-8e04-4a43-5b4c-9e37a15896ee@lexifi.com>
+
+On 07/07/2016 13:26, Andreas Hauptmann wrote:
+> Thanks,
+> it still needs to be fixed at least here:
+> https://github.com/alainfrisch/flexdll/blob/2aa2c0e22aa37515617245065cdbfee7108fc172/reloc.ml#L164
+
+Are you sure?  This goes through get_output, which already had the logic 
+to use bash for long command line.
+
+> Yes, I know, it probably won't happen in practice, because everybody
+> uses 'normal' filenames. But as soon as your string contains something,
+> that is interpreted by bash.....
+
+Ok.  Considering the effort David had to deploy to "get quoting right", 
+I'd prefer to focus on more immediate issues.  Ideally, all the process 
+invocation logic that David has been working on could be reused in 
+flexlink; one tricky point is that in order to simplify bootstrapping, I 
+avoided any non-stdlib dependency for flexlink (including Unix).
+
+
+Alain
+
+From Andre.OLIVEIRAMARONEZE at cea.fr  Thu Jul  7 13:27:36 2016
+From: Andre.OLIVEIRAMARONEZE at cea.fr (Andre Maroneze)
+Date: Thu, 7 Jul 2016 14:27:36 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <nllar2$ugo$1@ger.gmane.org>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+Message-ID: <577E4AB8.5050007@cea.fr>
+
+
+
+On 07/07/2016 12:27 PM, Andreas Hauptmann wrote:
+> Ok, I think I've identified the problem. Flexlink already writes the
+> command to a file and execute this file with bash, if the command line
+> is too long. Since both bash and gcc are linked against cygwin-1.dll,
+> there aren't any limits beside your main memory (cygwin programs use
+> shared memory to pass command line arguments and environment variables
+> around, if they hit a limit imposed by windows).
+>
+> However there are at least two problems:
+> - the decision to use bash or not is based on a gross estimation, not
+> the real command line length (It looks at your object files, not your
+> include directories)
+> - The wrong quote function is used to write the shell script
+> (Filename.quote quotes for cmd, not a unix shell,...)
+>
+> Try:
+> https://www.dropbox.com/s/570bs4205llxqwt/flexlink32.exe
+> or
+> https://www.dropbox.com/s/ki1bvfdld27vlwb/flexlink64.exe
+>
+> as replacement for your current flexlink.exe.
+>
+> I?m not sure, if my guess (and patch) is correct. When I?ve tried to
+> use a opam switch under a location with long filenames, I fail much
+> earlier because of the filename length limit of 260 - not because of
+> flexlink. (If you want to use more than 260 chars, you have to use the
+> unicode api and always use absolute paths ? of course no commonly used
+> build system can deal with such limitations.)
+>
+>
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+
+Thanks a lot, I just tested using your flexlink32.exe and it worked just 
+fine, I was able to compile frama-c-base on a directory with a long name.
+
+The prefix in my case is only 132 characters long, so even when adding 
+the longest path in my sources (~100 characters), it remains under 260, 
+so it worked. Still, it's good to know about that limit, I'll inform our 
+users about it.
+
+
+-- 
+Andr? Maroneze
+Ing?nieur-chercheur CEA/LIST
+Laboratoire S?ret? et S?curit? des Logiciels
+
+
+From andreashauptmann at t-online.de  Thu Jul  7 15:10:06 2016
+From: andreashauptmann at t-online.de (Andreas Hauptmann)
+Date: Thu, 7 Jul 2016 16:10:06 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+ <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+ <nlle9s$ugo$2@ger.gmane.org>
+ <33db5145-8e04-4a43-5b4c-9e37a15896ee@lexifi.com>
+Message-ID: <nllnru$5ij$1@ger.gmane.org>
+
+On Thu, 7 Jul 2016 13:41:30 +0200
+Alain Frisch wrote:
+
+> On 07/07/2016 13:26, Andreas Hauptmann wrote:
+> > Thanks,
+> > it still needs to be fixed at least here:
+> > https://github.com/alainfrisch/flexdll/blob/2aa2c0e22aa37515617245065cdbfee7108fc172/reloc.ml#L164  
+> 
+> Are you sure?  This goes through get_output, which already had the
+> logic to use bash for long command line.
+
+Indeed, but then there is something wrong with get_output,
+otherwise https://github.com/alainfrisch/flexdll/issues/7 couldn't
+occur (I've observed this error several times in the past).
+
+Probably it's just the magic number that is too high. The following
+program aborts before 8191 (or 8182):
+
+--
+let () =
+  let rec iter s =
+    let cmd = s ^ " >NUL 2>NUL" in
+    if Sys.command cmd <> 0 then (
+      Printf.eprintf "%d\n" @@ String.length cmd;
+      exit 0
+    )
+    else
+      iter (s ^ "a")
+  in
+  let b = Bytes.make 8100 'a' in
+  let start = "echo a" in
+  let () = Bytes.blit_string start 0 b 0 (String.length start) in
+  iter (Bytes.to_string b)
+--
+
+It's 8160 for me, and another user even reports 8158:
+http://forum.pellesc.de/index.php?topic=4975.5
+
+
+From dra-news at metastack.com  Thu Jul  7 20:40:37 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Thu, 7 Jul 2016 19:40:37 +0000
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <33db5145-8e04-4a43-5b4c-9e37a15896ee@lexifi.com>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr> <nllar2$ugo$1@ger.gmane.org>
+ <086f0d2f-99f6-ba8c-556f-77acd9e63733@lexifi.com>
+ <nlle9s$ugo$2@ger.gmane.org>
+ <33db5145-8e04-4a43-5b4c-9e37a15896ee@lexifi.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9011E9CB52B@Remus.metastack.local>
+
+Alain Frisch wrote:
+> On 07/07/2016 13:26, Andreas Hauptmann wrote:
+> > Thanks,
+> > it still needs to be fixed at least here:
+> > https://github.com/alainfrisch/flexdll/blob/2aa2c0e22aa37515617245065c
+> > dbfee7108fc172/reloc.ml#L164
+> 
+> Are you sure?  This goes through get_output, which already had the logic
+> to use bash for long command line.
+> 
+> > Yes, I know, it probably won't happen in practice, because everybody
+> > uses 'normal' filenames. But as soon as your string contains
+> > something, that is interpreted by bash.....
+> 
+> Ok.  Considering the effort David had to deploy to "get quoting right",
+> I'd prefer to focus on more immediate issues.  Ideally, all the process
+> invocation logic that David has been working on could be reused in
+> flexlink; one tricky point is that in order to simplify bootstrapping, I
+> avoided any non-stdlib dependency for flexlink (including Unix).
+
+Especially if stdout, stderr and stdin don't need to be controlled, it's just a matter of wrapping CreateProcess directly - it could be almost lifted straight out of otherlibs/win32unix/createprocess.c
+
+Though I'd hang on until the implementation in OPAM has been battle-tested some more ;o)
+
+
+David
+
+From alain at frisch.fr  Thu Jul  7 08:44:48 2016
+From: alain at frisch.fr (Alain Frisch)
+Date: Thu, 7 Jul 2016 09:44:48 +0200
+Subject: [wg-windows] mingw, ocamlopt and "input line is too long"
+In-Reply-To: <577E0231.6010705@cea.fr>
+References: <577D51D5.8070607@cea.fr> <nljo1h$u8f$1@ger.gmane.org>
+ <577E0231.6010705@cea.fr>
+Message-ID: <e6999432-baed-4e32-71eb-5805cdcfd8e7@frisch.fr>
+
+It seems flexdll decides to use response files only for file arguments 
+when calling gcc, not taking other arguments into account.
+
+I'll try to fix that.
+
+-- Alain
+
+
+On 07/07/2016 09:18, Andre Maroneze wrote:
+> Thanks, using those flags it shows useful information:
+>
+> - A call to i686-w64-mingw32-as, with a short command line, that succeeds;
+> - A call to flexlink, also with a short command line, using a response
+> file (@C:\cygwin32\tmp\camlresp0050ba);
+> - And then several lines:
+>
+> ** Use cygpath: true
+> ** Search path: .... (lots of directories, one per line)
+> ** Default libraries: ... (some -l<lib> followed by corresponding lines
+> "** open: .../lib/<lib>.a")
+> + i686-w64-mingw32-gcc -mconsole -shared -Wl,-e_FlexDLLiniter at 12  ...
+> (lots of -I and -L, plus some extra flags, and this line is slightly
+> larger than 8k characters)
+> La ligne de commande est trop longue.
+> ** Fatal error: Error during linking
+>
+> So it's that call to i686-w64-mingw32-gcc that fails. Is there a way to
+> use a response file for that command as well?
+>
+>
+> Regards,
+>
+>
+> On 07/06/2016 10:00 PM, Andreas Hauptmann wrote:
+>> Hi,
+>>
+>> On Wed, 6 Jul 2016 20:45:41 +0200
+>> Andre Maroneze wrote:
+>>> Has someone else also encountered this problem when compiling on
+>>> Windows with a MinGW-based OCaml?
+>> It's probably not your own command, that is too long, but a command
+>> that is internally created by flexlink (or ocamlopt)
+>> (See for example: https://github.com/alainfrisch/flexdll/issues/7 )
+>>
+>> Compile it with:
+>>
+>> export FLEXLINKFLAGS='-v -v -v'
+>> export OCAMLPARAM='_,verbose=1'
+>> ocamlfind ocamlopt ...
+>>
+>> then ocamlopt/ocamlc should print, which external commands they call to
+>> stderr. And flexlink will also print some debug output.
+>> With this information we can hopefully locate the point at which the
+>> wrong command is generated.
+>>
+>>
+>> _______________________________________________
+>> wg-windows mailing list
+>> wg-windows at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/wg-windows
+>
+

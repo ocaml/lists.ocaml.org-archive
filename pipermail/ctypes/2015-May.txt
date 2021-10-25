@@ -1,0 +1,985 @@
+From yallop at gmail.com  Mon May  4 14:04:35 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 4 May 2015 14:04:35 +0100
+Subject: [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN
+	coherently
+In-Reply-To: <20150429114013.GA13701@morbo>
+References: <20150429114013.GA13701@morbo>
+Message-ID: <CAAxsn=HYbL+zS+xkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A@mail.gmail.com>
+
+On 29 April 2015 at 12:40, Si Beaumont <simon.beaumont at citrix.com> wrote:
+> However, I wanted to also be able to get the struct layout and constant
+> definitions only available to the C preprocesor without me having to transcribe
+> them into my library (libpci like many other libraries `#define`s a whole bunch
+> of values for flags that need to be passed into functions). FWICT to get this
+> to work I need to create a second functor taking a module with signature
+> Cstubs.Types.TYPE and then use Cstubs.Type.write_c. This will generate
+> a C program which needs to be compiled. This compiled C program can then be run
+> to generate an OCaml module which can be used with my original Bindings
+> functor (gleanings from a few days of hacking and from ctypes
+> mailing-list[4][5]).
+
+Right.
+
+> It seems this pipeline is going to be quite difficult to integrate into a build
+> system like OASIS since I need to compile an auto-generated C program half way
+> through.
+
+It's not trivial, but it's certainly possible.  The async_ssl package
+is a useful example to work from; it binds various constants in the
+Ffi_bindings.types module:
+
+   https://github.com/janestreet/async_ssl/blob/c58a80b7/bindings/ffi_bindings.ml#L1-L40
+
+and uses ocamlbuild rules to set up the appropriate dependencies
+
+   https://github.com/janestreet/async_ssl/blob/c58a80b7/myocamlbuild.ml
+
+There's also a bit of _oasis set-up to build the executables:
+
+   https://github.com/janestreet/async_ssl/blob/c58a80b7/_oasis#L84-L97
+
+I wonder if it'd be useful for the Ctypes package to include some
+reusable ocamlbuild rules to make this kind of thing easier.
+
+> My final bit of research landed me on an open Bountysource issue[6] on
+> which it looks like there's a plan to smooth this out to make the workflow more
+> like the stub generation for foreign function bindings:
+>
+>> We can address both these concerns with an alternative workflow for
+>> Cstubs_structs.TYPE that follows the same pattern as stub generation for
+>> functions: generate C and ML directly from the functor containing your
+>> bindings, then link the generated C and ML into your program.
+>
+> This sounds fantastic! I was wondering if there is any branch of Ctypes with
+> this functionality yet that I could try out or if there is any expectation to
+> add this in the near-term?
+
+I've just pushed a branch with an implementation of this proposal.
+
+   https://github.com/ocamllabs/ocaml-ctypes/pull/296
+
+Feedback is very welcome!
+
+Jeremy.
+
+From anil at recoil.org  Mon May  4 14:15:13 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 4 May 2015 06:15:13 -0700
+Subject: [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN
+	coherently
+In-Reply-To: <CAAxsn=HYbL+zS+xkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A@mail.gmail.com>
+References: <20150429114013.GA13701@morbo>
+ <CAAxsn=HYbL+zS+xkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A@mail.gmail.com>
+Message-ID: <A2D19456-BC42-4F67-8BAD-03CB50881ACE@recoil.org>
+
+On 4 May 2015, at 06:04, Jeremy Yallop <yallop at gmail.com> wrote:
+> 
+> I wonder if it'd be useful for the Ctypes package to include some
+> reusable ocamlbuild rules to make this kind of thing easier.
+
+Creating a standard ocamlbuild plugin would be useful given the recent
+addition of -plugin-tags to ocamlbuild.
+
+Eliom uses this quite nicely here:
+https://ocsigen.org/eliom/manual/workflow-compilation#h5o-3
+
+to let this work:
+
+    ocamlbuild -use-ocamlfind -plugin-tags "package(eliom.ocamlbuild)" \
+      yourlib.cma yourlib.cmxa yourlib.cmxs yourexecutable.js
+
+A similar ctypes.ocamlbuild could also take additional _tags to
+control the various build options perhaps.
+
+Eliom source: https://github.com/ocsigen/eliom/tree/master/src/ocamlbuild
+
+-anil
+
+From simon.beaumont at citrix.com  Wed May  6 09:01:17 2015
+From: simon.beaumont at citrix.com (Si Beaumont)
+Date: Wed, 6 May 2015 09:01:17 +0100
+Subject: [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN
+ coherently
+In-Reply-To: <CAAxsn=HYbL+zS+xkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A@mail.gmail.com>
+References: <20150429114013.GA13701@morbo>
+ <CAAxsn=HYbL+zS+xkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A@mail.gmail.com>
+Message-ID: <20150506080117.GA768@morbo>
+
+On Mon, 04 May 2015 at 14:04, Jeremy Yallop wrote:
+> On 29 April 2015 at 12:40, Si Beaumont <simon.beaumont at citrix.com> wrote:
+> It's not trivial, but it's certainly possible.  The async_ssl package
+> is a useful example to work from; it binds various constants in the
+> Ffi_bindings.types module:
+> 
+>    https://github.com/janestreet/async_ssl/blob/c58a80b7/bindings/ffi_bindings.ml#L1-L40
+> 
+> and uses ocamlbuild rules to set up the appropriate dependencies
+> 
+>    https://github.com/janestreet/async_ssl/blob/c58a80b7/myocamlbuild.ml
+> 
+> There's also a bit of _oasis set-up to build the executables:
+> 
+>    https://github.com/janestreet/async_ssl/blob/c58a80b7/_oasis#L84-L97
+That's great! Thanks for the pointer. This was the kind of example I was
+looking for.
+
+> > My final bit of research landed me on an open Bountysource issue[6] on
+> > which it looks like there's a plan to smooth this out to make the workflow more
+> > like the stub generation for foreign function bindings:
+> I've just pushed a branch with an implementation of this proposal.
+> 
+>    https://github.com/ocamllabs/ocaml-ctypes/pull/296
+> 
+> Feedback is very welcome!
+Brilliant. I'll definitely give this a whirl later on this week. I'll try and
+get a branch of my project building with this and update you on my experience.
+Then, if and when this hits a ctypes release, we can merge it in.
+
+Thanks,
+
+- Si
+
+From thomas.braibant at gmail.com  Wed May 13 13:51:40 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Wed, 13 May 2015 14:51:40 +0200
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+Message-ID: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+
+For some obscure reason, I need to compile Ctypes on centos 5.x in a hurry.
+Unfortunately, I get the following error message in the compilation process
+
+### stderr ###
+# make: Circular _build/src/ctypes/ctypes_primitive_types.cmx <-
+_build/src/ctypes/ctypes_primitive_types.cmx dependency dropped.
+# make: Circular _build/src/ctypes/ctypes_memory_stubs.cmx <-
+_build/src/ctypes/ctypes_memory_stubs.cmx dependency dropped.
+# In file included from
+/home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/posix_types_stubs.c:8:
+#
+/home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+error: #error "No suitable OCaml type available for representing long longs"
+# make: *** [_build/src/ctypes/posix_types_stubs.o] Error 2
+
+I would be very grateful if someone had an idea of a workaround.
+
+Best,
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150513/dc068653/attachment.html>
+
+From yallop at gmail.com  Wed May 13 14:03:16 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 13 May 2015 14:03:16 +0100
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+In-Reply-To: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+References: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+Message-ID: <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+
+On 13 May 2015 at 13:51, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> For some obscure reason, I need to compile Ctypes on centos 5.x in a hurry.
+> Unfortunately, I get the following error message in the compilation process
+>
+[...]
+> /home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+> error: #error "No suitable OCaml type available for representing long longs"
+
+That's odd.  Could you post the output of the following program?
+
+#include <stdio.h>
+#include <limits.h>
+#include <stdint.h>
+#include <inttypes.h>
+
+int main(void)
+{
+  printf("ULLONG_MAX: %llu\nUINT64_MAX: %" PRIu64"\n",
+         ULLONG_MAX, UINT64_MAX);
+  return 0;
+}
+
+From thomas.braibant at gmail.com  Wed May 13 14:08:27 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Wed, 13 May 2015 15:08:27 +0200
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+In-Reply-To: <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+References: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+ <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+Message-ID: <CAHR=VkzXjQO02TfREFHB-JgvdNf7+Kbyk9NXxOCEN6nF7pcpWg@mail.gmail.com>
+
+gcc c.c
+c.c: In function ?main?:
+c.c:10: error: ?ULLONG_MAX? undeclared (first use in this function)
+c.c:10: error: (Each undeclared identifier is reported only once
+c.c:10: error: for each function it appears in.)
+
+this is not surprising when you look at the output (attached) of gcc -dM -E
+limits.h
+
+
+On Wed, May 13, 2015 at 3:03 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 13 May 2015 at 13:51, Thomas Braibant <thomas.braibant at gmail.com>
+> wrote:
+> > For some obscure reason, I need to compile Ctypes on centos 5.x in a
+> hurry.
+> > Unfortunately, I get the following error message in the compilation
+> process
+> >
+> [...]
+> >
+> /home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+> > error: #error "No suitable OCaml type available for representing long
+> longs"
+>
+> That's odd.  Could you post the output of the following program?
+>
+> #include <stdio.h>
+> #include <limits.h>
+> #include <stdint.h>
+> #include <inttypes.h>
+>
+> int main(void)
+> {
+>   printf("ULLONG_MAX: %llu\nUINT64_MAX: %" PRIu64"\n",
+>          ULLONG_MAX, UINT64_MAX);
+>   return 0;
+> }
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150513/685a3040/attachment.html>
+-------------- next part --------------
+#define __DBL_MIN_EXP__ (-1021)
+#define _POSIX2_BC_SCALE_MAX 99
+#define RE_DUP_MAX (0x7fff)
+#define __FLT_MIN__ 1.17549435e-38F
+#define __flexarr []
+#define __stub_fchflags 
+#define __CHAR_BIT__ 8
+#define SHRT_MAX __SHRT_MAX__
+#define PIPE_BUF 4096
+#define MQ_PRIO_MAX 32768
+#define __GLIBC_PREREQ(maj,min) ((__GLIBC__ << 16) + __GLIBC_MINOR__ >= ((maj) << 16) + (min))
+#define _POSIX2_BC_DIM_MAX 2048
+#define _POSIX_TTY_NAME_MAX 9
+#define __WCHAR_MAX__ 2147483647
+#define __stub___kernel_rem_pio2l 
+#define __DBL_DENORM_MIN__ 4.9406564584124654e-324
+#define __USE_BSD 1
+#define _POSIX2_BC_STRING_MAX 1000
+#define __FLT_EVAL_METHOD__ 0
+#define SHRT_MIN (-SHRT_MAX - 1)
+#define __ASMNAME2(prefix,cname) __STRING (prefix) cname
+#define ARG_MAX 131072
+#define SSIZE_MAX LONG_MAX
+#define _POSIX_DELAYTIMER_MAX 32
+#define XATTR_SIZE_MAX 65536
+#define __DBL_MIN_10_EXP__ (-307)
+#define __FINITE_MATH_ONLY__ 0
+#define _POSIX_SYMLINK_MAX 255
+#define PATH_MAX 4096
+#define __LDBL_REDIR1(name,proto,alias) name proto
+#define _LIMITS_H___ 
+#define __always_inline __inline __attribute__ ((__always_inline__))
+#define __SHRT_MAX__ 32767
+#define __LDBL_MAX__ 1.18973149535723176502e+4932L
+#define NAME_MAX 255
+#define SCHAR_MAX __SCHAR_MAX__
+#define __UINTMAX_TYPE__ long unsigned int
+#define __linux 1
+#define __stub_sigreturn 
+#define __unix 1
+#define _POSIX_AIO_MAX 1
+#define _POSIX_PIPE_BUF 512
+#define __linux__ 1
+#define SCHAR_MIN (-SCHAR_MAX - 1)
+#define _POSIX_AIO_LISTIO_MAX 2
+#define __LDBL_REDIR_NTH(name,proto) name proto __THROW
+#define __SCHAR_MAX__ 127
+#define __USING_NAMESPACE_STD(name) 
+#define __KERNEL_STRICT_NAMES 
+#define __NTH(fct) __attribute__ ((__nothrow__)) fct
+#define _POSIX_THREAD_THREADS_MAX 64
+#define _POSIX_MQ_OPEN_MAX 8
+#define _POSIX_LINK_MAX 8
+#define COLL_WEIGHTS_MAX 255
+#define __attribute_format_strfmon__(a,b) __attribute__ ((__format__ (__strfmon__, a, b)))
+#define _POSIX_SOURCE 1
+#define __stub___kernel_sinl 
+#define __attribute_used__ __attribute__ ((__used__))
+#define _POSIX_CHILD_MAX 25
+#define __USER_LABEL_PREFIX__ 
+#define __GLIBC__ 2
+#define __END_DECLS 
+#define __CONCAT(x,y) x ## y
+#define __STDC_HOSTED__ 1
+#define __GNU_LIBRARY__ 6
+#define __DBL_DIG__ 15
+#define __FLT_EPSILON__ 1.19209290e-7F
+#define __LDBL_MIN__ 3.36210314311209350626e-4932L
+#define _POSIX_NAME_MAX 14
+#define RTSIG_MAX 32
+#define __unix__ 1
+#define __STDC_IEC_559__ 1
+#define __STDC_ISO_10646__ 200009L
+#define __DECIMAL_DIG__ 21
+#define _POSIX2_RE_DUP_MAX 255
+#define __USE_FORTIFY_LEVEL 0
+#define __gnu_linux__ 1
+#define MAX_INPUT 255
+#define __attribute_warn_unused_result__ __attribute__ ((__warn_unused_result__))
+#define _POSIX_LOGIN_NAME_MAX 9
+#define DELAYTIMER_MAX 2147483647
+#define __LDBL_HAS_QUIET_NAN__ 1
+#define __THROW __attribute__ ((__nothrow__))
+#define __GLIBC_HAVE_LONG_LONG 1
+#define __GNUC__ 4
+#define __MMX__ 1
+#define __USE_SVID 1
+#define __LDBL_REDIR1_NTH(name,proto,alias) name proto __THROW
+#define LONG_MAX __LONG_MAX__
+#define _POSIX_THREAD_DESTRUCTOR_ITERATIONS 4
+#define _POSIX_HOST_NAME_MAX 255
+#define NGROUPS_MAX 65536
+#define __ASMNAME(cname) __ASMNAME2 (__USER_LABEL_PREFIX__, cname)
+#define HOST_NAME_MAX 64
+#define _POSIX_SEM_NSEMS_MAX 256
+#define __DBL_MAX__ 1.7976931348623157e+308
+#define _POSIX_SIGQUEUE_MAX 32
+#define __DBL_HAS_INFINITY__ 1
+#define _POSIX_NGROUPS_MAX 8
+#define __USE_XOPEN2K 1
+#define __END_NAMESPACE_C99 
+#define _POSIX_PATH_MAX 256
+#define LONG_MIN (-LONG_MAX - 1L)
+#define __USE_POSIX199506 1
+#define _FEATURES_H 1
+#define __stub_getmsg 
+#define __stub_setlogin 
+#define __stub_fattach 
+#define __stub___kernel_tanl 
+#define __DBL_MAX_EXP__ 1024
+#define __WORDSIZE_COMPAT32 1
+#define __SSE2_MATH__ 1
+#define __amd64 1
+#define _POSIX_TZNAME_MAX 6
+#define _POSIX_SSIZE_MAX 32767
+#define _POSIX_RE_DUP_MAX 255
+#define __bounded 
+#define __BEGIN_NAMESPACE_STD 
+#define __LONG_LONG_MAX__ 9223372036854775807LL
+#define __stub_bdflush 
+#define _BITS_POSIX2_LIM_H 1
+#define __ptrvalue 
+#define __GXX_ABI_VERSION 1002
+#define __FLT_MIN_EXP__ (-125)
+#define __x86_64 1
+#define _POSIX_CLOCKRES_MIN 20000000
+#define __DBL_MIN__ 2.2250738585072014e-308
+#define __REDIRECT(name,proto,alias) name proto __asm__ (__ASMNAME (#alias))
+#define __LP64__ 1
+#define __DBL_HAS_QUIET_NAN__ 1
+#define _POSIX_SYMLOOP_MAX 8
+#define __nonnull(params) __attribute__ ((__nonnull__ params))
+#define CHAR_MAX SCHAR_MAX
+#define ULONG_MAX (LONG_MAX * 2UL + 1UL)
+#define _POSIX_HIWAT _POSIX_PIPE_BUF
+#define __REGISTER_PREFIX__ 
+#define LOGIN_NAME_MAX 256
+#define CHAR_BIT __CHAR_BIT__
+#define __attribute_pure__ __attribute__ ((__pure__))
+#define __USE_POSIX2 1
+#define __NO_INLINE__ 1
+#define __warndecl(name,msg) extern void name (void)
+#define CHAR_MIN SCHAR_MIN
+#define MAX_CANON 255
+#define __FLT_MANT_DIG__ 24
+#define _POSIX_FD_SETSIZE _POSIX_OPEN_MAX
+#define __VERSION__ "4.1.2 20080704 (Red Hat 4.1.2-52)"
+#define AIO_PRIO_DELTA_MAX 20
+#define _SYS_CDEFS_H 1
+#define _BSD_SOURCE 1
+#define LINE_MAX _POSIX2_LINE_MAX
+#define __STRING(x) #x
+#define __unbounded 
+#define _POSIX2_EXPR_NEST_MAX 32
+#define __GNUC_PREREQ(maj,min) ((__GNUC__ << 16) + __GNUC_MINOR__ >= ((maj) << 16) + (min))
+#define _POSIX_STREAM_MAX 8
+#define __stub_gtty 
+#define __stub_sstk 
+#define __wur 
+#define __STDC_IEC_559_COMPLEX__ 1
+#define _POSIX_RTSIG_MAX 8
+#define USHRT_MAX (SHRT_MAX * 2 + 1)
+#define unix 1
+#define _POSIX_MAX_INPUT 255
+#define __SIZE_TYPE__ long unsigned int
+#define XATTR_LIST_MAX 65536
+#define _POSIX_QLIMIT 1
+#define __ELF__ 1
+#define __stub___kernel_cosl 
+#define __stub_lutimes 
+#define __FLT_RADIX__ 2
+#define __LDBL_EPSILON__ 1.08420217248550443401e-19L
+#define __GNUC_RH_RELEASE__ 52
+#define _POSIX_C_SOURCE 200112L
+#define PTHREAD_STACK_MIN 16384
+#define __SSE_MATH__ 1
+#define __long_double_t long double
+#define _POSIX_ARG_MAX 4096
+#define __k8 1
+#define __stub_feupdateenv 
+#define __LDBL_REDIR(name,proto) name proto
+#define UCHAR_MAX (SCHAR_MAX * 2 + 1)
+#define __restrict_arr __restrict
+#define __USE_MISC 1
+#define _GCC_LIMITS_H_ 
+#define __LDBL_DIG__ 18
+#define __x86_64__ 1
+#define _POSIX2_COLL_WEIGHTS_MAX 2
+#define __stub_revoke 
+#define INT_MAX __INT_MAX__
+#define PTHREAD_DESTRUCTOR_ITERATIONS _POSIX_THREAD_DESTRUCTOR_ITERATIONS
+#define _POSIX2_LINE_MAX 2048
+#define __FLT_HAS_QUIET_NAN__ 1
+#define __FLT_MAX_10_EXP__ 38
+#define __LONG_MAX__ 9223372036854775807L
+#define __FLT_HAS_INFINITY__ 1
+#define __bos0(ptr) __builtin_object_size (ptr, 0)
+#define _POSIX2_CHARCLASS_NAME_MAX 14
+#define __USING_NAMESPACE_C99(name) 
+#define EXPR_NEST_MAX _POSIX2_EXPR_NEST_MAX
+#define INT_MIN (-INT_MAX - 1)
+#define __stub_lchmod 
+#define __PMT(args) args
+#define _LINUX_LIMITS_H 
+#define linux 1
+#define __WORDSIZE 64
+#define __BEGIN_DECLS 
+#define __LDBL_MANT_DIG__ 64
+#define __USE_ANSI 1
+#define __k8__ 1
+#define __WCHAR_TYPE__ int
+#define __stub_fdetach 
+#define __stub_chflags 
+#define TTY_NAME_MAX 32
+#define __USE_POSIX 1
+#define __FLT_DIG__ 6
+#define __LDBL_REDIR_DECL(name) 
+#define __INT_MAX__ 2147483647
+#define __bos(ptr) __builtin_object_size (ptr, __USE_FORTIFY_LEVEL > 1)
+#define UINT_MAX (INT_MAX * 2U + 1U)
+#define __FLT_MAX_EXP__ 128
+#define __ptr_t void *
+#define __DBL_MANT_DIG__ 53
+#define _POSIX_SEM_VALUE_MAX 32767
+#define __GLIBC_MINOR__ 5
+#define __WINT_TYPE__ unsigned int
+#define __SSE__ 1
+#define __LDBL_MIN_EXP__ (-16381)
+#define BC_DIM_MAX _POSIX2_BC_DIM_MAX
+#define _POSIX_MAX_CANON 255
+#define __amd64__ 1
+#define __USE_POSIX199309 1
+#define __LDBL_MAX_EXP__ 16384
+#define __LDBL_MAX_10_EXP__ 4932
+#define __DBL_EPSILON__ 2.2204460492503131e-16
+#define BC_SCALE_MAX _POSIX2_BC_SCALE_MAX
+#define XATTR_NAME_MAX 255
+#define _SVID_SOURCE 1
+#define _LP64 1
+#define __stub_stty 
+#define __GNUC_PATCHLEVEL__ 2
+#define __REDIRECT_NTH(name,proto,alias) name proto __asm__ (__ASMNAME (#alias)) __THROW
+#define __END_NAMESPACE_STD 
+#define CHARCLASS_NAME_MAX 2048
+#define __LDBL_HAS_INFINITY__ 1
+#define _POSIX_UIO_MAXIOV 16
+#define _POSIX2_BC_BASE_MAX 99
+#define _POSIX_MQ_PRIO_MAX 32
+#define _LIBC_LIMITS_H_ 1
+#define __INTMAX_MAX__ 9223372036854775807L
+#define __FLT_DENORM_MIN__ 1.40129846e-45F
+#define __BEGIN_NAMESPACE_C99 
+#define CHILD_MAX 999
+#define __FLT_MAX__ 3.40282347e+38F
+#define __attribute_format_arg__(x) __attribute__ ((__format_arg__ (x)))
+#define __SSE2__ 1
+#define __FLT_MIN_10_EXP__ (-37)
+#define __INTMAX_TYPE__ long int
+#define _BITS_POSIX1_LIM_H 1
+#define _POSIX_TIMER_MAX 32
+#define __GNUC_MINOR__ 1
+#define __DBL_MAX_10_EXP__ 308
+#define __LDBL_DENORM_MIN__ 3.64519953188247460253e-4951L
+#define __STDC__ 1
+#define __attribute_malloc__ __attribute__ ((__malloc__))
+#define __PTRDIFF_TYPE__ long int
+#define __attribute_noinline__ __attribute__ ((__noinline__))
+#define BC_STRING_MAX _POSIX2_BC_STRING_MAX
+#define PTHREAD_KEYS_MAX 1024
+#define __LDBL_MIN_10_EXP__ (-4931)
+#define __attribute_deprecated__ __attribute__ ((__deprecated__))
+#define _POSIX_OPEN_MAX 20
+#define _POSIX_THREAD_KEYS_MAX 128
+#define __GNUC_GNU_INLINE__ 1
+#define BC_BASE_MAX _POSIX2_BC_BASE_MAX
+#define MB_LEN_MAX 16
+#define __stub_putmsg 
+#define __P(args) args
+
+From yallop at gmail.com  Wed May 13 14:25:49 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 13 May 2015 14:25:49 +0100
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+In-Reply-To: <CAHR=VkzXjQO02TfREFHB-JgvdNf7+Kbyk9NXxOCEN6nF7pcpWg@mail.gmail.com>
+References: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+ <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+ <CAHR=VkzXjQO02TfREFHB-JgvdNf7+Kbyk9NXxOCEN6nF7pcpWg@mail.gmail.com>
+Message-ID: <CAAxsn=G48Xd_ii6t0P6RX5dQqa9uszdnZRFJwWuF16TbfyE9Mg@mail.gmail.com>
+
+On 13 May 2015 at 14:08, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> On Wed, May 13, 2015 at 3:03 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+>> On 13 May 2015 at 13:51, Thomas Braibant <thomas.braibant at gmail.com>
+>> wrote:
+>> > /home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+>> > error: #error "No suitable OCaml type available for representing long
+>> > longs"
+>>
+>> That's odd.  Could you post the output of the following program?
+>
+> gcc c.c
+> c.c: In function ?main?:
+> c.c:10: error: ?ULLONG_MAX? undeclared (first use in this function)
+
+Hmm.  I didn't realise that long long support was such a recent
+addition to GCC.  Do you know whether it supports any 64-bit integer
+types?  If it supports int64_t and uint64_t, for example, then you
+might be able to get quite far with running something like this on the
+ctypes code:
+
+   find . -name '*.c' -o -name '*.h' | xargs sed -i 's!unsigned long
+long!uint64_t!g; s!long long!int64_t!g; s!LLONG!INT64!g'
+
+From thomas.braibant at gmail.com  Wed May 13 14:28:55 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Wed, 13 May 2015 15:28:55 +0200
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+In-Reply-To: <CAAxsn=G48Xd_ii6t0P6RX5dQqa9uszdnZRFJwWuF16TbfyE9Mg@mail.gmail.com>
+References: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+ <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+ <CAHR=VkzXjQO02TfREFHB-JgvdNf7+Kbyk9NXxOCEN6nF7pcpWg@mail.gmail.com>
+ <CAAxsn=G48Xd_ii6t0P6RX5dQqa9uszdnZRFJwWuF16TbfyE9Mg@mail.gmail.com>
+Message-ID: <CAHR=VkwceZvGhRUii2Py19nHM2PANS9WF+iPxyiAUFGpd0zPfw@mail.gmail.com>
+
+I am ashamed by this patch, but it seems to be a functional workaround...
+
+https://github.com/cryptosense/ocaml-ctypes/commit/8be776abc7d805e1c09ca20b360607a7ff1f8fd6
+
+On Wed, May 13, 2015 at 3:25 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 13 May 2015 at 14:08, Thomas Braibant <thomas.braibant at gmail.com>
+> wrote:
+> > On Wed, May 13, 2015 at 3:03 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+> >> On 13 May 2015 at 13:51, Thomas Braibant <thomas.braibant at gmail.com>
+> >> wrote:
+> >> >
+> /home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+> >> > error: #error "No suitable OCaml type available for representing long
+> >> > longs"
+> >>
+> >> That's odd.  Could you post the output of the following program?
+> >
+> > gcc c.c
+> > c.c: In function ?main?:
+> > c.c:10: error: ?ULLONG_MAX? undeclared (first use in this function)
+>
+> Hmm.  I didn't realise that long long support was such a recent
+> addition to GCC.  Do you know whether it supports any 64-bit integer
+> types?  If it supports int64_t and uint64_t, for example, then you
+> might be able to get quite far with running something like this on the
+> ctypes code:
+>
+>    find . -name '*.c' -o -name '*.h' | xargs sed -i 's!unsigned long
+> long!uint64_t!g; s!long long!int64_t!g; s!LLONG!INT64!g'
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150513/0e224bdb/attachment.html>
+
+From thomas.braibant at gmail.com  Wed May 13 14:46:45 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Wed, 13 May 2015 15:46:45 +0200
+Subject: [ocaml-ctypes] Build error when compiling Ctypes on centos 5
+In-Reply-To: <CAHR=VkwceZvGhRUii2Py19nHM2PANS9WF+iPxyiAUFGpd0zPfw@mail.gmail.com>
+References: <CAHR=Vkz98F0uwN=xMEf5dkerh7mTDSbmgNL8+8i0b1p-P7pnXA@mail.gmail.com>
+ <CAAxsn=E5Xo3_VVySOCAsdp=BBqH0R-EWN=UybikY0xHiRKNjTQ@mail.gmail.com>
+ <CAHR=VkzXjQO02TfREFHB-JgvdNf7+Kbyk9NXxOCEN6nF7pcpWg@mail.gmail.com>
+ <CAAxsn=G48Xd_ii6t0P6RX5dQqa9uszdnZRFJwWuF16TbfyE9Mg@mail.gmail.com>
+ <CAHR=VkwceZvGhRUii2Py19nHM2PANS9WF+iPxyiAUFGpd0zPfw@mail.gmail.com>
+Message-ID: <CAHR=VkwuUqGJVE7ZV-3FRHGqjYra13Fd6JM8Hqi2s1+WAsNqrQ@mail.gmail.com>
+
+Follow up issue https://github.com/ocamllabs/ocaml-ctypes/issues/302
+
+On Wed, May 13, 2015 at 3:28 PM, Thomas Braibant <thomas.braibant at gmail.com>
+wrote:
+
+> I am ashamed by this patch, but it seems to be a functional workaround...
+>
+>
+> https://github.com/cryptosense/ocaml-ctypes/commit/8be776abc7d805e1c09ca20b360607a7ff1f8fd6
+>
+> On Wed, May 13, 2015 at 3:25 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+>
+>> On 13 May 2015 at 14:08, Thomas Braibant <thomas.braibant at gmail.com>
+>> wrote:
+>> > On Wed, May 13, 2015 at 3:03 PM, Jeremy Yallop <yallop at gmail.com>
+>> wrote:
+>> >> On 13 May 2015 at 13:51, Thomas Braibant <thomas.braibant at gmail.com>
+>> >> wrote:
+>> >> >
+>> /home/vagrant/ocamlbrew/ocaml-4.02.1/.opam/4.02.1+PIC/build/ctypes.0.4.0/src/ctypes/ctypes_primitives.h:99:3:
+>> >> > error: #error "No suitable OCaml type available for representing long
+>> >> > longs"
+>> >>
+>> >> That's odd.  Could you post the output of the following program?
+>> >
+>> > gcc c.c
+>> > c.c: In function ?main?:
+>> > c.c:10: error: ?ULLONG_MAX? undeclared (first use in this function)
+>>
+>> Hmm.  I didn't realise that long long support was such a recent
+>> addition to GCC.  Do you know whether it supports any 64-bit integer
+>> types?  If it supports int64_t and uint64_t, for example, then you
+>> might be able to get quite far with running something like this on the
+>> ctypes code:
+>>
+>>    find . -name '*.c' -o -name '*.h' | xargs sed -i 's!unsigned long
+>> long!uint64_t!g; s!long long!int64_t!g; s!LLONG!INT64!g'
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150513/fd3bfab5/attachment.html>
+
+From matthieu.dubuget at gmail.com  Thu May 21 14:50:43 2015
+From: matthieu.dubuget at gmail.com (Matthieu Dubuget)
+Date: Thu, 21 May 2015 15:50:43 +0200
+Subject: [ocaml-ctypes] Troubles under windows
+Message-ID: <555DE2B3.3080403@gmail.com>
+
+Hello,
+
+I'm trying to use ctypes on windows. When I'm trying
+#use"ctypes.foreign"
+I'm getting a DLL error (see at the end of this message).
+
+My ocaml is x86_64-w64-mingw version.
+
+I did install libffi this way :
+
+tar xaf libffi-3.2.1.tar.gz
+cd libffi-3.2.1
+./autogen.sh
+./configure --host=x86_64-w64-mingw32 --prefix 
+/usr/x86_64-w64-mingw32/sys-root/mingw
+make
+make install
+
+It worked!
+
+$ x86_64-w64-mingw32-pkg-config.exe --list-all
+libffi                    libffi - Library supporting Foreign Function 
+Interfaces
+gsettings-desktop-schemas gsettings-desktop-schemas - Shared GSettings 
+schemas for the desktop, including helper headers
+autoopts                  AutoOpts - A semi-automated generated/library 
+option parser
+shared-mime-info          shared-mime-info - Freedesktop common MIME 
+database
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --libs
+-L/usr/x86_64-w64-mingw32/sys-root/mingw/lib/../lib -lffi
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --cflags
+-I/usr/x86_64-w64-mingw32/sys-root/mingw/lib/libffi-3.2.1/include
+
+I compiled ctypes :
+
+7z x ocaml-ctypes-0.4.1.zip
+cd ocaml-ctypes-0.4.1
+export LIBFFI_LIBS=$(x86_64-w64-mingw32-pkg-config.exe libffi --libs)
+export LIBFFI_CFLAGS=$(x86_64-w64-mingw32-pkg-config.exe libffi --cflags)
+make
+make install
+
+$ ocaml
+         OCaml version 4.02.1
+
+# #use"topfind";;
+- : unit = ()
+Findlib has been successfully loaded. Additional directives:
+   #require "package";;      to load a package
+   #list;;                   to list the available packages
+   #camlp4o;;                to load camlp4 (standard syntax)
+   #camlp4r;;                to load camlp4 (revised syntax)
+   #predicates "p,q,...";;   to set these predicates
+   Topfind.reset();;         to force that packages will be reloaded
+   #thread;;                 to enable threads
+
+- : unit = ()
+
+# #require"ctypes.foreign";;
+C:\OCaml\lib\unix.cma: loaded
+C:\OCaml\lib\bigarray.cma: loaded
+C:\OCaml\lib\str.cma: loaded
+C:\OCaml\lib\site-lib\bytes: added to search path
+C:\OCaml\lib\site-lib\ctypes: added to search path
+C:\OCaml\lib\site-lib\ctypes\ctypes.cma: loaded
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-base.cma: loaded
+Cannot load required shared library dllctypes-foreign-base_stubs.
+Reason: C:\OCaml\lib\site-lib\ctypes\dllctypes-foreign-base_stubs.dll: 
+Cannot resolve ffi_type_pointer.
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-unthreaded.cma: loaded
+Characters -1--1:
+   #require"ctypes.foreign";;
+
+Error: Reference to undefined global `Ctypes_closure_properties'
+
+
+I'm not sure if it can help to understand what the problem is?
+
+$ ldd /cygdrive/c/OCaml/lib/site-lib/ctypes/dllctypes-foreign-base_stubs.dll
+Cannot find FLEXDLL_RELOCATE
+         ntdll.dll => /cygdrive/c/Windows/SYSTEM32/ntdll.dll (0x76e40000)
+         kernel32.dll => /cygdrive/c/Windows/system32/kernel32.dll 
+(0x76c20000)
+         KERNELBASE.dll => /cygdrive/c/Windows/system32/KERNELBASE.dll 
+(0x7fefcc60000)
+         ??? => ??? (0x6e3c0000)
+         msvcrt.dll => /cygdrive/c/Windows/system32/msvcrt.dll 
+(0x7feff0b0000)
+         USER32.dll => /cygdrive/c/Windows/system32/USER32.dll (0x76d40000)
+         GDI32.dll => /cygdrive/c/Windows/system32/GDI32.dll (0x7fefed00000)
+         LPK.dll => /cygdrive/c/Windows/system32/LPK.dll (0x7fefd740000)
+         USP10.dll => /cygdrive/c/Windows/system32/USP10.dll (0x7fefd750000)
+         ??? => ??? (0x6b740000)
+         ??? => ??? (0x77000000)
+         IMM32.DLL => /cygdrive/c/Windows/system32/IMM32.DLL (0x7fefd710000)
+         MSCTF.dll => /cygdrive/c/Windows/system32/MSCTF.dll (0x7fefed70000)
+         nvinitx.dll => /cygdrive/c/Windows/system32/nvinitx.dll 
+(0x7fefcb30000)
+         VERSION.dll => /cygdrive/c/Windows/system32/VERSION.dll 
+(0x7fefcb20000)
+         ADVAPI32.dll => /cygdrive/c/Windows/system32/ADVAPI32.dll 
+(0x7fefd280000)
+         sechost.dll => /cygdrive/c/Windows/SYSTEM32/sechost.dll 
+(0x7feff090000)
+         RPCRT4.dll => /cygdrive/c/Windows/system32/RPCRT4.dll 
+(0x7fefd040000)
+         igdumd64.dll => /cygdrive/c/Windows/system32/NV/igdumd64.dll 
+(0x7feed120000)
+         SETUPAPI.dll => /cygdrive/c/Windows/system32/SETUPAPI.dll 
+(0x7fefd360000)
+         CFGMGR32.dll => /cygdrive/c/Windows/system32/CFGMGR32.dll 
+(0x7fefcc20000)
+         OLEAUT32.dll => /cygdrive/c/Windows/system32/OLEAUT32.dll 
+(0x7fefd630000)
+         ole32.dll => /cygdrive/c/Windows/system32/ole32.dll (0x7fefee80000)
+         DEVOBJ.dll => /cygdrive/c/Windows/system32/DEVOBJ.dll 
+(0x7fefcf20000)
+         igd10umd64.dll => 
+/cygdrive/c/Windows/system32/NV/igd10umd64.dll (0x7feec200000)
+
+Thanks for any help!
+
+-- 
+Matthieu Dubuget
+
+
+From matthieu.dubuget at gmail.com  Thu May 21 14:50:58 2015
+From: matthieu.dubuget at gmail.com (Matthieu Dubuget)
+Date: Thu, 21 May 2015 15:50:58 +0200
+Subject: [ocaml-ctypes] Troubles under windows
+Message-ID: <555DE2C2.7050306@gmail.com>
+
+Hello,
+
+I'm trying to use ctypes on windows. When I'm trying
+#use"ctypes.foreign"
+I'm getting a DLL error (see at the end of this message).
+
+My ocaml is x86_64-w64-mingw version.
+
+I did install libffi this way :
+
+tar xaf libffi-3.2.1.tar.gz
+cd libffi-3.2.1
+./autogen.sh
+./configure --host=x86_64-w64-mingw32 --prefix 
+/usr/x86_64-w64-mingw32/sys-root/mingw
+make
+make install
+
+It worked!
+
+$ x86_64-w64-mingw32-pkg-config.exe --list-all
+libffi                    libffi - Library supporting Foreign Function 
+Interfaces
+gsettings-desktop-schemas gsettings-desktop-schemas - Shared GSettings 
+schemas for the desktop, including helper headers
+autoopts                  AutoOpts - A semi-automated generated/library 
+option parser
+shared-mime-info          shared-mime-info - Freedesktop common MIME 
+database
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --libs
+-L/usr/x86_64-w64-mingw32/sys-root/mingw/lib/../lib -lffi
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --cflags
+-I/usr/x86_64-w64-mingw32/sys-root/mingw/lib/libffi-3.2.1/include
+
+I compiled ctypes :
+
+7z x ocaml-ctypes-0.4.1.zip
+cd ocaml-ctypes-0.4.1
+export LIBFFI_LIBS=$(x86_64-w64-mingw32-pkg-config.exe libffi --libs)
+export LIBFFI_CFLAGS=$(x86_64-w64-mingw32-pkg-config.exe libffi --cflags)
+make
+make install
+
+$ ocaml
+         OCaml version 4.02.1
+
+# #use"topfind";;
+- : unit = ()
+Findlib has been successfully loaded. Additional directives:
+   #require "package";;      to load a package
+   #list;;                   to list the available packages
+   #camlp4o;;                to load camlp4 (standard syntax)
+   #camlp4r;;                to load camlp4 (revised syntax)
+   #predicates "p,q,...";;   to set these predicates
+   Topfind.reset();;         to force that packages will be reloaded
+   #thread;;                 to enable threads
+
+- : unit = ()
+
+# #require"ctypes.foreign";;
+C:\OCaml\lib\unix.cma: loaded
+C:\OCaml\lib\bigarray.cma: loaded
+C:\OCaml\lib\str.cma: loaded
+C:\OCaml\lib\site-lib\bytes: added to search path
+C:\OCaml\lib\site-lib\ctypes: added to search path
+C:\OCaml\lib\site-lib\ctypes\ctypes.cma: loaded
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-base.cma: loaded
+Cannot load required shared library dllctypes-foreign-base_stubs.
+Reason: C:\OCaml\lib\site-lib\ctypes\dllctypes-foreign-base_stubs.dll: 
+Cannot resolve ffi_type_pointer.
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-unthreaded.cma: loaded
+Characters -1--1:
+   #require"ctypes.foreign";;
+
+Error: Reference to undefined global `Ctypes_closure_properties'
+
+
+I'm not sure if it can help to understand what the problem is?
+
+$ ldd /cygdrive/c/OCaml/lib/site-lib/ctypes/dllctypes-foreign-base_stubs.dll
+Cannot find FLEXDLL_RELOCATE
+         ntdll.dll => /cygdrive/c/Windows/SYSTEM32/ntdll.dll (0x76e40000)
+         kernel32.dll => /cygdrive/c/Windows/system32/kernel32.dll 
+(0x76c20000)
+         KERNELBASE.dll => /cygdrive/c/Windows/system32/KERNELBASE.dll 
+(0x7fefcc60000)
+         ??? => ??? (0x6e3c0000)
+         msvcrt.dll => /cygdrive/c/Windows/system32/msvcrt.dll 
+(0x7feff0b0000)
+         USER32.dll => /cygdrive/c/Windows/system32/USER32.dll (0x76d40000)
+         GDI32.dll => /cygdrive/c/Windows/system32/GDI32.dll (0x7fefed00000)
+         LPK.dll => /cygdrive/c/Windows/system32/LPK.dll (0x7fefd740000)
+         USP10.dll => /cygdrive/c/Windows/system32/USP10.dll (0x7fefd750000)
+         ??? => ??? (0x6b740000)
+         ??? => ??? (0x77000000)
+         IMM32.DLL => /cygdrive/c/Windows/system32/IMM32.DLL (0x7fefd710000)
+         MSCTF.dll => /cygdrive/c/Windows/system32/MSCTF.dll (0x7fefed70000)
+         nvinitx.dll => /cygdrive/c/Windows/system32/nvinitx.dll 
+(0x7fefcb30000)
+         VERSION.dll => /cygdrive/c/Windows/system32/VERSION.dll 
+(0x7fefcb20000)
+         ADVAPI32.dll => /cygdrive/c/Windows/system32/ADVAPI32.dll 
+(0x7fefd280000)
+         sechost.dll => /cygdrive/c/Windows/SYSTEM32/sechost.dll 
+(0x7feff090000)
+         RPCRT4.dll => /cygdrive/c/Windows/system32/RPCRT4.dll 
+(0x7fefd040000)
+         igdumd64.dll => /cygdrive/c/Windows/system32/NV/igdumd64.dll 
+(0x7feed120000)
+         SETUPAPI.dll => /cygdrive/c/Windows/system32/SETUPAPI.dll 
+(0x7fefd360000)
+         CFGMGR32.dll => /cygdrive/c/Windows/system32/CFGMGR32.dll 
+(0x7fefcc20000)
+         OLEAUT32.dll => /cygdrive/c/Windows/system32/OLEAUT32.dll 
+(0x7fefd630000)
+         ole32.dll => /cygdrive/c/Windows/system32/ole32.dll (0x7fefee80000)
+         DEVOBJ.dll => /cygdrive/c/Windows/system32/DEVOBJ.dll 
+(0x7fefcf20000)
+         igd10umd64.dll => 
+/cygdrive/c/Windows/system32/NV/igd10umd64.dll (0x7feec200000)
+
+Thanks for any help!
+
+-- 
+Matthieu Dubuget
+
+
+From yallop at gmail.com  Thu May 21 14:58:25 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 21 May 2015 14:58:25 +0100
+Subject: [ocaml-ctypes] Troubles under windows
+In-Reply-To: <555DE2B3.3080403@gmail.com>
+References: <555DE2B3.3080403@gmail.com>
+Message-ID: <CAAxsn=FU1Yq+Cc_PYT6LZJEQ0fjq8ACqpeOVLjb4WwzyG2Xj_A@mail.gmail.com>
+
+On 21 May 2015 at 14:50, Matthieu Dubuget <matthieu.dubuget at gmail.com> wrote:
+> I'm trying to use ctypes on windows. When I'm trying
+> #use"ctypes.foreign"
+> I'm getting a DLL error (see at the end of this message).
+
+This may be related to the limited support for dynamic libraries on
+Windows discussed in this issue:
+
+   https://github.com/ocamllabs/ocaml-ctypes/issues/198
+
+From matthieu.dubuget at gmail.com  Sat May 23 19:54:06 2015
+From: matthieu.dubuget at gmail.com (Matthieu Dubuget)
+Date: Sat, 23 May 2015 20:54:06 +0200
+Subject: [ocaml-ctypes] Troubles under windows
+In-Reply-To: <CAAxsn=FU1Yq+Cc_PYT6LZJEQ0fjq8ACqpeOVLjb4WwzyG2Xj_A@mail.gmail.com>
+References: <555DE2B3.3080403@gmail.com>
+ <CAAxsn=FU1Yq+Cc_PYT6LZJEQ0fjq8ACqpeOVLjb4WwzyG2Xj_A@mail.gmail.com>
+Message-ID: <5560CCCE.7090908@gmail.com>
+
+Thank you!
+
+I just added  --disable-shared --enable-static to libffi configure.
+
+
+
+Le 21/05/2015 15:58, Jeremy Yallop a ?crit :
+> On 21 May 2015 at 14:50, Matthieu Dubuget <matthieu.dubuget at gmail.com> wrote:
+>> I'm trying to use ctypes on windows. When I'm trying
+>> #use"ctypes.foreign"
+>> I'm getting a DLL error (see at the end of this message).
+> This may be related to the limited support for dynamic libraries on
+> Windows discussed in this issue:
+>
+>     https://github.com/ocamllabs/ocaml-ctypes/issues/198
+
+-- 
+Matthieu Dubuget
+Guide d?autod?fense num?rique : http://guide.boum.org
+
+

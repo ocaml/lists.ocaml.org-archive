@@ -1,0 +1,56 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;&lt;br&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;Le mer.&nbsp;20&nbsp;mai&nbsp;2015&nbsp;à 12:02,&nbsp;Martin&nbsp;Lucina&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:martin@lucina.net&quot;&gt;martin@lucina.net&lt;/a&gt;&gt;&nbsp;a&nbsp;écrit :&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;On&nbsp;Tuesday,&nbsp;19.05.2015&nbsp;at 15:58,&nbsp;Martin&nbsp;Lucina&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;E:&nbsp;Failure(&quot;Expected&nbsp;built&nbsp;file&nbsp;&#39;_build/src/unix/dlllwt-unix_stubs.so&#39;&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;doesn&#39;t&nbsp;exist.&quot;)&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;This&nbsp;is&nbsp;expected;&nbsp;the&nbsp;rumprun&nbsp;toolchain&nbsp;does&nbsp;not&nbsp;support&nbsp;dynamic&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;linking&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;and&nbsp;I&nbsp;have&nbsp;configured&nbsp;the&nbsp;ocaml-rumprun&nbsp;compiler&nbsp;with&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;-no-shared-libs.&nbsp;Is&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;there&nbsp;some&nbsp;way&nbsp;to&nbsp;tell&nbsp;OASIS&nbsp;to&nbsp;not&nbsp;expect&nbsp;any&nbsp;shared&nbsp;libraries&nbsp;to&nbsp;be&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;&gt;built?&lt;br&gt;<br>
+&gt;&nbsp;&gt;&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;Nope.&nbsp;OASIS&nbsp;is&nbsp;painfully&nbsp;inflexible,&nbsp;especially&nbsp;when&nbsp;cross-compiling.&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;You&nbsp;can&nbsp;probably&nbsp;patch&nbsp;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&nbsp;so&nbsp;that&nbsp;it&nbsp;thinks&nbsp;that&nbsp;the&nbsp;current&lt;br&gt;<br>
+&gt;&nbsp;&gt;&nbsp;OCaml&nbsp;is&nbsp;built&nbsp;without&nbsp;dynlink,&nbsp;but&nbsp;this&nbsp;is&nbsp;package-specific.&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;Turns&nbsp;out&nbsp;it&#39;s&nbsp;a&nbsp;two-line&nbsp;patch,&nbsp;at&nbsp;least&nbsp;in&nbsp;the&nbsp;case&nbsp;of&nbsp;Lwt:&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;&lt;a&nbsp;href=&quot;https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+Getting&nbsp;further&nbsp;through&nbsp;the&nbsp;list&nbsp;of&nbsp;Mirage&nbsp;dependencies,&nbsp;trying&nbsp;to&nbsp;get&lt;br&gt;<br>
+sexplib&nbsp;building&nbsp;for&nbsp;rumprun&nbsp;hits&nbsp;another&nbsp;different&nbsp;problem&nbsp;with&nbsp;OASIS:&lt;br&gt;<br>
+&lt;br&gt;<br>
+I&nbsp;use&nbsp;the&nbsp;following&nbsp;commands&nbsp;to&nbsp;build&nbsp;sexplib-rumprun,&nbsp;similar&nbsp;to&nbsp;what&nbsp;the&lt;br&gt;<br>
+android&nbsp;build&nbsp;does:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp;[&quot;ocaml&quot;&nbsp;&quot;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&quot;&nbsp;&quot;-configure&quot;&nbsp;&quot;--prefix&quot;&nbsp;&quot;${prefix}/x86_64-rumprun-netbsd&quot;&nbsp;&quot;--disable-syntax&quot;]&lt;br&gt;<br>
+ &nbsp;[&quot;ocamlbuild&quot;&nbsp;&quot;-use-ocamlfind&quot;&nbsp;&quot;-just-plugin&quot;]&lt;br&gt;<br>
+ &nbsp;[&quot;env&quot;&nbsp;&quot;OCAMLFIND_TOOLCHAIN=rumprun&quot;&nbsp;&quot;ocaml&quot;&nbsp;&quot;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&quot;&nbsp;&quot;-build&quot;]&lt;br&gt;<br>
+ &nbsp;[&quot;env&quot;&nbsp;&quot;OCAMLFIND_TOOLCHAIN=rumprun&quot;&nbsp;&quot;ocaml&quot;&nbsp;&quot;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&quot;&nbsp;&quot;-install&quot;]&lt;br&gt;<br>
+ &nbsp;[&quot;find&quot;&nbsp;sexplib:lib&nbsp;&quot;-name&quot;&nbsp;&quot;pa_sexp_conv.*&quot;&nbsp;&quot;-exec&quot;&nbsp;&quot;ln&quot;&nbsp;&quot;-sf&quot;&nbsp;&quot;{}&quot;&nbsp;&quot;%{prefix}%/x86_64-rumprun-netbsd/lib/sexplib/&quot;&nbsp;&quot;;&quot;]&nbsp;{&nbsp;type_conv-rumprun:installed&nbsp;}&lt;br&gt;<br>
+&lt;br&gt;<br>
+Now,&nbsp;sexplib&nbsp;tries&nbsp;to&nbsp;build&nbsp;a&nbsp;.cmxs&nbsp;which&nbsp;won&#39;t&nbsp;work&nbsp;with&nbsp;the&nbsp;rumprun&lt;br&gt;<br>
+toolchain,&nbsp;so&nbsp;I&#39;ve&nbsp;patched&nbsp;its&nbsp;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&nbsp;to&nbsp;force&nbsp;native_dynlink&nbsp;to&nbsp;be&lt;br&gt;<br>
+false:&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;&lt;/blockquote&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;I&nbsp;think&nbsp;it&nbsp;would&nbsp;be&nbsp;far&nbsp;easier&nbsp;to&nbsp;add&nbsp;&#39;--override&nbsp;native_dynlink&nbsp;false&#39;&nbsp;to&nbsp;the&nbsp;configure&nbsp;step.&lt;/div&gt;&lt;div&gt; &lt;/div&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+The&nbsp;problem&nbsp;I&#39;m&nbsp;seeing&nbsp;is&nbsp;that&nbsp;if&nbsp;I&nbsp;run&nbsp;&quot;opam&nbsp;install&nbsp;sexplib-rumprun&lt;br&gt;<br>
+--verbose&quot;,&nbsp;it&nbsp;fails&nbsp;in&nbsp;the&nbsp;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&nbsp;-install&nbsp;setup&nbsp;with&nbsp;a&nbsp;stack&nbsp;overflow:&lt;br&gt;<br>
+&lt;br&gt;<br>
+-&nbsp;Installed&nbsp;/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/sexplib_unix.cmx&lt;br&gt;<br>
+-&nbsp;Installed&nbsp;/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/META&lt;br&gt;<br>
+-&nbsp;E:&nbsp;Stack&nbsp;overflow&lt;br&gt;<br>
+[ERROR]&nbsp;The&nbsp;compilation&nbsp;of&nbsp;sexplib-rumprun&nbsp;failed&nbsp;at&nbsp;&quot;env&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp;OCAMLFIND_TOOLCHAIN=rumprun&nbsp;ocaml&nbsp;&lt;a&nbsp;href=&quot;http://setup.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;setup.ml&lt;/a&gt;&nbsp;-install&quot;.&lt;br&gt;<br>
+&lt;br&gt;<br>
+However:&nbsp;If&nbsp;I&nbsp;run&nbsp;the&nbsp;OPAM&nbsp;build&nbsp;commands&nbsp;from&nbsp;a&nbsp;shell&nbsp;in&nbsp;the&nbsp;build&lt;br&gt;<br>
+directory&nbsp;for&nbsp;sexplib,&nbsp;the&nbsp;install&nbsp;step&nbsp;works&nbsp;fine.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Any&nbsp;ideas?&lt;br&gt;<br>
+&lt;br&gt;<br>
+Martin&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;/div&gt;<br>
+
+</tt>

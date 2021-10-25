@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Problems building on Linux
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Problems%20building%20on%20Linux&In-Reply-To=%3CCADy1MauqU8Ue99NmTfJURqUzJ9%2BLOtUvamdq%3DQV-QHZXHkpL2g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Problems building on Linux</H1>
+    <B>David House</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Problems%20building%20on%20Linux&In-Reply-To=%3CCADy1MauqU8Ue99NmTfJURqUzJ9%2BLOtUvamdq%3DQV-QHZXHkpL2g%40mail.gmail.com%3E"
+       TITLE="Problems building on Linux">dmhouse at gmail.com
+       </A><BR>
+    <I>Tue Jan 31 19:27:36 GMT 2012</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1099">[ date ]</a>
+              <a href="thread.html#1099">[ thread ]</a>
+              <a href="subject.html#1099">[ subject ]</a>
+              <a href="author.html#1099">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Great! I applied your changes manually since they're not in the public repo yet.
+
+I ran in to a few more problems.
+
+1. The pre-build command for bin-prot wasn't working: I was getting
+'no such file or directory: lib/*.{h,mlh}'. I fixed this by expanding
+the braces in oasis.sh to be 'cp lib/*.h lib/*.mlh _build'.
+
+2. core seems to have a dependency on the res package which was not
+documented. I guess this should go in the installation hints on the
+wiki.
+
+3. There are some integer literals bigger than 2^31, and my measly
+four-bytes-to-a-word system couldn't cope :)
+  - core/extended/lib/bench.ml contains 1_000_000_000_000;
+  - extended_linux.ml in the same directory has three, on lines 127,
+138 and 139 (the CIFS_MAGIC_NUMBER, HPFS_SUPER_MAGIC and
+HUGETLBFS_MAGIC lines).
+I just commented out these lines. (But I expect the proper fix is to
+make these things [Int64]s, seeing as numbers &gt; 2^31 seem to be valid
+inputs to these functions.)
+
+I actually downgraded to Oasis 0.2.0 when I hit these, in case they
+fixed the errors. So I haven't tested with Oasis 0.2.1; but I also
+don't think supporting Oasis 0.2.1 is really a high priority.
+
+Async installed just fine, by the way.
+
+On 31 January 2012 11:19, Yury Sulsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yury.sulsky at gmail.com</A>&gt; wrote:
+&gt;<i> Thanks David! Fixes for all three issues are making their way to the
+</I>&gt;<i> public tree.
+</I>&gt;<i>
+</I>&gt;<i> The changes are:
+</I>&gt;<i> &#160;- use this bit of bash awesome to pass arrays that may be empty in
+</I>&gt;<i> the build-and-install script:
+</I>&gt;<i> &#160; &#160; ${foo[@]:+${foo[@]}} (from <A HREF="http://stackoverflow.com/q/7577052">http://stackoverflow.com/q/7577052</A>)
+</I>&gt;<i> &#160;- I was creating the a directory after using it. I forget which way time flows.
+</I>&gt;<i> &#160;- use patch -l (ignore whitespace) when patching the setup.ml files
+</I>&gt;<i> (which should make it work on 0.2.1)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On Sun, Jan 29, 2012 at 10:45 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> Will do. &#160;Sorry for the misdirection.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Sun, Jan 29, 2012 at 5:43 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dmhouse at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> The version that the installation hints specify, which is 0.2.1. (Which was,
+</I>&gt;&gt;&gt;<i> incidentally, a real pain to install!) I'll try again tomorrow with a
+</I>&gt;&gt;&gt;<i> downgraded version. Could you change the wiki?
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Jan 29, 2012 10:40 PM, &quot;Yaron Minsky&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Which version of Oasis do you have installed? &#160;I wouldn't expect it to
+</I>&gt;&gt;&gt;&gt;<i> work with anything but 0.2.0.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> y
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> On Sun, Jan 29, 2012 at 5:19 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dmhouse at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i> &gt; Hi all,
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; $ uname -a
+</I>&gt;&gt;&gt;&gt;<i> &gt; Linux tarn 3.0.0-15-generic-pae #25-Ubuntu SMP Mon Jan 2 19:40:15 UTC
+</I>&gt;&gt;&gt;&gt;<i> &gt; 2012 i686 athlon i386 GNU/Linux
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; I'm now not 100% sure of the state of my system, because I've had a
+</I>&gt;&gt;&gt;&gt;<i> &gt; few aborted attempts at installing the core packages. But if I clone a
+</I>&gt;&gt;&gt;&gt;<i> &gt; fresh checkout of the tree, and `ocamlfind remove' all the packages,
+</I>&gt;&gt;&gt;&gt;<i> &gt; then use build-and-install, the following problems occur:
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; 1. I get the 'Don't know what do with arguments: &quot;&quot;' error that Ron
+</I>&gt;&gt;&gt;&gt;<i> &gt; described. (Full output attached as build-output1.) I &quot;fixed&quot; this by
+</I>&gt;&gt;&gt;&gt;<i> &gt; replacing:
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160;./oasis.sh $optflags &quot;${configopts[@]-}&quot;
+</I>&gt;&gt;&gt;&gt;<i> &gt; with:
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160;./oasis.sh
+</I>&gt;&gt;&gt;&gt;<i> &gt; in build-and-install.sh.
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; 2. The following error occurs when building compare:
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; ------ base/compare ------
+</I>&gt;&gt;&gt;&gt;<i> &gt; ~/ocaml/core/base/compare ~/ocaml/core
+</I>&gt;&gt;&gt;&gt;<i> &gt; ./oasis.sh: line 45: ./lib/comparelib_dummy.ml: No such file or
+</I>&gt;&gt;&gt;&gt;<i> &gt; directory
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; (Full output attached as build-output2.) I &quot;fixed&quot; this by mkdir'ing
+</I>&gt;&gt;&gt;&gt;<i> &gt; base/compare/lib.
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; 3. patch fails in the fieldslib directory. Here's the error:
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; ------ base/fieldslib ------
+</I>&gt;&gt;&gt;&gt;<i> &gt; ~/ocaml/core/base/fieldslib ~/ocaml/core
+</I>&gt;&gt;&gt;&gt;<i> &gt; W: Field XMETAType is set but matching plugin is not enabled.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File INSTALL doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File Makefile doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: Regenerating file _tags
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File configure doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File lib/META doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File lib/fieldslib.mllib doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File lib/fieldslib.odocl has not changed, skipping
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File myocamlbuild.ml doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File setup.ml doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I: File syntax/pa_fields_conv.mllib doesn't exist, creating it.
+</I>&gt;&gt;&gt;&gt;<i> &gt; patching file setup.ml
+</I>&gt;&gt;&gt;&gt;<i> &gt; Hunk #1 succeeded at 979 with fuzz 1 (offset -13 lines).
+</I>&gt;&gt;&gt;&gt;<i> &gt; Hunk #2 FAILED at 1286.
+</I>&gt;&gt;&gt;&gt;<i> &gt; Hunk #3 succeeded at 1315 with fuzz 2 (offset -9 lines).
+</I>&gt;&gt;&gt;&gt;<i> &gt; Hunk #4 FAILED at 4269.
+</I>&gt;&gt;&gt;&gt;<i> &gt; 2 out of 4 hunks FAILED -- saving rejects to file setup.ml.rej
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; And:
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; $ cat setup.ml.rej
+</I>&gt;&gt;&gt;&gt;<i> &gt; --- setup.ml &#160; &#160;2012-01-26 09:04:49.000000000 +0000
+</I>&gt;&gt;&gt;&gt;<i> &gt; +++ setup.ml &#160; &#160;2012-01-26 09:25:06.000000000 +0000
+</I>&gt;&gt;&gt;&gt;<i> &gt; @@ -1286,6 +1287,7 @@
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; source_file_exists is_native ext_lib ext_dll =
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; (* The headers that should be compiled along *)
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; let headers =
+</I>&gt;&gt;&gt;&gt;<i> &gt; + &#160; &#160; &#160;if lib.lib_pack then [] else
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; List.fold_left
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; (fun hdrs modul -&gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160;try
+</I>&gt;&gt;&gt;&gt;<i> &gt; @@ -4269,6 +4278,7 @@
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; List.rev_append lib_extra acc
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; in
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; let acc =
+</I>&gt;&gt;&gt;&gt;<i> &gt; + &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160;if lib.lib_pack then acc else
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; (* Add uncompiled header from the source tree *)
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; let path =
+</I>&gt;&gt;&gt;&gt;<i> &gt; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; BaseFilePath.of_unix bs.bs_path
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; Full output is attached as build-output3. I've also attached my
+</I>&gt;&gt;&gt;&gt;<i> &gt; setup.ml from fieldslib. I'm stuck with this one.
+</I>
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1099">[ date ]</a>
+              <a href="thread.html#1099">[ thread ]</a>
+              <a href="subject.html#1099">[ subject ]</a>
+              <a href="author.html#1099">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

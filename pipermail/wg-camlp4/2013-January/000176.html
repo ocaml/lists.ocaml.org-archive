@@ -1,0 +1,180 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBHJP1xgNvSCDpYYFbBHwnPKPyODPjZUpkwOTs8ToU9ijQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000172.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBHJP1xgNvSCDpYYFbBHwnPKPyODPjZUpkwOTs8ToU9ijQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Jan 31 21:13:52 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000172.html">[wg-camlp4] Why Quotation is a good idea with decent Editor support
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#176">[ date ]</a>
+              <a href="thread.html#176">[ thread ]</a>
+              <a href="subject.html#176">[ subject ]</a>
+              <a href="author.html#176">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I like Leo's idea of distinguishing three different forms of syntax
+extensions (I'm not discussing concrete syntax):
+
+1. structured comments, which as the name indicates do not directly
+  influence the semantics of the OCaml source file
+
+  (users that don't have the corresponding extension can still use the
+  source file)
+
+  example in Use Cases
+  ( <A HREF="https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases">https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases</A>
+),
+  Bisect comments
+
+  match List.map foo [x; a x; b x] with
+  | [y1; y2; y3] -&gt; tata
+  | _ -&gt; (*BISECT-VISIT*) assert false
+
+  (Of course the concrete syntax does not need to be OCaml comments,
+  and in fact it would be nice to parse them as OCaml code rather than
+  raw strings; but this does not cover all &quot;annotations&quot;, only those
+  that can effectively be turned into comments and leave
+  a semantically correct file.)
+
+
+2. shallow embeddings, which is the style of lightweight marking
+  (in mostly valid OCaml syntax) of -ppx rewrites that Alain promotes
+
+  (the writer of said extension expects an OCaml syntax tree as input)
+
+  example in Use Cases : &quot;modified sedlex&quot; (modified by me following
+  the spirit of the compromises suggested by Alain in the &quot;not valid
+  OCaml syntax&quot; discussion)
+
+   (:sedlex
+     let:regexp letter = ('a'..'z'|'A'..'Z') in
+     match:lexer buf with
+     | number -&gt; Printf.printf &quot;Number %s\n&quot; (Sedlexing.Latin1.lexeme
+buf); token buf
+     | letter, Star ('A'..'Z' | 'a'..'z' | digit) -&gt; Printf.printf
+&quot;Ident %s\n&quot; (Sedlexing.Latin1.lexeme buf); token buf
+   )
+
+  (or possibly {{$letter([A-Z]|[a-z]|$digit)*}} -&gt; ...)
+
+3. deep embeddings, which uses a camlp4-like mechanism of
+   quasiquotations to inject arbitrary syntax, and antiquotations to
+   locally return to standard OCaml code with standard semantics
+   (sorry Jeremy, I'm using the &quot;quotation&quot; name for this potentially
+   improper usage, but I can't find a good matching pair for
+   &quot;antiquotations&quot; otherwise)
+
+  (the writer of said extensions expects a string to parse, with
+  library support to get OCaml syntax trees out of the antiquotations)
+
+  example in Use Cases: Cass
+
+  let button = &lt;:css&lt;
+     .button {
+       $Css.gradient ~low:color2 ~high:color1$;
+       color: white;
+       $Css.top_rounded$;
+   &gt;&gt;
+
+(It's not an exhaustive categorization: I'm not discussing arbitrary
+extensions of the OCaml grammar such as &quot;let open&quot; here. Nobody on
+wg-camlp4 seems to be discussing those anyway.)
+
+
+
+
+I would like to follow up with some questions:
+
+
+- What is the breadth of structured comments?
+
+  Which use cases can this form cover?  It's clear that it is adapted
+  for compiler pragmas (say local warning/error selection, which we
+  have wanted for a long time in OCaml) and more generally local
+  configuration of analysis tools (mascot, find-bisect, whatever)
+
+  Anil's remark on &quot;tools that perform external code generations&quot; can
+  also be understood in this form:
+  <A HREF="https://github.com/avsm/ocaml-github/blob/master/lib/github.atd">https://github.com/avsm/ocaml-github/blob/master/lib/github.atd</A>
+  could fairly easily be translated in this style.
+
+
+- What can user assume of the semantics of shallow embeddings?
+
+  I think having a global marker (here a &quot;prefix annotation&quot; in
+  Leo's taxonomy) to denote a piece of OCaml syntax with non-standard
+  semantics is important. But that does not resolve all
+  questions. Will only the topmost &quot;match&quot; construction be
+  interepreted as a lexer, or does this reinterpretation applies
+  recursively in depth? (In my snippet I marked concerned matches with
+  a :lexer annotation).
+
+  I have the impression that some choices may lead to extensions that
+  compose as well as the deep quasiquotations, but that some other may
+  result in extensions as fragile as unrestricted grammar
+  extension.
+
+  Besides, the concrete syntax is important here: a (match:lexer
+  ... with ...) annotation is clearly local to this one match
+  construct, while I would tend to understand (:sedlex match .. with
+  ...) as being a modality over the expression as a whole.
+
+
+- What are good concrete syntaxes for these forms?
+
+  (So far: Leo's suggestions, Alain snippets, and existing choices in
+  existing syntax extension frameworks)
+
+  It's not clear that shallow embeddings and foreign quasiquotations
+  should have radically distinct syntaxes. It's important for the
+  extension developper to specify the minimum amount of syntactic
+  freedom needed, but does the user care which is used?
+
+
+- Which forms could/should be *eventually* proposed for adoption by
+  the compiler's OCaml definition, which are best relegated to a more
+  sophisticated external tool like Fan?
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000172.html">[wg-camlp4] Why Quotation is a good idea with decent Editor support
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#176">[ date ]</a>
+              <a href="thread.html#176">[ thread ]</a>
+              <a href="subject.html#176">[ subject ]</a>
+              <a href="author.html#176">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

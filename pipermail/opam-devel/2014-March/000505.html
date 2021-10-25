@@ -1,0 +1,228 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0 packages on Archlinux)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Apscud%20on%20osx%20%3C%2010.9%20%28was%20Re%3A%20aspcud%201.9.0%0A%20packages%20on%20Archlinux%29&In-Reply-To=%3CCAJBwKuXVa-f8um9BFBTwicC1_VaQHrc9FZKo_6hsDcBhqkXOSQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000491.html">
+   <LINK REL="Next"  HREF="000494.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0 packages on Archlinux)</H1>
+    <B>Roberto Di Cosmo</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Apscud%20on%20osx%20%3C%2010.9%20%28was%20Re%3A%20aspcud%201.9.0%0A%20packages%20on%20Archlinux%29&In-Reply-To=%3CCAJBwKuXVa-f8um9BFBTwicC1_VaQHrc9FZKo_6hsDcBhqkXOSQ%40mail.gmail.com%3E"
+       TITLE="[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0 packages on Archlinux)">roberto at dicosmo.org
+       </A><BR>
+    <I>Fri Mar 28 01:23:05 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000491.html">[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0	packages on Archlinux)
+</A></li>
+        <LI>Next message: <A HREF="000494.html">[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0 packages on Archlinux)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#505">[ date ]</a>
+              <a href="thread.html#505">[ thread ]</a>
+              <a href="subject.html#505">[ subject ]</a>
+              <a href="author.html#505">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi Louis,
+    I am actually unable to reproduce Daniel's problem with a broken
+aspcud: the fallback to the internal heuristics seems to work well
+here:
+
+
+$# put a fake aspcud that always fail in /tmp
+$ cat &gt; /tmp/aspcud
+#!/bin/sh
+cat $1 &gt; /dev/null
+echo &quot;FAIL&quot; &gt; $2
+exit 1
+$ chmod +x /tmp/aspcud
+
+$ git checkout 79472ad3182993df854f0f3c2e9334bd39433e3d
+$ make
+...
+
+$ PATH=/tmp:$PATH _obuild/opam/opam.asm update
+default    Downloading <A HREF="https://opam.ocaml.org/urls.txt">https://opam.ocaml.org/urls.txt</A>
+Updating ~/.opam/repo/compiler-index ...
+Updating ~/.opam/compilers/ ...
+Updating ~/.opam/repo/package-index ...
+Updating ~/.opam/packages/ ...
+Updating the cache of metadata (~/.opam/state.cache) ...
+[WARNING] External solver failed with command 'aspcud
+&quot;/tmp/tmp.apt-cudf.wIabhR3CuA/in-cudf&quot;
+&quot;/tmp/tmp.apt-cudf.wIabhR3CuA/out-cudf&quot;
+&quot;-removed,-notuptodate,-changed&quot;' failed with code 1 Request saved to
+&quot;/home/dicosmo/.opam/log/solver-error-15843-1.cudf&quot;
+Falling back to the internal heuristic.
+1 to install | 6 to reinstall | 5 to upgrade | 0 to downgrade | 0 to remove
+You can now run 'opam upgrade' to upgrade your system.
+
+I notice, though, that in Daniel's cudf file the request is empty:
+look at the last lines
+
+$ tail /tmp/solver-error-76189-1.cudf
+opam-version: 0.6.0
+
+package: facebook-sdk
+version: 1
+depends: yojson , uri , ssl , oasis , lwt , cohttp &gt;= 17 , calendar ,
+bolt , atdgen
+conflicts: facebook-sdk
+opam-name: facebook-sdk
+opam-version: 0.2.12
+
+request: opam
+&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;====== there is no install/upgrade here!
+
+Maybe this can help?
+
+--
+Roberto
+
+P.S.: by the way get-git-id was not working in detached states, I pushed a fix
+
+
+2014-03-27 14:46 GMT+01:00 Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt;:
+&gt;<i> I think our best move on this would be to provide the cudf file + the aspcud output when this happens, and ask to report. With my latest PR, opam will stop so this will be more visible anyway (just suggests to retry with `--use-external-solver` at the moment)
+</I>&gt;<i>
+</I>&gt;<i> Any better idea ? This would have saved quite a bit of time on this.
+</I>&gt;<i>
+</I>&gt;<i> Le jeudi 27 mars 2014, 14:21:11 Pietro Abate a &#233;crit :
+</I>&gt;&gt;<i> i've seen this message before. It's probably due to a mismatch between
+</I>&gt;&gt;<i> the version of aspcud and the version of clasp/gringo installed on
+</I>&gt;&gt;<i> your system ... Debian packages take care of these dependencies, I'm not sure
+</I>&gt;&gt;<i> about the package manager on your platform.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> p
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On 27/03/14 14:11, Daniel B&#252;nzli wrote:
+</I>&gt;&gt;<i> &gt; Le jeudi, 27 mars 2014 &#224; 13:52, Roberto Di Cosmo a &#233;crit :
+</I>&gt;&gt;<i> &gt; &gt; Just tested with your cudf file, and aspcud works perfectly here (Debian/amd64),
+</I>&gt;&gt;<i> &gt; &gt; so it's probably an issue with the aspcud port on your platform
+</I>&gt;&gt;<i> &gt; &gt;
+</I>&gt;&gt;<i> &gt; &gt; $ aspcud /tmp/solver-error-76189-1.cudf /tmp/sol &quot;-count(removed),-notuptodate(solution),-count(new)&quot;
+</I>&gt;&gt;<i> &gt; This invocation gives that here:
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; &gt; aspcud /tmp/solver-error-76189-1.cudf /tmp/sol &quot;-count(removed),-notuptodate(solution),-count(new)&quot;
+</I>&gt;&gt;<i> &gt; *** ERROR: (clasp): In context '&lt;clasp&gt;': unknown option: 'opt-hierarch'
+</I>&gt;&gt;<i> &gt; *** Info : (clasp): Try '--help' for usage information
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:150:57-76: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; recommends(P,V,D,W)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:150:78-92: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; installed(P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:148:57-75: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; attribute(P,V,A,X)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:148:77-91: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; installed(P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:146:64-78: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; installed(P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:305:45-57: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:230:79-91: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:36:14-27: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; clique(#X0,#P1,#P2)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:39:37-50: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; clique(I,P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:39:52-64: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:38:52-65: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; clique(I,P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:38:37-49: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:144:42-56: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; installed(P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:141:16-30: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; installed(P,V)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:103:79-91: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:161:63-81: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; attribute(P,V,A,X)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:164:42-61: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; recommends(P,V,D,W)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:106:49-65: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; not unit(P,V,in)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:138:57-76: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; recommends(P,V,D,W)
+</I>&gt;&gt;<i> &gt; /usr/local/Cellar/aspcud/1.8.0/share/encodings/misc2012.lp:109:50-68: warning: atom is undefined:
+</I>&gt;&gt;<i> &gt; attribute(P,V,A,X)
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; _______________________________________________
+</I>&gt;&gt;<i> &gt; opam-devel mailing list
+</I>&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> opam-devel mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>
+
+
+-- 
+Roberto Di Cosmo
+
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: <A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>
+Universite Paris Diderot WWW  : <A HREF="http://www.dicosmo.org">http://www.dicosmo.org</A>
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann
+F-75205 Paris Cedex 13   Identica: <A HREF="http://identi.ca/rdicosmo">http://identi.ca/rdicosmo</A>
+FRANCE.                  Twitter: <A HREF="http://twitter.com/rdicosmo">http://twitter.com/rdicosmo</A>
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      <A HREF="http://www.gnu.org/philosophy/no-word-attachments.html">http://www.gnu.org/philosophy/no-word-attachments.html</A>
+------------------------------------------------------------------
+Office location:
+
+Bureau 320 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000491.html">[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0	packages on Archlinux)
+</A></li>
+	<LI>Next message: <A HREF="000494.html">[opam-devel] Apscud on osx &lt; 10.9 (was Re: aspcud 1.9.0 packages on Archlinux)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#505">[ date ]</a>
+              <a href="thread.html#505">[ thread ]</a>
+              <a href="subject.html#505">[ subject ]</a>
+              <a href="author.html#505">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

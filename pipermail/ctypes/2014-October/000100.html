@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Inverted stubs
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Inverted%20stubs&In-Reply-To=%3CCAAxsn%3DEDF_w3cBdD4OQNszZBquQVqHsd3-otmWVbOW%3D5jwWarw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000101.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Inverted stubs</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Inverted%20stubs&In-Reply-To=%3CCAAxsn%3DEDF_w3cBdD4OQNszZBquQVqHsd3-otmWVbOW%3D5jwWarw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Inverted stubs">yallop at gmail.com
+       </A><BR>
+    <I>Wed Oct  1 10:24:00 BST 2014</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000101.html">[ocaml-ctypes] Binding that works in bytecode,	segfaults in native code
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#100">[ date ]</a>
+              <a href="thread.html#100">[ thread ]</a>
+              <a href="subject.html#100">[ subject ]</a>
+              <a href="author.html#100">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 30 September 2014 11:09, Thomas Braibant &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">thomas.braibant at gmail.com</A>&gt; wrote:
+&gt;<i> First, I would like to report that my first attempt to make bindings
+</I>&gt;<i> using Ctypes for a sizable library was a success, and I would like to
+</I>&gt;<i> congratulate the people behind Ctypes for making such a wonderful
+</I>&gt;<i> library.
+</I>
+Thanks!  We're very glad to hear of your success.
+
+&gt;<i> Now, I would like to generate inverted stubs that match a third party
+</I>&gt;<i> C header file (the same one that I used to make my bindings in the
+</I>&gt;<i> first place). Generally speaking, this should be possible I suppose.
+</I>&gt;<i> However, one of the functions from this interface returns a struct
+</I>&gt;<i> that contains function pointers to all the other functions exposed in
+</I>&gt;<i> the interface. I am reasonably convinced that it is out of the scope
+</I>&gt;<i> of what Ctypes can do, but I wanted to be sure about that.
+</I>
+I think this is something that ctypes can handle.  The trickiest part
+is likely to be the memory management: when you pass an OCaml object
+to C you need to be careful to ensure that the GC can still see it.
+The inverted stubs support is still at an early stage, and in time I
+think we'll develop techniques to make memory management easier.
+
+On to the example.  If I understand correctly you'd like to build an
+interface that looks something like this:
+
+   struct callbacks {
+      int (*arith)(int, int);
+      int (*print)(char *);
+   };
+
+   struct callbacks *build(int id);
+
+Here's how to build a library with the above interface using ctypes.
+First, a definition for the struct:
+
+   (* bindings.ml *)
+   open Ctypes
+
+   let callbacks : [`callback] structure typ = structure &quot;callbacks&quot;
+   let arith = field callbacks &quot;arith&quot;
+                       (Foreign.funptr (int @-&gt; int @-&gt; returning int))
+   let print = field callbacks &quot;print&quot;
+                       (Foreign.funptr (string @-&gt; returning void))
+   let () = seal callbacks
+
+For this example I'll use the simplest possible memory management
+strategy: a cache which holds references to OCaml values returned from
+the 'build' function:
+
+   type state = { arith: int -&gt; int -&gt; int; print: string -&gt; unit }
+   let cache : ([`callback] structure  * state) list ref = ref []
+
+The build function itself allocates and initializes a struct, adds it
+to the cache, and returns it:
+
+   let build id =
+     let state = { arith = (+);
+                   print = Printf.printf &quot;id: %d; msg: %s\n%!&quot; id } in
+     let c = make callbacks in
+     begin
+       setf c arith state.arith;
+       setf c print state.print;
+       cache := (c, state) :: !cache;
+       addr c
+     end
+
+The external interface is described with a functor in the usual way.
+We expose a single function, &quot;build&quot;, by passing name, type, and
+implementation to the &quot;internal&quot; function.
+
+    module Bindings(I: Cstubs_inverted.INTERNAL) =
+    struct
+      let _ = I.internal &quot;build&quot; (int @-&gt; returning (ptr callbacks)) build
+    end
+
+I won't post all the build details here, but I've put them in a gist
+so that you can compile and run the example.
+
+   <A HREF="https://gist.github.com/yallop/d196fee1607883493876">https://gist.github.com/yallop/d196fee1607883493876</A>
+
+It's worth just showing a use of the library here.  Here's a little test client:
+
+   #include &quot;callback_stubs.h&quot;
+   #include &lt;caml/callback.h&gt;
+   #include &lt;stdio.h&gt;
+
+   int main(int argc, char **argv)
+   {
+     /* Initialize the OCaml runtime before calling the library. */
+     char *caml_argv[1] = { NULL };
+     caml_startup(caml_argv);
+
+     struct callbacks *c0 = build(0);
+     struct callbacks *c1 = build(1);
+
+     printf(&quot;c0-&gt;arith(10, 20) =&gt; %d\n&quot;, c0-&gt;arith(10, 20));
+     printf(&quot;c1-&gt;arith(30, 40) =&gt; %d\n&quot;, c0-&gt;arith(30, 40));
+     c0-&gt;print(&quot;printing via c0&quot;);
+     c1-&gt;print(&quot;printing via c1&quot;);
+
+     return 0;
+   }
+
+The output is as you'd expect:
+
+   c0-&gt;arith(10, 20) =&gt; 30
+   c1-&gt;arith(30, 40) =&gt; 70
+   id: 0; msg: printing via c0
+   id: 1; msg: printing via c1
+
+I hope that helps,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000101.html">[ocaml-ctypes] Binding that works in bytecode,	segfaults in native code
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#100">[ date ]</a>
+              <a href="thread.html#100">[ thread ]</a>
+              <a href="subject.html#100">[ subject ]</a>
+              <a href="author.html#100">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

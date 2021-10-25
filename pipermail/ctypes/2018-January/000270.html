@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] structures
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20structures&In-Reply-To=%3CCD71B8E2-306A-4CD5-9494-17E151D460C4%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000271.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] structures</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20structures&In-Reply-To=%3CCD71B8E2-306A-4CD5-9494-17E151D460C4%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] structures">skaller at internode.on.net
+       </A><BR>
+    <I>Wed Jan  3 07:42:41 GMT 2018</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000271.html">[ocaml-ctypes] string_of_char_ptr
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#270">[ date ]</a>
+              <a href="thread.html#270">[ thread ]</a>
+              <a href="subject.html#270">[ subject ]</a>
+              <a href="author.html#270">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Just thought, as a novice, I&#8217;d report on my latest attempt to use Ctypes
+to bind some C structs. The bottom line: it took me hours, i found it confusing,
+and wished there were  an example in the tutorial which included
+
+(a) the C code
+(b) Ocaml interface (mli file)
+(c) Ocaml implementation (ml file)
+
+The source of my confusion is the amount of &#8220;types&#8221; involved!
+Ocaml uses separate namespaces for types and values, and this
+is used in Ctypes. Supposedly to make things simpler, for me it
+made things much harder.
+
+Its not just the types but the operators do this too, for example
+&#8220;ptr&#8221; has two meanings, depending on context.
+
+When you&#8217;re binding you have a C type to think about,
+possibly with two names, a structure tag name as well as
+a typedef name.
+
+Then, you have an Ocaml type representing the C type.
+Then, you have an Ocaml value encoding the binding information,
+which is a &#8220;type&#8221; representation. And that representation itself
+has an Ocaml type, the type of the encoding value, which is distinct
+from the type of the Ocaml value used to represent the C value.
+
+Throw in the use of the same name for these things and my solution
+was to just try all the possible combinations until something compiled.
+
+This finally seems to work:
+
+
+(* C HEADER FILE ****)
+struct __ccc_t;
+typedef struct __ccc_t *ccc_t;
+void ccc_destroy(ccc_t);
+
+(* MLI FILE *********)
+type __ccc_t_tag
+type __ccc_t_struct = __ccc_t_tag structure
+type __ccc_t_type = __ccc_t_struct typ
+
+
+
+(* pointer alias *)
+type ccc_t = __ccc_t_struct ptr
+val ccc_t : ccc_t typ
+
+val ccc_destroy: ccc_t  -&gt; unit
+
+
+(* ML FILE ********)
+type __ccc_t_tag
+type __ccc_t_struct = __ccc_t_tag structure
+type __ccc_t_type = __ccc_t_struct typ
+let __ccc_t_tag  : __ccc_t_type = structure &quot;__ccc_t_tag&quot;
+
+(* pointer alias *)
+type ccc_t = __ccc_t_struct ptr
+let ccc_t: ccc_t typ = ptr (__ccc_t_tag)
+
+let ccc_destroy =  foreign &quot;ccc_destroy&quot; (
+  ccc_t @-&gt; returning void
+)
+
+
+That&#8217;s a lot of code for 3 lines of C. This is real code (with the name
+changed to protect the guilty).
+
+The phrase &#8220;ccc&#8221; occurs 5 times in the C code and
+27 times in the Ocaml code.
+
+I have made a choice that the structure &#8220;tag&#8221; name used in C is the
+only way to define the Ocaml struct, and where C uses a typedef
+to introduce a non-tag name, Ocaml will use an alias also.
+Since Ctypes  doesn&#8217;t split struct tag name space from type namespace
+I have added &#8220;_tag&#8221; to the tag name.
+
+I&#8217;m currently testing with dynamic/libffi link but I can see this isn&#8217;t going
+to cut it, either performance wise or interms of getting messy stuff like
+bit fields working .. so Cstubs unfortunately looks like a requirement
+(as well as some hand written extra C to cope with bitfields).
+
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000271.html">[ocaml-ctypes] string_of_char_ptr
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#270">[ date ]</a>
+              <a href="thread.html#270">[ thread ]</a>
+              <a href="subject.html#270">[ subject ]</a>
+              <a href="author.html#270">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

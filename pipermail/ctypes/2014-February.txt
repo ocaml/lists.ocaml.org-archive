@@ -1,0 +1,1021 @@
+From daniel.buenzli at erratique.ch  Wed Feb  5 13:56:28 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 5 Feb 2014 14:56:28 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+Message-ID: <53CA4642851346998E750105E7F129C8@erratique.ch>
+
+So I tried with libffi's head [1] and the bug still there. 
+
+Daniel
+
+[1] https://github.com/atgreen/libffi/commit/3dc3f32c35db5ab995a835225f6815369735ceb7
+
+For the record that was easier than I expected. I just did 
+
+> brew remove libffi
+> brew edit libffi 
+# in the url field point to the archive of a github commit
+# compute the sha1 of the archive and add it to the sha1 field
+> brew install libffi 
+> opam remove ctypes # don't now if its needed but just in case 
+> opam install ctypes
+
+
+From daniel.buenzli at erratique.ch  Wed Feb  5 14:57:33 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 5 Feb 2014 15:57:33 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <53CA4642851346998E750105E7F129C8@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+Message-ID: <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+
+Le mercredi, 5 f?vrier 2014 ? 14:56, Daniel B?nzli a ?crit :
+> So I tried with libffi's head [1] and the bug still there.
+
+So now I did a switch that reverts b2636c22d55b15f55a02b3 (https://github.com/ocaml/ocaml/commit/b2636c22d55b15f55a02b3) with http://erratique.ch/tmp/4.01.0+nouwc.patch  
+
+So far everything seems to work well. The only "drawback" is that I get what it it seems a huge number of warnings (one per function linked in it seems) at link time. These all have this form:
+
+ld: warning: could not create compact unwind for _camlTsdl__get_surface_size_1917: stack subq instruction is too different from dwarf stack size
+
+Any idea if I can try to add something to my patch for silencing that warning ? There's an option for turning it *on* (-warn_compact_unwind) or I can turn all warnings (-w), is that a good idea ?  
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Wed Feb  5 15:40:42 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 5 Feb 2014 16:40:42 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+Message-ID: <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+
+Le mercredi, 5 f?vrier 2014 ? 15:57, Daniel B?nzli a ?crit :
+> Any idea if I can try to add something to my patch for silencing that warning ? There's an option for turning it *on* (-warn_compact_unwind) or I can turn all warnings (-w), is that a good idea ?
+
+That's what I did, these warnings were slowing down my compilation times (the emacs compilation window is so slow on osx). So here's the patch I use in my switch:
+> http://erratique.ch/tmp/4.01.0+nouwc2.patch
+
+
+In situations like this, I bless opam's existence...
+
+Best,
+
+Daniel
+
+From daniel.buenzli at erratique.ch  Mon Feb 10 23:12:52 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 11 Feb 2014 00:12:52 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+Message-ID: <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+
+This thing is driving me crazy. In fact I reached to wrong conclusions about 4.00.1. The problem also exists there. I realized by running some programs for long enough, eventually they'd always exit with bus error 10. 
+
+I now have a short repro case that works for both 4.00.1 and 4.01.1 [1]. It exits with bus error 10:
+
+Exception Type: EXC_BAD_ACCESS (SIGBUS)
+Exception Codes: KERN_PROTECTION_FAILURE at 0x0000000100c4f3e8
+
+after entering the loop. I checked that a corresponding pure C program has no problem.
+
+I rechecked the bindings of all the functions used until error [2]. Note that just adding something like a printf statement to the loop may make the program work (or at least for a longer time).
+
+I'm at loss.
+
+Daniel
+
+
+[1]
+-----min.ml-------
+(* 
+    Minimal OCaml SDL example. This code is in the public domain. 
+    Compile with:
+    ocamlfind ocamlc -package tsdl -linkpkg -o min.byte min.ml
+    ocamlfind ocamlopt -package tsdl -linkpkg -o min.native min.ml
+*)
+
+open Tsdl
+
+let main () = match Sdl.init Sdl.Init.video with 
+| `Error -> exit 1
+| `Ok () -> 
+    match Sdl.create_window ~w:640 ~h:480 "SDL OpenGL" Sdl.Window.opengl with 
+    | `Error -> exit 1
+    | `Ok w ->
+        Printf.printf "Enter%!";
+        while true do Sdl.gl_swap_window w done;
+        Sdl.destroy_window w; 
+        Sdl.quit (); 
+        exit 0
+
+        let () = main ()
+--------------------
+
+[2]
+https://hg.libsdl.org/SDL/file/e749005cfd72/include/SDL.h#l129
+https://github.com/dbuenzli/tsdl/blob/master/src/tsdl.ml#L187
+
+https://hg.libsdl.org/SDL/file/e749005cfd72/include/SDL_video.h#l408
+https://github.com/dbuenzli/tsdl/blob/master/src/tsdl.ml#L1675
+
+https://hg.libsdl.org/SDL/file/e749005cfd72/include/SDL_video.h#l959
+https://github.com/dbuenzli/tsdl/blob/master/src/tsdl.ml#L1986
+
+
+
+From daniel.buenzli at erratique.ch  Tue Feb 11 16:18:36 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 11 Feb 2014 17:18:36 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+Message-ID: <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+
+I managed to get a little bit more info by compiling libffi with `--enable-debug` and everything compiled with -g under ocaml.
+
+Using lldb it seems something bad happens during the setup of ffi_call call in ctypes's ctypes_call function. See the `->' in the second disassemble below which points to this line:
+
+https://github.com/ocamllabs/ocaml-ctypes/blob/ocaml-ctypes-0.2.2/src/ctypes-foreign-base/ffi_call_stubs.c#L302
+
+Daniel
+
+> lldb bug.native 
+Current executable set to 'bug.native' (x86_64).
+(lldb) run
+Process 43924 launched: '/Users/dbuenzli/bug/bug.native' (x86_64)
+Process 43924 stopped
+* thread #1: tid = 0x26ff7d, 0x00000001007a37b0, queue = 'com.apple.main-thread, stop reason = EXC_BAD_ACCESS (code=2, address=0x1007a37b0)
+    frame #0: 0x00000001007a37b0
+-> 0x1007a37b0:  xorb   %ch, 65539(%rbx)
+   0x1007a37b6:  addb   %al, (%rax)
+   0x1007a37b8:  addl   (%rax), %eax
+   0x1007a37ba:  addb   %al, (%rax)
+(lldb) bt
+* thread #1: tid = 0x26ff7d, 0x00000001007a37b0, queue = 'com.apple.main-thread, stop reason = EXC_BAD_ACCESS (code=2, address=0x1007a37b0)
+    frame #0: 0x00000001007a37b0
+    frame #1: 0x0000000100076d50 bug.native`ctypes_call(function=4303202416, callspec_=4303295728, argwriter=4302976944, rvreader=4303196432) + 304 at ffi_call_stubs.c:298
+    frame #2: 0x000000010003ae3c bug.native`.L141 + 24
+(lldb) up
+frame #1: 0x0000000100076d50 bug.native`ctypes_call(function=4303202416, callspec_=4303295728, argwriter=4302976944, rvreader=4303196432) + 304 at ffi_call_stubs.c:298
+(lldb) di --mixed -c 13 -s $pc-20
+bug.native`ctypes_call + 284 at ffi_call_stubs.c:293
+   0x100076d3c:  clc    
+   0x100076d3d:  addq   %rdi, %r15
+bug.native`ctypes_call + 288 at ffi_call_stubs.c:298
+   0x100076d40:  callq  0x1000870c0               ; caml_copy_int64
+   0x100076d45:  movq   %r14, %rdi
+   0x100076d48:  movq   %rax, %rsi
+   0x100076d4b:  callq  0x100094bd0               ; caml_callback
+bug.native`ctypes_call + 304 at ffi_call_stubs.c:302
+-> 0x100076d50:  movq   -64(%rbp), %rax
+   0x100076d54:  movq   64(%rax), %rdi
+bug.native`ctypes_call + 312 at ffi_call_stubs.c:300
+   0x100076d58:  movq   -56(%rbp), %rax
+   0x100076d5c:  movq   8(%rax), %rsi
+bug.native`ctypes_call + 320 at ffi_call_stubs.c:302
+   0x100076d60:  movq   %r15, %rdx
+   0x100076d63:  movq   %r13, %rcx
+   0x100076d66:  callq  0x1000979f0               ; symbol stub for: caml_system__code_end
+(lldb) frame variable
+(value) function = 4303202416
+(value) callspec_ = 4303295728
+(value) argwriter = 4302976944
+(value) rvreader = 4303196432
+(caml__roots_block) caml__roots_function = {
+  next = 0x0000000000000000
+  ntables = 4
+  nitems = 1
+  tables = {
+    [0] = 0x00007fff5fbff6d8
+    [1] = 0x00007fff5fbff6d0
+    [2] = 0x00007fff5fbff6c8
+    [3] = 0x00007fff5fbff6c0
+    [4] = 0x000000010003ad20
+  }
+}
+(caml__roots_block) caml__roots_function = {
+  next = 0x0000000000000000
+  ntables = 4
+  nitems = 1
+  tables = {
+    [0] = 0x00007fff5fbff6d8
+    [1] = 0x00007fff5fbff6d0
+    [2] = 0x00007fff5fbff6c8
+    [3] = 0x00007fff5fbff6c0
+    [4] = 0x000000010003ad20
+  }
+}
+(caml__roots_block *) caml__frame = <register r12 is not available>
+(int) caml__dummy_function = 0
+(size_t) arg_array_offset = <variable not available>
+(char *) return_slot = <register r15 is not available>
+(void (*)()) cfunction = <variable not available>
+(callspec *) callspec = <no location, value may have been optimized out>
+(int) roffset = <no location, value may have been optimized out>
+(size_t) bytes = <no location, value may have been optimized out>
+(char *) callbuffer = <no location, value may have been optimized out>
+
+
+
+From daniel.buenzli at erratique.ch  Tue Feb 11 18:24:03 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 11 Feb 2014 19:24:03 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+Message-ID: <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+
+In order to reduce the investigation surface I made the bug self contained so that you just need ctypes, the C library libsdl2 and this file (i.e. no need for the whole tsdl):
+
+http://erratique.ch/tmp/bug.ml
+
+So here are the steps:
+
+brew install sdl2
+opam install ctypes
+cd /tmp
+curl -O http://erratique.ch/tmp/bug.ml
+ocamlfind ocamlopt -ccopt "`sdl2-config --libs`" \
+             -package ctypes,ctypes.foreign -linkpkg \
+             -o bug.native bug.ml
+
+./bug.native # booom
+
+Best,
+
+Daniel
+
+From daniel.buenzli at erratique.ch  Tue Feb 11 19:13:44 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 11 Feb 2014 20:13:44 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+ <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+Message-ID: <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+
+Excellent ! I can now even rule out SDL, mach_absolute_time [1] does the job. 
+
+The minimal so far, completely self-contained is at the end of the file. Note that slightly tweaking the program (e.g. print the results in the loop) makes the program work.
+
+Best,
+
+Daniel
+
+[1] http://www.opensource.apple.com/source/xnu/xnu-1456.1.26/osfmk/mach/mach_time.h
+
+
+--- bug.ml ---
+(* 
+   The annoying bug.
+   Compile with
+   ocamlfind ocamlopt -package ctypes,ctypes.foreign -linkpkg \
+             -o bug.native bug.ml
+*)
+
+open Ctypes
+open Foreign
+
+let mach_absolute_time = 
+  foreign "mach_absolute_time" (void @-> returning uint64_t)
+
+let main () = 
+  Printf.printf "Enter%!";
+  while true do ignore (mach_absolute_time ()) done
+          
+let () = main ()
+
+----
+
+
+
+
+
+
+
+From markus.weissmann at in.tum.de  Wed Feb 12 07:59:13 2014
+From: markus.weissmann at in.tum.de (=?UTF-8?Q?Markus_Wei=C3=9Fmann?=)
+Date: Wed, 12 Feb 2014 08:59:13 +0100
+Subject: [ocaml-ctypes] C-array of fixed size,
+	#defines and C11 anonymous unions
+Message-ID: <210eb5fd94b2c416eaa888ec860b8a74@in.tum.de>
+
+Hello ctypes list,
+
+1.) I was wondering how fixed-size C-arrays should be handled in 
+ctypes;
+there exist several APIs that use a fixed-size array as part of a 
+struct, e.g. ifreq (used to configure network interfaces via ioctl(2) on 
+linux)
+
+struct ifreq {
+   union {
+     char ifrn_name[16];
+   } ifr_ifrn;
+...
+
+How do I handle that in ctypes?
+
+
+2.) Is there a "clever" way of handling C-#defines? One obvious 
+possibility is to look them up manually and then hope that e.g. BUFSIZ 
+is the same on all machines used;
+another would be to introduce a stub.c file just to handle the 
+#defines... defeating somehow the purpose of ctypes.
+Something that would work, too, is to write a generator in C that 
+creates a defines.ml for me (e.g. "printf("let bufsiz = %d\n", BUFSIZ))
+Has someone found the holy grail (tm) for this problem?
+
+
+3.) The C11 standard allows for unnamed unions -- not a concrete 
+problem right now, but is there a more elegant way than to introduce a 
+new name for the union in my ocaml/ctypes code?
+
+typedef struct {
+   union {
+     float f;
+     int i;
+   };
+} some_t;
+...
+some_t x;
+x.f = 4.5;
+printf("%d", x.i);
+
+
+Best regards,
+
+-Markus
+
+-- 
+Markus Wei?mann, M.Sc.
+Technische Universit?t M?nchen
+Institut f?r Informatik
+Boltzmannstr. 3
+D-85748 Garching
+Germany
+http://wwwknoll.in.tum.de/
+
+
+From daniel.buenzli at erratique.ch  Wed Feb 12 09:31:46 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 12 Feb 2014 10:31:46 +0100
+Subject: [ocaml-ctypes] C-array of fixed size,
+ #defines and C11 anonymous unions
+In-Reply-To: <210eb5fd94b2c416eaa888ec860b8a74@in.tum.de>
+References: <210eb5fd94b2c416eaa888ec860b8a74@in.tum.de>
+Message-ID: <03B6501ECCA442A99BA007901CD424A8@erratique.ch>
+
+Regarding you questions 1) and 2) you can have a look at my answer to this question on stackoverflow: 
+
+http://stackoverflow.com/questions/20851390/passing-a-string-to-a-c-library-from-ocaml-using-ctypes-and-foreign/
+
+Best,
+
+Daniel
+
+From florian.pichlmeier at mytum.de  Wed Feb 12 10:23:56 2014
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Wed, 12 Feb 2014 10:23:56 -0000
+Subject: [ocaml-ctypes] ctypes oasis
+Message-ID: <20140212102356.63302.28414@magellan1.ze.tum.de>
+
+Hi,
+
+i am still writing on my small zeromq binding, and thanks to your contributions it grows, but
+i still have problems with runtime exceptions like this one
+
+Fatal error: exception Dl.DL_error("./bin-client: undefined symbol: zauth_new")
+
+I was wondering if the reason for this problem lies with in my oasis file
+
+OASISFormat: 0.3
+Name:        czmq
+Version:     0.1.0
+Synopsis:    OCaml binding for the High-level C Binding for Zeromq
+Authors:     Florian Pichlmeier
+License:     LGPL-3.0 with OCaml linking exception
+Plugins:     META (0.3), StdFiles (0.3), DevFiles (0.3)
+
+BuildDepends:
+  ctypes.foreign,
+  threads
+
+PreInstallCommand: cc -shared -o _build/lib/dllczmq_stubs.so -lsodium -lczmq -lzmq
+
+Library "czmq"
+  Path:       lib
+  BuildTools: ocamlbuild
+  Modules:    Czmq
+  InternalModules: Context,
+              Socket,
+              Poller,
+              Directory,
+              Auth,
+              Beacon,
+              Cert,
+              Certstore,
+              Config,
+              Clock,
+              Frame,
+              Msg
+#             Sys Structs,
+  CSources:   czmq.c
+  CCOpt:      -cclib,-Xlinker,-cclib,-no-as-needed,-Wl
+  CCLib:      -lsodium -lczmq -lzmq
+  DllLib:     -lczmq_stubs
+
+I have added the no-as-needed part to it but it still doesnt work. 
+
+Is there an obvious mistake in my oasis file?
+
+Best regards,
+
+Florian 
+
+From daniel.buenzli at erratique.ch  Wed Feb 12 12:46:42 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 12 Feb 2014 13:46:42 +0100
+Subject: [ocaml-ctypes] ctypes oasis
+In-Reply-To: <20140212102356.63302.28414@magellan1.ze.tum.de>
+References: <20140212102356.63302.28414@magellan1.ze.tum.de>
+Message-ID: <D7BD24AA2C2144B58A73D227D0A9EA57@erratique.ch>
+
+Le mercredi, 12 f?vrier 2014 ? 11:23, Florian Pichlmeier a ?crit :
+> Fatal error: exception Dl.DL_error("./bin-client: undefined symbol: zauth_new")
+>  
+> I was wondering if the reason for this problem lies with in my oasis file
+I can't help you with oasis and I would rather suggest you to drop it (it doesn't bring you much anyways), so that you actually know what you are doing build-wise. By following the steps I describe here:  
+
+https://github.com/ocamllabs/ocaml-ctypes/issues/51#issuecomment-30729675
+
+You should get to something that will handle dynamic linking for byte and native code and in the toplevel, all this by just using the ocamlfind package.  
+
+Feel free to ask me any question about it.  
+
+Best,
+
+Daniel
+
+
+
+From sheets at alum.mit.edu  Wed Feb 12 13:50:54 2014
+From: sheets at alum.mit.edu (David Sheets)
+Date: Wed, 12 Feb 2014 13:50:54 +0000
+Subject: [ocaml-ctypes] ctypes oasis
+In-Reply-To: <20140212102356.63302.28414@magellan1.ze.tum.de>
+References: <20140212102356.63302.28414@magellan1.ze.tum.de>
+Message-ID: <CAAWM5TzcY5eE28a6UVYaPOfFs2_f48ct+EKDwDpcP2twMV06+A@mail.gmail.com>
+
+On Wed, Feb 12, 2014 at 10:23 AM, Florian Pichlmeier
+<florian.pichlmeier at mytum.de> wrote:
+> Hi,
+>
+> i am still writing on my small zeromq binding, and thanks to your contributions it grows, but
+> i still have problems with runtime exceptions like this one
+>
+> Fatal error: exception Dl.DL_error("./bin-client: undefined symbol: zauth_new")
+>
+> I was wondering if the reason for this problem lies with in my oasis file
+>
+> OASISFormat: 0.3
+> Name:        czmq
+> Version:     0.1.0
+> Synopsis:    OCaml binding for the High-level C Binding for Zeromq
+> Authors:     Florian Pichlmeier
+> License:     LGPL-3.0 with OCaml linking exception
+> Plugins:     META (0.3), StdFiles (0.3), DevFiles (0.3)
+>
+> BuildDepends:
+>   ctypes.foreign,
+>   threads
+>
+> PreInstallCommand: cc -shared -o _build/lib/dllczmq_stubs.so -lsodium -lczmq -lzmq
+>
+> Library "czmq"
+>   Path:       lib
+>   BuildTools: ocamlbuild
+>   Modules:    Czmq
+>   InternalModules: Context,
+>               Socket,
+>               Poller,
+>               Directory,
+>               Auth,
+>               Beacon,
+>               Cert,
+>               Certstore,
+>               Config,
+>               Clock,
+>               Frame,
+>               Msg
+> #             Sys Structs,
+>   CSources:   czmq.c
+>   CCOpt:      -cclib,-Xlinker,-cclib,-no-as-needed,-Wl
+>   CCLib:      -lsodium -lczmq -lzmq
+>   DllLib:     -lczmq_stubs
+>
+> I have added the no-as-needed part to it but it still doesnt work.
+>
+> Is there an obvious mistake in my oasis file?
+
+Hi Florian,
+
+Please provide a link to the repository and revision/branch of the
+buggy code so that interested parties can independently investigate
+the build- and run-time behavior.
+
+Thanks,
+
+David
+
+> Best regards,
+>
+> Florian
+> _______________________________________________
+> Ctypes mailing list
+> Ctypes at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/ctypes
+
+From florian.pichlmeier at mytum.de  Wed Feb 12 14:21:19 2014
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Wed, 12 Feb 2014 14:21:19 -0000
+Subject: [ocaml-ctypes] ctypes oasis
+In-Reply-To: <CAAWM5TzcY5eE28a6UVYaPOfFs2_f48ct+EKDwDpcP2twMV06+A@mail.gmail.com>
+References: <CAAWM5TzcY5eE28a6UVYaPOfFs2_f48ct+EKDwDpcP2twMV06+A@mail.gmail.com>
+ <20140212102356.63302.28414@magellan1.ze.tum.de>
+Message-ID: <20140212142119.63302.30212@magellan1.ze.tum.de>
+
+Hi David,
+
+thats the link to my test branch
+
+https://github.com/fmp88/ocaml-czmq/tree/zmqv4_exp
+
+I have added a small test scenario, to reproduce my bug
+
+https://github.com/fmp88/ocaml-czmq/tree/zmqv4_exp/examples/hello_world
+
+Thanks,
+
+Florian
+
+David Sheets <sheets at alum.mit.edu> wrote:
+
+
+> On Wed, Feb 12, 2014 at 10:23 AM, Florian Pichlmeier
+> <florian.pichlmeier at mytum.de> wrote:
+> 
+> > Hi,
+> > 
+> > i am still writing on my small zeromq binding, and thanks to your contributions it grows, but
+> > i still have problems with runtime exceptions like this one
+> > 
+> > Fatal error: exception Dl.DL_error("./bin-client: undefined symbol: zauth_new")
+> > 
+> > I was wondering if the reason for this problem lies with in my oasis file
+> > 
+> > OASISFormat: 0.3
+> > Name:        czmq
+> > Version:     0.1.0
+> > Synopsis:    OCaml binding for the High-level C Binding for Zeromq
+> > Authors:     Florian Pichlmeier
+> > License:     LGPL-3.0 with OCaml linking exception
+> > Plugins:     META (0.3), StdFiles (0.3), DevFiles (0.3)
+> > 
+> > BuildDepends:
+> >   ctypes.foreign,
+> >   threads
+> > 
+> > PreInstallCommand: cc -shared -o _build/lib/dllczmq_stubs.so -lsodium -lczmq -lzmq
+> > 
+> > Library "czmq"
+> >   Path:       lib
+> >   BuildTools: ocamlbuild
+> >   Modules:    Czmq
+> >   InternalModules: Context,
+> >               Socket,
+> >               Poller,
+> >               Directory,
+> >               Auth,
+> >               Beacon,
+> >               Cert,
+> >               Certstore,
+> >               Config,
+> >               Clock,
+> >               Frame,
+> >               Msg
+> > #             Sys Structs,
+> >   CSources:   czmq.c
+> >   CCOpt:      -cclib,-Xlinker,-cclib,-no-as-needed,-Wl
+> >   CCLib:      -lsodium -lczmq -lzmq
+> >   DllLib:     -lczmq_stubs
+> > 
+> > I have added the no-as-needed part to it but it still doesnt work.
+> > 
+> > Is there an obvious mistake in my oasis file?
+> > 
+> > 
+> 
+> Hi Florian,
+> 
+> Please provide a link to the repository and revision/branch of the
+> buggy code so that interested parties can independently investigate
+> the build- and run-time behavior.
+> 
+> Thanks,
+> 
+> David
+> 
+> 
+> > Best regards,
+> > 
+> > Florian
+> > _______________________________________________
+> > Ctypes mailing list
+> > Ctypes at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/ctypes
+> > 
+> > 
+> 
+> 
+
+From yallop at gmail.com  Fri Feb 14 12:03:56 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 14 Feb 2014 12:03:56 +0000
+Subject: [ocaml-ctypes] C-array of fixed size,
+	#defines and C11 anonymous unions
+In-Reply-To: <210eb5fd94b2c416eaa888ec860b8a74@in.tum.de>
+References: <210eb5fd94b2c416eaa888ec860b8a74@in.tum.de>
+Message-ID: <CAAxsn=GYmZwcjmHqWKV-OPHyRtHm9Qbxo4_Ku_qRpTt0-QSJMg@mail.gmail.com>
+
+On 12/02/2014, Markus Wei?mann <markus.weissmann at in.tum.de> wrote:
+> 1.) I was wondering how fixed-size C-arrays should be handled in
+> ctypes;
+> there exist several APIs that use a fixed-size array as part of a
+> struct, e.g. ifreq (used to configure network interfaces via ioctl(2) on
+> linux)
+>
+> struct ifreq {
+>    union {
+>      char ifrn_name[16];
+>    } ifr_ifrn;
+> ...
+>
+> How do I handle that in ctypes?
+
+Array members are supported without the need to do anything special.
+
+  type ifreq
+  let ifreq : ifreq structure typ = structure "ifreq"
+  let ifr_ifrn = field ifreq "ifr_ifrn" (array 16 char)
+
+> 2.) Is there a "clever" way of handling C-#defines?
+[...]
+> Something that would work, too, is to write a generator in C that
+> creates a defines.ml for me (e.g. "printf("let bufsiz = %d\n", BUFSIZ))
+
+This is probably the best approach at the moment.  It's likely that
+there'll eventually be some support for this in ctypes itself.  The
+stub generation code (in trunk, but not yet released) already supports
+some function-like macros; it may eventually handle unparameterized
+macros like BUFSIZ as well.
+
+> 3.) The C11 standard allows for unnamed unions -- not a concrete
+> problem right now, but is there a more elegant way than to introduce a
+> new name for the union in my ocaml/ctypes code?
+>
+> typedef struct {
+>    union {
+>      float f;
+>      int i;
+>    };
+> } some_t;
+> ...
+> some_t x;
+> x.f = 4.5;
+> printf("%d", x.i);
+
+I think that naming the union is the best approach with the current
+ctypes release.  Things will improve when we have support for
+retrieving the struct layout from C (issue #62).  At that point making
+'f' and 'i' members of the surrounding struct (some_t) will give you
+something that behaves like the anonymous union, since C will report
+that the offsets of the fields are the same.
+
+From yallop at gmail.com  Mon Feb 17 09:43:11 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 17 Feb 2014 09:43:11 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+ <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+ <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+Message-ID: <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+
+Ok, so I finally got a Mac set up to take a look at this, and tracked
+down the source of the problem.  The following commit appears to fix
+both the SDL and mach_absolute_time examples:
+
+   https://github.com/yallop/ocaml-ctypes/commit/df51a59356
+
+You can try it out using my opam-repository fork:
+
+  opam remote add yallop https://github.com/yallop/opam-repository.git
+  opam install ctypes.0.2.3 tsdl
+
+Let me know if this fixes things, and I'll push 0.2.3 to the main
+opam-repository.
+
+Thanks for your patience, and for the precise and detailed bug report!
+
+From daniel.buenzli at erratique.ch  Mon Feb 17 14:18:37 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 17 Feb 2014 15:18:37 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+ <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+ <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+ <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+Message-ID: <BF507EE0992B4A97B78626EB85FE56A3@erratique.ch>
+
+Le lundi, 17 f?vrier 2014 ? 10:43, Jeremy Yallop a ?crit :
+> Let me know if this fixes things, and I'll push 0.2.3 to the main
+> opam-repository.
+
+
+Thanks for looking into that ! So, there is some good news and bad news. I think we were facing two separate issues in this discussion.  
+
+The good news is that I confirm the examples I gave and other tsdl programs I have do now survive more than 20s and don't show any bug occuring in ctypes_call. That's already a huge step since it actually allows me to use tsdl/tgsl on osx and I think you should already push that fix.
+
+The bad news is that my initial report, as the title of the thread indicates, was about a spinning process. And the working tsdl programs I mention above while they work, can't be exited when compiled with 4.01.0, they end up spinning, taking 100% cpu time, in that unwind thing.  
+
+For that my analysis about 4.00.1 vs 4.01.0 and the bissect to ocaml's b2636c22d55b15f55a02b3 still holds. A mildly good news (since I don't really understand what I'm doing) is that if I use my switch that applies this patch to 4.01.0:
+
+  https://gist.github.com/dbuenzli/9050340
+
+the programs do not spin on exit. The smallest repro case I have for now is here:
+
+  https://gist.github.com/dbuenzli/9050445
+
+If there is no bug, this program exits immediately otherwise it spins [1]. It should be noted that the bug still has a very heisenbug nature --- which make me nervously wonder if it could still not suddenly show up on 4.00.1 or on 4.01.0 with my patch. For example if I remove the useless `video` addition of line:
+
+  https://gist.github.com/dbuenzli/9050445#file-spin-ml-L29
+
+which equates to ctypes's Unsigned.UInt32.logor, see:
+
+  https://github.com/dbuenzli/tsdl/blob/a3ee691e75ef0635ee4304732aeae53f8352b4b7/src/tsdl.ml#L178
+
+the spin doesn't occur. Trying to remove any other instruction, like the useless call to Sdl.get_event_state followed by the match, to make the test case smaller also make the spin disappear.  
+
+Finally it should also be noted that the spin occurs in the call to Sdl.pump_events before all the other calls so I don't think it's a case of buggy bindings.
+
+Best,
+
+Daniel
+
+
+[1] It spins in there:
+
+> lldb spin.native  
+Current executable set to 'spin.native' (x86_64).
+(lldb) run
+Process 39079 launched: '/Users/dbuenzli/bug/spin.native' (x86_64)
+Pump...
+Process 39079 stopped
+* thread #1: tid = 0x3b2271, 0x00007fff8f27a334 libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getSavedRegister(libunwind::LocalAddressSpace&, libunwind::Registers_x86_64 const&, unsigned long long, libunwind::CFI_Parser<libunwind::LocalAddressSpace>::RegisterLocation const&), queue = 'com.apple.main-thread, stop reason = signal SIGSTOP
+frame #0: 0x00007fff8f27a334 libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getSavedRegister(libunwind::LocalAddressSpace&, libunwind::Registers_x86_64 const&, unsigned long long, libunwind::CFI_Parser<libunwind::LocalAddressSpace>::RegisterLocation const&)
+libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getSavedRegister(libunwind::LocalAddressSpace&, libunwind::Registers_x86_64 const&, unsigned long long, libunwind::CFI_Parser<libunwind::LocalAddressSpace>::RegisterLocation const&):
+-> 0x7fff8f27a334: pushq %rbp
+0x7fff8f27a335: movq %rsp, %rbp
+0x7fff8f27a338: movq %rcx, %rax
+0x7fff8f27a33b: movq %rdx, %rcx
+(lldb) bt
+* thread #1: tid = 0x3b2271, 0x00007fff8f27a334 libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getSavedRegister(libunwind::LocalAddressSpace&, libunwind::Registers_x86_64 const&, unsigned long long, libunwind::CFI_Parser<libunwind::LocalAddressSpace>::RegisterLocation const&), queue = 'com.apple.main-thread, stop reason = signal SIGSTOP
+frame #0: 0x00007fff8f27a334 libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getSavedRegister(libunwind::LocalAddressSpace&, libunwind::Registers_x86_64 const&, unsigned long long, libunwind::CFI_Parser<libunwind::LocalAddressSpace>::RegisterLocation const&)
+frame #1: 0x00007fff8f27a07b libunwind.dylib`libunwind::DwarfInstructions<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::stepWithDwarf(libunwind::LocalAddressSpace&, unsigned long long, unsigned long long, libunwind::Registers_x86_64&) + 287
+frame #2: 0x00007fff8f277538 libunwind.dylib`libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::step() + 100
+frame #3: 0x00007fff916e37af libobjc.A.dylib`objc_addExceptionHandler + 79
+frame #4: 0x00007fff8d6c5c6c CoreFoundation`_CFDoExceptionOperation + 380
+frame #5: 0x00007fff888ea24c AppKit`_NSAppKitLock + 77
+frame #6: 0x00007fff888a77f7 AppKit`NSAccessibilityPostNotificationWithUserInfo + 70
+frame #7: 0x00007fff889c88db AppKit`-[NSApplication sendEvent:] + 2328
+frame #8: 0x0000000100244b84 libSDL2-2.0.0.dylib`Cocoa_PumpEvents + 171
+frame #9: 0x00000001001eca3e libSDL2-2.0.0.dylib`SDL_PumpEvents + 23
+frame #10: 0x0000000100299124 libffi.6.dylib`ffi_call_unix64 + 76
+frame #11: 0x00000001002989f6 libffi.6.dylib`ffi_call + 854
+frame #12: 0x0000000100076ad2 spin.native`ctypes_call + 434
+frame #13: 0x000000010003ab5c spin.native`.L139 + 24
+
+
+From daniel.buenzli at erratique.ch  Wed Feb 19 12:11:08 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 19 Feb 2014 13:11:08 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+ <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+ <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+ <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+Message-ID: <1D4C9456BA144ECCA5526D4B15A12D1E@erratique.ch>
+
+Le lundi, 17 f?vrier 2014 ? 10:43, Jeremy Yallop a ?crit :
+> https://github.com/yallop/ocaml-ctypes/commit/df51a59356
+>  
+> You can try it out using my opam-repository fork:
+>  
+> opam remote add yallop https://github.com/yallop/opam-repository.git
+> opam install ctypes.0.2.3 tsdl
+
+Just one note, having to use an opam-repository fork to test fixes brings too much confusion, for one thing it insulates you from new updates of the regular opam repo as it shadows *all* packages.   
+
+Especially since I need the fix to be able work, I cannot just try your opam-repository and remove it.  
+
+It's better to provide pin instructions which in this case are  
+
+ opam pin --force ctypes https://github.com/yallop/ocaml-ctypes#0.2-fixes
+ opam update
+ opam reinstall ctypes
+
+
+Best,
+
+Daniel
+
+From yallop at gmail.com  Fri Feb 21 02:11:40 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 21 Feb 2014 02:11:40 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <BF507EE0992B4A97B78626EB85FE56A3@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <53CA4642851346998E750105E7F129C8@erratique.ch>
+ <2A07CF0FFC334833B56877C484ECD38D@erratique.ch>
+ <AFAA0F3EDF0B4690B8448F9A97797453@erratique.ch>
+ <9E88480F53F844D49C67E488AAEC8B5D@erratique.ch>
+ <CAAxsn=GawQUD1P7tYOi2-bZqFaZbKab8-SjpEhRZ=q4kz0khLQ@mail.gmail.com>
+ <9EBE8A8685A7419099B2D422D091783E@erratique.ch>
+ <8E00A7387FE74F49B548B18409A08BD2@erratique.ch>
+ <B2264E2AC0E846F6888AB6E20455C557@erratique.ch>
+ <B7804DEE997D42D5A92F02B6B333E297@erratique.ch>
+ <CAAxsn=EFkVQgtDeQAJmy1-SyxEJbKTh_s+FBF0-3aziH6OvOsQ@mail.gmail.com>
+ <BF507EE0992B4A97B78626EB85FE56A3@erratique.ch>
+Message-ID: <CAAxsn=EPYZRWMGjSVOGqeh3JcdHz8v2AJGTvpfXh3vfV=LktXA@mail.gmail.com>
+
+On 17 February 2014 14:18, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> The bad news is that my initial report, as the title of the thread indicates, was about a spinning process. And the working tsdl programs I mention above while they work, can't be exited when compiled with 4.01.0, they end up spinning, taking 100% cpu time, in that unwind thing.
+>
+> For that my analysis about 4.00.1 vs 4.01.0 and the bissect to ocaml's b2636c22d55b15f55a02b3 still holds. A mildly good news (since I don't really understand what I'm doing) is that if I use my switch that applies this patch to 4.01.0:
+>
+>   https://gist.github.com/dbuenzli/9050340
+>
+> the programs do not spin on exit. The smallest repro case I have for now is here:
+>
+>   https://gist.github.com/dbuenzli/9050445
+
+Thanks!  I can reliably reproduce this.  I've started looking into it,
+and will have some more time to look at it in a couple of days.  I'll
+report back once I know more.
+

@@ -1,0 +1,193 @@
+From shibano.nozomi at gmail.com  Wed Feb 17 09:21:29 2016
+From: shibano.nozomi at gmail.com (Nozomi Shibano)
+Date: Wed, 17 Feb 2016 18:21:29 +0900
+Subject: [omake] Is there a way to 'export' variable value from
+	sub-OMakefile to parent?
+Message-ID: <CABgqFzCRFGniU6TCwgLR3Yr-rWGu9zMs0Ozw8vZR1WPH4=r-Mw@mail.gmail.com>
+
+Hi,
+
+I had a general question. Please help if someone had answer. (Also
+advise if I should ask this question in other place.)
+
+Is there any way to 'export' variable value from sub-OMakefile to
+parent? Sometimes I want to declare 'accumulator' variable in root
+OMakefile and append to it in sub-OMakefiles using += operator, and
+then do some task with accumulated values in root OMakefile. For
+example, accumulate paths of all .o files in sub-directories and link
+them into single .exe file in the root directory.
+
+It seems to me that, it is not possible. (Exceptionally, when
+sub-OMakefile is written as .SUBDIRS section in root OMakefile,
+'export' command works for this purpose.) Passing information from
+sub-OMakefile to parent is only possible via target file in sub
+directory and dependency to it from root OMakefile. For above example
+case, I have to link .o files into .a file in sub-OMakefile and
+declare dependency from .exe to that .a file in root OMakefile. Is
+this correct understanding?
+
+Regards,
+Nozomi Shibano
+
+From info at gerd-stolpmann.de  Sun Feb 21 11:24:36 2016
+From: info at gerd-stolpmann.de (Gerd Stolpmann)
+Date: Sun, 21 Feb 2016 12:24:36 +0100
+Subject: [omake] Is there a way to 'export' variable value from
+ sub-OMakefile to parent?
+In-Reply-To: <CABgqFzCRFGniU6TCwgLR3Yr-rWGu9zMs0Ozw8vZR1WPH4=r-Mw@mail.gmail.com>
+References: <CABgqFzCRFGniU6TCwgLR3Yr-rWGu9zMs0Ozw8vZR1WPH4=r-Mw@mail.gmail.com>
+Message-ID: <1456053876.12030.6.camel@e130.lan.sumadev.de>
+
+Am Mittwoch, den 17.02.2016, 18:21 +0900 schrieb Nozomi Shibano:
+> Hi,
+> 
+> I had a general question. Please help if someone had answer. (Also
+> advise if I should ask this question in other place.)
+> 
+> Is there any way to 'export' variable value from sub-OMakefile to
+> parent? Sometimes I want to declare 'accumulator' variable in root
+> OMakefile and append to it in sub-OMakefiles using += operator, and
+> then do some task with accumulated values in root OMakefile. For
+> example, accumulate paths of all .o files in sub-directories and link
+> them into single .exe file in the root directory.
+> 
+> It seems to me that, it is not possible.
+
+Right, normal .SUBDIRS (w/o section) always starts a new environment,
+and there is no way to export updated variables.
+
+>  (Exceptionally, when
+> sub-OMakefile is written as .SUBDIRS section in root OMakefile,
+> 'export' command works for this purpose.) 
+
+Based on this observation, here is an idea: maybe the combo .SUBDIRS
+section with "include" works:
+
+.SUBDIRS: dir
+    include OMakefile
+    export variable
+
+This is not tested, though.
+
+Note that a simple "include dir/OMakefile" would not work because the
+rules in OMakefile wouldn't then be applied to the subdirectory.
+
+Gerd
+
+> Passing information from
+> sub-OMakefile to parent is only possible via target file in sub
+> directory and dependency to it from root OMakefile. For above example
+> case, I have to link .o files into .a file in sub-OMakefile and
+> declare dependency from .exe to that .a file in root OMakefile. Is
+> this correct understanding?
+> 
+> Regards,
+> Nozomi Shibano
+> _______________________________________________
+> Omake mailing list
+> Omake at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/omake
+
+-- 
+------------------------------------------------------------
+Gerd Stolpmann, Darmstadt, Germany    gerd at gerd-stolpmann.de
+My OCaml site:          http://www.camlcity.org
+Contact details:        http://www.camlcity.org/contact.html
+Company homepage:       http://www.gerd-stolpmann.de
+------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.ocaml.org/pipermail/omake/attachments/20160221/f672e7da/attachment.sig>
+
+From shibano.nozomi at gmail.com  Mon Feb 22 07:48:22 2016
+From: shibano.nozomi at gmail.com (Nozomi Shibano)
+Date: Mon, 22 Feb 2016 16:48:22 +0900
+Subject: [omake] Is there a way to 'export' variable value from
+ sub-OMakefile to parent?
+In-Reply-To: <1456053876.12030.6.camel@e130.lan.sumadev.de>
+References: <CABgqFzCRFGniU6TCwgLR3Yr-rWGu9zMs0Ozw8vZR1WPH4=r-Mw@mail.gmail.com>
+ <1456053876.12030.6.camel@e130.lan.sumadev.de>
+Message-ID: <CABgqFzDGci2622iZtiAJp6gRL5S3_aX0ewXWGuRNDHBesTO5Aw@mail.gmail.com>
+
+Hi Gerd,
+
+Thank you for your kind answer.
+
+I have done some test with your idea and it works. Here is short
+summary of test:
+
+'export' in sub-OMakefile => doesn't work
+'export' in included sub-OMakefile => works
+.SUBDIR with 'export region'  => works
+
+Test files are uploaded here:
+https://github.com/nshibano/omake-export-from-sub-omakefile-sample/blob/master/OMakefile
+
+Regards,
+Nozomi Shibano
+
+2016-02-21 20:24 GMT+09:00 Gerd Stolpmann <info at gerd-stolpmann.de>:
+> Am Mittwoch, den 17.02.2016, 18:21 +0900 schrieb Nozomi Shibano:
+>> Hi,
+>>
+>> I had a general question. Please help if someone had answer. (Also
+>> advise if I should ask this question in other place.)
+>>
+>> Is there any way to 'export' variable value from sub-OMakefile to
+>> parent? Sometimes I want to declare 'accumulator' variable in root
+>> OMakefile and append to it in sub-OMakefiles using += operator, and
+>> then do some task with accumulated values in root OMakefile. For
+>> example, accumulate paths of all .o files in sub-directories and link
+>> them into single .exe file in the root directory.
+>>
+>> It seems to me that, it is not possible.
+>
+> Right, normal .SUBDIRS (w/o section) always starts a new environment,
+> and there is no way to export updated variables.
+>
+>>  (Exceptionally, when
+>> sub-OMakefile is written as .SUBDIRS section in root OMakefile,
+>> 'export' command works for this purpose.)
+>
+> Based on this observation, here is an idea: maybe the combo .SUBDIRS
+> section with "include" works:
+>
+> .SUBDIRS: dir
+>     include OMakefile
+>     export variable
+>
+> This is not tested, though.
+>
+> Note that a simple "include dir/OMakefile" would not work because the
+> rules in OMakefile wouldn't then be applied to the subdirectory.
+>
+> Gerd
+>
+>> Passing information from
+>> sub-OMakefile to parent is only possible via target file in sub
+>> directory and dependency to it from root OMakefile. For above example
+>> case, I have to link .o files into .a file in sub-OMakefile and
+>> declare dependency from .exe to that .a file in root OMakefile. Is
+>> this correct understanding?
+>>
+>> Regards,
+>> Nozomi Shibano
+>> _______________________________________________
+>> Omake mailing list
+>> Omake at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/omake
+>
+> --
+> ------------------------------------------------------------
+> Gerd Stolpmann, Darmstadt, Germany    gerd at gerd-stolpmann.de
+> My OCaml site:          http://www.camlcity.org
+> Contact details:        http://www.camlcity.org/contact.html
+> Company homepage:       http://www.gerd-stolpmann.de
+> ------------------------------------------------------------
+>
+

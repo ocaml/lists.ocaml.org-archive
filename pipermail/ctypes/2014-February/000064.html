@@ -1,0 +1,117 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] C-array of fixed size,	#defines and C11 anonymous unions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20C-array%20of%20fixed%20size%2C%0A%09%23defines%20and%20C11%20anonymous%20unions&In-Reply-To=%3CCAAxsn%3DGYmZwcjmHqWKV-OPHyRtHm9Qbxo4_Ku_qRpTt0-QSJMg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000059.html">
+   <LINK REL="Next"  HREF="000060.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] C-array of fixed size,	#defines and C11 anonymous unions</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20C-array%20of%20fixed%20size%2C%0A%09%23defines%20and%20C11%20anonymous%20unions&In-Reply-To=%3CCAAxsn%3DGYmZwcjmHqWKV-OPHyRtHm9Qbxo4_Ku_qRpTt0-QSJMg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] C-array of fixed size,	#defines and C11 anonymous unions">yallop at gmail.com
+       </A><BR>
+    <I>Fri Feb 14 12:03:56 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000059.html">[ocaml-ctypes] C-array of fixed size, #defines and C11 anonymous unions
+</A></li>
+        <LI>Next message: <A HREF="000060.html">[ocaml-ctypes] ctypes oasis
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#64">[ date ]</a>
+              <a href="thread.html#64">[ thread ]</a>
+              <a href="subject.html#64">[ subject ]</a>
+              <a href="author.html#64">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 12/02/2014, Markus Wei&#223;mann &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">markus.weissmann at in.tum.de</A>&gt; wrote:
+&gt;<i> 1.) I was wondering how fixed-size C-arrays should be handled in
+</I>&gt;<i> ctypes;
+</I>&gt;<i> there exist several APIs that use a fixed-size array as part of a
+</I>&gt;<i> struct, e.g. ifreq (used to configure network interfaces via ioctl(2) on
+</I>&gt;<i> linux)
+</I>&gt;<i>
+</I>&gt;<i> struct ifreq {
+</I>&gt;<i>    union {
+</I>&gt;<i>      char ifrn_name[16];
+</I>&gt;<i>    } ifr_ifrn;
+</I>&gt;<i> ...
+</I>&gt;<i>
+</I>&gt;<i> How do I handle that in ctypes?
+</I>
+Array members are supported without the need to do anything special.
+
+  type ifreq
+  let ifreq : ifreq structure typ = structure &quot;ifreq&quot;
+  let ifr_ifrn = field ifreq &quot;ifr_ifrn&quot; (array 16 char)
+
+&gt;<i> 2.) Is there a &quot;clever&quot; way of handling C-#defines?
+</I>[...]
+&gt;<i> Something that would work, too, is to write a generator in C that
+</I>&gt;<i> creates a defines.ml for me (e.g. &quot;printf(&quot;let bufsiz = %d\n&quot;, BUFSIZ))
+</I>
+This is probably the best approach at the moment.  It's likely that
+there'll eventually be some support for this in ctypes itself.  The
+stub generation code (in trunk, but not yet released) already supports
+some function-like macros; it may eventually handle unparameterized
+macros like BUFSIZ as well.
+
+&gt;<i> 3.) The C11 standard allows for unnamed unions -- not a concrete
+</I>&gt;<i> problem right now, but is there a more elegant way than to introduce a
+</I>&gt;<i> new name for the union in my ocaml/ctypes code?
+</I>&gt;<i>
+</I>&gt;<i> typedef struct {
+</I>&gt;<i>    union {
+</I>&gt;<i>      float f;
+</I>&gt;<i>      int i;
+</I>&gt;<i>    };
+</I>&gt;<i> } some_t;
+</I>&gt;<i> ...
+</I>&gt;<i> some_t x;
+</I>&gt;<i> x.f = 4.5;
+</I>&gt;<i> printf(&quot;%d&quot;, x.i);
+</I>
+I think that naming the union is the best approach with the current
+ctypes release.  Things will improve when we have support for
+retrieving the struct layout from C (issue #62).  At that point making
+'f' and 'i' members of the surrounding struct (some_t) will give you
+something that behaves like the anonymous union, since C will report
+that the offsets of the fields are the same.
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000059.html">[ocaml-ctypes] C-array of fixed size, #defines and C11 anonymous unions
+</A></li>
+	<LI>Next message: <A HREF="000060.html">[ocaml-ctypes] ctypes oasis
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#64">[ date ]</a>
+              <a href="thread.html#64">[ thread ]</a>
+              <a href="subject.html#64">[ subject ]</a>
+              <a href="author.html#64">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

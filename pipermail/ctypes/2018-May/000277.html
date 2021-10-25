@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Passing ocaml strings to C functions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Passing%20ocaml%20strings%20to%20C%20functions&In-Reply-To=%3CCAHR%3DVkzUbUpU1MNFVM%2B5ORx9gaB65SezcOUiqfGvRwaCkZi-mw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000278.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Passing ocaml strings to C functions</H1>
+    <B>Thomas Braibant</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Passing%20ocaml%20strings%20to%20C%20functions&In-Reply-To=%3CCAHR%3DVkzUbUpU1MNFVM%2B5ORx9gaB65SezcOUiqfGvRwaCkZi-mw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Passing ocaml strings to C functions">thomas.braibant at gmail.com
+       </A><BR>
+    <I>Thu May 31 09:41:06 BST 2018</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000278.html">[ocaml-ctypes] Passing ocaml strings to C functions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#277">[ date ]</a>
+              <a href="thread.html#277">[ thread ]</a>
+              <a href="subject.html#277">[ subject ]</a>
+              <a href="author.html#277">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+I am trying to pass an OCaml string to a C function, in some specific
+scenario where I know that the C part will not keep a reference to the
+ OCaml string after the function returns. Without loss of generality,
+the binding would look like
+
+```
+module C (F : Cstubs.FOREIGN) = struct
+  open F
+  let foo = foreign &quot;fooC&quot; (ptr void @-&gt; size_t @-&gt; returning int);;
+end
+```
+
+After applying the bindings to the generated stubs, I can write something like
+
+```
+module M = C (C_generated)
+let foo_wrapped (s : Bigstring.t) =
+  C.foo
+    (Ctypes.to_voidp (Ctypes.bigarray_start Array1 s)
+    (Unsigned.Size_t.of_int (Bigstring.length str))
+;;
+```
+
+For some reason, I can't seem to find how to apply C.foo to an ocaml string.
+
+```
+let foo_wrapped' (s : String.t) =
+  C.foo
+    (Ctypes.to_voidp (Ctypes.ocaml_string_start s)
+    (Unsigned.Size_t.of_int (String.length str))
+;;
+```
+
+What's more surprising is the error message when trying to coerce the
+ptr char and ocaml strings together:
+```
+Ctypes.(coerce ocaml_string (ptr char) (Ctypes.ocaml_string_start &quot;&quot;))
+;;
+Exception: Coercion failure: char* is not coercible to char*.
+```
+
+What I think is that I could rewrite the binding, to have something like:
+```
+let foo' = foreign &quot;fooC&quot; (ocaml_string @-&gt; size_t @-&gt; returning int);;
+```
+but it seems like unnecessary code duplication (and would make my
+actual use case harder to write).
+
+Am I missing something here?
+Thanks in advance,
+Thomas Braibant
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000278.html">[ocaml-ctypes] Passing ocaml strings to C functions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#277">[ date ]</a>
+              <a href="thread.html#277">[ thread ]</a>
+              <a href="subject.html#277">[ subject ]</a>
+              <a href="author.html#277">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] [Caml-list] ctypes - Advice for binding big	structs?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20%5BCaml-list%5D%20ctypes%20-%20Advice%20for%20binding%20big%0A%09structs%3F&In-Reply-To=%3C86si0chcrm.fsf%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000194.html">
+   <LINK REL="Next"  HREF="000196.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] [Caml-list] ctypes - Advice for binding big	structs?</H1>
+    <B>Malcolm Matalka</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20%5BCaml-list%5D%20ctypes%20-%20Advice%20for%20binding%20big%0A%09structs%3F&In-Reply-To=%3C86si0chcrm.fsf%40gmail.com%3E"
+       TITLE="[ocaml-ctypes] [Caml-list] ctypes - Advice for binding big	structs?">mmatalka at gmail.com
+       </A><BR>
+    <I>Sun Feb 28 19:10:21 GMT 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000194.html">[ocaml-ctypes] [Caml-list] ctypes - Advice for binding big	structs?
+</A></li>
+        <LI>Next message: <A HREF="000196.html">[ocaml-ctypes] [Caml-list] ctypes - to string or to bigarray?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#195">[ date ]</a>
+              <a href="thread.html#195">[ thread ]</a>
+              <a href="subject.html#195">[ subject ]</a>
+              <a href="author.html#195">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; writes:
+
+&gt;<i> Dear Malcolm,
+</I>&gt;<i>
+</I>&gt;<i> On 28/02/2016, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> I have a large/complex struct I am trying to create bindings for
+</I>&gt;&gt;<i> operations on it in Ocaml.  I have an API that tells me how many bytes
+</I>&gt;&gt;<i> the struct is so I can allocate it just fine and pass it around to C
+</I>&gt;&gt;<i> functions I've bound with ctypes.  But some data in it is accessed via
+</I>&gt;&gt;<i> members.  I started implementing a structure in ctypes for it, but it's
+</I>&gt;&gt;<i> getting large and awkward.  Are there any best practices around doing
+</I>&gt;&gt;<i> this?
+</I>&gt;<i>
+</I>&gt;<i> The best approach is to use the Cstubs_structs module, which allows
+</I>&gt;<i> you to declare just the parts of the structs that you need to access
+</I>&gt;<i> in your program, and which generates code that uses the C struct
+</I>&gt;<i> declarations to work out sizes, alignments, field offsets, etc.  The
+</I>&gt;<i> basic API is the familiar set of functions &quot;structure&quot;, &quot;field&quot; and
+</I>&gt;<i> &quot;seal&quot; from the Ctypes module, but the build process is a little more
+</I>&gt;<i> involved.  However, in return for the more complex build, all the
+</I>&gt;<i> issues that you're concerned about are addressed.
+</I>&gt;<i>
+</I>&gt;<i> The Cstubs_structs API is not yet very well documented, but there's a
+</I>&gt;<i> brief guide with examples in the pull request that introduced it:
+</I>&gt;<i>
+</I>&gt;<i>    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/pull/62">https://github.com/ocamllabs/ocaml-ctypes/pull/62</A>
+</I>&gt;<i>
+</I>
+Great, with some small modifications this worked like a charm.
+
+
+&gt;&gt;<i> Some concerns I have:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - It seems fragile - a different version of the library might have
+</I>&gt;&gt;<i>   different members in the struct so keeping my ocaml code in-synch
+</I>&gt;&gt;<i>   seems error prone.
+</I>&gt;<i>
+</I>&gt;<i> The Cstubs_structs module addresses this by using generated C code to
+</I>&gt;<i> determine the offsets of fields each time you build your library.
+</I>&gt;<i>
+</I>&gt;&gt;<i> - It's annoying because the struct has a lot of members I don't care
+</I>&gt;&gt;<i>   about in my case.  I only want access to a few members that have
+</I>&gt;&gt;<i>   important details.
+</I>&gt;<i>
+</I>&gt;<i> Since Cstubs_structs retrieves layout rather than computing it you
+</I>&gt;<i> only need to declare the members that you care about.
+</I>&gt;<i>
+</I>&gt;&gt;<i> - The struct is large with lots of types that I don't necessarily want
+</I>&gt;&gt;<i>   to create so creating the struct becomes somewhat awkward.  If I know
+</I>&gt;&gt;<i>   the size of the types I might be able to pretend it's an array of N
+</I>&gt;&gt;<i>   chars or something instead of trying to implement the type just to
+</I>&gt;&gt;<i>   fill out this struct, but I don't know if that is valid.
+</I>&gt;<i>
+</I>&gt;<i> Again, since Cstubs_structs retrieves struct layout and alignment
+</I>&gt;<i> information from C, you can use Ctypes.make to create struct values,
+</I>&gt;<i> even if you haven't declared all the fields.
+</I>&gt;<i>
+</I>&gt;<i> Kind regards,
+</I>&gt;<i>
+</I>&gt;<i> Jeremy.
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000194.html">[ocaml-ctypes] [Caml-list] ctypes - Advice for binding big	structs?
+</A></li>
+	<LI>Next message: <A HREF="000196.html">[ocaml-ctypes] [Caml-list] ctypes - to string or to bigarray?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#195">[ date ]</a>
+              <a href="thread.html#195">[ thread ]</a>
+              <a href="subject.html#195">[ subject ]</a>
+              <a href="author.html#195">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

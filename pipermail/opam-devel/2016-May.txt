@@ -1,0 +1,440 @@
+From louis.gesbert at ocamlpro.com  Mon May  2 03:57:21 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 02 May 2016 11:57:21 +0900
+Subject: [opam-devel] On compiler package and the system compiler (fwd from:
+ https://github.com/ocaml/opam/issues/2537)
+Message-ID: <2152985.oxllW1kEKA@maitake>
+
+*> Drup[1] *commented 5 days ago[2] 
+> I created an empty switch last and installed ocaml in it manually. It seems
+> ocaml-version is not udpated. % opam install merlin utop tuareg
+> [ERROR] utop has unmet availability conditions: ocaml-version >= "4.01"
+> [ERROR] merlin has unmet availability conditions: ocaml-version >= "4.00.0"
+> % opam switch show
+> last
+> % opam list -i
+> base-bigarray base   Bigarray library distributed with the OCaml compiler
+> base-threads  base   Threads library distributed with the OCaml compiler
+> base-unix     base   Unix library distributed with the OCaml compiler
+> ocaml         4.03.0 Official 4.03.0 release
+
+Ah, this part is lacking documentation, and there may be some rough edges yet to polish, so let 
+me explain how it works at the moment (on next). And thanks again for testing ? 
+*How it works* 
+So, compilers now being in packages, compiler-specific variables (like typically ocaml-version) 
+can not generally be defined at switch creation time anymore. However, packages have been 
+able to export opam variables since opam 1.0 by providing a <pkgname>.config file at their root 
+(similar to .install; but although this is an older feature it probably lacks documentation too). 
+These variables, however, are scoped with the package name to avoid clashes: if you have foo 
+installed, you can always access foo:lib to get its lib directory (<prefix>/lib/foo normally), but 
+also foo:bar if foo defined bar in its configuration file. 
+The idea, then, to keep compatibility with the previously global ocaml-* variables, is that /for 
+packages installed as compilers/ (/i.e./ "base packages" having the compiler flag set), the 
+variables they define are re-exported in the global scope of the switch. So the ocaml package 
+just has to define an ocaml-version variable through its .config file. 
+It could be much simpler to define these values in the compiler's opam file, but that would be 
+assuming they can be statically defined. In particular, in the case of the system compiler, the 
+package build is simply a polling script that will generate the configuration, and we don't know 
+the OCaml version in advance (so ocaml-version and ocaml:version can be different, with the 
+latter being system in this case). Even for compiled OCamls, we might not know in advance 
+whether native-dynlink is available. 
+In your case, ocaml was installed as a "normal" package, so its variables weren't re-exported: 
+look at files in <switch-prefix>/.opam-switch/config, global-config.config is where global 
+variables are defined, the other files are per-package. Like we have opam install --[un]set-root, 
+we probably need expert commands that allow adjusting the defined compiler in the current 
+switch (you can edit <prefix>/.opam-switch/switch-state easily, but that won't do the variable 
+export part, and is no excuse for not having it in the CLI anyway). 
+*Now let's get to the funny details...* 
+The reason to re-export in the global scope rather than use the variable directly (after all, we 
+could replace uses of ocaml-native-tools with a scoped variable ocaml:native-tools, and even 
+ocaml-version with ocaml:real-version or something like that) is that there is a difference 
+between the two: 
+     *  package variables are only available in scripts, i.e. for actions happening /after/ the solver 
+solved
+     *  global variables can be used anywhere, and, most importantly, in the available: field, 
+which is used to filter the packages /before/ solving, and therefore shouldn't depend on what 
+packages are installed. 
+Obviously, ocaml-version is a variable we absolutely want accessible in the available: field... so 
+we needed to have it in the global scope. 
+What this implies, however, is that it's inconsistent to change your compiler /and/ non-compiler 
+packages in the same set of actions: ocaml-version may be defined incorrectly. Currently, we 
+do /not/ handle this correctly, however it could happen on:1. upgrade of the system compiler2. 
+manual change of the switch's compiler (e.g. through pinning) 
+I have a plan to solve this situation, which requires solving once, limiting the actions to the 
+removals and compiler change, processing them, then re-running the solver in the new 
+environment to complete the expected actions. It's a bit complex to my taste, however, and 
+means that, by design, the user must validate (and start removing packages) before being able 
+to know what the expected end state will be. May be acceptable for a compiler change, though, 
+in 1.2.2, case 1. required a manual, full switch reinstall (that could fail due to broken 
+constraints, I think), and case 2. was impossible altogether. 
+In the current state, the reinstallation of packages following the switch change could be tried 
+on package unavailable for the new version and fail, and the user will need to re-run opam with 
+a proper request to get a correct solution and retry to install them. 
+*Another solution (or not)* 
+Now, if you expected something simpler, you can skip this. More elegant, maybe, but not 
+simpler. Also (spoiler), this doesn't actually solve the problem of dynamic system packages. 
+Generally speaking, it would be nicer to be able to write, instead of
+
+available: ocaml-version >= "4.01"
+depends: [ "ocaml" >= "4.01" ] 
+This allows to pass all the details to the solver, and gets rid of these annoying package/global 
+variables needed for available:. One issue is that currently, we have a mismatch between 
+OCaml versions, and the ocaml package versions, which also encode information on the variant 
+(4.01.0+BER, system). 
+The idea here is to rely on the provides: feature, which allows a package to be available under 
+different names besides its own. This brings a whole lot of difficulties on its own, but that will 
+be for another time -- I have lots on notes on this too. For the time being, let's assume it just 
+works. 
+Using this, we could have the variants defined in different packages (e.g. ocaml+BER), and 
+"providing" the ocaml feature with version 4.01.0.This also works for other compiler features: 
+we currently use two mechanisms, base- packages (e.g. base-threads) that we depend on, and 
+ocaml- variables (e.g. ocaml-native-dynlink) that we use in scripts (and possibly, the available: 
+field). Here a given compiler could "provide" native-dynlink and threads as packages, and other 
+packages directly depend on that. It also seems much more appropriate on a package metadata 
+point of view, a given compiler implementation /providing/ a set of features. 
+What this doesn't solve at all, however, is the system compiler issue, since these provides: 
+must be defined statically 
+*Dynamic packages* 
+We've drifted a bit, but the bulk of the issue actually boils down to this: dynamic packages, and 
+in particular, definition of the system compiler. 
+     *  in 1.2.2, polling and generation of a compiler description, as well as further polling to 
+detect changes, were hard-coded in opam
+     *  in 2.0~alpha, there is no OCaml specific code in opam, the polling is done by the package 
+itself, and the compiler-package-variable-made-global feature bridges the gap to the package 
+selection 
+There may be middle-grounds or alternate solutions: 
+     *  somehow allow the definition of dynamic packages in the repository (seems complex, 
+costly, and most importantly very difficult to do without compromising security -- any dynamic 
+package would need to do its polling before it was selected by the user in any way)
+     *  keep the hard-coded generation, but put it in an ocaml plugin added to the ocaml-agnostic 
+opam. 
+Note that having the system package in the repository has some benefits; for example, in 1.2.2, 
+it is impossible to change its set of base packages, which raised some difficulties when base-
+ocamlbuild started being needed. 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160502/93fd2de1/attachment-0001.html>
+
+From gregoire.henry at ocamlpro.com  Fri May  6 15:49:52 2016
+From: gregoire.henry at ocamlpro.com (Gregoire Henry)
+Date: Fri, 06 May 2016 16:49:52 +0200
+Subject: [opam-devel] docker hub update?
+In-Reply-To: <50283E43-1DC4-4A3D-819A-702A35C952BC@recoil.org>
+References: <5707D379.20708@etorok.net>
+ <5FDFE90F-41A5-4A7A-A3AB-98B52F6FA1B8@recoil.org>
+ <20160411121935.GA13981@venema.ocamlpro.com>
+ <50283E43-1DC4-4A3D-819A-702A35C952BC@recoil.org>
+Message-ID: <04ac9636ad3999a6f77c2272867ec205@mail.local>
+
+
+>> What about including in `ocaml/opam-base` a "partial" OPAM repository
+>> with only the (some) compilers and initialize OPAM with it. Then
+>> `ocaml/opam` (or CI tools based on `ocaml/opam-base`) will replace the
+>> "partial" OPAM repository with the real one. If done correctly, they
+>> shouldn't have to recompile OCaml.
+> 
+> Yes I would really like this!  This could be easily done by running a
+> git filter-subtree on the existing checkout to mirror something that
+> containers only the compilers and a very small set of packages.
+
+As a matter of experiment, I just set up:
+
+   https://github.com/OCamlPro-Henry/opam-compiler-repository
+
+I haven't setup any cron job to update it, but running manually the
+script 'update.sh' from within the repo should be enough.
+
+HTH,
+Gr?goire
+
+From dra-news at metastack.com  Thu May 26 10:36:48 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Thu, 26 May 2016 10:36:48 +0100
+Subject: [opam-devel] OPAM 2.0 features
+Message-ID: <002e01d1b732$20915be0$61b413a0$@metastack.com>
+
+Hi (Louis mainly, I expect!),
+
+	I've rebased work I've been very slowly doing onto the OPAM 2.0
+alpha release and have been starting to get opam switch to work. There are a
+few things which I need to be able to do for this, and I'm wondering if
+there any opinions (or even existing features I've missed) as to
+mechanisms...
+
+1. Downloading a package from several tarballs
+	I've not finished delving into the full details, but I think I'm
+correct that the url file / section can only specify a single archive, even
+if it can be made available by multiple transports? Bootstrapping OCaml on
+Windows requires two tarballs, so I was going to extend the url system to
+allow multiple tarballs to be specified (with control over where in the
+overall tree they are extracted), rather than hackily including the second
+one in files and extracting it using a build command.
+
+2. Specifying package variables at opam switch install 
+	I've extended the ocaml package variables to include three new ones:
+ocaml-arch (which is exactly the architecture determined by OCaml's
+configure script), ocaml-cc (which is "cl" for a Microsoft C compiler based
+OCaml or "cc" for the rest of the world), and ocaml-libc (which is "msvc"
+for the four native Windows OCaml ports and "libc" for the rest of the
+world).
+
+	At OPAM switch time, one selects which Windows port you get by
+specifying these three variables. So, for example, mingw64 is
+ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is ocaml-arch=i386,
+ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is ocaml-arch=amd64, ocaml-cc=cc,
+ocaml-libc=libc.
+
+	My question is how to specify these - the concept of "architecture",
+"C compiler type" and "C runtime library" is generic enough that it doesn't
+feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0 and have the
+package initialise ocaml-arch, etc. based on those globally available
+variables. However, is there any plan (or existing feature) for a more
+generic way of specifying package input variables? (discussed in
+https://github.com/ocaml/opam/issues/2247).
+
+3. Upgrading dependent packages for the root
+	Any Windows OCaml installation will depend upon FlexDLL objects
+compiled with the specific C compiler combination. Although in principle
+these could be shared between multiple switches (the object files vary
+according ocaml-cc, ocaml-libc and ocaml-arch; not ocaml-version), it makes
+sense to compile these two object files per-switch, rather than introduce
+yet another installation layer.
+
+	This means that in addition to the base packages, the Windows OCaml
+package depends on a flexdll package. Is there any philosophical reason for
+that not to be part of opam upgrade? Obviously, one doesn't want to be
+trying to upgrade the ocaml package, but why lock its dependencies at a
+given version? It would be quite nice if a new version of flexdll is
+released to be able to have opam upgrade notice that flexdll can be
+upgraded, determine that the root package must therefore be recompiled and
+so automatically recompile the entire switch.
+
+	Is it just for philosophical reasons that the dependencies of the
+root package are not considered for upgrade or is there a technical
+consideration?
+
+TIA,
+
+
+David
+
+
+From louis.gesbert at ocamlpro.com  Mon May 30 09:00:51 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 30 May 2016 10:00:51 +0200
+Subject: [opam-devel] OPAM 2.0 features
+In-Reply-To: <002e01d1b732$20915be0$61b413a0$@metastack.com>
+References: <002e01d1b732$20915be0$61b413a0$@metastack.com>
+Message-ID: <13079077.OnIuBWAEKm@maitake>
+
+Le jeudi 26 mai 2016, 10:36:48 David Allsopp a ?crit :
+> Hi (Louis mainly, I expect!),
+> 
+> 	I've rebased work I've been very slowly doing onto the OPAM 2.0
+> alpha release and have been starting to get opam switch to work. There are a
+> few things which I need to be able to do for this, and I'm wondering if
+> there any opinions (or even existing features I've missed) as to
+> mechanisms...
+
+Great! All feedback is very welcome at this stage.
+
+> 1. Downloading a package from several tarballs
+> 	I've not finished delving into the full details, but I think I'm
+> correct that the url file / section can only specify a single archive, even
+> if it can be made available by multiple transports? Bootstrapping OCaml on
+> Windows requires two tarballs, so I was going to extend the url system to
+> allow multiple tarballs to be specified (with control over where in the
+> overall tree they are extracted), rather than hackily including the second
+> one in files and extracting it using a build command.
+
+Some other compilers, e.g. metaOCaml, have the same requirement, since they 
+consist of the official OCaml tarball plus a huge patch, so I have added a way 
+to handle this.
+
+The `url` section or file still is a single source, and the commands are 
+executed from its root (after extraction if necessary). But there is now also 
+an opam field `extra-sources:` that you can use to download more files, 
+unextracted, to the build directory. The format is:
+
+    extra-sources: [ [ "URL" { "target-filename" } "MD5" ] ... ]
+
+The "target-filename" part being optional. See for example 
+http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam
+
+> 2. Specifying package variables at opam switch install
+> 	I've extended the ocaml package variables to include three new ones:
+> ocaml-arch (which is exactly the architecture determined by OCaml's
+> configure script), ocaml-cc (which is "cl" for a Microsoft C compiler based
+> OCaml or "cc" for the rest of the world), and ocaml-libc (which is "msvc"
+> for the four native Windows OCaml ports and "libc" for the rest of the
+> world).
+> 
+> 	At OPAM switch time, one selects which Windows port you get by
+> specifying these three variables. So, for example, mingw64 is
+> ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is ocaml-arch=i386,
+> ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is ocaml-arch=amd64, ocaml-cc=cc,
+> ocaml-libc=libc.
+> 
+> 	My question is how to specify these - the concept of "architecture",
+> "C compiler type" and "C runtime library" is generic enough that it doesn't
+> feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0 and have the
+> package initialise ocaml-arch, etc. based on those globally available
+> variables. However, is there any plan (or existing feature) for a more
+> generic way of specifying package input variables? (discussed in
+> https://github.com/ocaml/opam/issues/2247).
+
+a) for the _output_ variables, you can define them in your `PKG.config` 
+variable (automatically installed by opam if present in your build dir). Note 
+that, at the moment, variables defined by the compiler package get exported as 
+global variables (so you can access e.g. `ocaml-version` anywhere), but there 
+are limitations due to this and it is likely to disappear from the final 
+release (see https://github.com/ocaml/opam/issues/2537 for details). You can 
+always access them through `ocaml:VAR` inside the script parts though.
+
+b) nothing yet for _input_ variables, but #2247 is still something I need to 
+work on. You can define global variables through `opam config set`, though, so 
+an option in the meantime could be to use `opam switch install --empty`, set 
+the variables, then install the compiler (the option to install and mark as 
+compiler is missing at the moment, though, for that you'll have to edit 
+`SWITCH/.opam-switch/switch-state`)
+
+> 3. Upgrading dependent packages for the root
+> 	Any Windows OCaml installation will depend upon FlexDLL objects
+> compiled with the specific C compiler combination. Although in principle
+> these could be shared between multiple switches (the object files vary
+> according ocaml-cc, ocaml-libc and ocaml-arch; not ocaml-version), it makes
+> sense to compile these two object files per-switch, rather than introduce
+> yet another installation layer.
+> 
+> 	This means that in addition to the base packages, the Windows OCaml
+> package depends on a flexdll package. Is there any philosophical reason for
+> that not to be part of opam upgrade? Obviously, one doesn't want to be
+> trying to upgrade the ocaml package, but why lock its dependencies at a
+> given version? It would be quite nice if a new version of flexdll is
+> released to be able to have opam upgrade notice that flexdll can be
+> upgraded, determine that the root package must therefore be recompiled and
+> so automatically recompile the entire switch.
+> 
+> 	Is it just for philosophical reasons that the dependencies of the
+> root package are not considered for upgrade or is there a technical
+> consideration?
+
+Yes, just philosophical, there is no constraint here besides the arbitrary "I 
+don't want to recompile the compiler, ever".
+
+Hope this helps,
+Louis
+
+From anil at recoil.org  Tue May 31 14:03:30 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 31 May 2016 14:03:30 +0100
+Subject: [opam-devel] opam 2 containers/building toplevel
+Message-ID: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+
+I'm just building Docker containers for the OPAM 2 master tree to sit alongside the existing 1.x containers.  The build currently uses the builtin libraries (make lib-ext), but this does not build the admin scripts for some reason.  
+
+The admin scripts are needed for transitioning the 1.x repo to the 2.x format -- is there any reason why this functionality shouldn't be integrated into `opam admin` rather than requiring external scripts that are difficult to build?  It would really help with testing the 2.x branch...
+
+Anil
+
+From louis.gesbert at ocamlpro.com  Tue May 31 14:36:01 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 31 May 2016 15:36:01 +0200
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+Message-ID: <25701235.zDHpBeXBVl@maitake>
+
+Le mardi 31 mai 2016, 14:03:30 Anil Madhavapeddy a ?crit :
+> I'm just building Docker containers for the OPAM 2 master tree to sit
+> alongside the existing 1.x containers.  The build currently uses the
+> builtin libraries (make lib-ext), but this does not build the admin scripts
+> for some reason.
+> 
+> The admin scripts are needed for transitioning the 1.x repo to the 2.x
+> format -- is there any reason why this functionality shouldn't be
+> integrated into `opam admin` rather than requiring external scripts that
+> are difficult to build?  It would really help with testing the 2.x
+> branch...
+> 
+> Anil
+
+I usually don't build them, but rather run them directly, and using them as 
+scripts is quite convenient to test out various operations on the repo. Most 
+of them are throw-away and don't justify to be added to a tool that gets 
+installed everywhere. Doing it this way reduces the cost of testing out 
+scripts as well as the maintenance cost (obsolete scripts may lag behind API 
+changes, then either get updated when needed or removed).
+
+The issue with `make lib-ext` may be that `opam-admin.top` can't find the 
+proper opam libraries installed. The Makefile in `admin-scripts/` has a quick 
+hack to build bytecode versions, but that reiles on `ocamlfind` to locate the 
+installed versions of the dependencies; it wouldn't be difficult to improve it 
+to work with `lib-ext` though.
+
+Now, for scripts that get generally useful and somewhat stable, it's perfectly 
+fine to migrate them to be part of opam-admin. Moving the scripts to their own 
+repo would also be fine if they reach a critical weight.
+
+Should we improve compat of the Makefile and/or move the 1.2->2.0 
+functionality to opam-admin ?
+
+Best,
+Louis
+
+From anil at recoil.org  Tue May 31 14:50:13 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 31 May 2016 14:50:13 +0100
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <25701235.zDHpBeXBVl@maitake>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <25701235.zDHpBeXBVl@maitake>
+Message-ID: <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+
+
+> On 31 May 2016, at 14:36, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> Le mardi 31 mai 2016, 14:03:30 Anil Madhavapeddy a ?crit :
+>> I'm just building Docker containers for the OPAM 2 master tree to sit
+>> alongside the existing 1.x containers.  The build currently uses the
+>> builtin libraries (make lib-ext), but this does not build the admin scripts
+>> for some reason.
+>> 
+>> The admin scripts are needed for transitioning the 1.x repo to the 2.x
+>> format -- is there any reason why this functionality shouldn't be
+>> integrated into `opam admin` rather than requiring external scripts that
+>> are difficult to build?  It would really help with testing the 2.x
+>> branch...
+>> 
+>> Anil
+> 
+> I usually don't build them, but rather run them directly, and using them as 
+> scripts is quite convenient to test out various operations on the repo. Most 
+> of them are throw-away and don't justify to be added to a tool that gets 
+> installed everywhere. Doing it this way reduces the cost of testing out 
+> scripts as well as the maintenance cost (obsolete scripts may lag behind API 
+> changes, then either get updated when needed or removed).
+
+Yeah, that makes sense.
+
+> 
+> The issue with `make lib-ext` may be that `opam-admin.top` can't find the 
+> proper opam libraries installed. The Makefile in `admin-scripts/` has a quick 
+> hack to build bytecode versions, but that reiles on `ocamlfind` to locate the 
+> installed versions of the dependencies; it wouldn't be difficult to improve it 
+> to work with `lib-ext` though.
+
+It would be very useful if they could work with lib-ext and the toplevel be built by default.  Right now there is some oddness where the extlib interactive installer is run if I build `opam-admin.top` manually, so I gave up around there.
+
+> 
+> Now, for scripts that get generally useful and somewhat stable, it's perfectly 
+> fine to migrate them to be part of opam-admin. Moving the scripts to their own 
+> repo would also be fine if they reach a critical weight.
+> 
+> Should we improve compat of the Makefile and/or move the 1.2->2.0 
+> functionality to opam-admin ?
+
+For the purposes of container-based testing, it would be great if we could move the essential functionality into `opam admin` directly.  This will let me insert in the right `git clone / opam admin upgrade` runs into the CI scripts so that OPAM 2 is easy to test for end users.
+
+Anil
+

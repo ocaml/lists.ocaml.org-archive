@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My uses of syntax extension
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C510697B4.3020804%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000088.html">
+   <LINK REL="Next"  HREF="000066.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My uses of syntax extension</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C510697B4.3020804%40etorok.net%3E"
+       TITLE="[wg-camlp4] My uses of syntax extension">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Mon Jan 28 15:22:28 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000088.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+        <LI>Next message: <A HREF="000066.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#27">[ date ]</a>
+              <a href="thread.html#27">[ thread ]</a>
+              <a href="subject.html#27">[ subject ]</a>
+              <a href="author.html#27">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/28/2013 04:33 PM, Alain Frisch wrote:
+&gt;<i> On 01/28/2013 02:06 PM, T&#246;r&#246;k Edwin wrote:
+</I>&gt;&gt;<i> Backward compatibility would be appreciated, especially for something as simple as IFDEF.
+</I>&gt;&gt;<i>...
+</I>&gt;&gt;<i> Thinking about backward compatibility again perhaps there should be more transformation phases:
+</I>&gt;<i> 
+</I>&gt;<i> Backward compatibility is an important topic, since the goal of this working group is to propose a migration plan.
+</I>&gt;<i> 
+</I>&gt;<i> My personal view is that we should not complexify our &quot;target&quot; (-ppx) only to support backward compatibility.  Clearly, -ppx will require some user-visible changes, since it is no longer an option to
+</I>&gt;<i> change the concrete syntax.  To take a concrete example, what should a project like js_of_ocaml do, once they have a fully functional -ppx version?
+</I>&gt;<i> An option could be to keep maintaining their camlp4 extension in parallel, but extend it to support for the syntax chosen for the -ppx version.  The only benefit of it is that users stuck with older
+</I>&gt;<i> versions of ocaml can still move smoothly to the new syntax, so as to be ready to get rid of camlp4 at some point.  Other users don't need that: they can rewrite their project progressively (e.g.
+</I>&gt;<i> module per module) using both the camlp4 syntax extension and the -ppx rewriter, and then stop using camlp4 when everything has been rewritten.  Is it worth the effort to adapt the camlp4 extension to
+</I>&gt;<i> match the new syntax?  It's probably up to each project maintainer to decide (considering that supporting several versions of camlp4 is also quite challenging).
+</I>
+Maybe the simplest solution to maintaining backwards compatibility is to ship pre-processed source code (using -ppx version) in release tarballs of libraries,
+but that isn't without problems either:
++ you don't need to have 4.00.1 to build newer versions of libraries
++ you can switch to the -ppx syntax in your library
++ building the library doesn't require building/running the syntax extension
+- you need a simple way to do this, i.e. oasis/OCamlMakefile/etc. should be updated to support this transparently
+- ppx's output has to be converted to source code again, and that must be backwards compatible with older OCaml versions
+- ppx transformations have to be architecture independent
+- without an automated way to test the above it could easily break
+
+&gt;<i>  Who is really stuck with old versions
+</I>&gt;<i> of ocaml (and still wanting and able to use new versions of packages)?
+</I>
+My use-case would be: I write an application that I want to be buildable at least with OCaml 3.12.1 and 4.00.1 (3.11.2 support would be nice, but not required).
+The end-user doesn't have to be aware of what OCaml is, I just want them to run my application on their OS without having to build a compiler to do that.
+
+Of course I can stick to the last version of a library that supports both (if they introduce an incompatibility) but then I'd have to backport
+bugfixes to a private branch on my own. If it comes to that I'd rather figure a way to distribute preprocessed OCaml source code for the libraries that I use.
+
+&gt;<i> 
+</I>&gt;&gt;<i> Also it'd be nice to have:
+</I>&gt;&gt;<i>   -ppt Typedtree -&gt; Typedtree for type-level transformations
+</I>&gt;<i> 
+</I>&gt;<i> I don't believe this is a viable option.  Producing Typedtree without breaking invariants of the type system (and the type soundness) is extremely challenging.  I'd be more comfortable with supporting
+</I>&gt;<i> a &quot;Typedtree -&gt; Parsetree&quot; pass, where you'd only need to be able to use information from the typedtree so as to produce fragments of code which are then type-checked again.  You don't need to fully
+</I>&gt;<i> understand everything in the Typedtree to do that, and the type-checker acts as a safety net.
+</I>&gt;<i> OCamlPro worked on a project called &quot;OCaml Templates&quot; doing exactly that, but I don't know the status of this project.  (Someone from OCamlPro to comment?)
+</I>
+That'd work too, although the -ppx based tool could do all that on its own. There wouldn't be any compiler changes required (i.e. no -ppt), just a library
+like astmapper to simplify this task.
+
+In fact my -ppl proposal is not really needed either, it could be just a library and the tool: a -pp based tool.
+
+The tool would be invoked by -pp:
+load all plugins
+read source
+use OCaml's lexer from compiler-libs to create tokens
+apply any token mappers from the plugins
+create the parsedtree using compiler-libs again
+apply any astmappers from the plugins
+run any ppx astmappers given on cmdline
+create the typedtree using compiler-libs
+apply and typedtree -&gt; parsetree mappers from the plugins
+output the ast
+
+This would then be an almost drop-in replacement for camlp4, except that syntax extensions (plugins here) will depend on compiler-libs instead of camlp4,
+and of course you would have similar limitations as -ppx, except you can modify the tokenstream as well.
+I haven't checked how ocamlfind invokes camlp4 exactly, but it might be possible to reuse its camlp4 support for this.
+
+Best regards,
+--Edwin
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000088.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+	<LI>Next message: <A HREF="000066.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#27">[ date ]</a>
+              <a href="thread.html#27">[ thread ]</a>
+              <a href="subject.html#27">[ subject ]</a>
+              <a href="author.html#27">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

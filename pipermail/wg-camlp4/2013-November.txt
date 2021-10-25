@@ -1,0 +1,897 @@
+From yminsky at janestreet.com  Sat Nov  2 17:21:19 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Sat, 2 Nov 2013 13:21:19 -0400
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+Message-ID: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+
+I've been playing using Merlin more and more for personal projects,
+and have started to wonder about how we're going to make Merlin work
+effectively in a ppx world.  In some ways, ppx simplifies Merlin's
+job, since there's now just one concrete syntax to parse.
+
+But there are still problems to solve.  In particular, you will still
+need to be able to apply AST-transformers to the partial ASTs that
+Merlin generates in order to run it through the type-inference stage,
+or to determine the environment.
+
+Obviously, Merlin could just reimplement a bunch of common AST
+transformers, as it does now for some common camlp4 extensions.  But
+this seems like a situation that is too painful to maintain in the
+long term.
+
+A better idea, perhaps, would be to have some libraries or standards
+about how to present an AST transformer so that it's suitable for
+running against a partial AST.  I don't really know the details of how
+Merlin works, but I understand it does a first pass to parse
+expressions into top-level units, the parsing of which is done
+independently.  AST transformers that operate on those units would
+naturally gain some level of incrementality.  Another, perhaps more
+intrustive approach would be to write PPX transformers against
+Merlin's version of the AST.
+
+I don't quite know what the right solution is, but when 4.02 comes out
+we're all going to be writing a bunch of new AST transformers, and if
+we really want Merlin to be a success, we should have a plan for how
+those transformers will integrate with it.
+
+y
+
+From alain.frisch at lexifi.com  Mon Nov  4 09:07:36 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 04 Nov 2013 10:07:36 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+Message-ID: <527763D8.4060300@lexifi.com>
+
+On 11/02/2013 06:21 PM, Yaron Minsky wrote:
+> A better idea, perhaps, would be to have some libraries or standards
+> about how to present an AST transformer so that it's suitable for
+> running against a partial AST.  I don't really know the details of how
+> Merlin works, but I understand it does a first pass to parse
+> expressions into top-level units, the parsing of which is done
+> independently.  AST transformers that operate on those units would
+> naturally gain some level of incrementality.
+
+I don't know anything about Merlin.  I assume that it uses a special 
+representation of the AST which is more robust w.r.t. ill-formed 
+fragments (syntax errors).  Is that right?   Could this representation 
+of partial ASTs be encoded in the official Parsetree using extension 
+nodes to denote invalid fragments?  Independently of the question of 
+supporting ppx transformers, anything which brings Merlin closer to the 
+official system is likely to make it more future-proof.
+
+
+Alain
+
+From defree at gmail.com  Mon Nov  4 12:39:21 2013
+From: defree at gmail.com (=?UTF-8?B?RnLDqWTDqXJpYyBCb3Vy?=)
+Date: Mon, 04 Nov 2013 13:39:21 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <527763D8.4060300@lexifi.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <527763D8.4060300@lexifi.com>
+Message-ID: <52779579.3060000@gmail.com>
+
+On 04/11/2013 10:07, Alain Frisch wrote:
+> On 11/02/2013 06:21 PM, Yaron Minsky wrote:
+>> A better idea, perhaps, would be to have some libraries or standards
+>> about how to present an AST transformer so that it's suitable for
+>> running against a partial AST. I don't really know the details of how
+>> Merlin works, but I understand it does a first pass to parse
+>> expressions into top-level units, the parsing of which is done
+>> independently. AST transformers that operate on those units would
+>> naturally gain some level of incrementality.
+>
+> I don't know anything about Merlin. I assume that it uses a special 
+> representation of the AST which is more robust w.r.t. ill-formed 
+> fragments (syntax errors). Is that right? Could this representation of 
+> partial ASTs be encoded in the official Parsetree using extension 
+> nodes to denote invalid fragments? Independently of the question of 
+> supporting ppx transformers, anything which brings Merlin closer to 
+> the official system is likely to make it more future-proof.
+
+Merlin uses the original AST definition, so that the typer can be used 
+with minimal modifications.
+Internally the Ocaml AST for a given file is split in a list of chunks 
+(around one per definition plus a special case for entering/exiting 
+sub-structures).
+
+The two changes wrt to ASTs produced by original ocaml are:
+? an hack to store more positional information in AST Nodes, by 
+working-around ocaml value representation.
+? when detected and recoverable, ill-formed expressions are replaced by 
+an expression of type "forall 'a .'a".
+
+The first case could obviously be made less hacky through extension nodes.
+
+>
+> Alain
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+
+From defree at gmail.com  Mon Nov  4 13:02:35 2013
+From: defree at gmail.com (=?UTF-8?B?RnLDqWTDqXJpYyBCb3Vy?=)
+Date: Mon, 04 Nov 2013 14:02:35 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+Message-ID: <52779AEB.2050402@gmail.com>
+
+On 02/11/2013 18:21, Yaron Minsky wrote:
+> I've been playing using Merlin more and more for personal projects,
+> and have started to wonder about how we're going to make Merlin work
+> effectively in a ppx world.  In some ways, ppx simplifies Merlin's
+> job, since there's now just one concrete syntax to parse.
+>
+> But there are still problems to solve.  In particular, you will still
+> need to be able to apply AST-transformers to the partial ASTs that
+> Merlin generates in order to run it through the type-inference stage,
+> or to determine the environment.
+Those partial ASTs are still represented with the same type as OCaml 
+"normal" ASTs.
+There should be no difference for the transformers at this stage.
+
+> Obviously, Merlin could just reimplement a bunch of common AST
+> transformers, as it does now for some common camlp4 extensions.  But
+> this seems like a situation that is too painful to maintain in the
+> long term.
+Indeed, ppx seems to be the opportunity to stop hardcoding extensions in 
+merlin.
+
+> A better idea, perhaps, would be to have some libraries or standards
+> about how to present an AST transformer so that it's suitable for
+> running against a partial AST.  I don't really know the details of how
+> Merlin works, but I understand it does a first pass to parse
+> expressions into top-level units, the parsing of which is done
+> independently.  AST transformers that operate on those units would
+> naturally gain some level of incrementality.  Another, perhaps more
+> intrustive approach would be to write PPX transformers against
+> Merlin's version of the AST.
+The work done by the transformer when invoked by merlin or by the 
+toplevel should be the same: the AST is given chunk-by-chunk, each chunk 
+being passed for transformation.
+
+Under the assumption that, for a given transformer t and without 
+imposing an order of transformation:
+t (def1;; def2) ~= t(def1) ;; t(def2)
+using this transformer in merlin should not require specific work.
+
+That being said, I don't know much about ppx. Here are the cases I see 
+that could be problematic in general:
+? the transformer relies on some global state, that has to be threaded 
+across different invocations.
+? the toplevel works only in a sequential way, and backtrack only if the 
+current definition fails to type. merlin can rollback to arbitrary point 
+in files, which could break assumptions in the transformer if there is a 
+state.
+? merlin also split definitions inside modules, which means that pieces 
+of ast could be extracted and transformed either separately or not in 
+the expected order (e.g. the signature constraining a structure can be 
+extracted by merlin and transformed as if it was an independent 
+declaration, then reinjected in the AST).
+
+>
+> I don't quite know what the right solution is, but when 4.02 comes out
+> we're all going to be writing a bunch of new AST transformers, and if
+> we really want Merlin to be a success, we should have a plan for how
+> those transformers will integrate with it.
+>
+> y
+
+
+From alain.frisch at lexifi.com  Mon Nov  4 13:25:19 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 04 Nov 2013 14:25:19 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <52779AEB.2050402@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com>
+Message-ID: <5277A03F.8020704@lexifi.com>
+
+On 11/04/2013 02:02 PM, Fr?d?ric Bour wrote:
+> ? the transformer relies on some global state, that has to be threaded
+> across different invocations.
+
+This will indeed be the case for some transformers -- think about a 
+macro system with macros defined in the same unit.
+
+But if you use the same representation as the compiler for the AST, 
+couldn't you simply apply the transformers to the whole AST?  Why do you 
+need to apply them to individual chunks?
+
+
+Alain
+
+From defree at gmail.com  Mon Nov  4 13:46:17 2013
+From: defree at gmail.com (=?UTF-8?B?RnLDqWTDqXJpYyBCb3Vy?=)
+Date: Mon, 04 Nov 2013 14:46:17 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277A03F.8020704@lexifi.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+Message-ID: <5277A529.9010707@gmail.com>
+
+Le lun. 04 nov. 2013 14:25:19 CET, Alain Frisch a ?crit :
+> On 11/04/2013 02:02 PM, Fr?d?ric Bour wrote:
+>> ? the transformer relies on some global state, that has to be threaded
+>> across different invocations.
+>
+> This will indeed be the case for some transformers -- think about a
+> macro system with macros defined in the same unit.
+>
+> But if you use the same representation as the compiler for the AST,
+> couldn't you simply apply the transformers to the whole AST?  Why do
+> you need to apply them to individual chunks?
+
+Merlin is used in an interactive context (were we expect a response in 
+less than ~ 60ms, on average).
+
+If we retransform the whole AST during each invocation, we also need to 
+retype the whole AST after. Then an "open Core.Std" alone is enough to 
+blow up the time budget. (And this existimation is done on a desktop 
+computer, some users have EEE).
+
+However, I wonder how this state threading would be handled in the 
+REPL??
+
+>
+>
+> Alain
+
+From yminsky at janestreet.com  Mon Nov  4 14:00:21 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Mon, 4 Nov 2013 09:00:21 -0500
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277A529.9010707@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com>
+Message-ID: <CACLX4jQh4PK9OB+nUhJbBJ4FaCMV7U-ECZfOw1O3xh_G1drA=A@mail.gmail.com>
+
+I very much hope that the Core.Std problem will be gone in 4.02.
+Module aliases look likely to land by then, and they should _greatly_
+reduce the cost.
+
+y
+
+On Mon, Nov 4, 2013 at 8:46 AM, Fr?d?ric Bour <defree at gmail.com> wrote:
+> Le lun. 04 nov. 2013 14:25:19 CET, Alain Frisch a ?crit :
+>
+>> On 11/04/2013 02:02 PM, Fr?d?ric Bour wrote:
+>>>
+>>> - the transformer relies on some global state, that has to be threaded
+>>> across different invocations.
+>>
+>>
+>> This will indeed be the case for some transformers -- think about a
+>> macro system with macros defined in the same unit.
+>>
+>> But if you use the same representation as the compiler for the AST,
+>> couldn't you simply apply the transformers to the whole AST?  Why do
+>> you need to apply them to individual chunks?
+>
+>
+> Merlin is used in an interactive context (were we expect a response in less
+> than ~ 60ms, on average).
+>
+> If we retransform the whole AST during each invocation, we also need to
+> retype the whole AST after. Then an "open Core.Std" alone is enough to blow
+> up the time budget. (And this existimation is done on a desktop computer,
+> some users have EEE).
+>
+> However, I wonder how this state threading would be handled in the REPL ?
+>
+>>
+>>
+>> Alain
+
+From yminsky at janestreet.com  Mon Nov  4 14:01:34 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Mon, 4 Nov 2013 09:01:34 -0500
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <52779AEB.2050402@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com>
+Message-ID: <CACLX4jT5wVu518G2r9Q4yDFRWZd_nMWvbcogNX4rXS7_F0EPEw@mail.gmail.com>
+
+On Mon, Nov 4, 2013 at 8:02 AM, Fr?d?ric Bour <defree at gmail.com> wrote:
+> On 02/11/2013 18:21, Yaron Minsky wrote:
+>>
+>> I've been playing using Merlin more and more for personal projects,
+>> and have started to wonder about how we're going to make Merlin work
+>> effectively in a ppx world.  In some ways, ppx simplifies Merlin's
+>> job, since there's now just one concrete syntax to parse.
+>>
+>> But there are still problems to solve.  In particular, you will still
+>> need to be able to apply AST-transformers to the partial ASTs that
+>> Merlin generates in order to run it through the type-inference stage,
+>> or to determine the environment.
+>
+> Those partial ASTs are still represented with the same type as OCaml
+> "normal" ASTs.
+> There should be no difference for the transformers at this stage.
+>
+>
+>> Obviously, Merlin could just reimplement a bunch of common AST
+>> transformers, as it does now for some common camlp4 extensions.  But
+>> this seems like a situation that is too painful to maintain in the
+>> long term.
+>
+> Indeed, ppx seems to be the opportunity to stop hardcoding extensions in
+> merlin.
+>
+>
+>> A better idea, perhaps, would be to have some libraries or standards
+>> about how to present an AST transformer so that it's suitable for
+>> running against a partial AST.  I don't really know the details of how
+>> Merlin works, but I understand it does a first pass to parse
+>> expressions into top-level units, the parsing of which is done
+>> independently.  AST transformers that operate on those units would
+>> naturally gain some level of incrementality.  Another, perhaps more
+>> intrustive approach would be to write PPX transformers against
+>> Merlin's version of the AST.
+>
+> The work done by the transformer when invoked by merlin or by the toplevel
+> should be the same: the AST is given chunk-by-chunk, each chunk being passed
+> for transformation.
+
+Does this work for sub-modules as well?  It's not rare in my
+experience to do quite a bit of programming within a sub-module.  In a
+top-level, you'd have to do that as one top-level chunk, which seems
+like the wrong solution for merlin.
+
+> Under the assumption that, for a given transformer t and without imposing an
+> order of transformation:
+> t (def1;; def2) ~= t(def1) ;; t(def2)
+> using this transformer in merlin should not require specific work.
+>
+> That being said, I don't know much about ppx. Here are the cases I see that
+> could be problematic in general:
+> - the transformer relies on some global state, that has to be threaded
+> across different invocations.
+> - the toplevel works only in a sequential way, and backtrack only if the
+> current definition fails to type. merlin can rollback to arbitrary point in
+> files, which could break assumptions in the transformer if there is a state.
+> - merlin also split definitions inside modules, which means that pieces of
+> ast could be extracted and transformed either separately or not in the
+> expected order (e.g. the signature constraining a structure can be extracted
+> by merlin and transformed as if it was an independent declaration, then
+> reinjected in the AST).
+>
+>
+>>
+>> I don't quite know what the right solution is, but when 4.02 comes out
+>> we're all going to be writing a bunch of new AST transformers, and if
+>> we really want Merlin to be a success, we should have a plan for how
+>> those transformers will integrate with it.
+>>
+>> y
+>
+>
+
+From alain.frisch at lexifi.com  Mon Nov  4 14:06:18 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 04 Nov 2013 15:06:18 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277A529.9010707@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com>
+Message-ID: <5277A9DA.7040206@lexifi.com>
+
+On 11/04/2013 02:46 PM, Fr?d?ric Bour wrote:
+> Merlin is used in an interactive context (were we expect a response in
+> less than ~ 60ms, on average).
+>
+> If we retransform the whole AST during each invocation, we also need to
+> retype the whole AST after.
+
+I assume there is already some logic to detect from which point the code 
+has changed, and to resume type-checking from the start of the phrase, 
+using some kind of snapshot.  Couldn't this logic be applied after the 
+preprocessing?
+
+Still, calling the PPX transformers as external processes might already 
+be too slow (there is always the option to link them in).
+
+ > Then an "open Core.Std" alone is enough to
+> blow up the time budget. (And this existimation is done on a desktop
+> computer, some users have EEE).
+
+For this specific example, this patch might help:
+
+http://caml.inria.fr/mantis/view.php?id=5916
+
+(I'm still waiting for a reproducible case before accepting the patch...)
+
+> However, I wonder how this state threading would be handled in the REPL ?
+
+Currently, it's not.  See:
+
+http://caml.inria.fr/mantis/view.php?id=5904#c8797
+
+
+Even though some rewriters might need to maintain state (or even have 
+access to the whole unit), many of them (and in particular those 
+corresponding to the extensions currently supported by Merlin) won't 
+probably need it.
+
+
+Alain
+
+From defree at gmail.com  Mon Nov  4 14:11:17 2013
+From: defree at gmail.com (=?windows-1252?Q?Fr=E9d=E9ric_Bour?=)
+Date: Mon, 04 Nov 2013 15:11:17 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <CACLX4jT5wVu518G2r9Q4yDFRWZd_nMWvbcogNX4rXS7_F0EPEw@mail.gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>	<52779AEB.2050402@gmail.com>
+ <CACLX4jT5wVu518G2r9Q4yDFRWZd_nMWvbcogNX4rXS7_F0EPEw@mail.gmail.com>
+Message-ID: <5277AB05.8070808@gmail.com>
+
+
+On 04/11/2013 15:01, Yaron Minsky wrote:
+> On Mon, Nov 4, 2013 at 8:02 AM, Fr?d?ric Bour <defree at gmail.com> wrote:
+>> On 02/11/2013 18:21, Yaron Minsky wrote:
+>>> I've been playing using Merlin more and more for personal projects,
+>>> and have started to wonder about how we're going to make Merlin work
+>>> effectively in a ppx world.  In some ways, ppx simplifies Merlin's
+>>> job, since there's now just one concrete syntax to parse.
+>>>
+>>> But there are still problems to solve.  In particular, you will still
+>>> need to be able to apply AST-transformers to the partial ASTs that
+>>> Merlin generates in order to run it through the type-inference stage,
+>>> or to determine the environment.
+>> Those partial ASTs are still represented with the same type as OCaml
+>> "normal" ASTs.
+>> There should be no difference for the transformers at this stage.
+>>
+>>
+>>> Obviously, Merlin could just reimplement a bunch of common AST
+>>> transformers, as it does now for some common camlp4 extensions.  But
+>>> this seems like a situation that is too painful to maintain in the
+>>> long term.
+>> Indeed, ppx seems to be the opportunity to stop hardcoding extensions in
+>> merlin.
+>>
+>>
+>>> A better idea, perhaps, would be to have some libraries or standards
+>>> about how to present an AST transformer so that it's suitable for
+>>> running against a partial AST.  I don't really know the details of how
+>>> Merlin works, but I understand it does a first pass to parse
+>>> expressions into top-level units, the parsing of which is done
+>>> independently.  AST transformers that operate on those units would
+>>> naturally gain some level of incrementality.  Another, perhaps more
+>>> intrustive approach would be to write PPX transformers against
+>>> Merlin's version of the AST.
+>> The work done by the transformer when invoked by merlin or by the toplevel
+>> should be the same: the AST is given chunk-by-chunk, each chunk being passed
+>> for transformation.
+> Does this work for sub-modules as well?  It's not rare in my
+> experience to do quite a bit of programming within a sub-module.  In a
+> top-level, you'd have to do that as one top-level chunk, which seems
+> like the wrong solution for merlin.
+
+In merlin, yes.
+This work for modules of the form "module A (P0 : S0) ? (Pn : Sn) : S = 
+struct ? end".
+In this case, merlin adds (P0 : S0), ? (Pn : Sn) to the environment, 
+then work with definitions inside "struct ? end" as it would do in the 
+top-level context.
+
+All cases are not handled (like completing inside the argument of a 
+functor application, constraining the signature after the structure, not 
+during the binding).
+
+>> Under the assumption that, for a given transformer t and without imposing an
+>> order of transformation:
+>> t (def1;; def2) ~= t(def1) ;; t(def2)
+>> using this transformer in merlin should not require specific work.
+>>
+>> That being said, I don't know much about ppx. Here are the cases I see that
+>> could be problematic in general:
+>> - the transformer relies on some global state, that has to be threaded
+>> across different invocations.
+>> - the toplevel works only in a sequential way, and backtrack only if the
+>> current definition fails to type. merlin can rollback to arbitrary point in
+>> files, which could break assumptions in the transformer if there is a state.
+>> - merlin also split definitions inside modules, which means that pieces of
+>> ast could be extracted and transformed either separately or not in the
+>> expected order (e.g. the signature constraining a structure can be extracted
+>> by merlin and transformed as if it was an independent declaration, then
+>> reinjected in the AST).
+>>
+>>
+>>> I don't quite know what the right solution is, but when 4.02 comes out
+>>> we're all going to be writing a bunch of new AST transformers, and if
+>>> we really want Merlin to be a success, we should have a plan for how
+>>> those transformers will integrate with it.
+>>>
+>>> y
+>>
+
+
+From defree at gmail.com  Mon Nov  4 14:56:38 2013
+From: defree at gmail.com (=?UTF-8?B?RnLDqWTDqXJpYyBCb3Vy?=)
+Date: Mon, 04 Nov 2013 15:56:38 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277A9DA.7040206@lexifi.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+Message-ID: <5277B5A6.7080207@gmail.com>
+
+
+On 04/11/2013 15:06, Alain Frisch wrote:
+> On 11/04/2013 02:46 PM, Fr?d?ric Bour wrote:
+>> Merlin is used in an interactive context (were we expect a response in
+>> less than ~ 60ms, on average).
+>>
+>> If we retransform the whole AST during each invocation, we also need to
+>> retype the whole AST after.
+>
+> I assume there is already some logic to detect from which point the 
+> code has changed, and to resume type-checking from the start of the 
+> phrase, using some kind of snapshot.  Couldn't this logic be applied 
+> after the preprocessing?
+
+The process is roughly the following:
+? Each chunk has an ending position.
+? The editor tells the coordinates of the first character that changed.
+? Merlin drops everything ending after that position then notify the 
+editor of the ending position of the last chunk on merlin side.
+? The editor is expected to tell the rest of the buffer (up to the 
+cursor) starting from this last chunk.
+
+So the "detection logic" has more to do with the editor than with the AST.
+> Still, calling the PPX transformers as external processes might 
+> already be too slow (there is always the option to link them in).
+Constantly invoking external processes should be fast enough in merlin's 
+case, as long as the work to do is not proportional to the size of the file.
+
+>
+> > Then an "open Core.Std" alone is enough to
+>> blow up the time budget. (And this existimation is done on a desktop
+>> computer, some users have EEE).
+>
+> For this specific example, this patch might help:
+> http://caml.inria.fr/mantis/view.php?id=5916
+> (I'm still waiting for a reproducible case before accepting the patch...)
+
+Merlin's actually use a patch to make substitution lazy, guaranteeing 
+"open" time proportional to the number of identifier introduced, not to 
+the number of path substituted.
+So "open Core.Std" is instantaneous (except on cold start, where the 
+vast majority of the time is spent unmarshalling data on C-side).
+
+I can't tell if this is the same approach as in the patch you linked, 
+but it works well for Merlin.
+
+>
+>> However, I wonder how this state threading would be handled in the 
+>> REPL ?
+>
+> Currently, it's not.  See:
+>
+> http://caml.inria.fr/mantis/view.php?id=5904#c8797
+>
+>
+> Even though some rewriters might need to maintain state (or even have 
+> access to the whole unit), many of them (and in particular those 
+> corresponding to the extensions currently supported by Merlin) won't 
+> probably need it.
+
+Ok. So if some work had to be done to ensure proper compatibility 
+between merlin and ppx, it would be for supporting stateful rewriters.
+
+>
+>
+> Alain
+
+
+From gabriel.scherer at gmail.com  Mon Nov  4 15:15:57 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 4 Nov 2013 16:15:57 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277B5A6.7080207@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+ <5277B5A6.7080207@gmail.com>
+Message-ID: <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+
+> If we retransform the whole AST during each invocation, we also need to retype the whole AST after.
+
+You could probably write a function that takes two AST, and compare
+them left-to-right, to cut them into a common prefix and a new chunk.
+You would lose incremental syntax-extension processing but still
+regain incremental type-checking afterwards (assuming the rewriter
+modifications are local enough: adding stuff at the toplevel would
+break that property). This would also help a lot to implement merlin
+frontend for editors with broken buffer-change support (you can send
+the whole buffer to the parser and still save on the type-checking
+time).
+
+> Ok. So if some work had to be done to ensure proper compatibility between
+> merlin and ppx, it would be for supporting stateful rewriters.
+
+I think we should consider making statefulness explicit in the
+rewriters API, that is asking stateful rewriter to use a marshallable
+state type and express their transform in the state monad (state * AST
+-> state * result), instead of silently initializing internal state.
+This would be compatible with an imperative style in the code of the
+rewriter themselves (you just need to reify the state at the end of
+the transformation).
+
+On Mon, Nov 4, 2013 at 3:56 PM, Fr?d?ric Bour <defree at gmail.com> wrote:
+>
+> On 04/11/2013 15:06, Alain Frisch wrote:
+>>
+>> On 11/04/2013 02:46 PM, Fr?d?ric Bour wrote:
+>>>
+>>> Merlin is used in an interactive context (were we expect a response in
+>>> less than ~ 60ms, on average).
+>>>
+>>> If we retransform the whole AST during each invocation, we also need to
+>>> retype the whole AST after.
+>>
+>>
+>> I assume there is already some logic to detect from which point the code
+>> has changed, and to resume type-checking from the start of the phrase, using
+>> some kind of snapshot.  Couldn't this logic be applied after the
+>> preprocessing?
+>
+>
+> The process is roughly the following:
+> - Each chunk has an ending position.
+> - The editor tells the coordinates of the first character that changed.
+> - Merlin drops everything ending after that position then notify the editor
+> of the ending position of the last chunk on merlin side.
+> - The editor is expected to tell the rest of the buffer (up to the cursor)
+> starting from this last chunk.
+>
+> So the "detection logic" has more to do with the editor than with the AST.
+>
+>> Still, calling the PPX transformers as external processes might already be
+>> too slow (there is always the option to link them in).
+>
+> Constantly invoking external processes should be fast enough in merlin's
+> case, as long as the work to do is not proportional to the size of the file.
+>
+>
+>>
+>> > Then an "open Core.Std" alone is enough to
+>>>
+>>> blow up the time budget. (And this existimation is done on a desktop
+>>> computer, some users have EEE).
+>>
+>>
+>> For this specific example, this patch might help:
+>> http://caml.inria.fr/mantis/view.php?id=5916
+>> (I'm still waiting for a reproducible case before accepting the patch...)
+>
+>
+> Merlin's actually use a patch to make substitution lazy, guaranteeing "open"
+> time proportional to the number of identifier introduced, not to the number
+> of path substituted.
+> So "open Core.Std" is instantaneous (except on cold start, where the vast
+> majority of the time is spent unmarshalling data on C-side).
+>
+> I can't tell if this is the same approach as in the patch you linked, but it
+> works well for Merlin.
+>
+>
+>>
+>>> However, I wonder how this state threading would be handled in the REPL ?
+>>
+>>
+>> Currently, it's not.  See:
+>>
+>> http://caml.inria.fr/mantis/view.php?id=5904#c8797
+>>
+>>
+>> Even though some rewriters might need to maintain state (or even have
+>> access to the whole unit), many of them (and in particular those
+>> corresponding to the extensions currently supported by Merlin) won't
+>> probably need it.
+>
+>
+> Ok. So if some work had to be done to ensure proper compatibility between
+> merlin and ppx, it would be for supporting stateful rewriters.
+>
+>
+>>
+>>
+>> Alain
+>
+>
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From francois.bobot at cea.fr  Mon Nov  4 16:06:44 2013
+From: francois.bobot at cea.fr (=?ISO-8859-1?Q?Fran=E7ois_Bobot?=)
+Date: Mon, 04 Nov 2013 17:06:44 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+ <5277B5A6.7080207@gmail.com>
+ <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+Message-ID: <5277C614.8010704@cea.fr>
+
+On 04/11/2013 16:15, Gabriel Scherer wrote:
+>> Ok. So if some work had to be done to ensure proper compatibility between
+>> merlin and ppx, it would be for supporting stateful rewriters.
+>
+> I think we should consider making statefulness explicit in the
+> rewriters API, that is asking stateful rewriter to use a marshallable
+> state type and express their transform in the state monad (state * AST
+> -> state * result), instead of silently initializing internal state.
+> This would be compatible with an imperative style in the code of the
+> rewriter themselves (you just need to reify the state at the end of
+> the transformation).
+>
+
+It is a nice idea to explicit the state but I'm not sure it is 
+compatible with an imperative style since merlin needs a persistent 
+state between every declaration. Since merlin needs only to backtrack, 
+it is sufficient for the rewriters to give a push/pop interface.
+
+-- 
+Fran?ois
+
+
+From alain.frisch at lexifi.com  Mon Nov  4 16:17:45 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 04 Nov 2013 17:17:45 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+ <5277B5A6.7080207@gmail.com>
+ <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+Message-ID: <5277C8A9.3080006@lexifi.com>
+
+On 11/04/2013 04:15 PM, Gabriel Scherer wrote:
+> I think we should consider making statefulness explicit in the
+> rewriters API, that is asking stateful rewriter to use a marshallable
+> state type and express their transform in the state monad (state * AST
+> -> state * result), instead of silently initializing internal state.
+
+We probably need to turn "state" into "state option" for the first 
+invocation of the rewriter.  This is a nice idea, but it would require 
+to change the current format of AST files (shared with Camlp4), and 
+introduce some unsafe behavior (the state will be untyped in the 
+external representation).
+
+Moreover, it would not cover all possible cases.  The problem is so much 
+that a rewriter can have an internal state, but rather than it can be 
+completely non compositional.  For instance, sedlex collects all lexer 
+specifications and generate shared transition tables/functions at the 
+beginning of the unit.  Admittedly, this is just an optimization (and it 
+works fine to process phrase by phrase), but other examples of ppx 
+rewriters could really do non-local processing which cannot be simply 
+captured by a state threaded sequentially.
+
+
+Alain
+
+From defree at gmail.com  Mon Nov  4 16:58:30 2013
+From: defree at gmail.com (=?UTF-8?B?RnLDqWTDqXJpYyBCb3Vy?=)
+Date: Mon, 04 Nov 2013 17:58:30 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277C8A9.3080006@lexifi.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+ <5277B5A6.7080207@gmail.com>
+ <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+ <5277C8A9.3080006@lexifi.com>
+Message-ID: <5277D236.8030806@gmail.com>
+
+
+On 04/11/2013 17:17, Alain Frisch wrote:
+> On 11/04/2013 04:15 PM, Gabriel Scherer wrote:
+>> I think we should consider making statefulness explicit in the
+>> rewriters API, that is asking stateful rewriter to use a marshallable
+>> state type and express their transform in the state monad (state * AST
+>> -> state * result), instead of silently initializing internal state.
+>
+> We probably need to turn "state" into "state option" for the first 
+> invocation of the rewriter. This is a nice idea, but it would require 
+> to change the current format of AST files (shared with Camlp4), and 
+> introduce some unsafe behavior (the state will be untyped in the 
+> external representation).
+
+Correct me if I am wrong, but the current code already relies on 
+marshalling and this is where the unsafety lies ? the external state can 
+just be seen as an abstract type ?
+
+> Moreover, it would not cover all possible cases. The problem is so 
+> much that a rewriter can have an internal state, but rather than it 
+> can be completely non compositional. For instance, sedlex collects all 
+> lexer specifications and generate shared transition tables/functions 
+> at the beginning of the unit. Admittedly, this is just an optimization 
+> (and it works fine to process phrase by phrase), but other examples of 
+> ppx rewriters could really do non-local processing which cannot be 
+> simply captured by a state threaded sequentially.
+
+Right. The point is that some extensions (like eliom) don't fit in the 
+framework that merlin or the toplevel could expect for working 
+incrementally.
+
+I think that we should focus on providing a simple API for the most 
+common cases (stateless transformers, then state monad, then 
+backtracking stack, etc.). As long as the plugin informs its host of the 
+way it is intended to be used, it is possible to provide graceful 
+degradation.
+
+Non compositional transformers are likely to be the exception rather 
+than the rule (optimizations aside).
+Also, I may stress that in the specific case of merlin, we are not 
+interested by the implementation produced by a transformer, only by the 
+interface, and this is how extensions are reimplemented right now. So as 
+a last resort, plugins could be provide specific support for use inside 
+an editor.
+
+From alain.frisch at lexifi.com  Mon Nov  4 17:40:34 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 04 Nov 2013 18:40:34 +0100
+Subject: [wg-camlp4] Reconciling Merlin and ppx
+In-Reply-To: <5277D236.8030806@gmail.com>
+References: <CACLX4jTxtLHN+4iU=hxwh-6QUfKxWEY9Ni=WTVXXQ2P-b_3+Eg@mail.gmail.com>
+ <52779AEB.2050402@gmail.com> <5277A03F.8020704@lexifi.com>
+ <5277A529.9010707@gmail.com> <5277A9DA.7040206@lexifi.com>
+ <5277B5A6.7080207@gmail.com>
+ <CAPFanBHjDBdWZ8fJuxrGvQE-J=mq7dn-rjHeKm9O3eZcGA4cXQ@mail.gmail.com>
+ <5277C8A9.3080006@lexifi.com> <5277D236.8030806@gmail.com>
+Message-ID: <5277DC12.7060203@lexifi.com>
+
+On 11/04/2013 05:58 PM, Fr?d?ric Bour wrote:
+> Correct me if I am wrong, but the current code already relies on
+> marshalling and this is where the unsafety lies ? the external state can
+> just be seen as an abstract type ?
+
+Currently, the marshaled data has always the same type (and we are 
+supposed to change its magic number if the format changes), so all the 
+I/O logic for PPX transformers is wrapped in a type-safe API.
+
+Here, we are talking about allowing a specific PPX transformer to return 
+an extra piece of arbitrary data (unless we want to specify the type of 
+the state).  The data only makes sense for a specific (version of a) PPX 
+transformer, and it cannot be protected by a magic number.
+
+> Right. The point is that some extensions (like eliom) don't fit in the
+> framework that merlin or the toplevel could expect for working
+> incrementally.
+
+Did you do some benchmarks?  I really don't know, but it could be the 
+case that parsing + preprocessing the whole unit is fast enough.  For 
+type-checking, I'm less sure, but a mechanism to reuse the result from 
+the previous run on the common prefix should not be too difficult to 
+support.  With such an approach, you could deal with a wider range of 
+PPX rewriters without any custom support.
+
+
+> I think that we should focus on providing a simple API for the most
+> common cases (stateless transformers, then state monad, then
+> backtracking stack, etc.). As long as the plugin informs its host of the
+> way it is intended to be used, it is possible to provide graceful
+> degradation.
+
+The "state monad" API would work in the toplevel, but I believe you 
+would need something more fine-grained for Merlin, in order to inform 
+the rewriter about entering/leaving structures decomposed by Merlin 
+itself.  Consider a rewriter which maintains a current "path" 
+(collecting the M in "module M = struct ... end" for the current scope).
+
+
+-- Alain
+

@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] CommonML: An opinionated build/package/develop	workflow on top of CommonJS
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20CommonML%3A%20An%20opinionated%20build/package/develop%0A%09workflow%20on%20top%20of%20CommonJS&In-Reply-To=%3CCAPOA5_58DJ5KYHosNmBJd1CQCpD6GOm-TxJ-s0PgC%3Dodzk_5kA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000957.html">
+   <LINK REL="Next"  HREF="000975.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] CommonML: An opinionated build/package/develop	workflow on top of CommonJS</H1>
+    <B>Jordan W</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20CommonML%3A%20An%20opinionated%20build/package/develop%0A%09workflow%20on%20top%20of%20CommonJS&In-Reply-To=%3CCAPOA5_58DJ5KYHosNmBJd1CQCpD6GOm-TxJ-s0PgC%3Dodzk_5kA%40mail.gmail.com%3E"
+       TITLE="[opam-devel] CommonML: An opinionated build/package/develop	workflow on top of CommonJS">jordojw at gmail.com
+       </A><BR>
+    <I>Tue Feb 24 08:28:57 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000957.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+        <LI>Next message: <A HREF="000975.html">[opam-devel] CommonML: An opinionated build/package/develop	workflow on top of CommonJS
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#963">[ date ]</a>
+              <a href="thread.html#963">[ thread ]</a>
+              <a href="subject.html#963">[ subject ]</a>
+              <a href="author.html#963">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Since there is a lot of interest in OCaml from web frontend communities, I
+thought it would be useful to imagine what the ideal development flow for
+this audience would look like. I know there's a ton of progress being made
+on documentation, and build systems, but I thought I would explore the
+problem from the perspective of a frontend developer, which means starting
+with the tooling that they are familiar with. One common tool is
+`CommonJS/package.json`, which is a way to model and organize dependencies
+using a single JSON file per package. The npm command line tools allow you
+to install files from disk based purely on these package.json files.
+
+I created a proof of concept called CommonML, which lets developers use
+their familiar CommonJS workflow with OCaml:
+<A HREF="https://github.com/jordwalke/CommonML">https://github.com/jordwalke/CommonML</A>
+
+I also took used it as an opportunity to explore what can be done when
+there are opinionated conventions in place. If you have a predictable
+project structure, how can that benefit us? In this case, I created an
+automatic docs builder (with nice styling) and also automatically generate
+IDE autocomplete support for all your dependencies (and your project's
+internal modules).
+
+
+I hope there is at least something we can take away from it that helps
+inform the design of OPAM and related tools.
+
+
+One nice aspect is that with `CommonJS`, there needn't be an authoritative
+package service. Your package.json file can point to arbitrary git URLs if
+you like.  (Note: The npm command line tool is *not* the npm package
+service - they are made by the same organization but one may be used
+without the other). However, this prototype I've built does allow you to
+host OCaml code on npm and depend on it.
+
+By far the nicest thing about developing with `CommonJS` is that you don't
+have to think about module namespace collisions. There is Just One Way to
+namespace modules/packages. This prototype automatically sets up a similar
+namespacing convention for OCaml modules. It's not flexible, and you can't
+customize it, but it always works. It uses module aliases (thank you to Leo
+White for helping me come up with the build conventions).
+
+Another thing I like about the `CommonJS` workflow is that developing
+packages locally is virtually the same as developing against remote
+dependencies. (`npm link` is much like `opam pin` I'm told). When you `npm
+install` dependencies, everything is pulled down into a local
+sandbox(node_modules directory) instead of being installed globally by
+default. If you want to see what versions your local package is seeing,
+just traverse the file system! If you want to reinstall, just delete the
+node_modules directory and then `npm install` again. I believe there is a
+way to get it to use a global package cache so the node_modules might
+contain symlinks to those shared packages - but that's just an
+optimization. There isn't any notion of building in `npm`, so there
+wouldn't be a build cache I believe.
+
+In my quick prototype, every dependency must be compiled at least once for
+the root level project that you are building. This ends up being nice in
+cases where the build flags (such as -g) must be in effect for the
+compilation of all my dependencies - relying on the build flags that you
+*installed* the package with will bite you. But of course, the rebuilding
+approach can end up being super slow. Still, the incremental build times
+are *totally* reasonable since it does try to do some basic incremental
+compilation. I would have used ocamlbuild which probably does a much better
+job, but I needed to write my own totally custom operations in order to get
+the auto-namespacing (with the help of Leo White). I wasn't sure how to do
+that with ocamlbuild, but if I could, I imagine the incremental compilation
+times would be way better.
+
+Either way, for most of the work I do (developing libraries with many other
+small libraries as dependencies) - I could see a development flow like this
+being a worthwhile goal, especially if it makes OCaml much more comfortable
+for a *huge* set of developers. `CommonJS` is likely becoming the most
+popular development flow. It's just a hacky proof of concept, but it was
+fun.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150224/e6ee5531/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150224/e6ee5531/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000957.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+	<LI>Next message: <A HREF="000975.html">[opam-devel] CommonML: An opinionated build/package/develop	workflow on top of CommonJS
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#963">[ date ]</a>
+              <a href="thread.html#963">[ thread ]</a>
+              <a href="subject.html#963">[ subject ]</a>
+              <a href="author.html#963">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

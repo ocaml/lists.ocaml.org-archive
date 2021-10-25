@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3C515C5E17.6050409%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000378.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3C515C5E17.6050409%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Wed Apr  3 17:51:35 BST 2013</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000378.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#377">[ date ]</a>
+              <a href="thread.html#377">[ thread ]</a>
+              <a href="subject.html#377">[ subject ]</a>
+              <a href="author.html#377">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/29/2013 02:46 PM, Gabriel Scherer wrote:
+&gt;<i> Would it be possible to use the extension mechanism itself for
+</I>&gt;<i> lightweight quasiquotations?
+</I>
+On 03/29/2013 08:18 PM, Alain Frisch wrote:
+&gt;<i> Something similar to
+</I>&gt;<i> branches/extension_points/experimental/frisch/print_gen.ml could be
+</I>&gt;<i> used to generate automatically an AST lifter.  The difficult part is
+</I>&gt;<i> to design anti-quotations, though, and since I'm not convinced by
+</I>&gt;<i> this approach, I'd rather put energy myself in other projects.
+</I>
+Ok, as usual, I've been sidetracked by your clever idea :-)
+
+I've created a meta quotation expander (or should it be called 
+&quot;quasiquotation&quot; ?), allowing to write AST builders using concrete 
+syntax as in:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot_test.ml?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot_test.ml?revision=HEAD&amp;view=markup</A>
+
+
+The code for the ppx rewriter supporting this style is:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot.ml?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot.ml?revision=HEAD&amp;view=markup</A>
+
+It relies on a &quot;Parsetree lifter&quot; class (Ast_lifter.lifter). The same 
+Parsetree lifter can also be used to write a Parsetree printer like the 
+tool ocamlast I've described previously, but now without relying on the 
+toplevel printer (which requires runtime access to parsetree.cmi, etc). 
+  The code for such a printer is in:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&amp;view=markup</A>
+
+
+Ast_lifter.lifter is a partial parametrized class, whose type parameter 
+describes which output is to be produced (Outcometree.value for the 
+printer; Parsetree.expression for the meta quotation expander).  This 
+class needs to be extended (through inheritance) in order to provide 
+&quot;builder functions&quot; for that type, and potentially to override the 
+default behavior for some type under Parsetree.  For instance, the 
+printer decides to map all locations of Oval_ellipsis.  Similarly, the 
+meta quotation expander detects uses of &quot;anti-quotations&quot; and maps them 
+to the identity instead of the default lifting behavior.
+
+The code of ast_lifter.ml looks like:
+
+class virtual ['res] lifter =
+   object (this)
+     method lift_Parsetree_expression : Parsetree.expression -&gt; 'res=
+       fun
+         { Parsetree.pexp_desc = pexp_desc; Parsetree.pexp_loc = pexp_loc;
+           Parsetree.pexp_attributes = pexp_attributes }
+          -&gt;
+         this#record &quot;Parsetree.expression&quot;
+           [(&quot;pexp_desc&quot;, (this#lift_Parsetree_expression_desc pexp_desc));
+           (&quot;pexp_loc&quot;, (this#lift_Location_t pexp_loc));
+           (&quot;pexp_attributes&quot;,
+             (this#list
+                (List.map this#lift_Parsetree_attribute pexp_attributes)))]
+     method lift_Parsetree_expression_desc :
+       Parsetree.expression_desc -&gt; 'res=
+       function
+       | Parsetree.Pexp_ident x0 -&gt;
+           this#constr &quot;Parsetree.expression_desc&quot;
+             (&quot;Pexp_ident&quot;, [this#lift_Asttypes_loc 
+this#lift_Longident_t x0])
+       | Parsetree.Pexp_constant x0 -&gt;
+           this#constr &quot;Parsetree.expression_desc&quot;
+             (&quot;Pexp_constant&quot;, [this#lift_Asttypes_constant x0])
+       .....
+
+which is very tedious to write by hand (and to maintain when the 
+Parsetree evolves).  Of course, this code is not written by hand, it is 
+generated from the definition of the Parsetree using a small tool:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&amp;view=markup</A>
+
+which is executed once to produce ast_lifter.ml:
+
+./genlifter.exe -I ../../parsing -I ../../stdlib Parsetree.expression &gt; 
+ast_lifter.ml
+
+All that can be tried by typing &quot;make lifter&quot; in experimental/frisch (on 
+the extension_points branch, of course, after a successful &quot;make world&quot;).
+
+Now, one could go crazy (Camlp4-style) and use the metaquot ppx rewriter 
+within genlifter.ml itself, and then get for free nasty bootstrapping 
+problems :-)
+
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000378.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#377">[ date ]</a>
+              <a href="thread.html#377">[ thread ]</a>
+              <a href="subject.html#377">[ subject ]</a>
+              <a href="author.html#377">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCADKNfhJOVopdM3s5Wpor3dJz0L8riLh2QBjZcrNmL60ciS5EBg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000249.html">
+   <LINK REL="Next"  HREF="000253.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCADKNfhJOVopdM3s5Wpor3dJz0L8riLh2QBjZcrNmL60ciS5EBg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">yminsky at gmail.com
+       </A><BR>
+    <I>Tue Mar 12 11:32:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000249.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000253.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#250">[ date ]</a>
+              <a href="thread.html#250">[ thread ]</a>
+              <a href="subject.html#250">[ subject ]</a>
+              <a href="author.html#250">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I have no objection to specifying that Core#Common should be connected
+to the Core package within the build system.  But it's important to us
+that namespace manipulations be observable by the programmer by
+reading the code.  If I understand correctly, Leo's proposal involves
+stashing that away in the build system, which undermines that goal.
+
+Another thing which may not be obvious is that one sometimes in the
+same file wants to access just Core.Std in some scopes in the file,
+and Async.Std in other scopes.  Full control of the namespace is
+important, and something we do at multiple scopes within a file.
+Being able to control this only at the file level, and only from
+within the build system, is a poor match for our needs.
+
+The fact that one should write:
+
+open Core.Std
+open Async.Std
+
+in a specific order does not strike me as a particular problem, and
+even if it were, the solution I think would not be to stuff it into
+the build system, but to build a single namespace that opened both
+Core and Async.
+
+If the proposal lands in the way Leo describes, I would think we would
+write a ppx extension that, for a certain whitelist of namespaces,
+would convert:
+
+   open namespace Core
+
+into
+
+   open namespace Core
+   open Core#Common
+
+Given that this is easy enough to do at the ppx level, I find it hard
+to see what difficulties would be raised by integrating this with the
+namespace system.  I understand that it feels mildly unsanitary
+because on the implementation end the two things are quite different,
+but from a user point of view, I think it's very much the right thing.
+
+y
+
+
+On Tue, Mar 12, 2013 at 6:57 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;<i> Leo's model allows the build system to precisely set the order of default
+</I>&gt;&gt;<i> opens, and tools such as ocamlfind could support this just as they do
+</I>&gt;&gt;<i> include and link directives at the moment.  I know JS doesn't use
+</I>&gt;&gt;<i> ocamlfind, but the moral equivalent could inject the command-line
+</I>&gt;&gt;<i> directives very easily.
+</I>&gt;<i>
+</I>&gt;<i> To expand on what Anil said, under my proposed system the idea is to push the
+</I>&gt;<i> problem of providing &quot;pervasive&quot; modules into the build or package system.
+</I>&gt;<i>
+</I>&gt;<i> For example, I would expect Core to provide some kind of package description
+</I>&gt;<i> for OCamlFind or similar tool including something like (using made up
+</I>&gt;<i> syntax):
+</I>&gt;<i>
+</I>&gt;<i>     path := ./core.mlpath
+</I>&gt;<i>     open := Core#Common
+</I>&gt;<i>
+</I>&gt;<i> where &quot;core.mlpath&quot; is a search path description file.
+</I>&gt;<i>
+</I>&gt;<i> Then Async would include a description including something like:
+</I>&gt;<i>
+</I>&gt;<i>     path := ./async.mlpath
+</I>&gt;<i>     path-depends := core
+</I>&gt;<i>     open := Async#Common
+</I>&gt;<i>     open-depends := core
+</I>&gt;<i>
+</I>&gt;<i> where &quot;async.mlpath&quot; is a search path description file that includes:
+</I>&gt;<i>
+</I>&gt;<i>     Core#Original#*: Core#*
+</I>&gt;<i>     Core#Gc: Async#Gc
+</I>&gt;<i>     Core#Condition: Async#Condition
+</I>&gt;<i>
+</I>&gt;<i> where &quot;Gc&quot; and &quot;Condition&quot; are the components of Core that Async
+</I>&gt;<i> re-implements.
+</I>&gt;<i>
+</I>&gt;<i> This would mean that commands equivalent to any of the following would all
+</I>&gt;<i> produce the correct default environment for using Async:
+</I>&gt;<i>
+</I>&gt;<i>     ocamlc -package async
+</I>&gt;<i>     ocamlc -package async -package core
+</I>&gt;<i>     ocamlc -package core -package async
+</I>&gt;<i>
+</I>&gt;<i> I think this is preferable to requiring all users of Async to start their
+</I>&gt;<i> files with:
+</I>&gt;<i>
+</I>&gt;<i>     open Core.Std
+</I>&gt;<i>     open Async.Std
+</I>&gt;<i>
+</I>&gt;<i> which is not something that a user might naturally assume was required.
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000249.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000253.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#250">[ date ]</a>
+              <a href="thread.html#250">[ thread ]</a>
+              <a href="subject.html#250">[ subject ]</a>
+              <a href="author.html#250">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

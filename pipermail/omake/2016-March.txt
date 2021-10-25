@@ -1,0 +1,169 @@
+From rudi.grinberg at gmail.com  Sun Mar  6 00:22:40 2016
+From: rudi.grinberg at gmail.com (rudi.grinberg at gmail.com)
+Date: Sat, 5 Mar 2016 19:22:40 -0500
+Subject: [omake] How to capture both stdout and return code of shell command?
+Message-ID: <CADU9VHt9ZgNuK_8AzV417snKnHqbbVNKJ9d=m2-hSbHJ6wPaDg@mail.gmail.com>
+
+Hello,
+
+I?ve made good use of shell-code to execute commands and capture their
+return code but now I?d like to capture their stdout (and stderr if
+possible) as well, rather than have it dumped on the screen.
+
+Is there a simple way to accomplish this? I?ve RTFM?d but could only think
+of convoluted ways that involve file redirection. I?m probably missing
+something simple.
+
+Thanks,
+
+Rudi.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/omake/attachments/20160305/aa2aa607/attachment.html>
+
+From info at gerd-stolpmann.de  Mon Mar  7 18:13:06 2016
+From: info at gerd-stolpmann.de (Gerd Stolpmann)
+Date: Mon, 07 Mar 2016 19:13:06 +0100
+Subject: [omake] How to capture both stdout and return code of shell
+ command?
+In-Reply-To: <CADU9VHt9ZgNuK_8AzV417snKnHqbbVNKJ9d=m2-hSbHJ6wPaDg@mail.gmail.com>
+References: <CADU9VHt9ZgNuK_8AzV417snKnHqbbVNKJ9d=m2-hSbHJ6wPaDg@mail.gmail.com>
+Message-ID: <1457374386.3406.8.camel@e130.lan.sumadev.de>
+
+There is nothing at hand. Just read a little bit through the source
+code:
+
+If you call $(shell) or $(shella), this goes straightly to
+Omake_rule.eval_shell_output, which is calling eval_shell_exp. If the
+exit code is not zero, an exception is raised. However, the exception is
+just a generic one, and does not include the exit code in a way you can
+use from omake code.
+
+If you call $(shell-code) the exception from eval_shell_exp is
+suppressed, and the code is returned.
+
+Another observation is that eval_shell_output simply creates a temporary
+file and saves the command output there. There seems to be no way to
+directly read into a buffer.
+
+So, I'd say the way to go (for the time being) is to create a temp file
+and redirect into this while using $(shell-code) to run the whole thing.
+
+Gerd
+
+
+Am Samstag, den 05.03.2016, 19:22 -0500 schrieb rudi.grinberg at gmail.com:
+> Hello,
+> 
+> 
+> I?ve made good use of shell-code to execute commands and capture their
+> return code but now I?d like to capture their stdout (and stderr if
+> possible) as well, rather than have it dumped on the screen.
+> 
+> 
+> Is there a simple way to accomplish this? I?ve RTFM?d but could only
+> think of convoluted ways that involve file redirection. I?m probably
+> missing something simple.
+> 
+> 
+> Thanks,
+> 
+> 
+> Rudi.
+> 
+> 
+> _______________________________________________
+> Omake mailing list
+> Omake at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/omake
+
+-- 
+------------------------------------------------------------
+Gerd Stolpmann, Darmstadt, Germany    gerd at gerd-stolpmann.de
+My OCaml site:          http://www.camlcity.org
+Contact details:        http://www.camlcity.org/contact.html
+Company homepage:       http://www.gerd-stolpmann.de
+------------------------------------------------------------
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.ocaml.org/pipermail/omake/attachments/20160307/55252821/attachment.sig>
+
+From rudi.grinberg at gmail.com  Tue Mar  8 05:21:28 2016
+From: rudi.grinberg at gmail.com (rudi.grinberg at gmail.com)
+Date: Tue, 8 Mar 2016 00:21:28 -0500
+Subject: [omake] How to capture both stdout and return code of shell
+ command?
+In-Reply-To: <1457374386.3406.8.camel@e130.lan.sumadev.de>
+References: <CADU9VHt9ZgNuK_8AzV417snKnHqbbVNKJ9d=m2-hSbHJ6wPaDg@mail.gmail.com>
+ <1457374386.3406.8.camel@e130.lan.sumadev.de>
+Message-ID: <etPan.56de6158.39499101.177e8@gmail.com>
+
+Thanks Gerd, I will do that for now. Creating a temporary file with omake?s tmpfile seems easy enough so I will do that.
+
+
+On March 7, 2016 at 1:13:16 PM, Gerd Stolpmann (info at gerd-stolpmann.de) wrote:
+
+There is nothing at hand. Just read a little bit through the source  
+code:  
+
+If you call $(shell) or $(shella), this goes straightly to  
+Omake_rule.eval_shell_output, which is calling eval_shell_exp. If the  
+exit code is not zero, an exception is raised. However, the exception is  
+just a generic one, and does not include the exit code in a way you can  
+use from omake code.  
+
+If you call $(shell-code) the exception from eval_shell_exp is  
+suppressed, and the code is returned.  
+
+Another observation is that eval_shell_output simply creates a temporary  
+file and saves the command output there. There seems to be no way to  
+directly read into a buffer.  
+
+So, I'd say the way to go (for the time being) is to create a temp file  
+and redirect into this while using $(shell-code) to run the whole thing.  
+
+Gerd  
+
+
+Am Samstag, den 05.03.2016, 19:22 -0500 schrieb rudi.grinberg at gmail.com:  
+> Hello,  
+>  
+>  
+> I?ve made good use of shell-code to execute commands and capture their  
+> return code but now I?d like to capture their stdout (and stderr if  
+> possible) as well, rather than have it dumped on the screen.  
+>  
+>  
+> Is there a simple way to accomplish this? I?ve RTFM?d but could only  
+> think of convoluted ways that involve file redirection. I?m probably  
+> missing something simple.  
+>  
+>  
+> Thanks,  
+>  
+>  
+> Rudi.  
+>  
+>  
+> _______________________________________________  
+> Omake mailing list  
+> Omake at lists.ocaml.org  
+> http://lists.ocaml.org/listinfo/omake  
+
+--  
+------------------------------------------------------------  
+Gerd Stolpmann, Darmstadt, Germany gerd at gerd-stolpmann.de  
+My OCaml site: http://www.camlcity.org  
+Contact details: http://www.camlcity.org/contact.html  
+Company homepage: http://www.gerd-stolpmann.de  
+------------------------------------------------------------  
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/omake/attachments/20160308/b0a42f45/attachment.html>
+

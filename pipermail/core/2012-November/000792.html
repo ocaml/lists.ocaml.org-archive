@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Result monad
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Result%20monad&In-Reply-To=%3CCACLX4jQX9a2ypZfSFjQAjYd99zwsS6v4_82gSD_CRc%3DWsQyw6w%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000791.html">
+   <LINK REL="Next"  HREF="000793.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Result monad</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Result%20monad&In-Reply-To=%3CCACLX4jQX9a2ypZfSFjQAjYd99zwsS6v4_82gSD_CRc%3DWsQyw6w%40mail.gmail.com%3E"
+       TITLE="Result monad">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Nov 27 22:52:54 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000791.html">Result monad
+</A></li>
+        <LI>Next message: <A HREF="000793.html">Will Incremental be open sourced?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#792">[ date ]</a>
+              <a href="thread.html#792">[ thread ]</a>
+              <a href="subject.html#792">[ subject ]</a>
+              <a href="author.html#792">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+We actually tend to a style where we use a ('a,Error.t) Result.t
+(also known as an 'a Or_error.t), where an Error.t is essentially a
+lazily constructed s-expression.  Obviously, once you do this, you
+can't programmatically distinguish between different errors
+effectively, but we like it better than the polymorphic variant trick
+that Sebastien mentions, because of the god-awful type error messages
+that leads to.
+
+y
+
+On Tue, Nov 27, 2012 at 4:11 PM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+&gt;<i> Thanks for pointing that out, I actually ran into it this weekend and
+</I>&gt;<i> didn't get what was going on.  I ended up just handling every failure in
+</I>&gt;<i> all cases, which is excessive but not so bad in this case.
+</I>&gt;<i>
+</I>&gt;<i> Sebastien Mondet &lt;<A HREF="http://lists.ocaml.org/listinfo/core">sebastien.mondet at gmail.com</A>&gt; writes:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Hi
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> We've been doing that for a few months (e.g.
+</I>&gt;&gt;<i> <A HREF="https://github.com/biocaml/biocaml/blob/master/src/lib/biocaml_fastq.mli">https://github.com/biocaml/biocaml/blob/master/src/lib/biocaml_fastq.mli</A> )
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In a sense it's great (and we plan to keep doing this):
+</I>&gt;&gt;<i> - polymorphic variants force the exhaustiveness of pattern matching (so you
+</I>&gt;&gt;<i> do not forget error cases)
+</I>&gt;&gt;<i> - (infered) function types fully document anything that may happen inside a
+</I>&gt;&gt;<i> function
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> There are a few annoyances to keep in mind:
+</I>&gt;&gt;<i> - the error types must remain open so that ocaml can merge them ( [&gt; ... ])
+</I>&gt;&gt;<i>   * sometimes this gets in the way, and you spend time type-hacking only
+</I>&gt;&gt;<i> for errors that never happen
+</I>&gt;&gt;<i>      (e.g. if you want to put a function in a record/object you have then
+</I>&gt;&gt;<i> to play with &quot;type 'error t =  { x : ... -&gt; (..., .... as 'error) Result.t
+</I>&gt;&gt;<i> }&quot; etc.)
+</I>&gt;&gt;<i>   * sometimes it's difficult to &quot;reopen&quot; polymorphic variant types
+</I>&gt;&gt;<i> - pattern matching does not know how to remove cases:
+</I>&gt;&gt;<i>   match error with
+</I>&gt;&gt;<i>   | `db_error e -&gt; .... return ()
+</I>&gt;&gt;<i>   |  other_error -&gt; error other_error (* without annotations, [&gt; `db_error
+</I>&gt;&gt;<i> ... ] will remain part of the total error type *)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Cheers
+</I>&gt;&gt;<i> Seb
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue, Nov 27, 2012 at 3:27 PM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/core">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I've been playing with writing code that can fail in a lot of ways and
+</I>&gt;&gt;&gt;<i> using Result.Monad_infix to make it more readable.  I've found that this
+</I>&gt;&gt;&gt;<i> only really works well if all of my functions that return a Result.t
+</I>&gt;&gt;&gt;<i> have polymorphic variants on the Error side.  Is this the suggested best
+</I>&gt;&gt;&gt;<i> practice as well?  I'm considering just mandating all my code that can
+</I>&gt;&gt;&gt;<i> return a Result.t does this.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Thanks,
+</I>&gt;&gt;&gt;<i> /Malcolm
+</I>&gt;&gt;&gt;<i>
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000791.html">Result monad
+</A></li>
+	<LI>Next message: <A HREF="000793.html">Will Incremental be open sourced?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#792">[ date ]</a>
+              <a href="thread.html#792">[ thread ]</a>
+              <a href="subject.html#792">[ subject ]</a>
+              <a href="author.html#792">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

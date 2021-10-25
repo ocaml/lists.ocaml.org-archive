@@ -1,0 +1,464 @@
+From anil at recoil.org  Sun Mar  2 13:53:26 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 2 Mar 2014 13:53:26 +0000
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+Message-ID: <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+
+Hi Pavel (CCing the ctypes mailing list as well).
+
+When linking the program, ctypes needs to know how to open the shared
+library.  One way to do this is by specifying the "-lpicosat" in the
+link options, as you've done below.
+
+Unfortunately, the Ubuntu linker has a mode where it decides to not
+link in the library if it's not explicitly referenced in the application,
+so you also need to pass the "-Wl,--no-as-needed" on Ubuntu.
+
+However, before going further, the below link line should have worked
+on MacOS X.  Could you confirm whether it only fails on Ubuntu, or if
+it also doesn't work on MacOS X?
+
+-anil
+
+On 2 Mar 2014, at 07:25, Pavel Zaichenkov <zaichenkov at gmail.com> wrote:
+
+> Hi,
+> 
+> I would be very grateful if someone can help me to create OCaml
+> bindings for PicoSAT SAT solver (http://fmv.jku.at/picosat/). I used
+> the version 936 that is available in Ubuntu repository.
+> 
+> I started with studying the corresponding chapter in RWC book
+> (https://realworldocaml.org/v1/en/html/foreign-function-interface.html)
+> and came up with the following picosat.ml file (a minimal working
+> example):
+> 
+> open Ctypes
+> type picosat = unit ptr
+> let picosat : picosat typ = ptr void
+> open Foreign
+> let init = foreign "picosat_init" (void @-> returning void)
+> 
+> This one is a simple program that shouldn't throw an error if binding
+> actually works:
+> 
+> open Picosat
+> let _ = init ()
+> 
+> The example is compiled using the command from the guide:
+> 
+> corebuild -pkg ctypes.foreign -lflags -cclib,lpicosat test.native
+> 
+> Command executes successfully, however execution of test.native throws
+> an exception "undefined symbol: picosat_init".
+> 
+> I have tried to perform this on two platforms that I need to support:
+> OS X and Ubuntu. I am pretty sure that headers and library itself are
+> installed and are seen in the system path, as I managed to run an
+> example on C using the library. I also checked the library and
+> corresponding symbol names inside the library using "readelf -Ws".
+> 
+> Since there is enough evidence that library itself exists and can be
+> successfully linked, I am out of ideas what I miss here and why this
+> binding doesn't work. Are there any suggestions?
+> 
+> Thanks.
+> 
+> 
+> Pavel
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+> 
+
+
+From zaichenkov at gmail.com  Tue Mar  4 01:54:19 2014
+From: zaichenkov at gmail.com (Pavel Zaichenkov)
+Date: Tue, 4 Mar 2014 01:54:19 +0000
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+Message-ID: <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+
+Hi Anil,
+
+It fails for both OS X and Ubuntu.
+
+Regarding Ubuntu. How would you pass "-Wl,--no-as-needed" to
+corebuild? hello (ncurses) example doesn't work on Ubuntu, so this
+could be the case. I want to try it also for minisat library, which is
+available from the repository.
+
+Although I don't know what is wrong with it in OS X.
+
+Btw, I get "Unbound value returning_checking_errno" error for datetime
+example in both systems.
+
+Thanks for your help.
+
+
+Pavel
+
+On 2 March 2014 13:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Hi Pavel (CCing the ctypes mailing list as well).
+>
+> When linking the program, ctypes needs to know how to open the shared
+> library.  One way to do this is by specifying the "-lpicosat" in the
+> link options, as you've done below.
+>
+> Unfortunately, the Ubuntu linker has a mode where it decides to not
+> link in the library if it's not explicitly referenced in the application,
+> so you also need to pass the "-Wl,--no-as-needed" on Ubuntu.
+>
+> However, before going further, the below link line should have worked
+> on MacOS X.  Could you confirm whether it only fails on Ubuntu, or if
+> it also doesn't work on MacOS X?
+>
+> -anil
+>
+> On 2 Mar 2014, at 07:25, Pavel Zaichenkov <zaichenkov at gmail.com> wrote:
+>
+>> Hi,
+>>
+>> I would be very grateful if someone can help me to create OCaml
+>> bindings for PicoSAT SAT solver (http://fmv.jku.at/picosat/). I used
+>> the version 936 that is available in Ubuntu repository.
+>>
+>> I started with studying the corresponding chapter in RWC book
+>> (https://realworldocaml.org/v1/en/html/foreign-function-interface.html)
+>> and came up with the following picosat.ml file (a minimal working
+>> example):
+>>
+>> open Ctypes
+>> type picosat = unit ptr
+>> let picosat : picosat typ = ptr void
+>> open Foreign
+>> let init = foreign "picosat_init" (void @-> returning void)
+>>
+>> This one is a simple program that shouldn't throw an error if binding
+>> actually works:
+>>
+>> open Picosat
+>> let _ = init ()
+>>
+>> The example is compiled using the command from the guide:
+>>
+>> corebuild -pkg ctypes.foreign -lflags -cclib,lpicosat test.native
+>>
+>> Command executes successfully, however execution of test.native throws
+>> an exception "undefined symbol: picosat_init".
+>>
+>> I have tried to perform this on two platforms that I need to support:
+>> OS X and Ubuntu. I am pretty sure that headers and library itself are
+>> installed and are seen in the system path, as I managed to run an
+>> example on C using the library. I also checked the library and
+>> corresponding symbol names inside the library using "readelf -Ws".
+>>
+>> Since there is enough evidence that library itself exists and can be
+>> successfully linked, I am out of ideas what I miss here and why this
+>> binding doesn't work. Are there any suggestions?
+>>
+>> Thanks.
+>>
+>>
+>> Pavel
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/groups/opt_out.
+>>
+>
+> --
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+
+From anil at recoil.org  Tue Mar  4 09:47:10 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 4 Mar 2014 09:47:10 +0000
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+Message-ID: <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+
+On 4 Mar 2014, at 01:54, Pavel Zaichenkov <zaichenkov at gmail.com> wrote:
+
+> Hi Anil,
+> 
+> It fails for both OS X and Ubuntu.
+
+Should investigate this separately then -- can you manually write a
+trivial C binding that successfully links on MacOS X?
+> 
+> Regarding Ubuntu. How would you pass "-Wl,--no-as-needed" to
+> corebuild? hello (ncurses) example doesn't work on Ubuntu, so this
+> could be the case. I want to try it also for minisat library, which is
+> available from the repository.
+> 
+> Although I don't know what is wrong with it in OS X.
+> 
+> Btw, I get "Unbound value returning_checking_errno" error for datetime
+> example in both systems.
+
+I don't have access to an Ubuntu machine to verify this at the moment,
+but I suspect that there's some minor interface breakage in RWO due
+to the recent Ctypes updates.  I'll rebuild the RWO examples repository
+later and update the online examples (print errata will take a little longer)
+
+Off the top of my head, you need something like
+
+-cclib,-Xlinker,-cclib,--no-as-needed,-Wl
+
+to corebuild
+
+(see https://github.com/rgrinberg/onanomsg/blob/master/_oasis for an OASIS example)
+
+The complication is that this will *not* work on MacOS X, since LLVM doesn't support that linker flag. C stub generation will greatly help reduce this complexity when that lands in Ctypes.
+
+-anil
+
+From daniel.buenzli at erratique.ch  Tue Mar  4 10:13:30 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 4 Mar 2014 11:13:30 +0100
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+ <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+Message-ID: <10C65B61B1A143A7A45535E07E36A857@erratique.ch>
+
+Le mardi, 4 mars 2014 ? 02:54, Pavel Zaichenkov a ?crit :
+> Btw, I get "Unbound value returning_checking_errno" error for datetime
+> example in both systems.
+
+
+This is a ctypes API issue, that function doesn't exist anymore. See:
+
+https://github.com/ocamllabs/ocaml-ctypes/commit/c4887ca35b40a9d53ef52642eb025262821ca245
+
+
+Le mardi, 4 mars 2014 ? 10:47, Anil Madhavapeddy a ?crit :
+> (see https://github.com/rgrinberg/onanomsg/blob/master/_oasis for an OASIS example)
+>  
+> The complication is that this will *not* work on MacOS X, since LLVM doesn't support that linker flag.  
+Well it's again oasis that renders things complicated... If you have full control over your build system it's quite easy follow the link below, the myocamlbuild.ml linked to is generic:
+
+https://github.com/ocamllabs/ocaml-ctypes/issues/51#issuecomment-30729675
+
+Best,
+
+Daniel
+
+From ygrek at autistici.org  Tue Mar  4 10:29:37 2014
+From: ygrek at autistici.org (ygrek)
+Date: Tue, 4 Mar 2014 18:29:37 +0800
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <10C65B61B1A143A7A45535E07E36A857@erratique.ch>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+ <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+ <10C65B61B1A143A7A45535E07E36A857@erratique.ch>
+Message-ID: <20140304182937.0af6ba47@kiwi.local.tld>
+
+On Tue, 4 Mar 2014 11:13:30 +0100
+Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Well it's again oasis that renders things complicated... If you have full control over your build system it's quite easy follow the link below, the myocamlbuild.ml linked to is generic:
+
+oasis is meant to be used for "standard" build setups. For simple projects it is more than adequate. For large/hairy/experimental/complicated projects
+one is free to use what better suits the task, especially if one masters ocaml build tools and different OS peculiarities, but for the ocaml
+novice oasis does the job pretty well.
+
+-- 
+
+From ygrek at autistici.org  Tue Mar  4 10:41:46 2014
+From: ygrek at autistici.org (ygrek)
+Date: Tue, 4 Mar 2014 18:41:46 +0800
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+ <FABF7142-84B2-4635-92A8-B399077F1E41@recoil.org>
+Message-ID: <20140304184146.6d2f512e@kiwi.local.tld>
+
+On Tue, 4 Mar 2014 09:47:10 +0000
+Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> Off the top of my head, you need something like
+> 
+> -cclib,-Xlinker,-cclib,--no-as-needed,-Wl
+> 
+> to corebuild
+> 
+> (see https://github.com/rgrinberg/onanomsg/blob/master/_oasis for an OASIS example)
+> 
+> The complication is that this will *not* work on MacOS X, since LLVM doesn't support that linker flag. C stub generation will greatly help reduce this complexity when that lands in Ctypes.
+
+OASIS allows conditional fields, so you can have a dynamic test whether linker supports this option, that will set some
+oasis flag and then test that flag with
+
+  if flag(xxx)
+    CCLib: -Xlinker --no-as-needed
+
+hth
+
+-- 
+
+From yallop at gmail.com  Tue Mar  4 11:34:51 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 4 Mar 2014 11:34:51 +0000
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+Message-ID: <CAAxsn=GZo0p4wutP3Q8HF8SdOSkCV2Z95_fq-cApe4P9+Sb4+A@mail.gmail.com>
+
+On 04/03/2014, Pavel Zaichenkov <zaichenkov at gmail.com> wrote:
+> It fails for both OS X and Ubuntu.
+
+Passing -Wl,--no-as-needed should fix the problem on Ubuntu.  Here's a
+full example that works (for me) on both Ubuntu and OS X.  I'm calling
+ocamlfind directly rather than using corebuild, but perhaps this'll be
+some help in constructing a corebuild command that does what you need.
+ (The '-verbose 1' corebuild option will show you the commands that
+corebuild is executing.)
+
+In both cases picosat.ml and test.ml contain exactly the code that you posted.
+
+On Ubuntu:
+
+  $ ocamlfind opt -a -cclib -lpicosat -cclib -Wl,--no-as-needed
+-package ctypes.foreign picosat.ml -o picosat.cmxa
+  $ ocamlfind opt    -cclib -lpicosat -cclib -Wl,--no-as-needed
+-package ctypes.foreign -linkpkg picosat.cmxa test.ml -o test.native
+
+On OS X
+
+  $ ocamlfind opt -a -cclib -lpicosat -package ctypes.foreign
+picosat.ml -o picosat.cmxa
+  $ ocamlfind opt    -cclib -lpicosat -package ctypes.foreign -linkpkg
+picosat.cmxa test.ml -o test.native
+
+You can check that the picosat library has been linked in using 'ldd
+test.native' on Ubuntu or 'otool -L test.native' on OS X; you should
+see a line like this:
+
+   libpicosat.so.1 => /usr/lib/libpicosat.so.1 (0x00007fa11567d000)
+
+or like this:
+
+   libpicosat.dylib (compatibility version 0.0.0, current version 0.0.0)
+
+> Btw, I get "Unbound value returning_checking_errno" error for datetime
+> example in both systems.
+
+As Daniel said, this is due to an API change in ctypes between 0.1.X
+(which is described in RWO) and 0.2.X (which is what OPAM now installs
+by default).  It's still possible to install 0.1.1 using OPAM if you
+want a version of ctypes that's fully compatible with the RWO text,
+but the API changes are actually fairly few, so it may be worth
+persisting with the latest version.  In this case the change you need
+is to change
+
+   foreign "gettimeofday"
+      (ptr timeval @-> ptr timezone @-> returning_checking_errno int)
+
+to
+
+   foreign "gettimeofday" ~check_errno:true
+      (ptr timeval @-> ptr timezone @-> returning int)
+
+Hope that helps,
+
+Jeremy.
+
+From zaichenkov at gmail.com  Sun Mar  9 01:15:30 2014
+From: zaichenkov at gmail.com (Pavel Zaichenkov)
+Date: Sun, 9 Mar 2014 01:15:30 +0000
+Subject: [ocaml-ctypes] Foreign function interface support
+In-Reply-To: <CAAxsn=GZo0p4wutP3Q8HF8SdOSkCV2Z95_fq-cApe4P9+Sb4+A@mail.gmail.com>
+References: <CANE7k9cpuh6Rs6vE0sTCjFxHfqsry+L-kx=ZR+GuGsJPXvp6og@mail.gmail.com>
+ <6B63BE07-96EA-4125-BDF8-7982FD5B9EB8@recoil.org>
+ <CANE7k9d0B1deaZVt67s5G18cZFRd+h02bqkZLTC1=Bo3NSfosA@mail.gmail.com>
+ <CAAxsn=GZo0p4wutP3Q8HF8SdOSkCV2Z95_fq-cApe4P9+Sb4+A@mail.gmail.com>
+Message-ID: <CANE7k9dvDnU3aE+zzFZMS2io-YhRScVek8n6a+bf043PF0XmbA@mail.gmail.com>
+
+Your suggestions helped me indeed.
+
+I finally made picosat bindings work.
+If you are interested, here is the repository:
+https://github.com/zayac/ocaml-picosat. This works for OS X only yet,
+but I will add relevant flags for Ubuntu later.
+
+On 4 March 2014 11:34, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 04/03/2014, Pavel Zaichenkov <zaichenkov at gmail.com> wrote:
+>> It fails for both OS X and Ubuntu.
+>
+> Passing -Wl,--no-as-needed should fix the problem on Ubuntu.  Here's a
+> full example that works (for me) on both Ubuntu and OS X.  I'm calling
+> ocamlfind directly rather than using corebuild, but perhaps this'll be
+> some help in constructing a corebuild command that does what you need.
+>  (The '-verbose 1' corebuild option will show you the commands that
+> corebuild is executing.)
+>
+> In both cases picosat.ml and test.ml contain exactly the code that you posted.
+>
+> On Ubuntu:
+>
+>   $ ocamlfind opt -a -cclib -lpicosat -cclib -Wl,--no-as-needed
+> -package ctypes.foreign picosat.ml -o picosat.cmxa
+>   $ ocamlfind opt    -cclib -lpicosat -cclib -Wl,--no-as-needed
+> -package ctypes.foreign -linkpkg picosat.cmxa test.ml -o test.native
+>
+> On OS X
+>
+>   $ ocamlfind opt -a -cclib -lpicosat -package ctypes.foreign
+> picosat.ml -o picosat.cmxa
+>   $ ocamlfind opt    -cclib -lpicosat -package ctypes.foreign -linkpkg
+> picosat.cmxa test.ml -o test.native
+>
+> You can check that the picosat library has been linked in using 'ldd
+> test.native' on Ubuntu or 'otool -L test.native' on OS X; you should
+> see a line like this:
+>
+>    libpicosat.so.1 => /usr/lib/libpicosat.so.1 (0x00007fa11567d000)
+>
+> or like this:
+>
+>    libpicosat.dylib (compatibility version 0.0.0, current version 0.0.0)
+>
+>> Btw, I get "Unbound value returning_checking_errno" error for datetime
+>> example in both systems.
+>
+> As Daniel said, this is due to an API change in ctypes between 0.1.X
+> (which is described in RWO) and 0.2.X (which is what OPAM now installs
+> by default).  It's still possible to install 0.1.1 using OPAM if you
+> want a version of ctypes that's fully compatible with the RWO text,
+> but the API changes are actually fairly few, so it may be worth
+> persisting with the latest version.  In this case the change you need
+> is to change
+>
+>    foreign "gettimeofday"
+>       (ptr timeval @-> ptr timezone @-> returning_checking_errno int)
+>
+> to
+>
+>    foreign "gettimeofday" ~check_errno:true
+>       (ptr timeval @-> ptr timezone @-> returning int)
+>
+> Hope that helps,
+>
+> Jeremy.
+

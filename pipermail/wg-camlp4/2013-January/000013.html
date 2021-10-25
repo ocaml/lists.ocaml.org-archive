@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My uses of syntax extension
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C51065998.9090009%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000077.html">
+   <LINK REL="Next"  HREF="000028.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My uses of syntax extension</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C51065998.9090009%40frisch.fr%3E"
+       TITLE="[wg-camlp4] My uses of syntax extension">alain at frisch.fr
+       </A><BR>
+    <I>Mon Jan 28 10:57:28 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000077.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+        <LI>Next message: <A HREF="000028.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#13">[ date ]</a>
+              <a href="thread.html#13">[ thread ]</a>
+              <a href="subject.html#13">[ subject ]</a>
+              <a href="author.html#13">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi John,
+
+Thanks for sharing this information!
+
+On 01/25/2013 12:03 AM, Harrison, John R wrote:
+&gt;<i> 1. In the code for my book (<A HREF="http://www.cl.cam.ac.uk/~jrh13/atp/">http://www.cl.cam.ac.uk/~jrh13/atp/</A>) I use
+</I>&gt;<i>     items entered in &lt;&lt;quotations&gt;&gt;, which I simply want to treat as a
+</I>&gt;<i>     string to get passed to my parser. This is essentially trivial in
+</I>&gt;<i>     camlp5, though I think it is less so in camlp4.
+</I>&gt;<i>
+</I>&gt;<i>     let quotexpander s =
+</I>&gt;<i>       .... &quot;default_parser \&quot;&quot;^(String.escaped s)^&quot;\&quot;&quot;;;
+</I>&gt;<i>
+</I>&gt;<i>     Quotation.add &quot;&quot; (Quotation.ExStr (fun x -&gt; quotexpander));;
+</I>
+It is planned to extend OCaml grammar directly with generic quotations 
+(in place of expressions, patterns, etc).  The type-checker would fail 
+on them, but -ppx filters will have a chance to rewrite them to 
+something the compiler understands.  It is not completely clear yet 
+which syntax (delimiters, lexing rules) will be chosen, though. 
+Delimiters will probably be different from Camlp4, to make it possible 
+to combine Camlp4 and -ppx.
+
+*If* you don't care too much about having to escape some characters in 
+the content of the quotations, a poor-man version is to rely on standard 
+strings.  For instance, a -ppx filter can detect the construction:
+
+   !&quot;.....&quot;
+
+(i.e. the bang character followed by a string literal) and rewrites it 
+to whatever it wants.  But given your example (where the quotation 
+expands to a simple function call on the string literal), I assume that 
+you use quotations precisely for them lexical properties.  Is that right?
+
+&gt;<i> 2. For the HOL Light prover (<A HREF="http://code.google.com/p/hol-light/">http://code.google.com/p/hol-light/</A>),
+</I>&gt;<i>     backward compatibility with other HOLs (where ML is used not only
+</I>&gt;<i>     as the implementation language but also as the toplevel) dictates
+</I>&gt;<i>     that I do various things to make OCaml look like old-style ML:
+</I>&gt;<i>
+</I>&gt;<i>         * Add some alphanumeric infixes like &quot;o&quot; and &quot;THEN&quot;
+</I>&gt;<i>
+</I>&gt;<i>         * Use &quot;it&quot; as the default binding for the previous expression
+</I>&gt;<i>           (actually, I would prefer the toplevel to do this anyway).
+</I>&gt;<i>
+</I>&gt;<i>         * Use quotations, but within the characters `....` not &lt;&lt;...&gt;&gt;
+</I>&gt;<i>
+</I>&gt;<i>         * Completely change the OCaml lexical conventions so that
+</I>&gt;<i>           all-uppercase words like INST and REWRITE_TAC are treated as
+</I>&gt;<i>           ordinary identifiers.
+</I>&gt;<i>
+</I>&gt;<i>     The subversion of the lexical conventions is the most tiresome
+</I>&gt;<i>     aspect. (It also needs to be switchable in order to allow easy
+</I>&gt;<i>     interfacing with more conventional OCaml code.) In camlp5, I do
+</I>&gt;<i>     this by copying and editing the existing lexer, which makes it
+</I>&gt;<i>     very brittle and necessitates frequent changes as camlp5's
+</I>&gt;<i>     internals evolve. I would very much like a better solution.
+</I>
+
+This is really about proposing a concrete syntax (even lexical 
+conventions) different from regular OCaml, a little bit in the same vein 
+as camlp4's revised syntax.  I believe this is better left outside the 
+scope of -ppx, which is about providing syntactic facilities (code 
+generation, macros, etc) rather than changing the concrete syntax.
+
+To support fully custom syntax, the &quot;-pp&quot; flag will always be available. 
+  You can implement a custom parser with 
+camlp4/camlp5/ocamlyacc/menhir/etc and then use -ppx rewriters on the 
+result, if needed (so that your users will be able to use all the nice 
+-ppx rewriter even if your concrete syntax is quite different from 
+OCaml).  In a sense, -ppx improve the situation here, because I suspect 
+that changing OCaml's grammar means destroying/shadowing some rules in 
+Camlp'4 OCaml grammar, and those rules might be relied upon by &quot;syntax 
+extensions&quot;.  With -ppx, we would have a stricter separation between the 
+concrete syntax, and additional syntactic tools (-ppx).
+
+Btw, did you consider forking OCaml's lexer/parser instead of relying on 
+camlp5 plus hacks for the lexical part?
+
+
+Alain
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000077.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+	<LI>Next message: <A HREF="000028.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#13">[ date ]</a>
+              <a href="thread.html#13">[ thread ]</a>
+              <a href="subject.html#13">[ subject ]</a>
+              <a href="author.html#13">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,276 @@
+From timmcgil at gmail.com  Fri Jan  2 23:01:43 2015
+From: timmcgil at gmail.com (Tim McGilchrist)
+Date: Sat, 3 Jan 2015 10:01:43 +1100
+Subject: [ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+Message-ID: <8D6EEB96-346B-4532-B859-014D36D27503@gmail.com>
+
+I'm trying to call some C code from OCaml where I need to supply an allocated pointer to my type yaml_parser_t. But I'm not sure how I should be allocating a valid pointer. The example code is below.
+
+Ideally I'd like to not have to supply a concrete implementation for yaml_parser_t as well, since I don't need to inspect it's internals, just pass it into and out of various functions. Plus the description of yaml_parser_t is large and I don't want to spend my time mapping it if I don't have to. I was initially following the time_t example from Real World OCaml but they seem to be using the time function to allocate which I don't have here. 
+
+open PosixTypes;;
+open Ctypes;;
+open Foreign;;
+
+type yaml_parser_t = unit;;
+let yaml_parser_t : yaml_parser_t typ = void;;
+
+(* To get it working in utop, specify the name of the library *)
+let libyaml = Dl.(dlopen ~filename:"libyaml.dylib" ~flags:[RTLD_NOW]);;
+
+let init = foreign "yaml_parser_initialize" (ptr yaml_parser_t @-> returning int);;
+
+let make =
+    let p_ptr = allocate yaml_parser_t (from_voidp yaml_parser) in
+    let _ = init p_ptr in
+    p_ptr;;
+
+How can I allocate a yaml_parser_t without having to map the entire structure in ctypes?
+
+Thanks
+
+-----------------------------------------------------
+Tim McGilchrist
+
+@lambda_foo
+http://github.com/tmcgilchrist
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150103/b5575305/attachment.html>
+
+From yallop at gmail.com  Sun Jan  4 00:19:33 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sun, 4 Jan 2015 00:19:33 +0000
+Subject: [ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+In-Reply-To: <8D6EEB96-346B-4532-B859-014D36D27503@gmail.com>
+References: <8D6EEB96-346B-4532-B859-014D36D27503@gmail.com>
+Message-ID: <CAAxsn=FM0aBeL1V7evkRuPovovn54MVWJ1QVT8K55JctEpaZdA@mail.gmail.com>
+
+On 2 January 2015 at 23:01, Tim McGilchrist <timmcgil at gmail.com> wrote:
+> I'm trying to call some C code from OCaml where I need to supply an
+> allocated pointer to my type yaml_parser_t. But I'm not sure how I should be
+> allocating a valid pointer. The example code is below.
+>
+> Ideally I'd like to not have to supply a concrete implementation for
+> yaml_parser_t as well, since I don't need to inspect it's internals, just
+> pass it into and out of various functions.
+
+There are a few ways to approach this.  If you have some way of
+finding out the size of a yaml_parser_t (e.g. via a configure script)
+then you can just allocate a buffer of that size and use it at an
+appropriate type.  For example, you might describe a parser as an
+struct type without actually specifying any fields:
+
+  type yaml_parser_t = [`yaml_parser_s] structure
+  let parser_t : yaml_parser_t typ = structure "yaml_parser_s"
+
+and then allocate parser_t values using something like the following:
+
+  let make_parser () =
+    coerce (ptr char) (ptr parser_t) (allocate_n ~count:parser_size char)
+
+(A couple of things that you might wonder about: allocate_n returns
+properly aligned memory, just like C's malloc(), so this is safe in
+terms of alignment; the buffer returned by allocate_n will be released
+automatically when you no longer have a reference to it).
+
+You can use the definition above in your "foreign" bindings, of course:
+
+   let init = foreign "yaml_parser_initialize" (ptr parser_t @-> returning int)
+
+Another possibility, if you're happy to work with the bleeding edge
+(i.e. unreleased Ctypes from GitHub) is to use "struct stubs", which
+will retrieve the size information for you without requiring you to
+describe parts of the structure that you're not going to use.  The
+functions for describing structures are essentially the same as what's
+described in Real World OCaml, but the build process is a little more
+complex.
+
+Here's an example of the struct stubs approach.  The main thing you
+need to do is describe the bits of the structure that you're
+interested in and put the description inside a functor with argument
+type Cstubs.Types.TYPE.
+
+  module Bindings(S : Cstubs.Types.TYPE) =
+  struct
+    open S
+    let yaml_parser_s : [`yaml_parser_s] structure typ =
+      structure "yaml_parser_s"
+    let () = seal yaml_parser_s
+  end
+
+You can then pass the functor to the write_c function to generate some
+C code which will determine the layout of the structure:
+
+   (* write the C code to stdout with the appropriate header: *)
+   print_endline "#include <yaml.h>";
+   Cstubs.Types.write_c Format.std_formatter (module Bindings)
+
+Compiling and running the C code will generate an OCaml module with
+the size and alignment information inlined:
+
+   ocamlfind ocamlc -c -package ctypes.stubs generated_c.c
+   gcc generated_c.o -o generated_c
+   ./generated_c > generated_module.ml
+   ocamlfind ocamlc -c -package ctypes.stubs generated_module.ml
+
+Finally you can apply the Bindings functor to the generated module to
+bring the layout information into your program:
+
+    # #load "generated_module.cmo";;
+    # include Bindings(Generated_module);;
+    val yaml_parser_s : [ `yaml_parser_s ] structure typ =
+      Static.Struct
+       {Static.tag = "yaml_parser_s";
+        spec = Static.Complete {Static.size = 480; align = 8}; fields = []}
+
+and you can immediately query the layout:
+
+    # sizeof yaml_parser_s;;
+    - : int = 480
+
+and allocate objects of the yaml_parser_s type:
+
+    # make yaml_parser_s;;
+    - : ([ `yaml_parser_s ], [ `Struct ]) structured =
+    {Static.structured = Static.CPointer <abstr>}
+
+I hope that helps!
+
+Jeremy.
+
+From tekk at parlementum.net  Sat Jan 10 22:22:38 2015
+From: tekk at parlementum.net (tekk)
+Date: Sat, 10 Jan 2015 14:22:38 -0800
+Subject: [ocaml-ctypes] Converting between primitive and ocaml types
+Message-ID: <20150110172238.14fee392@Hetalia.tekk.com.ar>
+
+
+I'm sure that there's something in the documentation that I'm missing,
+but I can't seem to find it. How do you convert between primitive types
+(uint8_t, uint32_t, etc.) and native ocaml types like plain int? I
+figured that views would be defined for this but I get type errors for
+trying to use these types as ints.
+
+From yallop at gmail.com  Sat Jan 10 22:37:19 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 10 Jan 2015 22:37:19 +0000
+Subject: [ocaml-ctypes] Converting between primitive and ocaml types
+In-Reply-To: <20150110172238.14fee392@Hetalia.tekk.com.ar>
+References: <20150110172238.14fee392@Hetalia.tekk.com.ar>
+Message-ID: <CAAxsn=HxwennBZ=u1h_DKPGcXfRYT7qSwXLGaeje9BXvfVF4vw@mail.gmail.com>
+
+On 10 January 2015 at 22:22, tekk <tekk at parlementum.net> wrote:
+> I'm sure that there's something in the documentation that I'm missing,
+> but I can't seem to find it. How do you convert between primitive types
+> (uint8_t, uint32_t, etc.) and native ocaml types like plain int?
+
+The unsigned types all have to_int and from_int methods in the
+associated modules:
+
+   http://ocamllabs.github.io/ocaml-ctypes/Unsigned.S.html#VALto_int
+
+For example:
+
+   # Unsigned.UInt32.of_int 10;;
+   - : Unsigned.UInt32.t = <uint32 10>
+
+> I figured that views would be defined for this but I get type errors for
+> trying to use these types as ints.
+
+There aren't any built-in views for this, but you can use views to
+build types that appear as int on the OCaml side and other types (e.g.
+uint32_t) on the C side.  For example,
+
+  # let isize_t = view size_t
+       ~read:Unsigned.Size_t.to_int
+       ~write:Unsigned.Size_t.of_int;;
+      val isize_t : int typ = size_t
+  # let memcpy = foreign "memcpy" (ptr void @-> ptr void @-> isize_t
+@-> returning (ptr void));;
+  val memcpy : unit ptr -> unit ptr -> int -> unit ptr = <fun>
+
+Now you can call memcpy passing an int as the third argument and the
+view will convert it to size_t automatically.
+
+I hope that's helpful.
+
+Jeremy.
+
+From jp.deplaix at gmail.com  Wed Jan 21 22:07:39 2015
+From: jp.deplaix at gmail.com (Jacques-Pascal Deplaix)
+Date: Wed, 21 Jan 2015 22:07:39 +0000
+Subject: [ocaml-ctypes] Bind a function with a type external to the library
+Message-ID: <54C0232B.2040107@gmail.com>
+
+Hi,
+
+I'm trying to bind libmemphis with ctypes and I encounter some problems 
+with one function in particular:
+https://github.com/LamaUrbain/ocaml-memphis/blob/master/src/memphis_renderer.ml#L55
+
+The function takes a cairo_t in C but in OCaml I would like to use 
+Cairo.context.
+So I tried by using Obj.magic in the overloading just below (in the code 
+linked above) but when I try to use the function it segfaults in some 
+random cairo function (memphis_renderer_draw_tile is called before and 
+seems to work).
+
+Is there an other way to use an OCaml type (Cairo.context) instead of 
+the abstract C type or the problem might comes from somewhere else ?
+
+Cheers,
+
+From yallop at gmail.com  Tue Jan 27 12:45:26 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 27 Jan 2015 12:45:26 +0000
+Subject: [ocaml-ctypes] Bind a function with a type external to the
+	library
+In-Reply-To: <54C0232B.2040107@gmail.com>
+References: <54C0232B.2040107@gmail.com>
+Message-ID: <CAAxsn=FdRQWBx_MNmE7SnYvjFPzX3hYcEwZMwR5bz3DPMaYcEw@mail.gmail.com>
+
+On 21 January 2015 at 22:07, Jacques-Pascal Deplaix
+<jp.deplaix at gmail.com> wrote:
+> I'm trying to bind libmemphis with ctypes and I encounter some problems with
+> one function in particular:
+> https://github.com/LamaUrbain/ocaml-memphis/blob/master/src/memphis_renderer.ml#L55
+>
+> The function takes a cairo_t in C but in OCaml I would like to use
+> Cairo.context.
+> So I tried by using Obj.magic in the overloading just below (in the code
+> linked above) but when I try to use the function it segfaults in some random
+> cairo function (memphis_renderer_draw_tile is called before and seems to
+> work).
+>
+> Is there an other way to use an OCaml type (Cairo.context) instead of the
+> abstract C type or the problem might comes from somewhere else ?
+
+If the cairo_t value isn't used abstractly inside libmemphis then
+passing an OCaml value instead of a cairo_t won't work.  You need to
+somehow extract the address of the underlying C object from the
+abstract Cairo representation and then pass that address to
+libmemphis.  A quick look at the Cairo source suggests that something
+along the following lines might work, but I haven't compiled or tested
+it:
+
+  /* C stub for turning a Cairo.t into a ctypes-compatible address */
+  #include "ml_cairo.h"
+  #include <caml/mlvalues.h>
+  #include <caml/alloc.h>
+  #include <stdint.h>
+
+  value cairo_address(value v)
+  {
+     return caml_copy_native_int((intptr_t)cairo_t_val(v));
+  }
+
+
+  (* ML binding for the C stub *)
+  external cairo_raw_address : Cairo.t -> nativeint =
+    "cairo_address"
+
+  let ctypes_ptr_of_cairo_t : Cairo.t -> unit Ctypes.ptr =
+    fun c -> Ctypes.ptr_of_raw_address (cairo_raw_address c)
+

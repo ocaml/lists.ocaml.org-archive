@@ -1,0 +1,1812 @@
+From andre at digirati.com.br  Tue Dec 19 23:00:35 2017
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 19 Dec 2017 21:00:35 -0200
+Subject: [ocaml-ctypes] Help with probable GC problem
+Message-ID: <12f7b334-d4de-85a8-d7b4-1eeb434289c3@digirati.com.br>
+
+Hi
+
+I've been trying to find a bug in my OCaml MariaDB bindings but haven't 
+had any luck so I decided to try the list.
+
+The issue is that after a few hundred runs, the username passed to the 
+MariaDB connection function becomes garbled, failing with a message like
+
+   Access denied for user 'x??P?'@'localhost' (using password: YES)
+
+It seems like a memory value is being overwritten, or maybe claimed by 
+the OCaml GC, although in the library I explicitly copy the username 
+string, and libmariadb calls strdup() on it so I'm not sure that's the 
+problem.
+
+Since the library is very large, I created a branch with the minimal 
+bindings to open and close a connection, so that inspection of the code 
+becomes feasible:
+
+   https://github.com/andrenth/ocaml-mariadb/tree/minimal
+
+The example test code simply opens and closes the connection 50k times. 
+It uses Unix.select to avoid dependencies, but the problem also happens 
+with, say, Lwt.
+
+In C, the library is used like this:
+
+   int status;
+   MYSQL mysql, *ret;
+
+   status = mysql_real_connect_start(&ret, &mysql,
+                                     "host", "user", "pass",
+                                     NULL, 0, NULL, 0);
+   while (status) {
+     status = wait_for_mysql(&mysql, status);
+     status = mysql_real_connect_cont(&ret, &mysql, status);
+   }
+
+   if (!ret)
+     fatal(&mysql, "Failed to mysql_real_connect()");
+
+The idea is to try to connect with the "start" function and keep trying 
+until the socket is ready and "cont" function succeeds.
+
+In OCaml, the bindings are as below:
+
+   type mysql = unit ptr
+   let mysql : mysql typ = ptr void
+
+   type mysql_opt = unit ptr option
+   let mysql_opt : mysql_opt typ = ptr_opt void
+
+   let mysql_real_connect_start = foreign "mysql_real_connect_start"
+     (ptr mysql_opt @-> mysql @-> ptr_opt char @-> ptr_opt char @->
+      ptr_opt char @-> ptr_opt char @-> uint @-> ptr_opt char @->
+      ulong @-> returning int)
+
+   let mysql_real_connect_cont = foreign "mysql_real_connect_cont"
+     (ptr mysql_opt @-> mysql @-> int @-> returning int)
+
+Then there are wrappers for the two connect functions:
+
+   let handle_ret f =
+     let ret = allocate B.mysql_opt None in
+     let status = f ret in
+     (status, !@ret)
+
+   let mysql_real_connect_start mysql host user pass db port sock flags =
+     (* convert string option to char ptr option *)
+     let host, user, pass, db, sock = ...
+     let port = Unsigned.UInt.of_int port in
+     let flags = Unsigned.ULong.of_int flags in
+     handle_ret
+       (fun ret ->
+         B.mysql_real_connect_start
+           ret mysql host user pass db port socket flags)
+
+   let mysql_real_connect_cont mysql status =
+     handle_ret (fun ret -> B.mysql_real_connect_cont ret mysql status)
+
+To implement the start/wait/cont loop, I have the function below:
+
+   let rec nonblocking mariadb (start, cont) =
+     match start () with
+     | `Ok v -> return (Ok v)
+     | `Error e -> return (Error e)
+     | `Wait status ->
+         W.wait mariadb status >>= fun s ->
+         nonblocking mariadb ((fun () -> cont status), cont)
+
+Here W is a user-provided module that checks socket readiness.
+
+Then two more wrappers to allow the connect start/cont functions to be 
+used with "nonblocking":
+
+   let handle_opt mariadb = function
+     | 0, Some _ -> `Ok mariadb
+     | 0, None -> `Error (error mariadb)
+     | s, _ -> `Wait (Status.of_int s)
+
+   let connect_start mariadb host user pass db port sock () =
+     handle_opt mariadb
+       (B.mysql_real_connect_start mariadb host user pass db port sock 0)
+
+   let connect_cont mariadb status =
+     handle_opt mariadb
+       (B.mysql_real_connect_cont mariadb (Status.to_int status))
+
+Collect both functions in a tuple:
+
+   let connect mariadb ?host ?user ?pass ?db ?(port=0) ?socket () =
+     let start = connect_start mariadb host user pass db port socket in
+     let cont = connect_cont mariadb in
+     (start, cont)
+
+And finally the user-visible function, which passes the tuple to 
+"nonblocking":
+
+   let connect ?host ?user ?pass ?db ?(port=0) ?socket () =
+     match init () with
+     | Some m ->
+         nonblocking m (connect m ?host ?user ?pass ?db ~port ?socket ())
+     | None ->
+         return (Error (2008, "out of memory"))
+
+I'm not sure if any sort of obvious error can be spotted from all that 
+above, but any help would be appreciated.
+
+Thanks in advance,
+Andre
+
+From yallop at gmail.com  Tue Dec 19 23:55:15 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 19 Dec 2017 23:55:15 +0000
+Subject: [ocaml-ctypes] Help with probable GC problem
+In-Reply-To: <12f7b334-d4de-85a8-d7b4-1eeb434289c3@digirati.com.br>
+References: <12f7b334-d4de-85a8-d7b4-1eeb434289c3@digirati.com.br>
+Message-ID: <CAAxsn=FSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg@mail.gmail.com>
+
+Dear Andre,
+
+On 19 December 2017 at 23:00, Andre Nathan <andre at digirati.com.br> wrote:
+> It seems like a memory value is being overwritten, or maybe claimed by the
+> OCaml GC, although in the library I explicitly copy the username string, and
+> libmariadb calls strdup() on it so I'm not sure that's the problem.
+>
+> Since the library is very large, I created a branch with the minimal
+> bindings to open and close a connection, so that inspection of the code
+> becomes feasible:
+>
+>   https://github.com/andrenth/ocaml-mariadb/tree/minimal
+
+Thanks for the clear explanation and reproduction case.  I think that
+your diagnosis is correct
+
+It appears that the problem arises from the nonblocking nature of the
+code.  When a program creates a block of memory using Ctypes.allocate,
+like this
+
+    let user = allocate ...
+
+ctypes ensures the memory is not freed so long as 'user' is reachable.
+Additionally, if 'user' is passed to a C function then ctypes ensures
+that the memory is not freed for the duration of the function call.
+
+However, in the MariaDB bindings 'user' appears to be accessed by
+MariaDB after the C function it's passed to returns.  More concretely,
+the pointer is passed into C like this:
+
+    let user = allocate ... in
+    ...
+    B.mysql_real_connect_start ret mysql host user pass db port socket flags
+
+and then mysql_real_connect_start keeps a reference to 'user' and
+returns immediately.  Since OCaml/ctypes can no longer see any uses of
+'user', the memory is assumed to be no longer needed and so it's
+reclaimed by the GC.  However, MariaDB still has a reference (that it
+later accesses asynchronously) which is unsafe to use after the GC
+reclaims the memory.
+
+If the above is correct then there are at least two solutions.  You
+could ensure somehow that 'user' and other such pointers are kept
+around on the OCaml side until the associated memory is no longer
+needed by MariaDB.  Or you could switch from 'allocate' to a
+malloc/free style arrangement to avoid the automatic collection
+altogether.
+
+There's a bit of guesswork involved in the above, so please follow up
+if it doesn't fix the problem for you!
+
+Kind regards,
+
+Jeremy
+
+PS You may find ocaml-memcpy (https://github.com/yallop/ocaml-memcpy)
+a useful alternative to char_ptr_buffer_of_string for copying strings
+between OCaml and C memory.
+
+From andre at digirati.com.br  Wed Dec 20 01:21:09 2017
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 19 Dec 2017 23:21:09 -0200
+Subject: [ocaml-ctypes] Help with probable GC problem
+In-Reply-To: <CAAxsn=FSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg@mail.gmail.com>
+References: <12f7b334-d4de-85a8-d7b4-1eeb434289c3@digirati.com.br>
+ <CAAxsn=FSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg@mail.gmail.com>
+Message-ID: <1d6dd742-6e39-30d6-0345-ae339f6375bb@digirati.com.br>
+
+Jeremy, it appears you are right, as usual.
+
+I've replace my type definition:
+
+   type 'm connection = B.mysql
+
+with
+
+   type 'm connection =
+     { handle : B.mysql
+     ; host   : char Ctypes.ptr option
+     ; port   : int
+     ; user   : char Ctypes.ptr option
+     ; pass   : char Ctypes.ptr option
+     ; db     : char Ctypes.ptr option
+     ; socket : char Ctypes.ptr option
+     }
+
+and that made the error disappear (initially the record only had a field 
+for the user, which caused and error on the password, then on the db 
+name, etc. which I guess confirms your diagnosis). The port is there 
+only for completeness.
+
+Tomorrow I'll make the fix in the real library code.
+
+Regarding ocaml-memcpy, would it have the same effect in this case if I 
+replaced the "ptr_opt char" parameters in the binding specifications 
+with just "string", thus letting ctypes make the copy? In that case, 
+would I still need to keep a reference to the strings on the OCaml side?
+
+Cheers, and thanks a lot,
+Andre
+
+
+On 12/19/2017 09:55 PM, Jeremy Yallop wrote:
+> Dear Andre,
+> 
+> On 19 December 2017 at 23:00, Andre Nathan <andre at digirati.com.br> wrote:
+>> It seems like a memory value is being overwritten, or maybe claimed by the
+>> OCaml GC, although in the library I explicitly copy the username string, and
+>> libmariadb calls strdup() on it so I'm not sure that's the problem.
+>>
+>> Since the library is very large, I created a branch with the minimal
+>> bindings to open and close a connection, so that inspection of the code
+>> becomes feasible:
+>>
+>>    https://github.com/andrenth/ocaml-mariadb/tree/minimal
+> 
+> Thanks for the clear explanation and reproduction case.  I think that
+> your diagnosis is correct
+> 
+> It appears that the problem arises from the nonblocking nature of the
+> code.  When a program creates a block of memory using Ctypes.allocate,
+> like this
+> 
+>      let user = allocate ...
+> 
+> ctypes ensures the memory is not freed so long as 'user' is reachable.
+> Additionally, if 'user' is passed to a C function then ctypes ensures
+> that the memory is not freed for the duration of the function call.
+> 
+> However, in the MariaDB bindings 'user' appears to be accessed by
+> MariaDB after the C function it's passed to returns.  More concretely,
+> the pointer is passed into C like this:
+> 
+>      let user = allocate ... in
+>      ...
+>      B.mysql_real_connect_start ret mysql host user pass db port socket flags
+> 
+> and then mysql_real_connect_start keeps a reference to 'user' and
+> returns immediately.  Since OCaml/ctypes can no longer see any uses of
+> 'user', the memory is assumed to be no longer needed and so it's
+> reclaimed by the GC.  However, MariaDB still has a reference (that it
+> later accesses asynchronously) which is unsafe to use after the GC
+> reclaims the memory.
+> 
+> If the above is correct then there are at least two solutions.  You
+> could ensure somehow that 'user' and other such pointers are kept
+> around on the OCaml side until the associated memory is no longer
+> needed by MariaDB.  Or you could switch from 'allocate' to a
+> malloc/free style arrangement to avoid the automatic collection
+> altogether.
+> 
+> There's a bit of guesswork involved in the above, so please follow up
+> if it doesn't fix the problem for you!
+> 
+> Kind regards,
+> 
+> Jeremy
+> 
+> PS You may find ocaml-memcpy (https://github.com/yallop/ocaml-memcpy)
+> a useful alternative to char_ptr_buffer_of_string for copying strings
+> between OCaml and C memory.
+> 
+
+From yallop at gmail.com  Thu Dec 21 23:49:16 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 21 Dec 2017 23:49:16 +0000
+Subject: [ocaml-ctypes] Help with probable GC problem
+In-Reply-To: <1d6dd742-6e39-30d6-0345-ae339f6375bb@digirati.com.br>
+References: <12f7b334-d4de-85a8-d7b4-1eeb434289c3@digirati.com.br>
+ <CAAxsn=FSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg@mail.gmail.com>
+ <1d6dd742-6e39-30d6-0345-ae339f6375bb@digirati.com.br>
+Message-ID: <CAAxsn=FJUa=x0VKG4KEaCeHmbOUeybhwG+BeR=yLur+HdE0A9Q@mail.gmail.com>
+
+On 20 December 2017 at 01:21, Andre Nathan <andre at digirati.com.br> wrote:
+> Regarding ocaml-memcpy, would it have the same effect in this case if I
+> replaced the "ptr_opt char" parameters in the binding specifications with
+> just "string", thus letting ctypes make the copy? In that case, would I
+> still need to keep a reference to the strings on the OCaml side?
+
+At the moment, no: if you use a string view ctypes will not keep the
+copy alive beyond the lifetime of the C call.
+
+But tying the lifetimes of the string and the copy together is a
+reasonable idea, and would match the behaviour of 'funptr', where
+keeping an OCaml function alive does keep the corresponding C function
+pointer alive.  I've opened an issue to discuss/track the possibility
+of changing the behaviour:
+https://github.com/ocamllabs/ocaml-ctypes/issues/556
+
+From skaller at internode.on.net  Mon Dec 25 21:44:57 2017
+From: skaller at internode.on.net (john skaller)
+Date: Tue, 26 Dec 2017 08:44:57 +1100
+Subject: [ocaml-ctypes] Help with strings
+Message-ID: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+
+Hi!
+
+I have not been able to understand well enough how the
+memory management protocols work.
+
+In C, there is a problem that pointed at objects, especially char*
+and char** are used as parameters and return values but the
+type does not specify ownership. This has to be done in comments.
+
+The method of binding is different. For example
+
+	char const *get_version();
+	char *get_buffer();
+	char *strdup(char *);
+
+
+The first function returns a pointer to an immutable global object.
+The second to a mutable part of a buffer.
+The third to a freshly malloc()ed copy of a NTBS.
+
+Also, strdup is accepting a string argument which it does not own
+so the caller must free it if the caller allocated it. The return value
+belongs to the caller so must be freed.
+
+Obviously ?returning string? Ctypes spec is not going to work for
+all three of these return types and it isn?t clear how ?string?
+works for the strdup argument. The string would be invisible to
+the Ocaml caller, so how does it get freed? Ctypes can?t know
+when to free it. 
+
+Here?s another example:
+
+	memcpy (a,b,n)
+
+which returns a copy of b, the output buffer pointer. And another
+
+	void add_opt (char **, char*)
+
+which adds the second argument to an array of NTBS (terminated
+by a NULL pointer).
+
+C types had better not delete the argument char* it creates for a string
+argument, but on the other hand, the client CANNOT delete it because
+it is hidden. Either we get a crash or a leak.
+
+So roughly, if you wanted to do it right, Ctypes ?type? system is inadequate.
+The ?types? must contain mutablility and ownership information.
+For example
+
+	immutable_lend_noincrementable_nonnull_pointer_char
+
+
+is better, but STILL not enough to ensure that a char const * passed to
+a function can be freed after Ctypes creates a copy of the Ocaml string
+contents (because the candidate function could return the pointer).
+
+Basically the programmer has to tell Ctypes the access method of
+every (non-scalar) object. 
+
+Of course I can do that by passing a char ptr manually created
+(C types can do that I think), copying Ocaml string contents manually
+(how?), and then manually free-ing it (C types can do that?)
+
+So roughly .. when is it safe to use ?string??
+At the moment the answer for me is ?never? because I don?t understand the
+memory management protocol.
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Tue Dec 26 23:04:30 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 26 Dec 2017 23:04:30 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+Message-ID: <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+
+Dear John,
+
+On 25/12/2017, john skaller <skaller at internode.on.net> wrote:
+> So roughly .. when is it safe to use ?string??
+> At the moment the answer for me is ?never? because I don?t understand the
+> memory management protocol.
+
+It works like this:
+
+  * passing a string using 'string' makes a copy in either direction.
+Furthermore,
+
+    - the copy created when passing a string from OCaml to C lives for
+the lifetime of the C call.
+      (It's possible this will be strengthened in the future:
+https://github.com/ocamllabs/ocaml-ctypes/issues/556)
+
+    - the copy created when passing a string from C to OCaml is a
+regular OCaml string, subject to usual GC behaviour.  Ctypes makes no
+attempt to deallocate the memory used by the original C string.
+
+So, for your three examples
+
+>         char const *get_version();
+>         char *get_buffer();
+>         char *strdup(char *);
+>
+>
+> The first function returns a pointer to an immutable global object.
+
+It's fine, and probably the best choice, to use 'string' for
+'get_version'.  Each call to the function will create a fresh OCaml
+string.
+
+> The second to a mutable part of a buffer.
+
+Mutability means that it's probably not useful to use `string` here,
+since 'string' will create a copy that won't track changes.  It would
+be better to write
+
+   let get_buffer = foreign "get_buffer"
+      (void @-> returning (ptr char))
+
+> The third to a freshly malloc()ed copy of a NTBS.
+
+Here 'string' is not the right thing for the *return type*, since (as
+you say) it prevents access to the pointer needed to free the returned
+memory.  Again, 'ptr char' is probably the best starting point.  On
+the other hand, 'string' is a reasonable choice for the *argument*,
+since Ctypes will automatically deallocate the copy of the string
+after the call.  So the following binding is reasonable:
+
+    let strdup = foreign "strdup"
+      (string @-> returning (ptr char))
+
+In this case it's possible to do a little better.  The 'ocaml_string'
+type description is an alternative to 'string' that avoids the copy:
+
+    let strdup = foreign "strdup"
+      (ocaml_string @-> returning (ptr char))
+
+In the general case, where the C function can call back into OCaml,
+'ocaml_string' is not safe.  But it's safe in the common (first-order)
+case, which includes 'strdup'.
+
+> So roughly, if you wanted to do it right, Ctypes ?type? system is inadequate.
+> The ?types? must contain mutablility and ownership information.
+> For example
+>
+>         immutable_lend_noincrementable_nonnull_pointer_char
+
+You're quite right, both that Ctypes doesn't capture these properties
+in the type system, and that it's quite challenging to do so, since C
+is so flexible.  (For example, the 'realpath' function can return
+either a malloc-allocated buffer or a caller-supplied buffer,
+depending on the value of its second argument!)
+
+Regarding mutability, the 4.06.0 release of OCaml distinguishes
+mutable from immutable strings.  When Ctypes drops support for older
+OCaml versions it's likely that string mutability will be more clearly
+marked in Ctypes bindings, too.
+
+> Of course I can do that by passing a char ptr manually created
+> (C types can do that I think),
+
+Indeed (see above).
+
+> copying Ocaml string contents manually (how?),
+
+A quick way is to use the 'coerce' function, which can convert between
+'ptr char' and 'string' because 'string' is a view for 'ptr char'.
+Here's an example using the 'strdup' binding above.
+
+    # let p = strdup "hello, world";;
+    val p : char Ctypes_static.ptr = (char*) 0x5601c2a90130
+    # coerce (ptr char) string p;;
+    - : string = "hello, world"
+
+More generally the 'ocaml-memcpy' package provides functions that can
+copy between several different representations
+(https://github.com/yallop/ocaml-memcpy).
+
+> and then manually free-ing it (C types can do that?)
+
+A simple way is to bind 'free'!  Here's an example, freeing the memory
+returned from the call to 'strdup' above.
+
+    # let free = foreign "free" (ptr char @-> returning void);;
+    val free : char Ctypes_static.ptr -> unit = <fun>
+    # free p;;
+    - : unit = ()
+
+Kind regards,
+
+Jeremy
+
+From skaller at internode.on.net  Tue Dec 26 23:45:23 2017
+From: skaller at internode.on.net (john skaller)
+Date: Wed, 27 Dec 2017 10:45:23 +1100
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+Message-ID: <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+
+
+> On 27 Dec. 2017, at 10:04, Jeremy Yallop <yallop at gmail.com> wrote:
+> 
+> Dear John,
+
+Hi! Sorry for the email mixuo, i?m subscribed twice now,
+once at sourceforge and once at internode.
+
+I have another question: what?s the best way to bind an ?enum??
+If the codes are sequential is there a builtin way to map the enum
+into an Ocaml variant?
+
+I guess that would use a ppx thing?
+
+> I have another question: what?s the best way to bind an ?enum??
+> If the codes are sequential is there a builtin way to map the enum
+> into an Ocaml variant?
+> 
+> 
+> On 25/12/2017, john skaller <skaller at internode.on.net> wrote:
+>> So roughly .. when is it safe to use ?string??
+>> At the moment the answer for me is ?never? because I don?t understand the
+>> memory management protocol.
+> 
+> It works like this:
+> 
+>  * passing a string using 'string' makes a copy in either direction.
+> Furthermore,
+> 
+>    - the copy created when passing a string from OCaml to C lives for
+> the lifetime of the C call.
+>      (It's possible this will be strengthened in the future:
+> https://github.com/ocamllabs/ocaml-ctypes/issues/556)
+> 
+>    - the copy created when passing a string from C to OCaml is a
+> regular OCaml string, subject to usual GC behaviour.  Ctypes makes no
+> attempt to deallocate the memory used by the original C string.
+
+Right, thanks! That?s a definite spec, perhaps please you could add those
+comments to the documentation?
+
+
+> 
+> So, for your three examples
+> 
+>>        char const *get_version();
+>>        char *get_buffer();
+>>        char *strdup(char *);
+>> 
+>> 
+>> The first function returns a pointer to an immutable global object.
+> 
+> It's fine, and probably the best choice, to use 'string' for
+> 'get_version'.  Each call to the function will create a fresh OCaml
+> string.
+
+Heh .. happily that?s the one function I have actually implemented and tested.
+
+> 
+>> The second to a mutable part of a buffer.
+> 
+> Mutability means that it's probably not useful to use `string` here,
+> since 'string' will create a copy that won't track changes.  It would
+> be better to write
+> 
+>   let get_buffer = foreign "get_buffer"
+>      (void @-> returning (ptr char))
+
+Gotcha!
+
+> 
+>> The third to a freshly malloc()ed copy of a NTBS.
+> 
+> Here 'string' is not the right thing for the *return type*, since (as
+> you say) it prevents access to the pointer needed to free the returned
+> memory.  Again, 'ptr char' is probably the best starting point.  On
+> the other hand, ?string' is a reasonable choice for the *argument*,
+
+Right.
+
+I may have some more questions, hope you don?t mind.
+Perhaps the answers will be useful to others starting out.
+
+BTW: some of the code appears in  several places.
+Why is that?
+(Ctypes vs Ctypes_types.TYPE)
+
+
+> since Ctypes will automatically deallocate the copy of the string
+> after the call.  So the following binding is reasonable:
+> 
+>    let strdup = foreign "strdup"
+>      (string @-> returning (ptr char))
+> 
+> In this case it's possible to do a little better.  The 'ocaml_string'
+> type description is an alternative to 'string' that avoids the copy:
+> 
+>    let strdup = foreign "strdup"
+>      (ocaml_string @-> returning (ptr char))
+> 
+> In the general case, where the C function can call back into OCaml,
+> 'ocaml_string' is not safe.  But it's safe in the common (first-order)
+> case, which includes ?strdup'.
+
+Ok, so that?s a pointer to the live Ocaml string, and we?re relying
+on the string not being modified or moved during the C call.
+
+Current rules say Ocaml strings are immutable, use bytes instead.
+However, if several threads are running, normally Ocaml is using
+a global lock to serialise them. However the lock is normally
+released when calling C code. That would not be safe in this
+case, using ocaml_string, so presumably in this case the lock
+is not released. Is that correct?
+
+
+> 
+>> So roughly, if you wanted to do it right, Ctypes ?type? system is inadequate.
+>> The ?types? must contain mutablility and ownership information.
+>> For example
+>> 
+>>        immutable_lend_noincrementable_nonnull_pointer_char
+> 
+> You're quite right, both that Ctypes doesn't capture these properties
+> in the type system, and that it's quite challenging to do so, since C
+> is so flexible.  (For example, the 'realpath' function can return
+> either a malloc-allocated buffer or a caller-supplied buffer,
+> depending on the value of its second argument!)
+
+Yeah. And what?s worse is that many libraries describe functionality
+in the documentation and fail to describe the ?ownership? rules.
+Ctypes could do with a bit more of that IMHO.
+
+EG:
+
+val string : string typ
+?
+?To avoid problems with the garbage collector, values passed using Ctypes_types.TYPE.string 
+are copied into immovable C-managed storage before being passed to C.?
+
+That would best contain your explanation above regarding lifetimes.
+It reads like ?you just leaked the copy? since ?C managed store? means
+the C heap and malloc(), which requires a called to free() which isn?t
+what happens.
+
+> 
+> Regarding mutability, the 4.06.0 release of OCaml distinguishes
+> mutable from immutable strings.  When Ctypes drops support for older
+> OCaml versions it's likely that string mutability will be more clearly
+> marked in Ctypes bindings, too.
+
+I?m using 4.05 at the moment and already you get a complaint
+using mutabile operations on string instead of bytes.
+[IMHO the way of doing this changes was poorly thought out]
+
+> 
+>> Of course I can do that by passing a char ptr manually created
+>> (C types can do that I think),
+> 
+> Indeed (see above).
+> 
+>> copying Ocaml string contents manually (how?),
+> 
+> A quick way is to use the 'coerce' function, which can convert between
+> 'ptr char' and 'string' because 'string' is a view for 'ptr char'.
+> Here's an example using the 'strdup' binding above.
+> 
+>    # let p = strdup "hello, world";;
+>    val p : char Ctypes_static.ptr = (char*) 0x5601c2a90130
+>    # coerce (ptr char) string p;;
+>    - : string = "hello, world"
+> 
+> More generally the 'ocaml-memcpy' package provides functions that can
+> copy between several different representations
+> (https://github.com/yallop/ocaml-memcpy).
+
+Thanks!
+
+> 
+>> and then manually free-ing it (C types can do that?)
+> 
+> A simple way is to bind 'free'!  Here's an example, freeing the memory
+> returned from the call to 'strdup' above.
+> 
+>    # let free = foreign "free" (ptr char @-> returning void);;
+>    val free : char Ctypes_static.ptr -> unit = <fun>
+>    # free p;;
+>    - : unit = ()
+> 
+> Kind regards,
+> 
+> Jeremy
+
+
+Thanks heaps!
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Wed Dec 27 05:33:38 2017
+From: skaller at internode.on.net (john skaller)
+Date: Wed, 27 Dec 2017 16:33:38 +1100
+Subject: [ocaml-ctypes] Another dumb question
+Message-ID: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+
+This should be a quicky?.
+
+Suppose I have some messy struct in C which is generally used
+via a pointer. Eg
+
+	void f (messy_struct *, int)
+
+Instead of trying to provide field access I think I?d just like to make it
+abstract. So I would say
+
+	type messy_t
+
+and 
+
+	let messy_c = ptr void 
+
+and then
+
+	let f = foreign ?f? = (messy_c @-> int @-> returning void)
+
+Does that seem right? (where messy_t is the Ocaml type and
+messy_c is the value encoding the view).
+
+Actually I would like to use ?abstract? but there?s doesn?t seem like
+a convenient way to make an abstract type ?the same size and
+alignment as a pointer?. That has the added advantage of
+preventing a pointer coercion.
+
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Wed Dec 27 05:55:55 2017
+From: skaller at internode.on.net (john skaller)
+Date: Wed, 27 Dec 2017 16:55:55 +1100
+Subject: [ocaml-ctypes] Another dumb question
+In-Reply-To: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+References: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+Message-ID: <6667955C-5E44-4506-8BF1-3C9699FA5B64@internode.on.net>
+
+
+> On 27 Dec. 2017, at 16:33, john skaller <skaller at internode.on.net> wrote:
+
+Oops let me try that again.
+
+val messy = abstract 
+	name:?messy? 
+	size:(sizeof null) 
+	aligment:(alignment null))
+
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Wed Dec 27 06:04:13 2017
+From: skaller at internode.on.net (john skaller)
+Date: Wed, 27 Dec 2017 17:04:13 +1100
+Subject: [ocaml-ctypes] Another dumb question
+In-Reply-To: <6667955C-5E44-4506-8BF1-3C9699FA5B64@internode.on.net>
+References: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+ <6667955C-5E44-4506-8BF1-3C9699FA5B64@internode.on.net>
+Message-ID: <87646E8C-27BE-49C1-AE90-96A2581B69F0@internode.on.net>
+
+
+> On 27 Dec. 2017, at 16:55, john skaller <skaller at internode.on.net> wrote:
+> 
+> 
+>> On 27 Dec. 2017, at 16:33, john skaller <skaller at internode.on.net> wrote:
+> 
+> Oops let me try that again.
+> 
+> val messy = abstract 
+> 	name:?messy? 
+> 	size:(sizeof null) 
+> 	aligment:(alignment null))
+
+
+Though Real World Ocaml just does this ..
+
+type messy_ocaml
+let messy_c = messy_ocaml typ
+
+where I assume it works because Ocaml boxes the type.
+Which means the underlying C pointer had better not have the
+low bit set (not that it ever will).
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Wed Dec 27 13:20:59 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 27 Dec 2017 13:20:59 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+Message-ID: <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+
+On 26 December 2017 at 23:45, john skaller <skaller at internode.on.net> wrote:
+>> On 27 Dec. 2017, at 10:04, Jeremy Yallop <yallop at gmail.com> wrote:
+> Hi! Sorry for the email mixuo, i?m subscribed twice now,
+> once at sourceforge and once at internode.
+>
+> I have another question: what?s the best way to bind an ?enum??
+> If the codes are sequential is there a builtin way to map the enum
+> into an Ocaml variant?
+
+Ctypes provides two functions for this:
+
+   'constant' retrieves the value of a compile-time constant
+(enumeration constant, #define value, etc.)
+   http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant
+
+   'enum' builds a 'typ' value from a mapping between constants and OCaml values
+   http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum
+
+Besides the documentation there are examples in various packages, such
+as the OCaml yaml bindings:
+
+   https://github.com/avsm/ocaml-yaml/blob/v0.1.0/types/bindings/yaml_bindings_types.ml#L59-L103
+
+ctypes_of_clang also provides an alternative method of bindings enums
+(see the README):
+
+   https://github.com/ujamjar/ctypes_of_clang
+
+> Right, thanks! That?s a definite spec, perhaps please you could add those
+> comments to the documentation?
+
+Good idea!  I'll get to that soon
+(https://github.com/ocamllabs/ocaml-ctypes/issues/558).
+
+> I may have some more questions, hope you don?t mind.
+> Perhaps the answers will be useful to others starting out.
+>
+> BTW: some of the code appears in  several places.
+> Why is that?
+> (Ctypes vs Ctypes_types.TYPE)
+
+Ctypes_type.TYPE is an abstract interface to type descriptions.  The
+Ctypes module gives a default implementation of the interface.  The
+interface is also used elsewhere, though; in particular, it's used for
+describing C types whose layout is retrieved from C:
+
+    https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli
+
+For example, you can bind a struct using the 'structure' and 'field'
+values in the TYPE interface:
+
+   let s = structure "s"
+   let x  = field s "x" int
+   ....
+
+If you use the implementations of 'structure' and 'field in the Ctypes
+module then the struct layout is computed using an implementation that
+computes offsets using the alignment information for each type.  But
+if you use the implementations of 'structure' and 'field' from the
+Cstubs module then the layout information is retrieved by generating C
+code that's run through a C compiler.  The interface (i.e. TYPE) is
+the same in both cases, but it's useful to have different
+implementations of that interface.
+
+> Ok, so that?s a pointer to the live Ocaml string, and we?re relying
+> on the string not being modified or moved during the C call.
+
+Right.
+
+> Current rules say Ocaml strings are immutable, use bytes instead.
+> However, if several threads are running, normally Ocaml is using
+> a global lock to serialise them. However the lock is normally
+> released when calling C code. That would not be safe in this
+> case, using ocaml_string, so presumably in this case the lock
+> is not released. Is that correct?
+
+Yes, that's correct.  Ctypes supports releasing the lock (via the
+~release_runtime_lock argument in Foreign.foreign, or via the
+concurrency policy in Cstubs), but the lock isn't released by default.
+
+Kind regards,
+
+Jeremy
+
+From yallop at gmail.com  Wed Dec 27 13:31:21 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 27 Dec 2017 13:31:21 +0000
+Subject: [ocaml-ctypes] Another dumb question
+In-Reply-To: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+References: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+Message-ID: <CAAxsn=EbqaKmwtGdT=+URPY0oi_x0JVWbAbgOMBacYCKZMTvFw@mail.gmail.com>
+
+On 27 December 2017 at 05:33, john skaller <skaller at internode.on.net> wrote:
+> This should be a quicky?.
+>
+> Suppose I have some messy struct in C which is generally used
+> via a pointer. Eg
+>
+>         void f (messy_struct *, int)
+>
+> Instead of trying to provide field access I think I?d just like to make it
+> abstract. So I would say
+>
+>         type messy_t
+>
+> and
+>
+>         let messy_c = ptr void
+>
+> and then
+>
+>         let f = foreign ?f? = (messy_c @-> int @-> returning void)
+>
+> Does that seem right? (where messy_t is the Ocaml type and
+> messy_c is the value encoding the view).
+
+The usual way of dealing with this is to define a struct using
+'structure' without calling 'field' or 'seal', like this:
+
+   type messy_t
+   let messy_struct : messy_t structure typ = structure "messy_struct"
+   let messy_c = ptr messy_struct
+
+   let f = foreign ?f? = (messy_c @-> int @-> returning void)
+
+Defining a structure without calling 'seal' is like writing an
+incomplete type declaration in C, so the code above roughly
+corresponds to
+
+   struct messy_struct;
+   typedef struct messy_struct *messy_c;
+
+   void f(messy_c, int);
+
+(The 'abstract' type is not often as useful as it seems to be at
+first.  The use case I had in mind for it is pthread_t, which can be
+different kinds of type -- struct, pointer, integer, etc. -- on
+different platforms.  But that sort of thing is pretty rare in
+practice.)
+
+Kind regards,
+
+Jeremy
+
+From skaller at internode.on.net  Wed Dec 27 23:37:02 2017
+From: skaller at internode.on.net (john skaller)
+Date: Thu, 28 Dec 2017 10:37:02 +1100
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+Message-ID: <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+
+BTW: Just though I?d say, Ctypes is a pretty nice library.
+Well done! There?s no such thing as a perfect foreign interface
+to C, but Ctypes handles much of it reasonably well.
+Indeed, even the ?domestic? interface to C (using C from C
+code) is pretty messy.
+
+>> I have another question: what?s the best way to bind an ?enum??
+>> If the codes are sequential is there a builtin way to map the enum
+>> into an Ocaml variant?
+> 
+> Ctypes provides two functions for this:
+> 
+>   'constant' retrieves the value of a compile-time constant
+> (enumeration constant, #define value, etc.)
+>   http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant
+> 
+>   'enum' builds a 'typ' value from a mapping between constants and OCaml values
+>   http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum
+
+Ah, thanks, I missed that.
+
+Hmm. What does it mean when it says ?the size and alignment are retrieved???
+The only way to do that would be to generate C code and measure it.
+
+So this is Cstubs which IS used that way. But its a multi-step process I do not
+wish to use.  At least for me at this stage .. too much magic:
+
+https://www.youtube.com/watch?v=cV5mmi7BBMY
+
+Looking at the yaml example, jbuilder is used with a ppx to do this at
+during Ocaml compilation, is that correct?
+
+
+> 
+> Ctypes_type.TYPE is an abstract interface to type descriptions.  The
+> Ctypes module gives a default implementation of the interface.  The
+> interface is also used elsewhere, though; in particular, it's used for
+> describing C types whose layout is retrieved from C:
+> 
+>    https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli
+
+Ah, ok, that makes sense.
+
+> 
+> For example, you can bind a struct using the 'structure' and 'field'
+> values in the TYPE interface:
+> 
+>   let s = structure "s"
+>   let x  = field s "x" int
+>   ....
+> 
+> If you use the implementations of 'structure' and 'field in the Ctypes
+> module then the struct layout is computed using an implementation that
+> computes offsets using the alignment information for each type.  But
+> if you use the implementations of 'structure' and 'field' from the
+> Cstubs module then the layout information is retrieved by generating C
+> code that's run through a C compiler.  The interface (i.e. TYPE) is
+> the same in both cases, but it's useful to have different
+> implementations of that interface.
+
+Again, worth adding this description somewhere in the docs.
+Not sure where though, it doesn?t fit into the ?ocamldoc? generated
+pages, more into an ?overall design? doc.
+
+Hmm. How can I contribute easily. Its too early for me to actually
+write docs. However I could create an issue with copies of your
+email comments for someone to integrate.
+
+Also the Q&A style here might suit Stackoverflow?
+
+
+> 
+>> Current rules say Ocaml strings are immutable, use bytes instead.
+>> However, if several threads are running, normally Ocaml is using
+>> a global lock to serialise them. However the lock is normally
+>> released when calling C code. That would not be safe in this
+>> case, using ocaml_string, so presumably in this case the lock
+>> is not released. Is that correct?
+> 
+> Yes, that's correct.  Ctypes supports releasing the lock (via the
+> ~release_runtime_lock argument in Foreign.foreign, or via the
+> concurrency policy in Cstubs), but the lock isn?t released by default.
+
+Ah. That?s important info. Hmm. It is possible the client will be
+using the binding which is of a high performance specialised
+file transfer/analysis code with Jane St Async and might expect
+operations to run ?in the background? using a future. The C library
+uses a thread pool, for example. I suspect this means the lock
+would have to be released. Also  .. when .. or should that be ?if??
+multi-core arrives it will create a big mess. (Especially for 
+JS/Async :)
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From evilkidder at gmail.com  Thu Dec 28 00:09:23 2017
+From: evilkidder at gmail.com (Andy Ray)
+Date: Thu, 28 Dec 2017 00:09:23 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+Message-ID: <CAHYOizG3yv1aTgM0FQMtSKpg4u5M5dRZE2JMS787vf_vn6LLWQ@mail.gmail.com>
+
+>
+>
+>
+>   * passing a string using 'string' makes a copy in either direction.
+> Furthermore,
+>
+>     - the copy created when passing a string from OCaml to C lives for
+> the lifetime of the C call.
+>       (It's possible this will be strengthened in the future:
+> https://github.com/ocamllabs/ocaml-ctypes/issues/556)
+>
+>     - the copy created when passing a string from C to OCaml is a
+> regular OCaml string, subject to usual GC behaviour.  Ctypes makes no
+> attempt to deallocate the memory used by the original C string.
+>
+
+
+In the case where a C function takes and returns the same string, does a
+signature of [string @-> returning string] also work?  In other words, does
+the input string live long enough to ensure the output string is created?
+
+Silly example:
+
+char * foo (char * p) { return (p+1); }
+
+I guess this gets more complex with structures and the like.  More
+generally do the arguments to a function call live long enough to create
+[view]s of a returned value?
+
+-Andy
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20171228/6af6dd70/attachment.html>
+
+From skaller at internode.on.net  Thu Dec 28 00:29:09 2017
+From: skaller at internode.on.net (john skaller)
+Date: Thu, 28 Dec 2017 11:29:09 +1100
+Subject: [ocaml-ctypes] Another dumb question
+In-Reply-To: <CAAxsn=EbqaKmwtGdT=+URPY0oi_x0JVWbAbgOMBacYCKZMTvFw@mail.gmail.com>
+References: <302C46F4-0908-44B8-A793-C9071E0DF3E5@internode.on.net>
+ <CAAxsn=EbqaKmwtGdT=+URPY0oi_x0JVWbAbgOMBacYCKZMTvFw@mail.gmail.com>
+Message-ID: <067A01E6-6F54-499D-A1EB-901521BF3B18@internode.on.net>
+
+
+> On 28 Dec. 2017, at 00:31, Jeremy Yallop <yallop at gmail.com> wrote:
+> 
+> On 27 December 2017 at 05:33, john skaller <skaller at internode.on.net> wrote:
+>> This should be a quicky?.
+>> 
+>> Suppose I have some messy struct in C which is generally used
+>> via a pointer. Eg
+
+
+
+> 
+> The usual way of dealing with this is to define a struct using
+> ?structure' without calling 'field' or 'seal',
+
+I started to do this. But I began to think it was dangerous.
+
+The client of the binding is going to have to do some
+low level work to use the binding, which is a bit nasty.
+However exposing the structures and letting them poke
+about in them feels too dangerous.
+
+And a key struct also uses bitfield :)
+
+In C++ you?d provide a constructor, and some accessor
+and mutator methods, and make the actual data private.
+
+In Ocaml, it feels more natural in these cases where
+functional operations are favoured to make the structure
+opaque, and if necessary for construction, write
+some methods in C, and then provide binding to them.
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Thu Dec 28 13:05:27 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 00:05:27 +1100
+Subject: [ocaml-ctypes] Passing Caml function to C
+Message-ID: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+
+There?s some machinery for this but .. well I am suspicious :)
+
+How can this possibly work?
+
+Caml functions are closures,  the only way you could pass
+a closure would be to generate a thunk. I?m suspicious that
+this doesn?t work in general. And you would need to find
+a place to put the thunk which the OS allows you to execute.
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From ssp.mryau at gmail.com  Thu Dec 28 13:59:46 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Thu, 28 Dec 2017 18:59:46 +0500
+Subject: [ocaml-ctypes] Passing Caml function to C
+In-Reply-To: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+References: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+Message-ID: <CAOUGqWwpa1ucHXm6eii-+Y0H-J_MoXQf5RwEk9b8gC7AVdtyUg@mail.gmail.com>
+
+An one of simplest methods will be to use
+Callback.register name callback_func
+on OCaml side and to use something like:
+closure_f = caml_named_value(name);
+ml_reply = caml_callback(*closure_f, ml_arg);
+on C side.
+
+WBR, ssp
+
+2017-12-28 18:05 GMT+05:00 john skaller <skaller at internode.on.net>:
+
+> There?s some machinery for this but .. well I am suspicious :)
+>
+> How can this possibly work?
+>
+> Caml functions are closures,  the only way you could pass
+> a closure would be to generate a thunk. I?m suspicious that
+> this doesn?t work in general. And you would need to find
+> a place to put the thunk which the OS allows you to execute.
+>
+> ?
+> john skaller
+> skaller at users.sourceforge.net
+> http://felix-lang.org
+>
+> _______________________________________________
+> Ctypes mailing list
+> Ctypes at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/ctypes
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20171228/2c477f69/attachment.html>
+
+From skaller at internode.on.net  Thu Dec 28 14:15:14 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 01:15:14 +1100
+Subject: [ocaml-ctypes] Passing Caml function to C
+In-Reply-To: <CAOUGqWwpa1ucHXm6eii-+Y0H-J_MoXQf5RwEk9b8gC7AVdtyUg@mail.gmail.com>
+References: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+ <CAOUGqWwpa1ucHXm6eii-+Y0H-J_MoXQf5RwEk9b8gC7AVdtyUg@mail.gmail.com>
+Message-ID: <1C830DDE-E90F-4D04-8365-F89435029E39@internode.on.net>
+
+
+> On 29 Dec. 2017, at 00:59, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> 
+> An one of simplest methods will be to use 
+> Callback.register name callback_func
+> on OCaml side and to use something like:
+> closure_f = caml_named_value(name);
+> ml_reply = caml_callback(*closure_f, ml_arg);
+> on C side.
+
+So the user supplied name is used to associate the code
+and data across the boundary?
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From ssp.mryau at gmail.com  Thu Dec 28 14:39:52 2017
+From: ssp.mryau at gmail.com (Serge Sivkov)
+Date: Thu, 28 Dec 2017 19:39:52 +0500
+Subject: [ocaml-ctypes] Passing Caml function to C
+In-Reply-To: <1C830DDE-E90F-4D04-8365-F89435029E39@internode.on.net>
+References: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+ <CAOUGqWwpa1ucHXm6eii-+Y0H-J_MoXQf5RwEk9b8gC7AVdtyUg@mail.gmail.com>
+ <1C830DDE-E90F-4D04-8365-F89435029E39@internode.on.net>
+Message-ID: <CAOUGqWzeziQJWaZyF5nS2AP6Mk5-umGL9wKaQPqVBWuDcPEWhw@mail.gmail.com>
+
+Yes, that's right.
+
+WBR, ssp
+
+2017-12-28 19:15 GMT+05:00 john skaller <skaller at internode.on.net>:
+
+>
+> > On 29 Dec. 2017, at 00:59, Serge Sivkov <ssp.mryau at gmail.com> wrote:
+> >
+> > An one of simplest methods will be to use
+> > Callback.register name callback_func
+> > on OCaml side and to use something like:
+> > closure_f = caml_named_value(name);
+> > ml_reply = caml_callback(*closure_f, ml_arg);
+> > on C side.
+>
+> So the user supplied name is used to associate the code
+> and data across the boundary?
+>
+>
+> ?
+> john skaller
+> skaller at users.sourceforge.net
+> http://felix-lang.org
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20171228/386c502c/attachment.html>
+
+From yallop at gmail.com  Thu Dec 28 16:31:56 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 28 Dec 2017 16:31:56 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+Message-ID: <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+
+On 27 December 2017 at 23:37, john skaller <skaller at internode.on.net> wrote:
+> BTW: Just though I?d say, Ctypes is a pretty nice library.
+> Well done! There?s no such thing as a perfect foreign interface
+> to C, but Ctypes handles much of it reasonably well.
+
+Thank you!  I appreciate the kind words.
+
+>>   'enum' builds a 'typ' value from a mapping between constants and OCaml values
+>>   http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum
+>
+> Hmm. What does it mean when it says ?the size and alignment are retrieved???
+> The only way to do that would be to generate C code and measure it.
+
+Indeed, that's exactly what happens.  The C standard doesn't place
+many constraints on the layout of enums, so there isn't really another
+way of building enum types that's guaranteed to work.
+
+> Looking at the yaml example, jbuilder is used with a ppx to do this at
+> during Ocaml compilation, is that correct?
+
+I don't think there's a ppx involved, but there is a code generation
+step (or, rather, a couple of code generation steps).
+
+> Hmm. How can I contribute easily. Its too early for me to actually
+> write docs. However I could create an issue with copies of your
+> email comments for someone to integrate.
+
+Issues suggesting improvements to the documentation are always welcome!
+
+Kind regards,
+
+Jeremy
+
+From yallop at gmail.com  Thu Dec 28 16:34:22 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 28 Dec 2017 16:34:22 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAHYOizG3yv1aTgM0FQMtSKpg4u5M5dRZE2JMS787vf_vn6LLWQ@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <CAHYOizG3yv1aTgM0FQMtSKpg4u5M5dRZE2JMS787vf_vn6LLWQ@mail.gmail.com>
+Message-ID: <CAAxsn=ESCXnRkb=n+jGVz92oBkQCZBpsMJtRkycaTs+yUr5kSg@mail.gmail.com>
+
+On 28 December 2017 at 00:09, Andy Ray <evilkidder at gmail.com> wrote:
+> More generally do the arguments to a function call live long enough to create [view]s of a
+> returned value?
+
+Hmm.  This certainly ought to be the behaviour, but I think that not
+enough is done to guarantee it at the moment.  I've made a note to
+take a closer look
+(https://github.com/ocamllabs/ocaml-ctypes/issues/556#issuecomment-354314966).
+
+From yallop at gmail.com  Thu Dec 28 16:44:30 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 28 Dec 2017 16:44:30 +0000
+Subject: [ocaml-ctypes] Passing Caml function to C
+In-Reply-To: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+References: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+Message-ID: <CAAxsn=GiPAS-goitbn42yJj9Mhwo+SGUD-q7iyPMgLORN+NA0w@mail.gmail.com>
+
+On 28 December 2017 at 13:05, john skaller <skaller at internode.on.net> wrote:
+> There?s some machinery for this but .. well I am suspicious :)
+>
+> How can this possibly work?
+>
+> Caml functions are closures,  the only way you could pass
+> a closure would be to generate a thunk. I?m suspicious that
+> this doesn?t work in general. And you would need to find
+> a place to put the thunk which the OS allows you to execute.
+
+Serge Sivkov has explained how things work using OCaml's standard
+Callback module.  Ctypes provides a slightly different mechanism.
+
+The interface is the 'funptr' function that builds a typed description
+of a C function pointer:
+
+   http://ocamllabs.io/ocaml-ctypes/Foreign.html#VALfunptr
+
+The implementation of funptr uses the closure functions in the libffi
+library to dynamically generate function pointers
+
+   http://www.chiark.greenend.org.uk/doc/libffi-dev/html/The-Closure-API.html
+
+There's also a second implementation of funptr in progress that
+provides a simpler mechanism for the case where the OCaml function to
+be passed to C is known at code-generation time.
+
+Kind regards,
+
+Jeremy
+
+From skaller at internode.on.net  Thu Dec 28 17:04:09 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 04:04:09 +1100
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+ <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+Message-ID: <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+
+
+> On 29 Dec. 2017, at 03:31, Jeremy Yallop <yallop at gmail.com> wrote:
+
+>> Hmm. What does it mean when it says ?the size and alignment are retrieved???
+>> The only way to do that would be to generate C code and measure it.
+> 
+> Indeed, that's exactly what happens.  The C standard doesn't place
+> many constraints on the layout of enums, so there isn't really another
+> way of building enum types that?s guaranteed to work.
+
+
+Layout rules in general for C are fully fixed by the ABI.
+That?s platform dependent BUT you only need to figure out
+the ABI once per platform. Otherwise, there?d be no way
+to bind to the C standard library which is usually the vendor
+provided access to the OS kernel.
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Thu Dec 28 17:34:15 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 04:34:15 +1100
+Subject: [ocaml-ctypes] Passing Caml function to C
+In-Reply-To: <CAAxsn=GiPAS-goitbn42yJj9Mhwo+SGUD-q7iyPMgLORN+NA0w@mail.gmail.com>
+References: <E64B00E3-3164-4227-8627-040360B0C274@internode.on.net>
+ <CAAxsn=GiPAS-goitbn42yJj9Mhwo+SGUD-q7iyPMgLORN+NA0w@mail.gmail.com>
+Message-ID: <A34BF4AE-0CB1-4BDD-AF90-815F1CB14E37@internode.on.net>
+
+
+> On 29 Dec. 2017, at 03:44, Jeremy Yallop <yallop at gmail.com> wrote:
+> 
+> Serge Sivkov has explained how things work using OCaml's standard
+> Callback module.  Ctypes provides a slightly different mechanism.
+
+> The implementation of funptr uses the closure functions in the libffi
+> library to dynamically generate function pointers
+> 
+>   http://www.chiark.greenend.org.uk/doc/libffi-dev/html/The-Closure-API.html
+
+The standard way to do that is
+
+THUNK:
+	JSR handler
+	DATA data_address
+	DATA code_address?
+
+and you just pop the return address off the stack to get the
+data and code addresses, leaving the return address of the call to THUNK.
+
+But the thunk has to be in memory which is both writable and executable,
+and usually that combination is disallowed for ordinary users for
+security reasons. Hmmm.
+
+In my system I use the 
+
+	void *client_data
+
+pointer that callbacks, and the HOFs that accept them, almost always
+have. However, the programmer has to TELL the compiler which
+argument is the client data pointer.
+
+This doesn?t require any thunks, but it doesn?t work without a client data pointer.
+
+An amusing story .. except for those that had to deal with this massive
+screw up ..  in older versions of Windows, the event callbacks were passed
+the window handle. So you would store the client data in the window data
+frame. There was only one problem: when you created a window,
+your callback had to PUT the client data pointer into the window frame.
+The problem was .. where did you GET that client data from, in a callback?
+
+So what you did was put it into a global variable and hope and pray that
+the very next callback was the create window callback so it picked
+up the right data from the global variable.
+
+MS fixed it with CreateWindowEx.
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Thu Dec 28 18:54:08 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 28 Dec 2017 18:54:08 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+ <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+ <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+Message-ID: <CAAxsn=FNUT36cnW+=xc750CfAXFVU_d9_seZYBN4tqOTniXX2Q@mail.gmail.com>
+
+On 28 December 2017 at 17:04, john skaller <skaller at internode.on.net> wrote:
+>> On 29 Dec. 2017, at 03:31, Jeremy Yallop <yallop at gmail.com> wrote:
+>
+>>> Hmm. What does it mean when it says ?the size and alignment are retrieved???
+>>> The only way to do that would be to generate C code and measure it.
+>>
+>> Indeed, that's exactly what happens.  The C standard doesn't place
+>> many constraints on the layout of enums, so there isn't really another
+>> way of building enum types that?s guaranteed to work.
+>
+> Layout rules in general for C are fully fixed by the ABI.
+> That?s platform dependent BUT you only need to figure out
+> the ABI once per platform.
+
+Fair enough -- checking the ABI at configuration time could be made to
+work, too.  But would there be much benefit?  Wouldn't it still be
+necessary to generate C code (or do something similar, like parse
+headers and evaluate constant expressions) to retrieve the values of
+enumeration constants?
+
+From skaller at internode.on.net  Thu Dec 28 19:31:45 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 06:31:45 +1100
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <CAAxsn=FNUT36cnW+=xc750CfAXFVU_d9_seZYBN4tqOTniXX2Q@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+ <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+ <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+ <CAAxsn=FNUT36cnW+=xc750CfAXFVU_d9_seZYBN4tqOTniXX2Q@mail.gmail.com>
+Message-ID: <1526BC37-F412-4C9B-A185-C9387FEBD358@internode.on.net>
+
+
+>> Layout rules in general for C are fully fixed by the ABI.
+>> That?s platform dependent BUT you only need to figure out
+>> the ABI once per platform.
+> 
+> Fair enough -- checking the ABI at configuration time could be made to
+> work, too.  But would there be much benefit?  Wouldn't it still be
+> necessary to generate C code (or do something similar, like parse
+> headers and evaluate constant expressions) to retrieve the values of
+> enumeration constants?
+
+I don?t know. However at present Cstubs stuff is really worrying.
+The process involves generating C just so you can get the
+information to then generate some Ocaml. The resulting Ocaml
+is fragile, because it only works on the platform you generated it on.
+
+It doesn?t work for cross compilation, and it doesn?t have the usual
+properties of pure Ocaml that it ?just works? on all platforms
+(which is really BIG plus IMHO .. write once, run anywhere).
+
+On the other hand just generating C, compiling it, and using
+that C code everywhere removes some steps. You still have
+to compile the C on the target platform, but the Ocaml binding
+to it is invariant (Ctypes uses the ABI data to interpret the terms).
+
+I think the point is, why generate C just so you can generete
+platform dependent Ocaml, when you can just generate the C
+and bind to the C you generated? You have to compile the C
+in both cases, but in the second case you just link to it,
+and you have to link to the foreign library anyhow.
+
+Of course I?m using a script which parses the C header files
+to generate the bindings, so generating some extra C only
+has an O(1) cost.
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Thu Dec 28 20:38:06 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 28 Dec 2017 20:38:06 +0000
+Subject: [ocaml-ctypes] Help with strings
+In-Reply-To: <1526BC37-F412-4C9B-A185-C9387FEBD358@internode.on.net>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+ <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+ <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+ <CAAxsn=FNUT36cnW+=xc750CfAXFVU_d9_seZYBN4tqOTniXX2Q@mail.gmail.com>
+ <1526BC37-F412-4C9B-A185-C9387FEBD358@internode.on.net>
+Message-ID: <CAAxsn=GQ9q3Fgq4+8xv=pXx1s7Q6-0S4A9-5jeGaqW30NnDbFQ@mail.gmail.com>
+
+Dear John,
+
+On 28 December 2017 at 19:31, john skaller <skaller at internode.on.net> wrote:
+> I think the point is, why generate C just so you can generete
+> platform dependent Ocaml, when you can just generate the C
+> and bind to the C you generated?
+
+I'm not sure it's exactly what you have in mind, but there is
+something rather like this on the roadmap:
+
+   https://github.com/ocamllabs/ocaml-ctypes/issues/266
+   https://github.com/ocamllabs/ocaml-ctypes/pull/296
+
+As you say, the new approach will provide better support for cross compilation.
+
+> You have to compile the C
+> in both cases, but in the second case you just link to it,
+> and you have to link to the foreign library anyhow.
+
+That's the usual situation, but it's occasionally useful to bind
+static elements (struct & union definitions, compile-time constants,
+etc.) only, in which case it's preferable to pull all the
+layout/constant information into the generated OCaml code, and avoid
+the need to link in C.  For example, the Profuse library, which
+implements the FUSE protocol, does exactly that:
+
+   https://github.com/effuse/profuse/tree/master/lib_gen
+
+Kind regards,
+
+Jeremy
+
+From skaller at internode.on.net  Fri Dec 29 00:32:20 2017
+From: skaller at internode.on.net (john skaller)
+Date: Fri, 29 Dec 2017 11:32:20 +1100
+Subject: [ocaml-ctypes] calbacks
+In-Reply-To: <CAAxsn=GQ9q3Fgq4+8xv=pXx1s7Q6-0S4A9-5jeGaqW30NnDbFQ@mail.gmail.com>
+References: <1A47B410-EF50-455C-B549-3CF320C33469@internode.on.net>
+ <CAAxsn=FikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh+Q@mail.gmail.com>
+ <57BB673D-C1F1-42EA-8B65-6DF54E290E88@internode.on.net>
+ <CAAxsn=FgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw@mail.gmail.com>
+ <0EF0083A-B8F8-4481-96DD-2C0F3A9F527D@internode.on.net>
+ <CAAxsn=FVf91EnWcarWmhsWtu1EZp8_RvCCLqg8uNVFZP8Rp60Q@mail.gmail.com>
+ <229A9A72-8647-428C-8A26-688E5CF888C6@internode.on.net>
+ <CAAxsn=FNUT36cnW+=xc750CfAXFVU_d9_seZYBN4tqOTniXX2Q@mail.gmail.com>
+ <1526BC37-F412-4C9B-A185-C9387FEBD358@internode.on.net>
+ <CAAxsn=GQ9q3Fgq4+8xv=pXx1s7Q6-0S4A9-5jeGaqW30NnDbFQ@mail.gmail.com>
+Message-ID: <D583672D-CB51-4812-8D95-3DE3521701F7@internode.on.net>
+
+FWIW here?s what I do for callbacks.  Its a bit waffly! 
+The code that does it is actually written in Ocaml but it is
+generating C++ text. 
+
+The situation is different because my system Felix is a C++ code generator 
+so the compiler can translate Felix code to C++ without worrying about any additional
+compilation step(s). Indeed, Felix is designed as a C++ upgrade,
+meaning to throw out the bad syntax, introduce a good type system,
+but *preserve* ABI compatibility and make writing bindings 
+for C and C++ trivial.
+
+First, normally a function binding is roughly like:
+
+	fun myfun : A * B * C * D -> R = ?Cfunction($1,$2,$3,$4)?;
+
+but this:
+
+	callback fun myfun_t: A * B * myfun_t * D -> R;
+
+is actually a *type* definition. The type defined is roughly
+
+	typedef myfun_t = A * B * CLIENT * D ?> R
+
+
+Here, I wrote ?> with two dashes, which means a C function type in
+Felix whereas -> is a Felix function type. A Felix function is a C++
+class with an apply() method that accepts an argument of the type
+of the function argument.  The context is bound into the class
+object by the C++ constructor. Where I wrote CLIENT above, it means
+a C void*. When the compiler sees the above it generates a wrapper
+function that looks roughly like this:
+
+	R myfun_t W_myfun_t (A a, B b, myfun_t *CLOSURE, D d) {
+		return CLOSURE->apply(a,b,d);
+	}
+
+I left out a lot of messy casts. But we?re not finished. When we call a
+C HOF it will have a signature like this:
+
+	typedef void (*hof) (X, Y, C_myfun_t func, void *client_data, Z);
+
+where C_myfun_t is the C type of the callback, and the void pointer
+client data is the associated data pointer. When the programmer
+declares that the Felix type should be
+
+	X * Y * myfun_t * Z ->  void
+
+so we leave out the function type entirely, and use the Felix function
+type in place of the client data pointer,
+and we need a second wrapper now, one that picks up the myfun_t, which
+in Felix is a pointer to the C++ class object of the function type,
+and passes it for the callbacks specified CLIENT data pointer,
+and passes W_myfun_t, an actual C function pointer, as the function.
+
+The wrapper function is invariant, it is the same for ALL callbacks
+of the same type, and the type of the closure is also invariant,
+its the same for all Felix functions of the same type.
+
+So: to make this work in Felix I have to translate a special kind of type
+and I have to translate a HOF accepting a callback into some C
+type definitions AND two wrapper function: actually one
+wrapper for each callback type, and, one wrapper for each
+HOF.
+
+So what can Ctypes do? It can do exactly the same thing.
+
+You need a value of a special type say 
+
+	?a callback
+
+to use in the callback function type signature that indicates
+where the client data pointer lives in the signature:
+
+	A @-> B @-> clientdata @->D @-> returning R
+
+in the foreign function. This is all you need to know to
+generate a wrapper for the callback. You do not have to actually
+generate C code to be compiled if you can manipulate the
+Ocaml data type representation well enough from Ocaml
+in your interpreter, as long as it ?does? the right thing somehow,
+what you?re actually generating is an Ocaml function which
+translates another Ocaml function. The mind boggles,
+it was easier for me, because I could just print the
+required C++ code into the Felix compiler output.
+But you must be able to do it without doing that because,
+Ctypes is *already* doing it.
+
+Having done that, you have to organise that a HOF binding
+in Ocaml accepting an Ocaml function of the correct type 
+actually calls the code for a binding that accepted a C function
+and also a void *, passing the wrapper as above and the
+actual closure pointer as the client data.
+
+So I think you can do all this without generating any C at all,
+since you can already translate Ctypes values representing
+types and functions into C functions and C function calls.
+That?s what you?d be doing here, except you have to do the
+extra work in your Ocaml interpreter of the Ctypes to munge
+things around a bit. I could be wrong you *might* need to
+generate some C that requires compilation.
+
+And it *might* be useful to generate that C as a first attempt,
+to avoid getting caught in a mental meta-recursive knot.
+I found it really hard to think about when I was doing it
+for Felix, it took weeks to get right.
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+

@@ -1,0 +1,142 @@
+From no263 at dpmms.cam.ac.uk  Wed Apr  8 16:34:15 2015
+From: no263 at dpmms.cam.ac.uk (Nicolas Ojeda Bar)
+Date: Wed, 8 Apr 2015 16:34:15 +0100
+Subject: [ocaml-ctypes] calling a dynamically generated function
+Message-ID: <CAPunWhCkDi63aGtUAWWVQ1H-9fmyk4HH=ssJs59Ax=XWqe8vkg@mail.gmail.com>
+
+Hi list,
+
+I have a value of type `unit ptr` that points to a function with known
+signature.  Is there a way to obtain an OCaml function out of it in order
+to call it ?
+
+In other words, I am looking for a function with signature : `unit ptr ->
+'a fn -> 'a`.
+
+I did look through the docs but unless I missed something this case does
+not seem to be covered.
+
+Any ideas?
+
+Best wishes,
+Nicolas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150408/b40bcc1e/attachment.html>
+
+From yallop at gmail.com  Wed Apr  8 16:42:12 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 8 Apr 2015 16:42:12 +0100
+Subject: [ocaml-ctypes] calling a dynamically generated function
+In-Reply-To: <CAPunWhCkDi63aGtUAWWVQ1H-9fmyk4HH=ssJs59Ax=XWqe8vkg@mail.gmail.com>
+References: <CAPunWhCkDi63aGtUAWWVQ1H-9fmyk4HH=ssJs59Ax=XWqe8vkg@mail.gmail.com>
+Message-ID: <CAAxsn=Fstf2h5Uwi3CKG7CA=Tri1Z5T2Ksau9J1z9AYimXx7RA@mail.gmail.com>
+
+On 8 April 2015 at 16:34, Nicolas Ojeda Bar <no263 at dpmms.cam.ac.uk> wrote:
+> I have a value of type `unit ptr` that points to a function with known
+> signature.  Is there a way to obtain an OCaml function out of it in order to
+> call it ?
+>
+> In other words, I am looking for a function with signature : `unit ptr -> 'a
+> fn -> 'a`.
+
+I think this is what you're looking for:
+
+   # fun c f -> coerce (ptr void) (Foreign.funptr f) c;;
+   - : unit Ctypes_static.ptr -> ('a -> 'b) fn -> 'a -> 'b = <fun>
+
+From no263 at dpmms.cam.ac.uk  Wed Apr  8 16:52:53 2015
+From: no263 at dpmms.cam.ac.uk (Nicolas Ojeda Bar)
+Date: Wed, 8 Apr 2015 16:52:53 +0100
+Subject: [ocaml-ctypes] calling a dynamically generated function
+In-Reply-To: <CAAxsn=Fstf2h5Uwi3CKG7CA=Tri1Z5T2Ksau9J1z9AYimXx7RA@mail.gmail.com>
+References: <CAPunWhCkDi63aGtUAWWVQ1H-9fmyk4HH=ssJs59Ax=XWqe8vkg@mail.gmail.com>
+ <CAAxsn=Fstf2h5Uwi3CKG7CA=Tri1Z5T2Ksau9J1z9AYimXx7RA@mail.gmail.com>
+Message-ID: <CAPunWhBAzSMOYknrWBH6aDM61KxebJarPMV43iXJ8sTZ153GZw@mail.gmail.com>
+
+Thanks ! That should do it.
+
+Best wishes,
+Nicolas
+
+On Wed, Apr 8, 2015 at 4:42 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 8 April 2015 at 16:34, Nicolas Ojeda Bar <no263 at dpmms.cam.ac.uk> wrote:
+> > I have a value of type `unit ptr` that points to a function with known
+> > signature.  Is there a way to obtain an OCaml function out of it in
+> order to
+> > call it ?
+> >
+> > In other words, I am looking for a function with signature : `unit ptr
+> -> 'a
+> > fn -> 'a`.
+>
+> I think this is what you're looking for:
+>
+>    # fun c f -> coerce (ptr void) (Foreign.funptr f) c;;
+>    - : unit Ctypes_static.ptr -> ('a -> 'b) fn -> 'a -> 'b = <fun>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150408/4e84a95b/attachment.html>
+
+From simon.beaumont at citrix.com  Wed Apr 29 12:40:13 2015
+From: simon.beaumont at citrix.com (Si Beaumont)
+Date: Wed, 29 Apr 2015 12:40:13 +0100
+Subject: [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN coherently
+Message-ID: <20150429114013.GA13701@morbo>
+
+Hi,
+
+I've been looking to use Ctypes to create bindings to libpci and use
+stub-generation. I was hoping to generate stubs for both the foreign function
+bindings and also for the struct layouts (including inlining of `#define`d
+constants from the library).
+
+I successfully got stub generation working for the functions and for the
+structures by creating a functor taking a module with signature Cstubs.FOREIGN
+as per the examples I've seen in the Ctypes repo[1] and even got that working
+with OASIS by creating an executable using the Cstubs.write_{c,ml} functions
+and using this as a "BuildTool" following some other examples I found
+(ocaml-gsasl[2] and onanomsg[3]).
+
+However, I wanted to also be able to get the struct layout and constant
+definitions only available to the C preprocesor without me having to transcribe
+them into my library (libpci like many other libraries `#define`s a whole bunch
+of values for flags that need to be passed into functions). FWICT to get this
+to work I need to create a second functor taking a module with signature
+Cstubs.Types.TYPE and then use Cstubs.Type.write_c. This will generate
+a C program which needs to be compiled. This compiled C program can then be run
+to generate an OCaml module which can be used with my original Bindings
+functor (gleanings from a few days of hacking and from ctypes
+mailing-list[4][5]).
+
+It seems this pipeline is going to be quite difficult to integrate into a build
+system like OASIS since I need to compile an auto-generated C program half way
+through. My final bit of research landed me on an open Bountysource issue[6] on
+which it looks like there's a plan to smooth this out to make the workflow more
+like the stub generation for foreign function bindings:
+
+> We can address both these concerns with an alternative workflow for
+> Cstubs_structs.TYPE that follows the same pattern as stub generation for
+> functions: generate C and ML directly from the functor containing your
+> bindings, then link the generated C and ML into your program.
+
+This sounds fantastic! I was wondering if there is any branch of Ctypes with
+this functionality yet that I could try out or if there is any expectation to
+add this in the near-term?
+
+For now, I think I'll have to use just the stub generation for the functions
+(and for the structures that I've transcribed) and have to hardcode the
+`#define`d constants and enums.
+
+TIA,
+
+- Si
+[1]: https://github.com/ocamllabs/ocaml-ctypes/blob/f7d8f63d/examples/ncurses/stub-generation/bindings/ncurses_bindings.ml
+[2]: https://github.com/nojb/ocaml-gsasl/blob/a96c7b94/_oasis
+[3]: https://github.com/rgrinberg/onanomsg/blob/4d09e396/_oasis
+[4]: http://lists.ocaml.org/pipermail/ctypes/2015-January/000143.html
+[5]: http://lists.ocaml.org/pipermail/ctypes/2015-February/000153.html
+[6]: https://www.bountysource.com/issues/8206607-new-constant-function-is-hard-to-use
+

@@ -1,0 +1,120 @@
+From ns441 at cam.ac.uk  Sun Jul 31 20:28:27 2016
+From: ns441 at cam.ac.uk (Nik Sultana)
+Date: Sun, 31 Jul 2016 20:28:27 +0100
+Subject: [compiler-hacking] Warnings for uncaught exceptions
+Message-ID: <9b075840a0857ddf618a9c79af6ec5e7@cam.ac.uk>
+
+I'm not sure if there already exists such functionality for OCaml, but 
+thought that adapting this work to OCaml from SML might make an 
+interesting project for somebody on this list:
+
+"Estimating uncaught exceptions in Standard ML programs from type-based 
+equations" by Yi et al.
+<abstract>
+We present a static analysis that detects potential runtime exceptions 
+that are raised and never handled inside Standard ML (SML) programs. 
+Contrary to our earlier method (Yi, 1994) based on abstract 
+interpretation, where the input program's control flow is simultaneously 
+computed while our exception analysis progresses, we separate the two 
+phases in a manner similar to conventional data flow analysis. Before 
+the exception analysis begins, we first estimate the input program's 
+control flow from the type information from SML/NJ compiler. Based on 
+this call-graph structure, exception flow is specified as a set of 
+equations, whose solution is computed using an iterative least fixpoint 
+method. A prototype of this analysis is applied to two realistic SML 
+programs (ML-LEX and OR-SML core) and is 3 or 40 times faster than the 
+earlier method and saves memory by 35 or 65 percent
+</abstract>
+
+The full paper's at 
+http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=544613
+
+From sk826 at cam.ac.uk  Sun Jul 31 21:01:26 2016
+From: sk826 at cam.ac.uk (KC Sivaramakrishnan)
+Date: Sun, 31 Jul 2016 20:01:26 -0000
+Subject: [compiler-hacking] Warnings for uncaught exceptions
+In-Reply-To: <9b075840a0857ddf618a9c79af6ec5e7@cam.ac.uk>
+References: <9b075840a0857ddf618a9c79af6ec5e7@cam.ac.uk>
+Message-ID: <CACVN0VsMgzkYypgbMcrXy1vMDJGWk320hn9gytR5cuP1LaFZSQ@mail.gmail.com>
+
+As a part of the multicore OCaml work, we are developing an effect system
+for OCaml. The effect system could be used for describing *checked*
+exceptions. Leo's developing a prototype [0], and which already looks very
+promising:
+
+===
+
+# effect not_found = Not_found;;
+
+effect not_found = Not_found
+
+# let half x =
+    if x mod 2 = 0 then x / 2
+    else perform Not_found;;
+
+val half : int -[not_found | io]-> int = <fun>
+
+# half 7;;
+
+Characters 0-6:
+  half 7;;
+  ^^^^^^
+Error: This expression performs effect [not_found | io | !~]
+       but an expression was expected that performed [io]
+       Type [not_found | !~] is not compatible with type []
+
+# let not_found_to_opt f x =
+    match f x with
+    | x -> Some x
+    | effect Not_found -> None;;
+
+val not_found_to_opt : ('a -[not_found | !~]-> 'b) => 'a ~> 'b option =
+<fun>
+
+# not_found_to_opt half 7;;
+
+- : int option = None
+
+# not_found_to_opt half 8;;
+
+- : int option = Some 4
+
+===
+
+[0]: https://github.com/lpw25/ocaml/tree/ecaml
+
+On Sun, Jul 31, 2016 at 8:28 PM, Nik Sultana <ns441 at cam.ac.uk> wrote:
+
+> I'm not sure if there already exists such functionality for OCaml, but
+> thought that adapting this work to OCaml from SML might make an interesting
+> project for somebody on this list:
+>
+> "Estimating uncaught exceptions in Standard ML programs from type-based
+> equations" by Yi et al.
+> <abstract>
+> We present a static analysis that detects potential runtime exceptions
+> that are raised and never handled inside Standard ML (SML) programs.
+> Contrary to our earlier method (Yi, 1994) based on abstract interpretation,
+> where the input program's control flow is simultaneously computed while our
+> exception analysis progresses, we separate the two phases in a manner
+> similar to conventional data flow analysis. Before the exception analysis
+> begins, we first estimate the input program's control flow from the type
+> information from SML/NJ compiler. Based on this call-graph structure,
+> exception flow is specified as a set of equations, whose solution is
+> computed using an iterative least fixpoint method. A prototype of this
+> analysis is applied to two realistic SML programs (ML-LEX and OR-SML core)
+> and is 3 or 40 times faster than the earlier method and saves memory by 35
+> or 65 percent
+> </abstract>
+>
+> The full paper's at
+> http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=544613
+> _______________________________________________
+> Cam-compiler-hacking mailing list
+> Cam-compiler-hacking at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/cam-compiler-hacking
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20160731/a4cb1856/attachment.html>
+

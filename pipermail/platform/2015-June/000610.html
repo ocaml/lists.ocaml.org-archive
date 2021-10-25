@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20%5Bwg-windows%5D%20Identifying%20windows%20ports%20for%0A%20build%20systems%20%26%20cross%20compiling%20distinctions&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9C9F6C4%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000608.html">
+   <LINK REL="Next"  HREF="000609.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20%5Bwg-windows%5D%20Identifying%20windows%20ports%20for%0A%20build%20systems%20%26%20cross%20compiling%20distinctions&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9C9F6C4%40Remus.metastack.local%3E"
+       TITLE="[ocaml-platform] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions">david at allsopps.net
+       </A><BR>
+    <I>Tue Jun 30 18:13:12 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000608.html">[ocaml-platform] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+        <LI>Next message: <A HREF="000609.html">[ocaml-platform] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#610">[ date ]</a>
+              <a href="thread.html#610">[ thread ]</a>
+              <a href="subject.html#610">[ subject ]</a>
+              <a href="author.html#610">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Daniel B&#252;nzli wrote:
+&gt;<i> Hello,
+</I>&gt;<i> 
+</I>&gt;<i> In the context of building things, one apparently needs to be able
+</I>&gt;<i> precisely identify the windows ports in order to produce build artefacts
+</I>&gt;<i> with correct extensions (see [1]). It seems that:
+</I>&gt;<i> 
+</I>&gt;<i> 1) Using the OCaml MSVC ports, windows specific extensions are used
+</I>&gt;<i> 2) Using the OCaml mingw ports, unix extensions are used
+</I>
+Not quite: shared libraries are .dll rather than .so
+
+&gt;<i> 3) Using the OCaml cygwin port, unix extensions are used
+</I>
+I can't remember if Cygwin uses .so.dll or just .so, but I expect whatever it does that it fakes everything to work with just .so (just as it fakes things to work without .exe) - tricks which *do not work* when dealing with mingw-compiled programs which obviously don't have the Cygwin layer.
+
+&gt;<i> The problem is that at the moment various detection bits e.g. [2] conflate
+</I>&gt;<i> 1) + 2) under a single variable, namely win32. Something is needed to
+</I>&gt;<i> distinguish them in build systems in general.
+</I>&gt;<i> 
+</I>&gt;<i> Here are a few ideas:
+</I>&gt;<i> 
+</I>&gt;<i> a) Introduce a new toolchain variable, that specifies the toolchain used,
+</I>&gt;<i> whatever that means.
+</I>
+$OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc. Equally, all of the required extensions can be determined by grep'ing the output of ocamlopt -config (or with more recent OCamls by using the Config module of compiler-libs.common)
+
+&gt;<i> b) Distinguish an OS for the mingw ports
+</I>&gt;<i> c) Distinguish these 3 cases through a distribution variable [3]
+</I>&gt;<i> 
+</I>&gt;<i> I have the impression that a) is going to introduce again more noise,
+</I>&gt;<i> names and branches in the eco-system which already has plenty enough.
+</I>&gt;<i> Regarding c) I think it would be bending the semantics of the variable.
+</I>&gt;<i> Given that cygwin is already treated as an OS I would suggest that we
+</I>&gt;<i> rather use b) and introduce a &quot;win32-mingw&quot; or &quot;mingw&quot; (or whichever name
+</I>&gt;<i> windows users would find accurate) value for OS like variables.
+</I>&gt;<i> 
+</I>&gt;<i> Besides for cross compilation of packages we need to distinguish between
+</I>&gt;<i> `build-os` and `host-os` (os on which the build products are run). It
+</I>&gt;<i> would be nice if opam could somehow provide variables for these values for
+</I>&gt;<i> build systems to use in order to configure packages properly. IIRC opam
+</I>&gt;<i> currently only has an `os` variable which has the value of `build-os` but
+</I>&gt;<i> is currently being used for `host-os` semantics.
+</I>
+The mingw compiler already use the form w64 for the host, so that the compilers &quot;fake&quot; a cross-compiling triple (e.g. i686-w64-mingw32-gcc and x86_64-w64-mingw32-gcc). Perhaps that would be better?
+
+&gt;<i> Note that some other variables pertaining to the capabilities of the
+</I>&gt;<i> installed OCaml compilers see [4] will also need {build,host}-os
+</I>&gt;<i> distinction (e.g. `ocaml-native` and `ocaml-native-dynlink`). In order to
+</I>&gt;<i> remain backward compatible with the current repository, I guess that the
+</I>&gt;<i> simplest is to deem all current variables as having host semantics and
+</I>&gt;<i> introduce only new variables for build semantics i.e. `build-os-ocaml-
+</I>&gt;<i> native`, `build-os-ocaml-native-dynlink`, `build-os-ocaml-version`, etc.
+</I>&gt;<i> 
+</I>&gt;<i> Best,
+</I>&gt;<i> 
+</I>&gt;<i> Daniel
+</I>&gt;<i> 
+</I>&gt;<i> P.S. To windows users. I would also be interested in knowing if there is a
+</I>&gt;<i> tool invocation that is actually able to distinguish between 1) and 2).
+</I>&gt;<i> 
+</I>&gt;<i> [1] <A HREF="https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094">https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094</A>
+</I>&gt;<i> [2] <A HREF="https://github.com/ocaml/opam-">https://github.com/ocaml/opam-</A>
+</I>&gt;<i> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+</I>&gt;<i> [3] <A HREF="https://github.com/ocaml/opam-">https://github.com/ocaml/opam-</A>
+</I>&gt;<i> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L76-L109
+</I>&gt;<i> [4] <A HREF="https://opam.ocaml.org/doc/manual/dev-manual.html#sec37">https://opam.ocaml.org/doc/manual/dev-manual.html#sec37</A>
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-windows mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">wg-windows at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-windows">http://lists.ocaml.org/listinfo/wg-windows</A>
+</I></PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000608.html">[ocaml-platform] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+	<LI>Next message: <A HREF="000609.html">[ocaml-platform] [wg-windows] Identifying windows ports for build systems &amp; cross compiling distinctions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#610">[ date ]</a>
+              <a href="thread.html#610">[ thread ]</a>
+              <a href="subject.html#610">[ subject ]</a>
+              <a href="author.html#610">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

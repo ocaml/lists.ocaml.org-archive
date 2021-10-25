@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Troubles under windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Troubles%20under%20windows&In-Reply-To=%3C555DE2B3.3080403%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000174.html">
+   <LINK REL="Next"  HREF="000176.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Troubles under windows</H1>
+    <B>Matthieu Dubuget</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Troubles%20under%20windows&In-Reply-To=%3C555DE2B3.3080403%40gmail.com%3E"
+       TITLE="[ocaml-ctypes] Troubles under windows">matthieu.dubuget at gmail.com
+       </A><BR>
+    <I>Thu May 21 14:50:43 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000174.html">[ocaml-ctypes] Build error when compiling Ctypes on centos 5
+</A></li>
+        <LI>Next message: <A HREF="000176.html">[ocaml-ctypes] Troubles under windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#175">[ date ]</a>
+              <a href="thread.html#175">[ thread ]</a>
+              <a href="subject.html#175">[ subject ]</a>
+              <a href="author.html#175">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I'm trying to use ctypes on windows. When I'm trying
+#use&quot;ctypes.foreign&quot;
+I'm getting a DLL error (see at the end of this message).
+
+My ocaml is x86_64-w64-mingw version.
+
+I did install libffi this way :
+
+tar xaf libffi-3.2.1.tar.gz
+cd libffi-3.2.1
+./autogen.sh
+./configure --host=x86_64-w64-mingw32 --prefix 
+/usr/x86_64-w64-mingw32/sys-root/mingw
+make
+make install
+
+It worked!
+
+$ x86_64-w64-mingw32-pkg-config.exe --list-all
+libffi                    libffi - Library supporting Foreign Function 
+Interfaces
+gsettings-desktop-schemas gsettings-desktop-schemas - Shared GSettings 
+schemas for the desktop, including helper headers
+autoopts                  AutoOpts - A semi-automated generated/library 
+option parser
+shared-mime-info          shared-mime-info - Freedesktop common MIME 
+database
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --libs
+-L/usr/x86_64-w64-mingw32/sys-root/mingw/lib/../lib -lffi
+
+$ x86_64-w64-mingw32-pkg-config.exe libffi --cflags
+-I/usr/x86_64-w64-mingw32/sys-root/mingw/lib/libffi-3.2.1/include
+
+I compiled ctypes :
+
+7z x ocaml-ctypes-0.4.1.zip
+cd ocaml-ctypes-0.4.1
+export LIBFFI_LIBS=$(x86_64-w64-mingw32-pkg-config.exe libffi --libs)
+export LIBFFI_CFLAGS=$(x86_64-w64-mingw32-pkg-config.exe libffi --cflags)
+make
+make install
+
+$ ocaml
+         OCaml version 4.02.1
+
+# #use&quot;topfind&quot;;;
+- : unit = ()
+Findlib has been successfully loaded. Additional directives:
+   #require &quot;package&quot;;;      to load a package
+   #list;;                   to list the available packages
+   #camlp4o;;                to load camlp4 (standard syntax)
+   #camlp4r;;                to load camlp4 (revised syntax)
+   #predicates &quot;p,q,...&quot;;;   to set these predicates
+   Topfind.reset();;         to force that packages will be reloaded
+   #thread;;                 to enable threads
+
+- : unit = ()
+
+# #require&quot;ctypes.foreign&quot;;;
+C:\OCaml\lib\unix.cma: loaded
+C:\OCaml\lib\bigarray.cma: loaded
+C:\OCaml\lib\str.cma: loaded
+C:\OCaml\lib\site-lib\bytes: added to search path
+C:\OCaml\lib\site-lib\ctypes: added to search path
+C:\OCaml\lib\site-lib\ctypes\ctypes.cma: loaded
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-base.cma: loaded
+Cannot load required shared library dllctypes-foreign-base_stubs.
+Reason: C:\OCaml\lib\site-lib\ctypes\dllctypes-foreign-base_stubs.dll: 
+Cannot resolve ffi_type_pointer.
+C:\OCaml\lib\site-lib\ctypes\ctypes-foreign-unthreaded.cma: loaded
+Characters -1--1:
+   #require&quot;ctypes.foreign&quot;;;
+
+Error: Reference to undefined global `Ctypes_closure_properties'
+
+
+I'm not sure if it can help to understand what the problem is?
+
+$ ldd /cygdrive/c/OCaml/lib/site-lib/ctypes/dllctypes-foreign-base_stubs.dll
+Cannot find FLEXDLL_RELOCATE
+         ntdll.dll =&gt; /cygdrive/c/Windows/SYSTEM32/ntdll.dll (0x76e40000)
+         kernel32.dll =&gt; /cygdrive/c/Windows/system32/kernel32.dll 
+(0x76c20000)
+         KERNELBASE.dll =&gt; /cygdrive/c/Windows/system32/KERNELBASE.dll 
+(0x7fefcc60000)
+         ??? =&gt; ??? (0x6e3c0000)
+         msvcrt.dll =&gt; /cygdrive/c/Windows/system32/msvcrt.dll 
+(0x7feff0b0000)
+         USER32.dll =&gt; /cygdrive/c/Windows/system32/USER32.dll (0x76d40000)
+         GDI32.dll =&gt; /cygdrive/c/Windows/system32/GDI32.dll (0x7fefed00000)
+         LPK.dll =&gt; /cygdrive/c/Windows/system32/LPK.dll (0x7fefd740000)
+         USP10.dll =&gt; /cygdrive/c/Windows/system32/USP10.dll (0x7fefd750000)
+         ??? =&gt; ??? (0x6b740000)
+         ??? =&gt; ??? (0x77000000)
+         IMM32.DLL =&gt; /cygdrive/c/Windows/system32/IMM32.DLL (0x7fefd710000)
+         MSCTF.dll =&gt; /cygdrive/c/Windows/system32/MSCTF.dll (0x7fefed70000)
+         nvinitx.dll =&gt; /cygdrive/c/Windows/system32/nvinitx.dll 
+(0x7fefcb30000)
+         VERSION.dll =&gt; /cygdrive/c/Windows/system32/VERSION.dll 
+(0x7fefcb20000)
+         ADVAPI32.dll =&gt; /cygdrive/c/Windows/system32/ADVAPI32.dll 
+(0x7fefd280000)
+         sechost.dll =&gt; /cygdrive/c/Windows/SYSTEM32/sechost.dll 
+(0x7feff090000)
+         RPCRT4.dll =&gt; /cygdrive/c/Windows/system32/RPCRT4.dll 
+(0x7fefd040000)
+         igdumd64.dll =&gt; /cygdrive/c/Windows/system32/NV/igdumd64.dll 
+(0x7feed120000)
+         SETUPAPI.dll =&gt; /cygdrive/c/Windows/system32/SETUPAPI.dll 
+(0x7fefd360000)
+         CFGMGR32.dll =&gt; /cygdrive/c/Windows/system32/CFGMGR32.dll 
+(0x7fefcc20000)
+         OLEAUT32.dll =&gt; /cygdrive/c/Windows/system32/OLEAUT32.dll 
+(0x7fefd630000)
+         ole32.dll =&gt; /cygdrive/c/Windows/system32/ole32.dll (0x7fefee80000)
+         DEVOBJ.dll =&gt; /cygdrive/c/Windows/system32/DEVOBJ.dll 
+(0x7fefcf20000)
+         igd10umd64.dll =&gt; 
+/cygdrive/c/Windows/system32/NV/igd10umd64.dll (0x7feec200000)
+
+Thanks for any help!
+
+-- 
+Matthieu Dubuget
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000174.html">[ocaml-ctypes] Build error when compiling Ctypes on centos 5
+</A></li>
+	<LI>Next message: <A HREF="000176.html">[ocaml-ctypes] Troubles under windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#175">[ date ]</a>
+              <a href="thread.html#175">[ thread ]</a>
+              <a href="subject.html#175">[ subject ]</a>
+              <a href="author.html#175">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

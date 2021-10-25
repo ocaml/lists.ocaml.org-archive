@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM on Windows (1.3 Roadmap)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%20on%20Windows%20%281.3%20Roadmap%29&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E96936D7%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000788.html">
+   <LINK REL="Next"  HREF="000790.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM on Windows (1.3 Roadmap)</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%20on%20Windows%20%281.3%20Roadmap%29&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E96936D7%40Remus.metastack.local%3E"
+       TITLE="[opam-devel] OPAM on Windows (1.3 Roadmap)">david.allsopp at metastack.com
+       </A><BR>
+    <I>Wed Nov  5 18:06:32 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000788.html">[opam-devel] OPAM on Windows (1.3 Roadmap)
+</A></li>
+        <LI>Next message: <A HREF="000790.html">[opam-devel] OPAM on Windows (1.3 Roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#789">[ date ]</a>
+              <a href="thread.html#789">[ thread ]</a>
+              <a href="subject.html#789">[ subject ]</a>
+              <a href="author.html#789">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Louis Gesbert wrote:
+&gt;<i> Thanks for these comments !
+</I>&gt;<i> 
+</I>&gt;<i> * Rewrite the parallel command engine
+</I>&gt;<i> 
+</I>&gt;<i> This is well underway, I've got a working prototype with limited backends
+</I>&gt;<i> at the moment.
+</I>&gt;<i> I'm not relying on fork anymore, but we'll still need some windows way of
+</I>&gt;<i> implementing `Unix.waitpid 0`; and to add OS switches to the build system.
+</I>
+Although Windows has them, Windows and Unix process groups aren't quite the same concept. I expect you want more the behaviour of Unix.waitpid (-1) (any child) which is sort of what I implemented in my branch. In fact, the way waiting works under Windows, the stub I implemented specifically waits for any one of a list of PIDs to terminate. 
+
+&gt;<i> * Native system manipulation
+</I>&gt;<i> 
+</I>&gt;<i> I agree on re-coding cp, mv etc.; here is also a possible idea, it may be
+</I>&gt;<i> worth checking if it's practical: make sure we may work if limited to
+</I>&gt;<i> busybox, and include some Windows version of busybox in the Windows
+</I>&gt;<i> distribution.
+</I>
+But unless you guarantee that all 700/800 packages in OPAM do the same thing, at some point you will need a &quot;real&quot; environment - make, patch, m4, etc (you can't even get as far as findlib without m4) and ocamlopt's need for a C compiler, or at least an assembler, is never far away - and the two MSVC ports will *always* require you to install the Windows SDK separately to get the Microsoft assembler (I don't think packaging that in other setups is permitted under the licence).
+
+I completely agree that making OPAM more portable is a good idea (ocaml-fileutils would be a very good thing to use), but my point is that it has *nothing* to do with making Windows usage of OPAM better, at least for non-toy usage so, at least for this part of the roadmap, it feels like effort targeted at the wrong problem.
+
+&gt;<i> * Test &amp; fix on Windows
+</I>&gt;<i> &gt; &quot;Cygwin, then, maybe, native.&quot; I'm afraid implies a crucial
+</I>&gt;<i> &gt; misunderstanding of how OCaml-on-Windows works.
+</I>&gt;<i> 
+</I>&gt;<i> I know that Cygwin is hardly a step towards native windows compatibility
+</I>&gt;<i> and about the cross-compilation tangle. But given the difference in cost,
+</I>&gt;<i> I think it's worth ensuring Cygwin is well supported before attacking the
+</I>&gt;<i> bulk of the problem: you quickly trip over tiny issues even with Cygwin at
+</I>&gt;<i> the moment.
+</I>
+What tiny issues have you seen? I've just bootstrapped OPAM on OCaml 4.01.0 on Cygwin 1.7 with no problems, as I expected. I've been able to switch into 4.01.0, run opam install opam-lib --deps-only and re-compile OPAM 1.2 using its &quot;own&quot; compiler. I had trouble with 4.02.1, but that's because there's a bug in ocamlbuild, which is hardly OPAM's fault! I've put a patch at <A HREF="http://people.ds.cam.ac.uk/~dra27/patches/ocaml-4.02.1+cygwin.patch">http://people.ds.cam.ac.uk/~dra27/patches/ocaml-4.02.1+cygwin.patch</A> and will shortly see if the issue is already mentioned in Mantis and with that patch was able to switch into 4.02.1 and similarly bootstrap OPAM.
+
+Incidentally, the problem with Cygwin and OCaml 4.02.1 is a reasonable demonstration of why stripping out external calls to cp, etc. can be a BAD idea! Cygwin neatly masks the &quot;.exe&quot; problem if you do things POSIX-ly. Consider:
+
+$ test -e /usr/bin/ocaml &amp;&amp; echo OCaml is installed
+
+In a Cygwin bash prompt, this will echo that OCaml is indeed installed. Now, in reality /usr/bin/ocaml is C:\cygwin\bin\ocaml.exe and test -e /usr/bin/ocaml.exe will also be true. ocamlbuild fails because for reasons best understood by Nicolas Pouillard, it replaces Sys.file_exists with a manual attempt to read the directory entries itself (see ocamlbuild/my_std.ml and notes in ocamlbuild/Changelog) - and in so doing bypasses Cygwin's compatibility layers which handle the &quot;.exe&quot; problem for Cygwin.
+
+
+David
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000788.html">[opam-devel] OPAM on Windows (1.3 Roadmap)
+</A></li>
+	<LI>Next message: <A HREF="000790.html">[opam-devel] OPAM on Windows (1.3 Roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#789">[ date ]</a>
+              <a href="thread.html#789">[ thread ]</a>
+              <a href="subject.html#789">[ subject ]</a>
+              <a href="author.html#789">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

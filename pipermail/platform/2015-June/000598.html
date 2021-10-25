@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] OPAM: signing the repository
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20OPAM%3A%20signing%20the%20repository&In-Reply-To=%3C557195B9.4060401%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000604.html">
+   <LINK REL="Next"  HREF="000601.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] OPAM: signing the repository</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20OPAM%3A%20signing%20the%20repository&In-Reply-To=%3C557195B9.4060401%40etorok.net%3E"
+       TITLE="[ocaml-platform] OPAM: signing the repository">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Fri Jun  5 13:27:37 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000604.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+        <LI>Next message: <A HREF="000601.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#598">[ date ]</a>
+              <a href="thread.html#598">[ thread ]</a>
+              <a href="subject.html#598">[ subject ]</a>
+              <a href="author.html#598">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 06/05/2015 12:59 PM, Hannes Mehnert wrote:
+&gt;<i> Hi all,
+</I>&gt;<i> 
+</I>&gt;<i> After a couple months of research and discussions between Louis
+</I>&gt;<i> Gesbert and myself, the proposal for a secured OPAM repository
+</I>&gt;<i> (featuring both end-to-end signing, and repository signing), is ready
+</I>&gt;<i> for a wider review.
+</I>&gt;<i> 
+</I>&gt;<i> The result has just been posted at
+</I>&gt;<i> <A HREF="https://opam.ocaml.org/blog/Signing-the-opam-repository/">https://opam.ocaml.org/blog/Signing-the-opam-repository/</A>
+</I>&gt;<i> 
+</I>&gt;<i> This thread is intended as the official channel for comments and
+</I>&gt;<i> discussion on the proposal above.
+</I>
+Thanks for working on this, I think this is an important piece in the opam infrastructure.
+
+- there's been a few downgrade/MiTM attacks related to legacy cryptography in TLS or Jwt and I'd like to avoid that here.
+
+Can we require that minimum key sizes and algorithms are always specified outside the file itself that contains the signature?
+For example client-side enforcement of minimum SHA-256 [*] and RSA-2048 for the entire chain, otherwise someone could create a signed file
+specifying md5 as algo, and perform an md5 collision on the signature, or introduce a weak RSA key in the delegation chain.
+
+As long as the format supports multiple hashes you can of course still include md5, sha1 for compatibility with old opam versions,
+and when you want to upgrade the algo or hash you can just bump the minimum requirement in the next opam version and provide
+both signatures in the repository.
+In fact its probably better to have multiple hashes even if one of them is weaker as it is probably much harder
+to generate a collision with the same file for multiple hashes
+
+- packages with git or local directory as source
+
+These should probably not be signable with anything higher than a snapshot key, because the remote git repository
+can change any time without signature verification.
+And local directory sources are probably similarly unsafe (could be NFS mounted, etc.)
+
+Package signatures with a high trust path must always contain a hash of the source tarball.
+
+- Github PR merge security
+
+Author of PR can push more commits (even rewrite the whole PR history with force push) which might create a race condition
+between reviewing a PR and merging the PR. Can the snapshot bot add a comment to each PR after it finished the Travis build
+with the Git commit hash?
+
+- opam --trace-sigs
+
+Perhaps you intended to include this in opam-admin, but would be useful to be able to display the full signature chain,
+and all the files and signatures involved in it in the client too (think: dig +trace).
+
+- how expensive is it to check signatures?
+
+Will the client check each package's full chain, or just for the root and the packages that are to be installed/upgraded?
+
+[*] I know Git uses SHA1, but that shouldn't prevent us from using SHA-2 (too) for the signatures
+
+
+Best regards,
+--Edwin
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000604.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+	<LI>Next message: <A HREF="000601.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#598">[ date ]</a>
+              <a href="thread.html#598">[ thread ]</a>
+              <a href="subject.html#598">[ subject ]</a>
+              <a href="author.html#598">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

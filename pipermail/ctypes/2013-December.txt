@@ -1,0 +1,1208 @@
+From daniel.buenzli at erratique.ch  Wed Dec  4 11:21:23 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 4 Dec 2013 12:21:23 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+Message-ID: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+
+Hello, 
+
+I'm getting crazy with a kind of heisen bug that *seems* to occur only with OCaml 4.01.0 but not with 4.00.1.
+
+I have ctypes 0.2.2, libffi 3.0.13, xcode 5 (using clang) on osx 10.8.5.
+
+The bug is quite reproducible in different context with different (UI related) functions, it seems to be sensitive to the length of the function/program. In all the contexts where the bug occurs it eventually spins in obj_addExceptionHandler (see below), unable to get out of that it I try to step the program. 
+
+(gdb) bt
+#0 0x00007fff85f18a81 in memmove$VARIANT$sse42 ()
+#1 0x00007fff90fd2abc in libunwind::CFI_Parser<libunwind::LocalAddressSpace>::parseInstructions ()
+#2 0x00007fff90fd2a5e in libunwind::CFI_Parser<libunwind::LocalAddressSpace>::parseFDEInstructions ()
+#3 0x00007fff90fd28db in libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::getInfoFromDwarfSection ()
+#4 0x00007fff90fd0ebd in libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::setInfoBasedOnIPRegister ()
+#5 0x00007fff90fd1555 in libunwind::UnwindCursor<libunwind::LocalAddressSpace, libunwind::Registers_x86_64>::step ()
+#6 0x00007fff8ce8c7af in objc_addExceptionHandler ()
+#7 0x00007fff87055c6c in _CFDoExceptionOperation ()
+#8 0x00007fff8642724c in _NSAppKitLock ()
+#9 0x00007fff863e47f7 in NSAccessibilityPostNotificationWithUserInfo ()
+#10 0x00007fff865058db in -[NSApplication sendEvent:] ()
+#11 0x00000001001f3b84 in Cocoa_PumpEvents ()
+#12 0x000000010019ba3e in SDL_PumpEvents ()
+#13 0x0000000100172354 in ffi_call_unix64 ()
+
+
+This is with a program that has the following source, it gets stuck in the call to Sdl.pump_events (). If I try to comment out any part (and dependents) of this program the bug disappears. Especially, if I comment out one of the `video +` in main(), the bug disappears (`+` is `Unsigned.UInt32.logor`). So I suspect some kind of stack alignement issue. 
+
+let test () = 
+  match Sdl.create_window "Test" ~w:640 ~h:480 Sdl.Window.resizable with  
+  | `Error -> ()
+  | `Ok w ->
+      Sdl.pump_events ();
+      let e = Sdl.Event.create () in
+      let s = Sdl.get_event_state Sdl.Event.window_event in
+      Printf.printf "Event state: %s" begin match s with 
+      | s when s = Sdl.Event.disable -> "disable" 
+      | s when s = Sdl.Event.enable -> "enable" 
+      | _ -> assert false
+      end;
+      ignore (Sdl.wait_event_timeout e 1);
+      Sdl.destroy_window w;
+      ()
+
+let main () = match Sdl.init Sdl.Init.(video + video + events) with 
+| `Error -> exit 1
+| `Ok -> test (); exit 0
+
+let () = main ()
+
+
+That's just a first probe if anybody has something obvious in mind. I will provide more info and a fully reproducible test case. But for now I think I'll stick with ocaml 4.00.1 (hoping it's not there but just hiding more deeply) as I need to get some work done. 
+
+Best,
+
+Daniel
+
+
+P.S. Also I do get the following warnings when I install ctypes
+
+clang: warning: argument unused during compilation: '-fno-defer-pop'
+../../../src/ctypes/type_info_stubs.c:134:48: warning: format specifies type 'short' but the argument has type 'int' [-Wformat]
+case Short: snprintf(buf, sizeof buf, "%hd", Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+%d
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:143:53: warning: format specifies type 'char' but the argument has type 'int' [-Wformat]
+case Int8_t: snprintf(buf, sizeof buf, "%" PRId8, Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:144:55: warning: format specifies type 'short' but the argument has type 'int' [-Wformat]
+case Int16_t: snprintf(buf, sizeof buf, "%" PRId16, Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:146:55: warning: format specifies type 'long long' but the argument has type 'int64' (aka 'long') [-Wformat]
+case Int64_t: snprintf(buf, sizeof buf, "%" PRId64, Int64_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:268:22: note: expanded from macro 'Int64_val'
+#define Int64_val(v) (*((int64 *) Data_custom_val(v)))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+
+
+From daniel.buenzli at erratique.ch  Wed Dec  4 18:13:06 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 4 Dec 2013 19:13:06 +0100
+Subject: [ocaml-ctypes] Bigarray typing problem
+Message-ID: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+
+Hello,
+
+Suppose I have a C function like this that takes a 256 element array prototyped like this:  
+
+  void write (Uint16 *a); 
+
+I would like to expose it as 
+
+  val write : (int, Bigarray.int16_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t -> unit
+
+tried something along 
+
+  let write = foreign "write" (ptr uint16_t @-> returning void) 
+  let write a = write (bigarray_start array1 a) 
+
+But it fails on the second line with (for the parenthised expression) : 
+
+  Error: This expression has type int Ctypes.ptr
+  but an expression was expected of type Unsigned.uint16 Ctypes.ptr
+
+
+It seems to me that bigarray_start has the wrong type, it should map to a pointer of the *storage* type of the bigarray, not the type used to read/write the bigarray. 
+
+Besides I can't see how you can do that without introducing phantom witness values to make the translation from bigarray storage types to ctypes storage types (i.e. in that case from Bigarray.int16_unsigned_elt to uint16_t). 
+
+I could just coerce the damn thing, but something feels wrong here. Am I missing something ? 
+
+Thanks,
+
+Daniel
+
+
+
+From yallop at gmail.com  Thu Dec  5 11:08:38 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 5 Dec 2013 11:08:38 +0000
+Subject: [ocaml-ctypes] Bigarray typing problem
+In-Reply-To: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+References: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+Message-ID: <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+
+Hi Daniel,
+
+On 4 December 2013 18:13, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Suppose I have a C function like this that takes a 256 element array prototyped like this:
+>
+>   void write (Uint16 *a);
+>
+> I would like to expose it as
+>
+>   val write : (int, Bigarray.int16_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t -> unit
+>
+> tried something along
+>
+>   let write = foreign "write" (ptr uint16_t @-> returning void)
+>   let write a = write (bigarray_start array1 a)
+>
+> But it fails on the second line with (for the parenthised expression) :
+>
+>   Error: This expression has type int Ctypes.ptr
+>   but an expression was expected of type Unsigned.uint16 Ctypes.ptr
+
+Right: this is by design, although I'm not certain that it's the best
+possible design to use.  The intention is to have the ctypes Bigarray
+interface imitate the design of Bigarray itself, with a distinction
+between storage behaviour and read/write type.  For instance, using
+the type in question,
+
+   ((int, Bigarray.int16_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t)
+
+the Bigarray modules stores the elements as 16-bit integers, but
+exposes them (through indexing functions etc.) as ints.  Ctypes does
+the same: when you ask for a pointer into the bigarray you get back a
+pointer that gives you an int when you dereference it, but behaves as
+a pointer to 16-bit integers for purposes of arithmetic etc.:
+
+    # let ba = Array1.create int16_unsigned c_layout 5;;
+    val ba : (int, int16_unsigned_elt, c_layout) Array1.t = <abstr>
+    # let p = bigarray_start array1 ba;;
+    val p : int ptr = (int16_t*) 0xe5cb40
+
+The type of p indicates that dereferencing gives you an int, but the
+way the value of p is printed indicates that it's treated as a pointer
+into an array of 16-bit integers.  (There's a bug relating to
+signedness -- the value should be "(uint16_t*) 0xe5cb40", but that's a
+separate issue.  I'll note it on the issue tracker.).  You can see
+that pointer arithmetic (for example) behaves correctly by accessing
+bigarray elements through both the array and the pointer:
+
+   # for i = 0 to 4 do ba.{i} <- i done;;
+   - : unit = ()
+   # for i = 0 to 4 do Printf.printf "%d " !@(p +@ i) done;;
+   0 1 2 3 4 - : unit = ()
+
+Similarly,
+
+   # sizeof (reference_type p);;
+   - : int = 2
+
+> It seems to me that bigarray_start has the wrong type, it should map to a pointer of the *storage* type of the bigarray, not the type used to read/write the bigarray.
+
+That would be a reasonable approach as well.  I suppose it depends on
+whether you want a bigarray-like interface or simply an interface that
+accesses bigarray-managed memory.
+
+I've tried changing the interface so that bigarray_start etc. return
+pointers to storage types rather than to read/write types.  You can
+find it on the bigarray-kinds branch on my repository:
+
+   https://github.com/yallop/ocaml-ctypes/commit/0d15800310
+
+(It appears to work, but it's only lightly tested and not polished.
+It may be possible to simplify the types.)
+
+The main changes are:
+
+   * there's now a family of bigarray_kind values -- ba_float32,
+ba_float64, etc. -- that correspond to the kind values in the Bigarray
+module.  These should be used in place of Bigarray.kind values in the
+ctypes Bigarray interface.
+
+   * the type of bigarray_class now includes an extra field for the
+ctypes equivalent of the storage type
+
+   * bigarray_start and array_of_bigarray now take an additional
+argument of type bigarray_kind to indicate the storage type of the
+bigarray
+
+With these changes in place you have the behaviour you were expecting:
+
+   # let write = foreign "write" (ptr uint16_t @-> returning void);;
+   val write : Unsigned.uint16 ptr -> unit = <fun>
+   # let write a = write (bigarray_start array1 ba_int16_unsigned a);;
+   val write : (int, int16_unsigned_elt, c_layout) Array1.t -> unit = <fun>
+
+As I said, I'm not sure which interface is preferable overall.
+Perhaps it's worth providing both.
+
+Jeremy.
+
+From daniel.buenzli at erratique.ch  Thu Dec  5 14:13:33 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 5 Dec 2013 15:13:33 +0100
+Subject: [ocaml-ctypes] Bigarray typing problem
+In-Reply-To: <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+References: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+ <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+Message-ID: <19B60FCEA4AA40D1ACD2E7EA052BD36F@erratique.ch>
+
+
+> the Bigarray modules stores the elements as 16-bit integers, but
+> exposes them (through indexing functions etc.) as ints. Ctypes does
+> the same: when you ask for a pointer into the bigarray you get back a
+> pointer that gives you an int when you dereference it, but behaves as
+> a pointer to 16-bit integers for purposes of arithmetic etc.:
+
+Ok it makes sense. As you said maybe it's worth providing both, but I think I'll keep making coercions for now. I expect my following weeks to be ctypes heavy, maybe things will become clearer to me and we can have a more thorough look at that with real examples in hand. 
+ 
+That being said maybe what feels odd in that particular case is that ctypes has:
+
+  val uint16_t : uint16 typ
+
+and not 
+
+  val uint16_t : int typ
+
+i.e. it "disagrees" with bigarrays. In practice I'd prefer the latter for unsigned types smaller than 31 bits as it avoids having to use the Unsigned.UIntX.of_int functions if you try to avoid leaking ctypes types in your interface. My intuition was that you did it that way so that you can be more precise typewise (but it then asks the question why we have `val int16_t : int typ` and not some `val int16_t : int16 typ` that you have to convert aswell). 
+
+Best,
+
+Daniel
+
+
+
+From yallop at gmail.com  Sat Dec  7 22:34:26 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 7 Dec 2013 22:34:26 +0000
+Subject: [ocaml-ctypes] Bigarray typing problem
+In-Reply-To: <19B60FCEA4AA40D1ACD2E7EA052BD36F@erratique.ch>
+References: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+ <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+ <19B60FCEA4AA40D1ACD2E7EA052BD36F@erratique.ch>
+Message-ID: <CAAxsn=FPEY3+f7hxsx9=gAqDCkqAwgLGj08V18wcDqbgAbH_BQ@mail.gmail.com>
+
+On 5 December 2013 14:13, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> That being said maybe what feels odd in that particular case is that ctypes has:
+>
+>   val uint16_t : uint16 typ
+>
+> and not
+>
+>   val uint16_t : int typ
+>
+> i.e. it "disagrees" with bigarrays.
+
+Yes, it's a little unfortunate.  The reason is that ctypes aims to
+support platforms where int is 16 bits (which is permitted by C)
+whereas bigarray is written under the assumption that int is at least
+32 bits.
+
+From yallop at gmail.com  Sat Dec  7 22:48:21 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 7 Dec 2013 22:48:21 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+Message-ID: <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+
+On 4 December 2013 11:21, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> I'm getting crazy with a kind of heisen bug that *seems* to occur only with OCaml 4.01.0 but not with 4.00.1.
+
+If the bug can be triggered by a script it'd be interesting to see the
+results of running the script under 'git bisect' on the OCaml compiler
+repository.
+
+> P.S. Also I do get the following warnings when I install ctypes
+
+Thanks.  I've added a note to the issue tracker:
+https://github.com/ocamllabs/ocaml-ctypes/issues/108
+
+From daniel.buenzli at erratique.ch  Sat Dec  7 23:37:29 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 8 Dec 2013 00:37:29 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+Message-ID: <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+
+Le samedi, 7 d?cembre 2013 ? 23:48, Jeremy Yallop a ?crit :
+> If the bug can be triggered by a script it'd be interesting to see the
+> results of running the script under 'git bisect' on the OCaml compiler
+> repository.
+
+Will give you that during next week when the binding I'm working on will be repoified.  
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Thu Dec 12 18:20:19 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 12 Dec 2013 19:20:19 +0100
+Subject: [ocaml-ctypes] Stack allocated structs ?
+Message-ID: <727FB4E96BBF452885966D6FB6A6A350@erratique.ch>
+
+Hello, 
+
+Is returning stack allocated structs unsupported ? When I try to do this I get this exception:
+
+Fatal error: exception Static.Unsupported("libffi does not support passing arrays")
+
+(the struct has a single field with an array 16 uint8_t))
+
+Best,
+
+Daniel 
+
+
+
+From yallop at gmail.com  Thu Dec 12 18:44:16 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 12 Dec 2013 18:44:16 +0000
+Subject: [ocaml-ctypes] Stack allocated structs ?
+In-Reply-To: <727FB4E96BBF452885966D6FB6A6A350@erratique.ch>
+References: <727FB4E96BBF452885966D6FB6A6A350@erratique.ch>
+Message-ID: <CAAxsn=Ef24RPQnSs2WJMH0M=Oarn-LHGSbM5L41tvdsvvvcFkg@mail.gmail.com>
+
+On 12 December 2013 18:20, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Is returning stack allocated structs unsupported ? When I try to do this I get this exception:
+>
+> Fatal error: exception Static.Unsupported("libffi does not support passing arrays")
+>
+> (the struct has a single field with an array 16 uint8_t))
+
+There's some support for returning stack-allocated structs, but (as
+you've discovered) that doesn't include array members for the moment.
+This is another thing that'll certainly improve once we have stub
+generation.
+
+It might be possible to add the missing support before that, though,
+if it's safe to assume that a struct with a member of type T[n] is
+passed in the same way as a struct with n members of type T.  I've
+added an issue as a reminder to investigate:
+
+https://github.com/ocamllabs/ocaml-ctypes/issues/113
+
+From daniel.buenzli at erratique.ch  Thu Dec 12 19:30:20 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 12 Dec 2013 20:30:20 +0100
+Subject: [ocaml-ctypes] Stack allocated structs ?
+In-Reply-To: <CAAxsn=Ef24RPQnSs2WJMH0M=Oarn-LHGSbM5L41tvdsvvvcFkg@mail.gmail.com>
+References: <727FB4E96BBF452885966D6FB6A6A350@erratique.ch>
+ <CAAxsn=Ef24RPQnSs2WJMH0M=Oarn-LHGSbM5L41tvdsvvvcFkg@mail.gmail.com>
+Message-ID: <DBA50C9B48B645B98557164A83C91A10@erratique.ch>
+
+Le jeudi, 12 d?cembre 2013 ? 19:44, Jeremy Yallop a ?crit :
+> It might be possible to add the missing support before that, though,
+> if it's safe to assume that a struct with a member of type T[n] is
+> passed in the same way as a struct with n members of type T.  
+
+Thanks for the tip, didn't think far enough (tried to use the array directly but that didn't work either). Note that it's a very marginal case in the api in I'm binding to.  
+
+Best,
+
+Daniel
+
+
+
+
+From daniel.buenzli at erratique.ch  Sun Dec 15 23:51:15 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 16 Dec 2013 00:51:15 +0100
+Subject: [ocaml-ctypes] Bigarray typing problem
+In-Reply-To: <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+References: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+ <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+Message-ID: <135488FED1734DFAA716632056B33BE7@erratique.ch>
+
+
+
+Le jeudi, 5 d?cembre 2013 ? 12:08, Jeremy Yallop a ?crit :
+
+> I've tried changing the interface so that bigarray_start etc. return
+> pointers to storage types rather than to read/write types. You can
+> find it on the bigarray-kinds branch on my repository:
+>  
+> https://github.com/yallop/ocaml-ctypes/commit/0d15800310
+>  
+> (It appears to work, but it's only lightly tested and not polished.
+> It may be possible to simplify the types.)
+
+The patch seems rather big and typed-involved for what it brings. So far I was fine simply working with coercions.  
+
+However I now have another problem which is the other way round. I would like to be able to see a chunk of (void *) memory as a Bigarray.Array1.t of a given, client-defined, kind (failing if there are size alignment issue).  
+
+Here's an example:
+
+  val get_pixels : t -> ('a, 'b) kind -> ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
+
+For that I need to use Ctypes.bigarray_of_ptr, however to remain generic I need to coerce my (void *) pointer to the right type according to the bigarray kind. For that I wrote this function, just in order to match the access types (is that ok or should I match the storage aswell ?):
+
+let access_ptr_typ_of_ba_kind : ('a, 'b) Bigarray.kind -> 'a ptr typ = fun k ->  
+  let open Bigarray in  
+  match Obj.magic k with  
+  | k when k = float32 || k = float64 -> Obj.magic (ptr Ctypes.double)
+  | k when k = complex32 || k = complex64 -> Obj.magic (ptr Ctypes.complex64)
+  | k when k = int8_signed || k = int8_unsigned || k = int16_signed ||  
+           k = int16_unsigned || k = int -> Obj.magic (ptr Ctypes.camlint)
+  | k when k = int32 -> Obj.magic (ptr Ctypes.int32_t)
+  | k when k = int64 -> Obj.magic (ptr Ctypes.int64_t)
+  | k when k = nativeint -> Obj.magic (ptr Ctypes.nativeint)
+  | k when k = char -> Obj.magic (ptr Ctypes.char)
+  | k -> assert false  
+
+
+This allows me to write:  
+
+let get_pixels v kind =  
+  let () = ? (* check num of pixels is aligned on kind type *)  
+  let pixels : unit Ctypes.ptr = ... (* get void pointer on pixels *)
+  let pixels = coerce (ptr void) (access_ptr_type_of_ba_kind kind) ptr in  
+  bigarray_of_ptr array1 size kind pixels
+  
+Is that correct ? If it is and there's no other way I think it would be nice to have the above function in ctypes.  
+
+Best,
+
+Daniel
+
+From travis.brady at gmail.com  Tue Dec 17 04:46:15 2013
+From: travis.brady at gmail.com (Travis Brady)
+Date: Mon, 16 Dec 2013 22:46:15 -0600
+Subject: [ocaml-ctypes] Structs with malloc allocated fields
+Message-ID: <CABHK4nVYayyS00_DAn6t3=0t11Gh2fYfuhcViQ7os7=4fDWZFg@mail.gmail.com>
+
+I'm wrapping a simple library that contains a few functions that call
+malloc or realloc internally to allocate a few struct members and I'm
+wondering how to make those behave with Ctypes and the GC.
+
+The library exposes structname_free functions where applicable, but I'm not
+certain how to tell Ctypes how to use them or if I even need to at all.
+
+I've read through the ctypes examples, tests and other code from onanomsg
+and ocaml-libnl to no avail.
+
+Anyone mind sharing any tips here?
+
+thank you
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131216/2b828c42/attachment.html>
+
+From daniel.buenzli at erratique.ch  Tue Dec 17 05:41:12 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 17 Dec 2013 06:41:12 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+Message-ID: <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+
+Le dimanche, 8 d?cembre 2013 ? 00:37, Daniel B?nzli a ?crit :
+> Le samedi, 7 d?cembre 2013 ? 23:48, Jeremy Yallop a ?crit :
+> > If the bug can be triggered by a script it'd be interesting to see the
+> > results of running the script under 'git bisect' on the OCaml compiler
+> > repository.
+>  
+
+Okay so here you have. First a few preliminaries.
+
+  brew update && brew install sdl2
+  opam repo add erratique-u http://erratique.ch/software/opam/unreleased
+  opam update && opam install tsdl
+  curl http://erratique.ch/tmp/tsdl_bug.ml > /tmp/tsdl_bug.ml
+
+Then test that the bug exists on your machine. This assumes OCaml 4.01.0 is in your environment (and here I'm on osx 10.8.5 with xcode 5.0.2 which implies clang).
+
+  cd /tmp/
+  ocamlbuild -use-ocamlfind -tag "package(tsdl)" tsdl_bug.native
+  ./tsdl_bug.native # black window pops up, runs forever, pizza of death
+  killall -9 tsdl_bug.native # in another terminal
+
+If the bug exists then with that setup you can use the following script, it builds and runs the issue. If the program spins it exits with 1 otherwise with 0. It assumes the built compilers are in the environment.  
+
+#!/bin/sh
+opam remove tsdl
+opam install tsdl
+cd /tmp/
+ocamlbuild -clean  
+ocamlbuild -use-ocamlfind -tag "package(tsdl)" tsdl_bug.native
+
+(./tsdl_bug.native) & pid=$!
+sleep 2
+kill -9 $pid 2>/dev/null
+if [ "$?" = "0" ]; then  
+# Killed we were spinning.
+exit 1
+else
+# Not killed we finished, no bug
+exit 0
+fi
+
+Best,
+
+Daniel
+
+P.S. With 4.01.0 tsdl.cmx is a breeze to compile, on 4.00.1 it takes approx. 8 min on my machine. 
+
+From daniel.buenzli at erratique.ch  Tue Dec 17 16:53:46 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 17 Dec 2013 17:53:46 +0100
+Subject: [ocaml-ctypes] Calling from C into OCaml
+Message-ID: <BC23E84946594E78B04718BF093A8550@erratique.ch>
+
+Hello, 
+
+How does ctypes handle callback closures from C when they are stored in C structures ? 
+
+  1) Do they respect the OCaml runtime lock ? 
+  2) Are they ensured of not being gc'd ?
+
+In tsdl I did that once for the audio callback which gets called on another thread, it *worked* but I wonder if what I do is safe or if it works by chance (tried to Gc.compact () in the callback but the world didn't explode...).
+
+For reference here are the various bits:
+
+The OCaml record where you specify your callback:
+http://erratique.ch/software/tsdl/doc/Tsdl.Sdl.html#TYPEaudio_spec
+
+Callback and C structure holding it:
+http://hg.libsdl.org/SDL/file/default/include/SDL_audio.h#l159
+
+ocaml-ctypes translation:
+https://github.com/dbuenzli/tsdl/blob/master/src/tsdl.ml#L4305
+
+Translation of the OCaml record to a C struct that has a pointer on the callback:
+https://github.com/dbuenzli/tsdl/blob/master/src/tsdl.ml#L4333
+
+Example of use (440Hz sin wave):
+https://github.com/dbuenzli/tsdl/blob/master/test/test.ml#L1250
+
+Best,
+
+Daniel
+
+From yallop at gmail.com  Tue Dec 17 22:17:03 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 17 Dec 2013 22:17:03 +0000
+Subject: [ocaml-ctypes] Bigarray typing problem
+In-Reply-To: <135488FED1734DFAA716632056B33BE7@erratique.ch>
+References: <640E61C2E0B047FB8767E4449732F174@erratique.ch>
+ <CAAxsn=FjEKS1rqA902XbxjMp+p89FU9b4xXwrtZuXxX7Zio1Ww@mail.gmail.com>
+ <135488FED1734DFAA716632056B33BE7@erratique.ch>
+Message-ID: <CAAxsn=H0vh157L7hv+EJ36KmozNNo92NQH11LCc5wdEOCQH4=w@mail.gmail.com>
+
+On 15 December 2013 23:51, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> However I now have another problem which is the other way round. I would like to be able to see a chunk of (void *) memory as a Bigarray.Array1.t of a given, client-defined, kind (failing if there are size alignment issue).
+>
+> Here's an example:
+>
+>   val get_pixels : t -> ('a, 'b) kind -> ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
+>
+> For that I need to use Ctypes.bigarray_of_ptr, however to remain generic I need to coerce my (void *) pointer to the right type according to the bigarray kind. For that I wrote this function, just in order to match the access types (is that ok or should I match the storage aswell ?):
+
+Yes, you need to consider the storage type as well.  The following
+should be about right:
+
+  let access_ptr_typ_of_ba_kind : ('a, 'b) Bigarray.kind -> 'a ptr typ
+= fun k ->
+    let open Bigarray in
+    match Obj.magic k with
+    | k when k = float32 -> Obj.magic (ptr Ctypes.float)
+    | k when k = float64 -> Obj.magic (ptr Ctypes.double)
+    | k when k = complex32 -> Obj.magic (ptr Ctypes.complex32)
+    | k when k = complex64 -> Obj.magic (ptr Ctypes.complex64)
+    | k when k = int8_signed -> Obj.magic (ptr Ctypes.int8_t)
+    | k when k = int8_unsigned -> Obj.magic (ptr Ctypes.uint8_t)
+    | k when k = int16_signed -> Obj.magic (ptr Ctypes.int16_t)
+    | k when k = int16_unsigned -> Obj.magic (ptr Ctypes.uint16_t)
+    | k when k = int -> Obj.magic (ptr Ctypes.camlint)
+    | k when k = int32 -> Obj.magic (ptr Ctypes.int32_t)
+    | k when k = int64 -> Obj.magic (ptr Ctypes.int64_t)
+    | k when k = nativeint -> Obj.magic (ptr Ctypes.nativeint)
+    | k when k = char -> Obj.magic (ptr Ctypes.char)
+    | _ -> assert false
+
+> Is that correct ?
+
+It looks reasonable to me.
+
+> If it is and there's no other way I think it would be nice to have the above function in ctypes.
+
+Agreed: it's both needed in the interface for completeness, and much
+simpler to implement internally:
+
+   https://github.com/ocamllabs/ocaml-ctypes/pull/114/files
+
+It should be in the next release.
+
+Jeremy.
+
+From yallop at gmail.com  Tue Dec 17 23:33:53 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 17 Dec 2013 23:33:53 +0000
+Subject: [ocaml-ctypes] Structs with malloc allocated fields
+In-Reply-To: <CABHK4nVYayyS00_DAn6t3=0t11Gh2fYfuhcViQ7os7=4fDWZFg@mail.gmail.com>
+References: <CABHK4nVYayyS00_DAn6t3=0t11Gh2fYfuhcViQ7os7=4fDWZFg@mail.gmail.com>
+Message-ID: <CAAxsn=HtWu=5rZNSLS9OkZgBMhBqAzfDgK2JZN3UM1SgYMMjGw@mail.gmail.com>
+
+On 17 December 2013 04:46, Travis Brady <travis.brady at gmail.com> wrote:
+> I'm wrapping a simple library that contains a few functions that call malloc
+> or realloc internally to allocate a few struct members and I'm wondering how
+> to make those behave with Ctypes and the GC.
+>
+> The library exposes structname_free functions where applicable, but I'm not
+> certain how to tell Ctypes how to use them or if I even need to at all.
+
+There are several possible approaches to consider.  One approach is to
+simply write C-style code in OCaml, binding the structname_free
+functions and explicitly calling them when you know that it's safe to
+do so.  This will probably work best if the lifetime of the struct is
+easy to predict -- for example, if it's associated with a file
+descriptor or other resource that also needs to be explicitly
+released.
+
+Another approach is to register the destructor functions with the GC
+so that they're called automatically when ctypes no longer has a
+reference to the memory.  This approach should work well where you're
+allocating the memory from ctypes, since the hooks for registering
+destructor functions are currently associated with the ctypes
+allocation functions such as make
+(http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake).
+
+Here's a simple example with a struct whose fields point to memory
+dynamically allocated by C code.  The unmanaged_person function shows
+the C-style approach, with explicit deallocation; the managed_person
+function shows the GC-based approach, using the finaliser argument to
+the make function to register the destructor:
+
+   $ cat example_stubs.c
+   #include <stdlib.h>
+   #include <string.h>
+   #include <stdio.h>
+
+   struct person { char *name; int age; };
+
+   void initialize_person(struct person *p, const char *name, int age)
+   {
+     p->name = malloc(strlen(name) + 1);
+     strcpy(p->name, name);
+     p->age = age;
+   }
+
+   void destroy_person(struct person *p)
+   {
+     printf("goodbye %s (age %d)\n", p->name, p->age);
+     free(p->name);
+   }
+   $ cat example.ml
+   open Ctypes
+   open Foreign
+
+   type person
+   let person : person structure typ = structure "person"
+   let name = field person "name" string
+   let age = field person "age" int
+   let () = seal person
+
+   let initialize_person = foreign "initialize_person"
+     (ptr person @-> string @-> int @-> returning void)
+
+   let destroy_person = foreign "destroy_person"
+     (ptr person @-> returning void)
+
+   (* Allocate a `person' value, registering the destructor function
+with the GC *)
+   let managed_person ~name ~age =
+     let p = make ~finalise:(fun p -> destroy_person (addr p)) person in
+     initialize_person (addr p) name age;
+     p
+
+   (* Allocate a `person' value that must be explicitly deallocated *)
+   let unmanaged_person ~name ~age =
+     let p = make person in
+     initialize_person (addr p) name age;
+     p
+   $ ocamlfind ocamlc -c -package ctypes example_stubs.c example.ml
+   $ ocamlmklib -o example example_stubs.o example.cmo
+   $ ocaml
+           OCaml version 4.01.0
+
+   # #use "topfind";;
+   [...]
+   # #require "ctypes.foreign";;
+   [...]
+   # #load "example.cma";;
+   # open Example;;
+   # let mcc = unmanaged_person "Mrs McCave" 40;;
+   val mcc : (Example.person, [ `Struct ]) Ctypes.structured = <abstr>
+   # let () = for i = 1 to 23 do ignore (managed_person ~name:"Dave"
+~age:i) done;;
+   # Gc.full_major ();;
+   goodbye Dave (age 23)
+   goodbye Dave (age 22)
+   goodbye Dave (age 21)
+   goodbye Dave (age 20)
+   goodbye Dave (age 19)
+   goodbye Dave (age 18)
+   goodbye Dave (age 17)
+   goodbye Dave (age 16)
+   goodbye Dave (age 15)
+   goodbye Dave (age 14)
+   goodbye Dave (age 13)
+   goodbye Dave (age 12)
+   goodbye Dave (age 11)
+   goodbye Dave (age 10)
+   goodbye Dave (age 9)
+   goodbye Dave (age 8)
+   goodbye Dave (age 7)
+   goodbye Dave (age 6)
+   goodbye Dave (age 5)
+   goodbye Dave (age 4)
+   goodbye Dave (age 3)
+   goodbye Dave (age 2)
+   goodbye Dave (age 1)
+   - : unit = ()
+   # destroy_person (Ctypes.addr mcc);;
+   goodbye Mrs McCave (age 40)
+   - : unit = ()
+
+From florian.pichlmeier at mytum.de  Wed Dec 18 12:28:53 2013
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Wed, 18 Dec 2013 12:28:53 -0000
+Subject: [ocaml-ctypes] ptr ptr argument
+Message-ID: <20131218122853.76253.92260@andromeda1.ze.tum.de>
+
+Hi,
+
+i am trying to call this function from ocaml
+
+CZMQ_EXPORT int
+    zframe_send (zframe_t **self_p, void *socket, int flags);
+
+The function i use to create a new zframe_t is
+
+let create msg =
+  let stub = foreign "zframe_new"
+    (string @-> size_t @-> returning (ptr_opt Structs._zframe_t))
+  in
+  let msg_size =  Size_t.of_int (String.length msg) in
+  stub msg msg_size
+
+and the structure is defined this way
+
+type zframe_t
+let _zframe_t : zframe_t structure typ = structure "_zframe_t"
+
+The problem is with the pointer to pointer argument in the zframe_send function
+call.
+
+let send frame socket flags =
+  let stub = foreign "zframe_send"
+    ((ptr (ptr Structs._zframe_t)) @-> ptr void @-> int @-> returning int)
+  in
+  match flags with
+  | More -> stub (addr frame) socket 1
+  | Dontwait -> stub (addr frame) socket 4 
+  | More_Dontwait -> stub (addr frame) socket 42
+
+Does someone see, how i can fix my send function to work properly?
+
+Thanks a lot
+
+Florian
+
+From daniel.buenzli at erratique.ch  Wed Dec 18 16:21:42 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 18 Dec 2013 17:21:42 +0100
+Subject: [ocaml-ctypes] ptr ptr argument
+In-Reply-To: <20131218122853.76253.92260@andromeda1.ze.tum.de>
+References: <20131218122853.76253.92260@andromeda1.ze.tum.de>
+Message-ID: <34EA8E022A7045929C6101585361B6DB@erratique.ch>
+
+Not sure what is your problem is exactly (be more specific in your questions). But the following notes may answer. 
+
+First if zframe is abstract (and since it always seem to be allocated allocated by the C side) there no need to actually describe it as structure, just declare it that way:
+
+type zframe = unit ptr
+let zframe : zframe typ = ptr void
+let zframe_opt : zframe option typ = ptr_opt void
+
+
+
+we're using zframe to denote pointer on zframe_t, then:
+
+> let create msg =
+> let stub = foreign "zframe_new"
+> (string @-> size_t @-> returning (ptr_opt Structs._zframe_t))
+> in
+> let msg_size = Size_t.of_int (String.length msg) in
+> stub msg msg_size
+
+This will generate the binding to zframe_new on each call to create. Better is to do: 
+
+let zframe_new = 
+  foreign "zframe_new" (string @-> size_t @-> returning zframe_opt)
+
+let zframe_new data = 
+  zframe_new data (Size_t.of_int (String.length data))
+
+Then 
+
+let zframe_send = 
+  foreign "zframe_send" (ptr zframe @-> ptr void @-> int @-> returning int)
+
+let zframe_send frame socket flags = 
+  let fptr = allocate (ptr zframe) frame in 
+  zframe_end fptr socket flags
+
+Best,
+
+Daniel
+
+From daniel.buenzli at erratique.ch  Thu Dec 19 15:21:53 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 19 Dec 2013 16:21:53 +0100
+Subject: [ocaml-ctypes] Less copying, a hybrid approach
+Message-ID: <A5F3DFD047FF469CBAB8B43EDDCA4CE4@erratique.ch>
+
+Hello, 
+
+In certain cases I would really like to avoid copying the data passed to C (see [1]). Main uses cases are strings and arrays and records of unboxed floats (on architectures that have ARCH_ALIGN_DOUBLE undefined, see [2]). Since I don't want to wait on the promise of stub generation I have devised the following approach.
+
+The idea is to use ctypes to get the function pointer and pass it to a regular stub just to apply the function. What's the point will you tell me ? Why don't you immediately make a stub for the function then ? 
+
+First I'm still using "regular" ctypes for other parts of the binding. Second, I'm also using ctypes for the dll functionality, this means that I don't need to handle that in the C part will all the configure business it would entail; I piggyback on a correct install of ctypes for handling that and for the rest of the C that is needed I just need a correct install of ocaml. 
+
+I would like to get feedback on this approach, I think it should work on both 32 bits and 64 bits platform. To make it more easy to implement the only thing that is missing in ctypes now is `val ptr_to_raw_address : unit ptr -> int64`. In my example below I bypassed that by directly using the "ctypes_dlsym" stub.
+
+Below I show the approach on unsetenv(3) at the end of the ml file. Note that you need only one stub per function *type*.
+
+Any thoughts ? 
+
+Daniel
+
+
+[1] https://github.com/ocamllabs/ocaml-ctypes/issues/106
+[2] http://caml.inria.fr/pub/ml-archives/caml-list/2006/01/a8a5a8a9ee7fd2b71cc74835c2f7b924.en.html
+
+The ml file:
+
+------test.ml---------
+open Ctypes;;
+open Foreign;;
+
+type fun_ptr = int64
+
+external app_str_int : fun_ptr -> string -> int = "mlapp_str_int" "noalloc"
+
+external dlsym : ?handle:Dl.library -> symbol:string -> int64 option = 
+  "ctypes_dlsym"
+
+let unsetenv_fun_ptr : fun_ptr = match dlsym "unsetenv" with 
+| None -> assert false 
+| Some addr -> addr
+
+let unsetenv : string -> int = fun s -> app_str_int unsetenv_fun_ptr s 
+
+let () = 
+  assert (try ignore (Sys.getenv "HOME"); true with Not_found -> false);
+  assert (unsetenv "HOME" = 0); 
+  assert (try ignore (Sys.getenv "HOME"); false with Not_found -> true);
+  ()
+
+-------------
+
+The C stub:
+
+------test_stub.c---------
+#include <caml/mlvalues.h>
+
+typedef int (*str_int)(char *);
+
+value mlapp_str_int (value *fun_ptr, value *str)
+{  
+  str_int f = *(str_int)(Int64_val(fun_ptr)); 
+  char *s = String_val(str);
+  return Val_int(f (s));
+}
+
+------------------------------
+
+
+
+
+From yallop at gmail.com  Thu Dec 19 15:55:40 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 19 Dec 2013 15:55:40 +0000
+Subject: [ocaml-ctypes] Less copying, a hybrid approach
+In-Reply-To: <A5F3DFD047FF469CBAB8B43EDDCA4CE4@erratique.ch>
+References: <A5F3DFD047FF469CBAB8B43EDDCA4CE4@erratique.ch>
+Message-ID: <CAAxsn=GGb-hjfzftO4aSdU4ctXA12SKLRSMGM8NS0dzYQRdP-g@mail.gmail.com>
+
+On 19 December 2013 15:21, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> I would like to get feedback on this approach, I think it should work on both 32 bits and 64 bits platform. To make it more easy to implement the only thing that is missing in ctypes now is `val ptr_to_raw_address : unit ptr -> int64`. In my example below I bypassed that by directly using the "ctypes_dlsym" stub.
+
+It looks fine to me.  I've added the missing function here:
+
+   https://github.com/ocamllabs/ocaml-ctypes/pull/116
+
+> value mlapp_str_int (value *fun_ptr, value *str)
+
+Shouldn't this be
+
+   value mlapp_str_int (value fun_ptr, value str)
+
+?
+
+From daniel.buenzli at erratique.ch  Thu Dec 19 16:06:26 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 19 Dec 2013 17:06:26 +0100
+Subject: [ocaml-ctypes] Less copying, a hybrid approach
+In-Reply-To: <CAAxsn=GGb-hjfzftO4aSdU4ctXA12SKLRSMGM8NS0dzYQRdP-g@mail.gmail.com>
+References: <A5F3DFD047FF469CBAB8B43EDDCA4CE4@erratique.ch>
+ <CAAxsn=GGb-hjfzftO4aSdU4ctXA12SKLRSMGM8NS0dzYQRdP-g@mail.gmail.com>
+Message-ID: <0AD2F3D84C71488FB317B4E1B9794067@erratique.ch>
+
+Le jeudi, 19 d?cembre 2013 ? 16:55, Jeremy Yallop a ?crit :
+> It looks fine to me. I've added the missing function here:
+>  
+> https://github.com/ocamllabs/ocaml-ctypes/pull/116
+Thanks.
+
+> > value mlapp_str_int (value *fun_ptr, value *str)
+> Shouldn't this be
+>  
+> value mlapp_str_int (value fun_ptr, value str)
+>  
+> ?  
+Yes you're right. Thanks.   
+
+Daniel
+
+From daniel.buenzli at erratique.ch  Sun Dec 22 01:47:48 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 22 Dec 2013 02:47:48 +0100
+Subject: [ocaml-ctypes] Unsigned int smaller than 32 bits
+Message-ID: <7BA79A45059547C28F16604D4F47F8CC@erratique.ch>
+
+Hello,
+
+Is there any particular reason why signed int smaller than 32 bits are accessed as ocaml ints but unsigned ints smaller than 32 bits are not ? 
+
+In both cases you need to care about the range if you represent them as ocaml ints, and in both cases you want to represent them by ocaml ints if you don't want ctypes types to leak in the interface. I must be missing something. 
+
+Best, 
+
+Daniel
+
+P.S. Already tired of writing:
+
+let int_as_uint8_t = 
+  view ~read:Unsigned.UInt8.to_int ~write:Unsigned.UInt8.of_int uint8_t
+
+let int_as_uint16_t = 
+  view ~read:Unsigned.UInt16.to_int ~write:Unsigned.UInt16.of_int uint16_t
+
+
+
+
+From yallop at gmail.com  Sun Dec 22 02:12:51 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sun, 22 Dec 2013 02:12:51 +0000
+Subject: [ocaml-ctypes] Unsigned int smaller than 32 bits
+In-Reply-To: <7BA79A45059547C28F16604D4F47F8CC@erratique.ch>
+References: <7BA79A45059547C28F16604D4F47F8CC@erratique.ch>
+Message-ID: <CAAxsn=H2tWcR=v-seJEcLcy1vsBm7_rf0cxqthw+fBq7diypMw@mail.gmail.com>
+
+On 22 December 2013 01:47, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Is there any particular reason why signed int smaller than 32 bits are accessed as ocaml ints but unsigned ints smaller than 32 bits are not ?
+
+Well, there's a rationale for uint16_t being a distinct type, since
+the C (signed) int type can be as small as 16 bits.  I don't see why
+uint8_t needs to be a distinct type, though.
+
+> P.S. Already tired of writing:
+>
+> let int_as_uint8_t =
+>   view ~read:Unsigned.UInt8.to_int ~write:Unsigned.UInt8.of_int uint8_t
+
+Yes, this is pretty annoying.  Perhaps we should have multiple views
+for a single C type in the Ctypes interface; something like this:
+
+   module Uint8 :
+   sig
+     val t : uint8_t typ   (* access C uint8_t values using the OCaml
+uint8_t type *)
+     val int : int typ       (* access C uint8_t values using the
+OCaml int type *)
+   end
+
+Then Ctypes.Uint8.t would behave like the current Ctypes.uint8_t, and
+Ctypes.Uint8.int would behave like your int_as_uint8_t (except that it
+could be made a little more efficient).
+
+Feedback welcome.  If this approach is reasonable then it could also
+might also lead to resolutions for the following issues:
+
+    Expose arithmetic operations for POSIX arithmetic types
+    https://github.com/ocamllabs/ocaml-ctypes/issues/87
+
+    ptrdiff_t ?
+    https://github.com/ocamllabs/ocaml-ctypes/issues/117
+
+Jeremy
+
+From daniel.buenzli at erratique.ch  Sat Dec 28 01:39:44 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 28 Dec 2013 02:39:44 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+Message-ID: <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+
+Ok this thing is too annoying, either my code runs an infinite loop (4.01) or I have to wait over 6 minutes for my code to compile (4.00.1). 
+
+So I gave it a go, making a full script this time that works in an ocaml repo checkout, see the end of this message. Note that in practice doing a bisect is not as easy as 
+
+   git bisect start 4.00.1 4.01.0
+   git bisect run script
+
+since you tend to fall on commits in which ocaml doesn't build which screws the search procedure. So in practice you have to watch carefully which checkouts fail because ocaml fails to build and which because of your actual don't so you can restart at slightly different points (e.g. parent or successor of a bad, good commit) to avoid falling on the checkouts that fail for other reasons than your bug. So I guess I really understand now the benefits of CI. 
+
+In any case the offending commit is: 
+
+    https://github.com/ocaml/ocaml/commit/b2636c22d55b15f55a02b3
+
+Before I submit something upstream does that ring a bell to anyone ? Do you think it's maybe a specific libffi issue/interaction ? 
+
+Daniel
+
+
+The bug happens with:
+
+> gcc -v
+Configured with: --prefix=/Applications/Xcode.app/Contents/Developer/usr --with-gxx-include-dir=/usr/include/c++/4.2.1
+Apple LLVM version 5.0 (clang-500.2.79) (based on LLVM 3.3svn)
+Target: x86_64-apple-darwin12.5.0
+Thread model: posix
+
+
+
+> uname -a
+Darwin hehey.local 12.5.0 Darwin Kernel Version 12.5.0: Sun Sep 29 13:33:47 PDT 2013; root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64
+
+
+
+To reproduce let $T be a directory (change the $T variable accordingly in the script).
+
+brew update && brew install sdl2
+cd $T 
+git clone https://github.com/ocaml/ocaml
+cd ocaml
+git checkout trunk
+$T/sdlspin.sh # exits with 0 if there is no bug
+
+---- sdlspin.sh ----
+#!/bin/sh
+
+T=/Users/dbuenzli/tmp
+cd $T/ocaml
+
+# OCaml
+./configure --prefix $T/ocaml
+make world.opt 
+make install
+
+export PATH="$T/ocaml/bin:$PATH"
+
+# Findlib 
+curl -O http://download.camlcity.org/download/findlib-1.4.tar.gz
+tar -xvzf findlib-1.4.tar.gz
+cd findlib-1.4
+./configure \
+ -bindir $T/ocaml/bin \
+ -mandir $T/ocaml/man \
+ -sitelib $T/ocaml/lib/ocaml/site-lib \
+ -config $T/ocaml/findlib.conf
+make all opt install
+cd ..
+curl -O -L \
+ https://github.com/ocamllabs/ocaml-ctypes/archive/ocaml-ctypes-0.2.2.tar.gz
+
+# Ctypes 
+tar -xvzf ocaml-ctypes-0.2.2.tar.gz 
+cd ocaml-ctypes-ocaml-ctypes-0.2.2 # WTF
+make
+make install 
+cd ..
+
+# Tsdl overwrite test.ml with bug so we can directly compile
+git clone https://github.com/dbuenzli/tsdl.git
+curl http://erratique.ch/tmp/tsdl_bug.ml > tsdl/test/test.ml
+cd tsdl 
+./build test.native
+
+(./test.native) & pid=$!
+sleep 2
+kill -9 $pid 2>/dev/null
+if [ "$?" = "0" ]; then  
+  echo "Spinning, bug" 
+  # Killed we were spinning.
+  EXIT=1
+else
+  # Not killed we finished, no bug
+  echo "No spinning, no bug"
+  EXIT=0
+fi
+cd ..
+
+# Cleanup 
+git clean -q -f -d -x 
+rm -rf tsdl
+
+exit $EXIT
+-------------------------
+
+
+
+From yallop at gmail.com  Sat Dec 28 20:23:52 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 28 Dec 2013 20:23:52 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+Message-ID: <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+
+On 28 December 2013 01:39, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> In any case the offending commit is:
+>
+>     https://github.com/ocaml/ocaml/commit/b2636c22d55b15f55a02b3
+>
+> Before I submit something upstream does that ring a bell to anyone ? Do you think it's maybe a specific libffi issue/interaction ?
+
+There do seem to have been some issues with -no_compact_unwind and libffi:
+
+    https://ghc.haskell.org/trac/ghc/ticket/5019
+

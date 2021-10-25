@@ -1,0 +1,186 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Lwt/Async abstraction for HTTP library
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3C20120821021103.GR24660%40dark.recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001366.html">
+   <LINK REL="Next"  HREF="001367.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Lwt/Async abstraction for HTTP library</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3C20120821021103.GR24660%40dark.recoil.org%3E"
+       TITLE="Lwt/Async abstraction for HTTP library">anil at recoil.org
+       </A><BR>
+    <I>Tue Aug 21 03:11:03 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001366.html">Lwt/Async abstraction for HTTP library
+</A></li>
+        <LI>Next message: <A HREF="001367.html">Lwt/Async abstraction for HTTP library
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#479">[ date ]</a>
+              <a href="thread.html#479">[ thread ]</a>
+              <a href="subject.html#479">[ subject ]</a>
+              <a href="author.html#479">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On Sun, Aug 19, 2012 at 02:54:25PM -0400, Yaron Minsky wrote:
+&gt;<i> One quick observation: this code would be a little cleaner if you
+</I>&gt;<i> opened Async.Std.  Then you'd write:
+</I>&gt;<i> 
+</I>&gt;<i>    open Core.Std
+</I>&gt;<i>    open Async.Std
+</I>&gt;<i> 
+</I>
+Ah, I missed the Async package's existence and went straight for
+Async_unix.  I've now updated the dependency to use Async directly and all
+the interfaces are much simpler.
+
+&gt;<i>    let _ =  within' (fun () -&gt;
+</I>&gt;<i>      try_with make_net_req
+</I>&gt;<i>      &gt;&gt;= function
+</I>&gt;<i>      | Error exn -&gt;
+</I>&gt;<i>        (* TODO: how to dump out top-level errors in a nicer way? *)
+</I>&gt;<i>         fprintf stderr &quot;err %s.\n%!&quot; (Exn.backtrace ());
+</I>&gt;<i>         return ()
+</I>&gt;<i>      | Ok _ -&gt; return ()
+</I>&gt;<i>    )
+</I>&gt;<i>    in
+</I>&gt;<i>    Scheduler.go ()
+</I>&gt;<i> 
+</I>&gt;<i> Further, I don't think the [within'] call is doing you any good, since
+</I>&gt;<i> you're not using it to set the block group, the monitor or the
+</I>&gt;<i> priority.  So you should be able to just drop that.
+</I>
+This was actually related to me experimenting with what all those options
+do (particularly the custom monitor).  I'll wait for your new update when
+Yury's back and see what the interface looks like.   Do you normally just
+read the s-expr encoded in Error.t, or do you have something fancier (the
+former is good enough for me in practise).
+
+&gt;<i> &gt; - Async_streams are deprecated, and I should use Pipes instead. I
+</I>&gt;<i> &gt;   need to be able to run a background task that will close the I/O
+</I>&gt;<i> &gt;   channel whenever the Pipe is completed to close the underlying fd.
+</I>&gt;<i> &gt;   I obtain a Deferred via Pipe.closed, but how should this run in
+</I>&gt;<i> &gt;   the background?  Should I just ignore the return, or register it
+</I>&gt;<i> &gt;   with the Scheduler?
+</I>&gt;<i> 
+</I>&gt;<i> Sorry, I'm not quite able to decode the question.  Do you have a code
+</I>&gt;<i> snippet you could share?
+</I>
+Yeah, in:
+<A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async.ml</A>
+
+let pipe_of_body read_fn ic =
+  let rd, wr = Pipe.create () in
+  (* Consume from the input channel and write to the new pipe *)
+  let rec write () =
+    read_fn ic &gt;&gt;= function
+    |Transfer.Done -&gt;
+      Pipe.close wr; return ()
+    |Transfer.Final_chunk c -&gt; begin
+      Pipe.with_write wr ~f:(fun wrfn -&gt; wrfn c) &gt;&gt;= 
+        function
+        |`Closed -&gt; return ()
+        |`Ok _ -&gt; Pipe.close wr; return ()
+    end
+    |Transfer.Chunk c -&gt; begin
+      Pipe.with_write wr ~f:(fun wrfn -&gt; wrfn c) &gt;&gt;=
+        function
+        |`Closed -&gt; return ()
+        |`Ok _ -&gt; write () 
+    end
+  in
+  (* TODO: how to run write () as a background task? *)
+  let _ = write () in
+  rd
+
+This function is called to convert a HTTP body into a Pipe pair, such that
+the client can lazily consume the (potentially very large) HTTP body, or
+pass it onto a proxy process.  There is a write() function that reads from
+the HTTP body and potentially blocks on the I/O or pushback from the pipe.
+We immediately return the reader pipe as a return value from the function.
+
+So my question is what to do with:
+
+  (* TODO: how to run write () as a background task? *)
+  let _ = write () in
+  rd
+
+Does write() need to be registered with something to be a &quot;proper&quot;
+background task for accounting purposes, or to run a cleanup function if
+the Reader pipe terminates early?
+
+The equivalent code in Lwt is here and looks like:
+<A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt.ml</A>
+
+let stream_of_body read_fn ic =
+  let fin = ref false in
+  Lwt_stream.from (fun () -&gt;
+    match !fin with
+    |true -&gt; return None
+    |false -&gt; begin
+      match_lwt read_fn ic with
+      |Transfer.Done -&gt; 
+        return None
+      |Transfer.Final_chunk c -&gt;
+        fin := true;
+        return (Some c);
+      |Transfer.Chunk c -&gt;
+        return (Some c)
+    end
+  )
+
+The Lwt_stream that is returned has an Lwt.on_terminate handler for when
+the consumer hits EOF (e.g. to close the socket), and I think (but am a
+little blurry here) cancels the other end with an Lwt.Canceled exception
+if the other side stops early.
+
+&gt;<i> &gt; In general, are there any toy network programs written using Async
+</I>&gt;<i> &gt; that I could crib good style from?
+</I>&gt;<i> 
+</I>&gt;<i> That's an excellent question.  We do have some examples that are
+</I>&gt;<i> presently not included in our external tree.  I'll see if we can fix
+</I>&gt;<i> that.
+</I>
+That would be great!
+
+-- 
+Anil Madhavapeddy                                 <A HREF="http://anil.recoil.org">http://anil.recoil.org</A>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001366.html">Lwt/Async abstraction for HTTP library
+</A></li>
+	<LI>Next message: <A HREF="001367.html">Lwt/Async abstraction for HTTP library
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#479">[ date ]</a>
+              <a href="thread.html#479">[ thread ]</a>
+              <a href="subject.html#479">[ subject ]</a>
+              <a href="author.html#479">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

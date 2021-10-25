@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> scripting with ocaml and core
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20scripting%20with%20ocaml%20and%20core&In-Reply-To=%3CA6CD9DEE-D02A-472F-94C0-E1CB6EBBB999%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000573.html">
+   <LINK REL="Next"  HREF="000570.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>scripting with ocaml and core</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20scripting%20with%20ocaml%20and%20core&In-Reply-To=%3CA6CD9DEE-D02A-472F-94C0-E1CB6EBBB999%40recoil.org%3E"
+       TITLE="scripting with ocaml and core">anil at recoil.org
+       </A><BR>
+    <I>Mon Sep 24 02:57:57 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000573.html">scripting with ocaml and core
+</A></li>
+        <LI>Next message: <A HREF="000570.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#569">[ date ]</a>
+              <a href="thread.html#569">[ thread ]</a>
+              <a href="subject.html#569">[ subject ]</a>
+              <a href="author.html#569">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Switching to the native toplevel would no doubt help a lot. 
+
+I took a quick look at ocamlnat in 4.00.0, and it has bitrotted slightly.  Attached patch (+make ocamlnat) gets ocaml-trunk/ocamlnat building again, but then I ran into a slew of OPAM bugs and the fact that most packages don't install .cmxs files.  Patch against ocaml-trunk attached anyway, and I'll submit it upstream when cleaned up; it'll be nice to have ocamlnat working out of OPAM soon as a compiler switch.
+
+Jeremie, have you ever tried utop as native code?
+
+
+-anil
+
+On 23 Sep 2012, at 13:36, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+
+&gt;<i> I've seen more or less the same thing.  Manipulating the name space seems to be quite expensive.  To be fair, Core.Std is a pretty massive module.  Does anyone who knows more about how the toplevel actually works have any thoughts on what might be going on, and if it can be made more efficient?
+</I>&gt;<i> 
+</I>&gt;<i> y
+</I>&gt;<i> 
+</I>&gt;<i> On Sun, Sep 23, 2012 at 8:31 AM, Sean McLaughlin &lt;<A HREF="http://lists.ocaml.org/listinfo/core">seanmcl at gmail.com</A>&gt; wrote:
+</I>&gt;<i> Not loading core_extended is surprisingly not helping much.  
+</I>&gt;<i> 
+</I>&gt;<i> 3.5s with 
+</I>&gt;<i> 3.0s without
+</I>&gt;<i> 
+</I>&gt;<i> It's actually the call to 
+</I>&gt;<i> 
+</I>&gt;<i>     open Core.std
+</I>&gt;<i> 
+</I>&gt;<i> that takes most of the time.  Without that, I have
+</I>&gt;<i> 
+</I>&gt;<i> 1.0s with no special toplevel
+</I>&gt;<i> 0.7s with the linked toplevel
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> On Sun, Sep 23, 2012 at 8:10 AM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;<i> I don't know how to make this faster either, unfortunately.  How long does it take if you don't include core_extended?  We should move Shell from core_extended to Core, which should allow one to avoid most of Core_extended.
+</I>&gt;<i> 
+</I>&gt;<i> I think this kind of thing should get better when namespaces show up in OCaml, so that we can load just parts of Core and still have a coherent set of naming conventions.
+</I>&gt;<i> 
+</I>&gt;<i> y
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> On Sun, Sep 23, 2012 at 8:01 AM, Sean McLaughlin &lt;<A HREF="http://lists.ocaml.org/listinfo/core">seanmcl at gmail.com</A>&gt; wrote:
+</I>&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> I'm interested in doing some shell scripting in ocaml with core for some regression testing.  It takes awhile (~4 seconds) for core to load into the toplevel.  (Simple example at end of email.)  I figured I could make a custom toplevel that linked all the code in, but I can't seem to improve it much (~3 seconds).  I suspect I'm calling ocamlmktop incorrectly though, because I can't see what would be taking all that time.  Here's what I used:
+</I>&gt;<i> 
+</I>&gt;<i> ocamlfind ocamlmktop -o core-ocaml -thread -package core,core_extended,findlib -linkpkg
+</I>&gt;<i> 
+</I>&gt;<i> which I concocted after reading
+</I>&gt;<i> 
+</I>&gt;<i> <A HREF="http://projects.camlcity.org/projects/dl/findlib-1.2.1/doc/guide-html/x227.html">http://projects.camlcity.org/projects/dl/findlib-1.2.1/doc/guide-html/x227.html</A>
+</I>&gt;<i> 
+</I>&gt;<i> Has anyone successfully used core with the toplevel and not had this big performance hit?
+</I>&gt;<i> 
+</I>&gt;<i> Thanks,
+</I>&gt;<i> 
+</I>&gt;<i> Sean
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> (* test.ml *)
+</I>&gt;<i> 
+</I>&gt;<i> #directory &quot;/Users/seanmcl/.opam/4.00.0/lib/toplevel&quot;;;
+</I>&gt;<i> #directory &quot;/Users/seanmcl/.opam/4.00.0/lib/stublibs&quot;;;
+</I>&gt;<i> 
+</I>&gt;<i> #use &quot;topfind&quot;;;
+</I>&gt;<i> #camlp4o;;
+</I>&gt;<i> #thread;;
+</I>&gt;<i> #require &quot;pcre&quot;;;
+</I>&gt;<i> #require &quot;core&quot;;;
+</I>&gt;<i> #require &quot;core_extended&quot;;;
+</I>&gt;<i> 
+</I>&gt;<i> open Core.Std
+</I>&gt;<i> 
+</I>&gt;<i> let _ = Printf.printf &quot;Hello, world!\n&quot;
+</I>&gt;<i> ;;
+</I>&gt;<i> 
+</I>&gt;<i> exit 0
+</I>&gt;<i> (* end test.ml *)
+</I>&gt;<i> 
+</I>&gt;<i> $ time ocaml test.ml
+</I>&gt;<i> Hello, world!
+</I>&gt;<i> 
+</I>&gt;<i> real	0m4.254s
+</I>&gt;<i> 
+</I>&gt;<i> $ time ./core-ocaml test.ml
+</I>&gt;<i> Hello, world!
+</I>&gt;<i> 
+</I>&gt;<i> real	0m3.430s
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment.html">http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment.html</A>&gt;
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment-0001.html">http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment-0001.html</A>&gt;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ocamlnat-trunk.diff
+Type: application/octet-stream
+Size: 5680 bytes
+Desc: not available
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment.obj">http://lists.ocaml.org/pipermail/core/attachments/20120923/a48eedf2/attachment.obj</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000573.html">scripting with ocaml and core
+</A></li>
+	<LI>Next message: <A HREF="000570.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#569">[ date ]</a>
+              <a href="thread.html#569">[ thread ]</a>
+              <a href="subject.html#569">[ subject ]</a>
+              <a href="author.html#569">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

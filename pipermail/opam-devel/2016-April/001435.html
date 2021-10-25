@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] docker hub update?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20docker%20hub%20update%3F&In-Reply-To=%3C570BB9CE.7070906%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001434.html">
+   <LINK REL="Next"  HREF="001436.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] docker hub update?</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20docker%20hub%20update%3F&In-Reply-To=%3C570BB9CE.7070906%40etorok.net%3E"
+       TITLE="[opam-devel] docker hub update?">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Mon Apr 11 15:50:54 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001434.html">[opam-devel] docker hub update?
+</A></li>
+        <LI>Next message: <A HREF="001436.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1435">[ date ]</a>
+              <a href="thread.html#1435">[ thread ]</a>
+              <a href="subject.html#1435">[ subject ]</a>
+              <a href="author.html#1435">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 04/11/2016 14:44, Anil Madhavapeddy wrote:
+&gt;<i> The Docker packages up on ocaml/opam are still somewhat experimental,
+</I>&gt;<i> so please do bear with me as I rearrange things around to make it
+</I>&gt;<i> work more efficiently.
+</I>
+Hi Anil,
+
+They're already quite useful, thanks a lot for creating them!
+
+&gt;<i>  On the other hand, this is a great time to
+</I>&gt;<i> bring up your usecases for them
+</I>&gt;<i> as well so I can make breaking
+</I>&gt;<i> changes in the Hub namespace before announcing them properly.
+</I>&gt;<i> 
+</I>&gt;<i> There are a few goals for the Docker Hub containers:
+</I>&gt;<i> 
+</I>&gt;<i> - make it easy to publish an OCaml-based application (such as your
+</I>&gt;<i> Skylable LibreS3, or Mirage, Irmin, Flowtype, Hack, Infer, etc etc)
+</I>
+I'd love to be able to do this, but I had to jump through some hoops to get my image size down,
+e.g. by installing, compiling and removing the development tools in a single RUN line.
+This got my image down from ~1GB to 85 MB, but I can't use an ocaml/opam base image for this (since removing files doesn't shrink the image download size).
+
+Don't know if it'd be possible to squash some layers on the Docker Hub, or build in 2 phases: 
+one container to build a .deb/.apk/.rpm, another container to install that on a minimal base image
+(using a package to make sure all system gets installed, like libev, etc.).
+
+For this use-case it would be useful to have a base image that doesn't change every day, but only when ocaml/opam/opam depext itself changes.
+
+&gt;<i> -&gt; continuous integration with a variety of distros and compiler version
+</I>&gt;<i> variants
+</I>
+My current use case fits roughly here. I want to test that I got all opam deps and system deps properly
+specified, i.e. I want to build in a 'clean' environment.
+Docker's cache comes in handy to avoid rebuilding all the deps when the opam file doesn't change.
+Testing on multiple distros is meant to be as simple as changing the FROM line (and fixing opam files where needed):
+<A HREF="https://gist.github.com/edwintorok/0149412fb55f58c0b7c5eb605adaa8fa">https://gist.github.com/edwintorok/0149412fb55f58c0b7c5eb605adaa8fa</A>
+
+Also for testing a local opam remote, although SSH agent forwarding is a bit tricky:
+<A HREF="https://gist.github.com/edwintorok/b8bf92acc6ba9aecadcb25f0f492e8e2">https://gist.github.com/edwintorok/b8bf92acc6ba9aecadcb25f0f492e8e2</A>
+
+&gt;<i> - development environments for OCaml
+</I>
+I thought about this, but I'd personally wait until Docker gains the ability to run containers as non-root.
+
+&gt;<i> - ocaml/opam-base -
+</I>&gt;<i> provides an installed OPAM binary, but _not_ initialised, and has the
+</I>&gt;<i> capability to volume mount an OPAM repository from which it can
+</I>&gt;<i> initialise the local base without any data being held in the
+</I>&gt;<i> container.
+</I>
+Yes! This would be similar to Debian containers, where you must run apt-get update:
+otherwise 'apt-get install' finds no packages.
+
+&gt;<i> - ocaml/opam - embeds an OPAM repository checkout and
+</I>&gt;<i> works as-is right now
+</I>
+Not sure if rebuilding the image or using ONBUILD would be better here.
+For local usage ONBUILD might get you something fresher without having to pull everyday from Docker.
+
+On Docker Hub the shared checkout would probably save time in containers that depend on this.
+
+&gt;&gt;<i> E.g. 'ocaml/opam:latest' and 'ocaml/opam:debian' was last updated 9
+</I>&gt;&gt;<i> days ago according to docker hub, but then some images were updated
+</I>&gt;&gt;<i> a few hours ago. That looks confusing, would it be possible to
+</I>&gt;&gt;<i> prioritize building 'ocaml/opam:latest'?
+</I>&gt;<i> 
+</I>&gt;<i> It's difficult to prioritise unfortunately -- Docker (my employer) is
+</I>&gt;<i> sponsoring the builds so that we have up to 100 in parallel, and they
+</I>&gt;<i> are pushed when they were built.
+</I>
+Nice!
+
+&gt;<i> 
+</I>&gt;<i> I was on vacation last week and it was an errant cron job that did
+</I>&gt;<i> the push that you saw, but the eventual plan is to have a cron job
+</I>&gt;<i> that rebuilds every day.
+</I>
+Ok, in case some limits are hit would it be possible to pick a few images (like :latest) that are triggered first,
+and the rest are triggered later?
+
+Best regards,
+-- 
+Edwin T&#246;r&#246;k | Co-founder and Lead Developer
+
+Skylable open-source object storage: reliable, fast, secure
+<A HREF="http://www.skylable.com">http://www.skylable.com</A>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001434.html">[opam-devel] docker hub update?
+</A></li>
+	<LI>Next message: <A HREF="001436.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1435">[ date ]</a>
+              <a href="thread.html#1435">[ thread ]</a>
+              <a href="subject.html#1435">[ subject ]</a>
+              <a href="author.html#1435">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

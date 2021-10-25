@@ -1,0 +1,271 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAJDLOYK%3DQaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000186.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?</H1>
+    <B>Andi McClure</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAJDLOYK%3DQaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?">andi.m.mcclure at gmail.com
+       </A><BR>
+    <I>Mon Aug 10 06:05:00 BST 2015</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000186.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello&#8212;
+
+Thanks Jeremy for this response. After some time I've been able to come
+back and try these things out. I do have some new questions :) I might
+write this out a little more verbosely than I need to just to be certain
+I'm speaking precisely.
+
+I have a test program with a c function
+
+    int increment3(int x) { return x + 3; }
+
+On the OCaml side, this is accessed as
+
+    let increment3 = foreign &quot;increment3&quot; (int @-&gt; returning int) in
+    increment3 3
+
+And that works and I'm happy with it. Actually, after playing with the
+foreign / &quot;@-&gt;&quot; interface, I'm finding it seems to be about as good as I
+need, and I'm trying to figure out if I can use that instead of having to
+work with the low-level interfaces (which as discussed before are not
+necessarily directly exposed at this time anyway).
+
+Anyway, I'm trying to set up my OCaml-implemented interpreter, so that this
+line of code in Emily is equivalent to the &quot;let increment3&quot; above:
+
+    (* Just pretend .int is shorthand for &quot;int&quot; *)
+    increment3 = package.emily.ffi.c.function [ name = .increment3; args =
+[ .int, ]; return = .int ]
+
+The syntax could use some work :P But never mind that. I've so far got it
+where when you invoke ffi.c.function, the function specification you
+provided gets piped into OCaml and turned into this OCaml data structure:
+
+    type foreignSpec = { name : string; args : string list; returning:
+string; }
+
+This seems like a straightforward representation of the information @-&gt;
+encodes; it seems something parsing a header would need to represent the
+data the same way.
+
+My naive impulse is to imagine that this is straightforward, and I need to
+just build up a typ variable by repeatedly chaining @-&gt;, something like:
+
+    let typeConvert = function &quot;void&quot; -&gt; void | &quot;int&quot; -&gt; int | _ -&gt;
+failwith &quot;??&quot;
+    let functionFrom spec =
+        foreign spec.name ( List.fold_right
+            ( @-&gt; )
+            ( List.map typeConvert wrap.args )
+            ( returning ( typeConvert wrap.returning ) ) )
+
+If I start trying to implement this, OCaml immediately objects that even
+just typeConvert is impossible to compile:
+
+    Error: This expression has type int Ctypes.typ = int Ctypes_static.typ
+           but an expression was expected of type
+             unit Ctypes.typ = unit Ctypes_static.typ
+           Type int is not compatible with type unit
+
+This seems to make immediate sense: I don't fully understand what the type
+of the thing @-&gt; returns is (Merlin says it's '_a -&gt; '_b -&gt; '_c ...) but it
+seems like whatever @-&gt; may be doing, in all cases @-&gt; or foreign actually
+gets used, the type of that @-&gt;'s return must be something known at the
+call site at compile time-- because when OCaml code invokes &quot;foreign&quot; OCaml
+will need to statically compile a statically typed result. So I can't
+possibly store one of the typs in a variable which could contain sometimes
+&quot;int&quot; and sometimes &quot;void&quot;. I'm assuming this works something like C++
+template arguments, which are something I have a little more familiarity
+with than OCaml type variables.
+
+It seems like, if I really understood what @-&gt; is doing, I might be able to
+maybe make this work anyway. In Emily I currently have only one &quot;type&quot;, a
+big variant which is modeled in OCaml like:
+
+type value = Null | True | FloatValue of float | StringValue of string |
+AtomValue of string
+    | BuiltinFunctionValue of (value -&gt; value)
+
+I eventually intend for the ffi.c.function implementation to return a
+BuiltinFunctionValue that takes an argument; either unpacks it from a
+&quot;value&quot; into the correct tagged type or throws an error; then packs the
+return back into an appropriately tagged &quot;value&quot;. The &quot;value&quot; pack and
+unpack functions will know their types statically, so maybe in principle
+they can work in participation with whatever type-chaining trick @-&gt; does
+and still produce well-typed code. But it's very unclear to me how to get
+started with that, or whether it will ultimately work.
+
+Do you have any thoughts on this? Is this approach (engaging foreign / @-&gt;
+directly) one which can eventually work, or should I back off and attempt
+one of the lower-level approaches mentioned in your previous email? Your
+previous email proposed building out a Ctypes_untyped with a slightly
+different interface, but it was not clear to me what implementation of that
+would look like.
+
+Thanks!
+
+ - Andi
+
+On Mon, Jun 29, 2015 at 4:16 PM, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+
+&gt;<i> Hi Andi,
+</I>&gt;<i>
+</I>&gt;<i> Please excuse the slow response.
+</I>&gt;<i>
+</I>&gt;<i> On 27 June 2015 at 14:25, Andi McClure &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andi.m.mcclure at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; Hello, I have a project which is a programming language (
+</I>&gt;<i> &gt; <A HREF="http://emilylang.org/">http://emilylang.org/</A> ) and the current interpreter is implemented in
+</I>&gt;<i> ocaml.
+</I>&gt;<i> &gt; I want to add a C FFI, and I am looking at ocaml-ctypes, but I am having
+</I>&gt;<i> &gt; trouble figuring out how best to use the ocaml-ctypes library given my
+</I>&gt;<i> &gt; project's specific needs as a language.
+</I>&gt;<i>
+</I>&gt;<i> Well, using ocaml-ctypes to build an FFI for another language is a bit
+</I>&gt;<i> different from the usual use case of exposing a particular C library
+</I>&gt;<i> to OCaml, so it'll be interesting to see how things turn out.
+</I>&gt;<i>
+</I>&gt;<i> &gt; Basically: ocaml-ctypes seems to take libFFI and recast its operations in
+</I>&gt;<i> &gt; terms of ocaml idioms and primitives. This looks great if I am writing an
+</I>&gt;<i> &gt; ocaml program. However, my goal is to present an interface to libffi (or
+</I>&gt;<i> &gt; something like it) in terms of *Emily* idioms and primitives (Emily
+</I>&gt;<i> being my
+</I>&gt;<i> &gt; language) so that I can write an Emily program. This means directly
+</I>&gt;<i> wrapping
+</I>&gt;<i> &gt; ocaml-ctypes probably won't work out well (the ocaml idioms ocaml-ctypes
+</I>&gt;<i> &gt; uses can't all be directly represented in my language, and they might
+</I>&gt;<i> come
+</I>&gt;<i> &gt; across as weird to the language users who are probably not ocaml users).
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; My initial thought was that what I probably wanted to do was try to
+</I>&gt;<i> present
+</I>&gt;<i> &gt; an interface between the interpreter and interpreted code that closely
+</I>&gt;<i> &gt; tracks the programming interface of libffi. Then I could write an
+</I>&gt;<i> &gt; in-language library on top of this with a friendlier/more idiomatic
+</I>&gt;<i> &gt; interface. (The reason I believe I want the interpreter-interpreted
+</I>&gt;<i> &gt; interface to resemble libffi is that I might someday switch from ocaml to
+</I>&gt;<i> &gt; another language, and libffi will probably be available in other contexts
+</I>&gt;<i> &gt; but ocaml-ctypes will not). Looking over the ctypes code it looked like a
+</I>&gt;<i> &gt; &quot;raw&quot; libffi-flavored interface might be possible using
+</I>&gt;<i> &gt; ctypes-foreign-base/ctypes_ffi.mli and the function_of_pointer interface,
+</I>&gt;<i> &gt; but it looks like this mli is present in the code but not exposed in the
+</I>&gt;<i> &gt; opam package.
+</I>&gt;<i>
+</I>&gt;<i> Right: that module is intended to be internal-only.  However, some of
+</I>&gt;<i> the functionality is expressible via the public interface.  For
+</I>&gt;<i> example, here are alternative implementations of function_of_pointer
+</I>&gt;<i> and pointer_of_function using only functions that are currently
+</I>&gt;<i> publicly exposed:
+</I>&gt;<i>
+</I>&gt;<i>   let function_of_pointer ?name ~abi ~check_errno ~release_runtime_lock fn
+</I>&gt;<i> p =
+</I>&gt;<i>     Ctypes.coerce (ptr void)
+</I>&gt;<i>       (Foreign.funptr ?name ~abi ~check_errno
+</I>&gt;<i> ~runtime_lock:release_runtime_lock fn)
+</I>&gt;<i>       p
+</I>&gt;<i>
+</I>&gt;<i>   let pointer_of_function ~abi ~acquire_runtime_lock fn f =
+</I>&gt;<i>     Ctypes.coerce (Foreign.funptr ~abi ~runtime_lock:acquire_runtime_lock
+</I>&gt;<i> fn)
+</I>&gt;<i>       (ptr void)
+</I>&gt;<i>       f
+</I>&gt;<i>
+</I>&gt;<i> &gt; What would you recommend in this case?
+</I>&gt;<i>
+</I>&gt;<i> I can think of three approaches that are not obviously wrong, and it's
+</I>&gt;<i> likely that there are others.
+</I>&gt;<i>
+</I>&gt;<i> First, you might do what you've been considering already -- i.e. using
+</I>&gt;<i> the low-level parts of ctypes as a basis for a more Emily-flavoured
+</I>&gt;<i> libffi binding.  The two essential modules are probably
+</I>&gt;<i> Ctypes_memory_stubs (src/ctypes/ctypes_memory_stubs.ml), which
+</I>&gt;<i> provides an untyped API for accessing C-managed memory, and
+</I>&gt;<i> Ctypes_ffi_stubs (src/ctypes-foreign-base/ctypes_ffi_stubs.ml), which
+</I>&gt;<i> provides a fairly direct OCaml binding onto libffi.  Neither of these
+</I>&gt;<i> modules is exposed directly, but it should be reasonably
+</I>&gt;<i> straightforward to make them available by tweaking the Makefile to add
+</I>&gt;<i> them to the appropriate '.public' list.
+</I>&gt;<i>
+</I>&gt;<i> Second, you might find some way to massage the ctypes API into a form
+</I>&gt;<i> that's more suitable for use in Emily.  For example, I can imagine the
+</I>&gt;<i> type parameters causing problems if you want to use the type
+</I>&gt;<i> representations (for int, float, etc.) in a more uniform way.  It
+</I>&gt;<i> probably wouldn't be too much work to build an 'untyped' interface on
+</I>&gt;<i> top of ctypes along the following lines
+</I>&gt;<i>
+</I>&gt;<i>   module Ctypes_untyped :
+</I>&gt;<i>   sig
+</I>&gt;<i>     type typ
+</I>&gt;<i>     val int : typ
+</I>&gt;<i>     val float : typ
+</I>&gt;<i>     val (@-&gt;) :  typ -&gt; typ -&gt; typ
+</I>&gt;<i>     (* ... *)
+</I>&gt;<i>
+</I>&gt;<i> This is just a guess, of course, and perhaps there are other OCaml
+</I>&gt;<i> idioms that aren't so easy to factor out.
+</I>&gt;<i>
+</I>&gt;<i> Finally, you might use ctypes to build a binding to libffi -- i.e.
+</I>&gt;<i> just treat libffi like any other C library and describe its interface
+</I>&gt;<i> using ctypes, ignoring the fact that ctypes uses libffi internally.
+</I>&gt;<i> This approach isn't as absurd as it might sound at first, since recent
+</I>&gt;<i> versions of ctypes make it possible to bind to C libraries by
+</I>&gt;<i> generating C and OCaml code rather than by routing calls through
+</I>&gt;<i> libffi, so you wouldn't necessarily end up using libffi twice.
+</I>&gt;<i>
+</I>&gt;<i> Feel free to ask if you'd like more detail on any of the above!
+</I>&gt;<i>
+</I>&gt;<i> Kind regards,
+</I>&gt;<i>
+</I>&gt;<i> Jeremy.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20150809/9d2853dd/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20150809/9d2853dd/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000186.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

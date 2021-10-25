@@ -1,0 +1,234 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] On domain-specific foreign syntaxes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3CCAOOOohRzCVwjqk1Ta7zEy476qT6ieStNmSesTGKUBSRpnLcZqw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000162.html">
+   <LINK REL="Next"  HREF="000172.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] On domain-specific foreign syntaxes</H1>
+    <B>Philippe Veber</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3CCAOOOohRzCVwjqk1Ta7zEy476qT6ieStNmSesTGKUBSRpnLcZqw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] On domain-specific foreign syntaxes">philippe.veber at gmail.com
+       </A><BR>
+    <I>Thu Jan 31 13:16:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000162.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+        <LI>Next message: <A HREF="000172.html">[wg-camlp4] Why Quotation is a good idea with decent Editor support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#150">[ date ]</a>
+              <a href="thread.html#150">[ thread ]</a>
+              <a href="subject.html#150">[ subject ]</a>
+              <a href="author.html#150">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Not much to add to this, I just wanted to emphasize that the point Gabriel
+makes is especially relevant in web programming or database interaction,
+because in those area ocaml is not often the first option that comes to
+mind. So being able to quote json, sql, html etc in an ocaml source without
+unplugging the type checker is real feature. Of course, there are cases
+when you build those &quot;foreign&quot; values programmatically, in that case I
+concur you're better off without the syntax extension (maybe not always, if
+the guest language has some real nice support than cannot be rendered
+concisely with ocaml), but there are many times when the antiquotation part
+is really small compared to the &quot;constant&quot; fragments. In that case, it may
+be desirable to have non-ocaml-programmers work directly on the ml source.
+
+2013/1/31 Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt;
+
+&gt;<i> &gt; From all the uses of Camlp4 I've seen listed since the beginning of this
+</I>&gt;<i> &gt; discussion, I can imagine using at some point almost each of them, except
+</I>&gt;<i> &gt; those which are basically &quot;just&quot; about quoting fragments of external
+</I>&gt;<i> &gt; languages in their native syntax.  I just don't see the real benefits.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; It would be useful to get feedback from users: do people actually use
+</I>&gt;<i> &gt; pa_tyxml, pa_json, etc, and do they consider this is really better than
+</I>&gt;<i> &gt; proposed alternatives?
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Alain
+</I>&gt;<i>
+</I>&gt;<i> The point of quoting foreign languages is to translate them into a
+</I>&gt;<i> form that exercize the OCaml type-checker to produce rich typing
+</I>&gt;<i> information. With (parse_json &quot;...&quot;) you have no static typing
+</I>&gt;<i> information on the parsed value, while with a quotation you can expect
+</I>&gt;<i> to get, say, a (&lt; streetAdress : string &gt; Json.t) expression.
+</I>&gt;<i> Supporting antiquotations there allows you to write those foreign
+</I>&gt;<i> values in a composable way, eg. using &lt;:json&lt; { streetAddress: $addr$
+</I>&gt;<i> } &gt;&gt; with (addr : string Json.t).
+</I>&gt;<i>
+</I>&gt;<i> This is essentially a nice concrete syntax on top of the typed
+</I>&gt;<i> combinators (point 1. in your message quoted below); indeed, good
+</I>&gt;<i> extensions should embed as few domain knowledge as possible and defer
+</I>&gt;<i> that to the pure-ocaml library providing the combinators. That is not
+</I>&gt;<i> always possible, however, when you want to express rich binding
+</I>&gt;<i> structures in a typed way (for example the support of GROUP BY in a
+</I>&gt;<i> finely-typed way in Macaque relies on clever Camlp4 expansion
+</I>&gt;<i> strategies.
+</I>&gt;<i>
+</I>&gt;<i> Furthermore, the bare approach of using combinators directly is not
+</I>&gt;<i> always desirable in situations where you want the code to be used by
+</I>&gt;<i> non-domain-experts. &quot;Templates&quot; in web programming are an entire
+</I>&gt;<i> cottage industry made of preprocessing HTML-looking quasiquotations,
+</I>&gt;<i> to help the role separation between designers and programmers. More
+</I>&gt;<i> generally, if there is a widely accepted domain-specific notation,
+</I>&gt;<i> your domain-specific library should have a way to support it (so that
+</I>&gt;<i> you can, for example, call over SQL tuning experts to comment on the
+</I>&gt;<i> performance optimization of the database queries embedded in your
+</I>&gt;<i> OCaml code).
+</I>&gt;<i>
+</I>&gt;<i> This is maybe less visible for non-programmable data description
+</I>&gt;<i> languages such as JSON, but I suspect this still holds. For example,
+</I>&gt;<i> if you distribute a protocol library built on top of JSON and bridging
+</I>&gt;<i> over many programming languages, you want the same maintainer to be
+</I>&gt;<i> able to quickly reflect changes to the protocol schema over all
+</I>&gt;<i> implements. This is vastly easier if they respect the domain-specific
+</I>&gt;<i> syntax instead of each having an embedding following the concrete
+</I>&gt;<i> syntax of the corresponding language.
+</I>&gt;<i>
+</I>&gt;<i> On Thu, Jan 31, 2013 at 1:28 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain at frisch.fr</A>&gt; wrote:
+</I>&gt;<i> &gt; On 01/31/2013 12:48 PM, Leo White wrote:
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt; and &lt;&lt; are really not keywords of OCaml, and I wouldn't be
+</I>&gt;<i> &gt;&gt;&gt; surprised they are actually used as operators.  I prefer breaking
+</I>&gt;<i> &gt;&gt;&gt; compatibility with camlp4 than with OCaml.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Thinking about it &quot;&lt;:&quot; is not entirely unproblematic. Since &quot;[&lt;&quot; is a
+</I>&gt;<i> &gt;&gt; single token, [&lt;:foo&lt; .. &gt;&gt;] would be awkward for the lexer.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Even if we abandon the camlp4 syntax for quotations
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Hurrah :-)
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;&gt; , I still think that
+</I>&gt;<i> &gt;&gt; {:lid {x{ string }x}} is too heavy and inflexible for traditional
+</I>&gt;<i> &gt;&gt; quotations. For example, a JSON quotation would look like:
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; {:json {&lt;{ {&quot;streetAddress&quot;: &quot;21 2nd Street&quot;} }&gt;}}
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; I would write this:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; (:json {{ {&quot;streetAddress&quot;: &quot;21 2nd Street&quot;} }})
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; And if we keep the &quot;end marker&quot; in the AST, this could be:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; {json{ {&quot;streetAddress&quot;: &quot;21 2nd Street&quot;} }json}
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; But maybe we should take a step back, and really ask ourselves why we
+</I>&gt;<i> should
+</I>&gt;<i> &gt; use concrete JSON syntax here.  Other possibilities:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; 1. Write the JSON AST directly as regular OCaml code:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;  Json.(M[&quot;streetAdress&quot;, S &quot;21 2snd Street&quot;])
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;  (assuming module Json export constructors M and S.)
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; 2. Use &quot;parsed&quot; OCaml syntax, with some -ppx filter mapping it to JSON
+</I>&gt;<i> AST:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;  (:json { streetAddress: &quot;21 2snd Street&quot; })
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; (which would expand to the version above)
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; 3. Use a JSON parser (if we don't need &quot;anti-quotations&quot;):
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;   parse_json &quot;{\&quot;streetAddress\&quot;: \&quot;21 2nd Street\&quot;}&quot;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;   or:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;   parse_json {{ {&quot;streetAddress: &quot;21 2nd Street&quot;} }}
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; From all the uses of Camlp4 I've seen listed since the beginning of this
+</I>&gt;<i> &gt; discussion, I can imagine using at some point almost each of them, except
+</I>&gt;<i> &gt; those which are basically &quot;just&quot; about quoting fragments of external
+</I>&gt;<i> &gt; languages in their native syntax.  I just don't see the real benefits.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; It would be useful to get feedback from users: do people actually use
+</I>&gt;<i> &gt; pa_tyxml, pa_json, etc, and do they consider this is really better than
+</I>&gt;<i> &gt; proposed alternatives?
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Alain
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; _______________________________________________
+</I>&gt;<i> &gt; wg-camlp4 mailing list
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130131/6effd0e9/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130131/6effd0e9/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000162.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+	<LI>Next message: <A HREF="000172.html">[wg-camlp4] Why Quotation is a good idea with decent Editor support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#150">[ date ]</a>
+              <a href="thread.html#150">[ thread ]</a>
+              <a href="subject.html#150">[ subject ]</a>
+              <a href="author.html#150">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

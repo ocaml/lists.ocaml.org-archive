@@ -1,0 +1,2340 @@
+From kakadu.hafanana at gmail.com  Fri Jun  1 07:30:16 2012
+From: kakadu.hafanana at gmail.com (Kakadu)
+Date: Thu, 31 May 2012 23:30:16 -0700 (PDT)
+Subject: My linking issue with unix_stubs
+In-Reply-To: <CAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg@mail.gmail.com>
+References: <0236afb0-c23a-4352-a32a-607efdf1f096@googlegroups.com>
+ <CACLX4jTMBeDbcjp5gbUfuuGAqy20W27rYRj-3Ut_fKDo-Tjtqg@mail.gmail.com>
+ <bf9ec177-324a-46f9-b0ff-5483dc513047@googlegroups.com>
+ <CACLX4jQbQkGxGEsDeiCwLr+Kef2MB8rVL1+1csnJczc50PDD1w@mail.gmail.com>
+ <da428317-453f-4f6e-bd71-80842f48521e@googlegroups.com>
+ <CAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg@mail.gmail.com>
+Message-ID: <51d04630-6f69-4629-95d1-e84e57877bc9@googlegroups.com>
+
+It seems to be OK now.
+
+On Friday, June 1, 2012 12:59:32 AM UTC+4, Yury wrote:
+>
+> Thanks very much Kadaku! If you look at: 
+>
+> $ ocamlobjinfo $(ocamlfind query core)/core.cma|grep 'Extra C object 
+> files' 
+> Extra C object files: -lrt -lcore_stubs 
+>
+> Which is the wrong order. I wonder if gcc or ld have become stricter 
+> in this respect. We'll push a patch to fix this. In the meantime, you 
+> can apply this one: 
+>
+> --- a/base/core/myocamlbuild.ml 2012-05-31 16:57:05.000000000 -0400 
+> +++ b/base/core/myocamlbuild.ml 2012-05-31 16:55:52.000000000 -0400 
+> @@ -656,12 +656,12 @@ 
+>      flag ["mlh"; "ocaml"; "ocamldep"] (S[A"-ppopt"; A"-Ilib/"]); 
+>      flag ["mlh"; "ocaml"; "compile"]  (S[A"-ppopt"; A"-Ilib/"]); 
+>
+> +    dispatch_default e; 
+> + 
+>      if test "ld -lrt -shared -o /dev/null 2>/dev/null" then begin 
+>        flag ["ocamlmklib"; "c"]                      (S[A"-lrt"]); 
+>        flag ["use_libcore_stubs"; "link"] (S[A"-cclib"; A"-lrt"]); 
+> -    end; 
+> - 
+> -    dispatch_default e; 
+> +    end 
+>    | e -> dispatch_default e 
+>
+>  let () = Ocamlbuild_plugin.dispatch dispatch 
+>
+>
+> On Wed, May 30, 2012 at 12:18 PM, Kakadu <kakadu.hafanana at gmail.com> 
+> wrote: 
+> > Yaron, 
+> > 
+> > The same with tarballs. Btw, I've discoverd that it is 32bit only bug. 
+> > 
+> > Kakadu 
+> > 
+> > 
+> > On Wednesday, May 30, 2012 5:29:57 PM UTC+4, Yaron Minsky wrote: 
+> >> 
+> >> Have you tried the release tarballs?  Do they build and install 
+> cleanly? 
+> >> 
+> >> y 
+> >> 
+> >> On Wed, May 30, 2012 at 7:20 AM, Kakadu <kakadu.hafanana at gmail.com> 
+> wrote: 
+> >> >  Ubuntu 12.04 32bit. Core from bitbucket. OCaml from ubuntu. 
+> >> > 
+> >> > Best wishes, 
+> >> > Kakadu 
+> >> > 
+> >> > 
+> >> > 
+> >> > On Wednesday, May 30, 2012 2:54:22 PM UTC+4, Yaron Minsky wrote: 
+> >> >> 
+> >> >> More details please!  What platform are you running on? 
+> >> >> 
+> >> >> On Wed, May 30, 2012 at 5:49 AM, Kakadu <kakadu.hafanana at gmail.com> 
+> >> >> wrote: 
+> >> >> > Hallo, list! 
+> >> >> > 
+> >> >> > I have problem with using core. It seems that solution is very 
+> simple 
+> >> >> > but I 
+> >> >> > haven't found it yet. 
+> >> >> > 
+> >> >> > Best wishes, 
+> >> >> > Kakadu 
+> >> >> > 
+> >> >> > $ ocamlfind opt -thread -package unix,core,threads -linkpkg -ccopt 
+> >> >> > -lrt 
+> >> >> > main.ml 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_gettime': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:823: 
+> >> >> > undefined reference to `clock_gettime' 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_settime': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:834: 
+> >> >> > undefined reference to `clock_settime' 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_getres': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:842: 
+> >> >> > undefined reference to `clock_getres' 
+> >> >> > collect2: ld returned 1 exit status 
+> >> >> > File "caml_startup", line 1, characters 0-1: 
+> >> >> > Error: Error during linking 
+> >> >> > 
+> >> >> > $ cat main.ml 
+> >> >> > open Core.Linux_ext 
+> >> >> > 
+> >> >> > let f = Clock.get_time 
+> >> >> > 
+> >> >> > $ 
+> >> >> > 
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120531/5db8e2be/attachment.html>
+
+From yminsky at janestreet.com  Fri Jun  1 20:07:26 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 1 Jun 2012 15:07:26 -0400
+Subject: Distribution packaging
+Message-ID: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+
+Has anyone done any work on packaging the Core release for the various and
+sundry linux and mac distributions, and for GODI?  This seemed to have
+happened in the past without us knowing much about it, and it would be nice
+to try and figure out what we can do to make that as easy as possible.
+
+y
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120601/80ab2d83/attachment.html>
+
+From markus.mottl at gmail.com  Fri Jun  1 21:46:17 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Fri, 1 Jun 2012 16:46:17 -0400
+Subject: Bitbucket patch queues
+In-Reply-To: <CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+References: <CAP_800qTA9LZQ873Kq6c=GGb1sErW-xevPgV7z=3wupoC5QiRw@mail.gmail.com>
+	<CACLX4jRVN=W5dQy+sHKtrzz+yxuHNckr_d7TxPCwFDtxqC2VCA@mail.gmail.com>
+	<CAP_800owLyUv8SbsKLV9E=r0VvpGfDhkM_7ECqQMVgp_abu+HA@mail.gmail.com>
+	<CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+Message-ID: <CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+
+
+On Wed, May 30, 2012 at 8:03 PM, Yaron Minsky <yminsky at gmail.com> wrote:
+> Well, that was easy enough. ?I just created it. ?So, the next step is a pull
+> request, I suppose?
+
+Thanks, it seems it's working out for me as a contributor so far.
+Here is what I had to do:
+
+  * Fork yminsky/ocaml-core-submissions.  The Bitbucket fork will only
+contain the version-controlled patches, nothing else.
+  * On my machine: hg qclone
+ssh://hg at bitbucket.org/yminsky/ocaml-core-submissions
+  * Add a default-push to .hg/patches/.hg/hgrc in the checked out
+repo, pointing it to (in my case):
+ssh://hg at bitbucket.org/mmottl/ocaml-core-submissions/.hg/patches
+
+The rest is pretty plain vanilla work with Mercurial queues and Bitbucket.
+
+Once everything works for your role as a maintainer, too, and once
+you've verified my workflow, you may want to put the above on the Wiki
+for other contributors.
+
+Let me know if there are issues applying patches.  I really hope
+maintenance is as easy as contributing now.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Fri Jun  1 22:46:29 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 1 Jun 2012 17:46:29 -0400
+Subject: Bitbucket patch queues
+In-Reply-To: <CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+References: <CAP_800qTA9LZQ873Kq6c=GGb1sErW-xevPgV7z=3wupoC5QiRw@mail.gmail.com>
+	<CACLX4jRVN=W5dQy+sHKtrzz+yxuHNckr_d7TxPCwFDtxqC2VCA@mail.gmail.com>
+	<CAP_800owLyUv8SbsKLV9E=r0VvpGfDhkM_7ECqQMVgp_abu+HA@mail.gmail.com>
+	<CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+	<CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+Message-ID: <CACLX4jTK9O2U7G37m8Tz24_3aENvs+v7TwnSy_FhDTekD3Ub+g@mail.gmail.com>
+
+
+I suspect applying patches will be dead easy.  I've done some quick
+experiments, and it looks good so far.
+
+On Fri, Jun 1, 2012 at 4:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Wed, May 30, 2012 at 8:03 PM, Yaron Minsky <yminsky at gmail.com> wrote:
+>> Well, that was easy enough. ?I just created it. ?So, the next step is a pull
+>> request, I suppose?
+>
+> Thanks, it seems it's working out for me as a contributor so far.
+> Here is what I had to do:
+>
+> ?* Fork yminsky/ocaml-core-submissions. ?The Bitbucket fork will only
+> contain the version-controlled patches, nothing else.
+> ?* On my machine: hg qclone
+> ssh://hg at bitbucket.org/yminsky/ocaml-core-submissions
+> ?* Add a default-push to .hg/patches/.hg/hgrc in the checked out
+> repo, pointing it to (in my case):
+> ssh://hg at bitbucket.org/mmottl/ocaml-core-submissions/.hg/patches
+>
+> The rest is pretty plain vanilla work with Mercurial queues and Bitbucket.
+>
+> Once everything works for your role as a maintainer, too, and once
+> you've verified my workflow, you may want to put the above on the Wiki
+> for other contributors.
+>
+> Let me know if there are issues applying patches. ?I really hope
+> maintenance is as easy as contributing now.
+>
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From fermin.reig at gmail.com  Sat Jun  2 14:31:47 2012
+From: fermin.reig at gmail.com (Fermin Reig)
+Date: Sat, 2 Jun 2012 06:31:47 -0700 (PDT)
+Subject: 108.00.01 Released
+In-Reply-To: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+Message-ID: <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+
+One for the wish list: add a build target to generate and install docs.
+
+Fermin
+
+On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>
+> This is a minor tweak on top of 108.00; 108.00.01 contains just some small 
+> build fixes for 64-bit platforms.
+>
+> Tarballs are on the bitbucket site.
+>
+> y
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120602/299efd98/attachment.html>
+
+From yminsky at janestreet.com  Sat Jun  2 15:50:05 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Sat, 2 Jun 2012 10:50:05 -0400
+Subject: 108.00.01 Released
+In-Reply-To: <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+	<60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+Message-ID: <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+
+
+Understood.  We'll get that done.
+
+On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> wrote:
+> One for the wish list: add a build target to generate and install docs.
+>
+> Fermin
+>
+>
+> On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>>
+>> This is a minor tweak on top of 108.00; 108.00.01 contains just some small
+>> build fixes for 64-bit platforms.
+>>
+>> Tarballs are on the bitbucket site.
+>>
+>> y
+
+
+From markus.mottl at gmail.com  Mon Jun  4 03:13:37 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Sun, 3 Jun 2012 22:13:37 -0400
+Subject: Distribution packaging
+In-Reply-To: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+References: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+Message-ID: <CAP_800ra_dG+4HtY4-SSxDYrDWHmXKOS=-1mYTJaSo7VrsqL3w@mail.gmail.com>
+
+
+I've just updated the type_conv, sexplib, and bin_prot packages in
+Godi to refer to your Bitbucket version.  Feel free to use these
+packages as templates for adding your other libraries.
+
+Regards,
+Markus
+
+On Fri, Jun 1, 2012 at 3:07 PM, Yaron Minsky <yminsky at janestreet.com> wrote:
+> Has anyone done any work on packaging the Core release for the various and
+> sundry linux and mac distributions, and for GODI? ?This seemed to have
+> happened in the past without us knowing much about it, and it would be nice
+> to try and figure out what we can do to make that as easy as possible.
+>
+> y
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From kakadu.hafanana at gmail.com  Thu Jun  7 10:57:43 2012
+From: kakadu.hafanana at gmail.com (Kakadu)
+Date: Thu, 7 Jun 2012 02:57:43 -0700 (PDT)
+Subject: 108.00.01 Released
+In-Reply-To: <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+ <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+ <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+Message-ID: <8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+
+Btw, I can't generate docs for core-108.00.01. It says 
+
++ ocamlfind ocamldoc -dump lib/core_map.odoc -package variantslib.syntax -package variantslib -package unix -package threads -package sexplib.syntax -package sexplib -package res -package pa_pipebang -package pa_ounit -package fieldslib.syntax -package fieldslib -package bin_prot.syntax -package bin_prot -package bigarray -syntax camlp4o -I +threads -I lib lib/core_map.mli
+ocamlfind: [WARNING] Package `threads' signals error: Missing -thread or -vmthread switch
+The type map could not be found in the signature of module Core_map.Poly.
+
+
+Full log here: http://paste.in.ua/4332/raw/
+
+Have you already detected this problem?
+
+Best wishes,
+Kakadu
+
+On Saturday, June 2, 2012 6:50:05 PM UTC+4, Yaron Minsky wrote:
+>
+> Understood.  We'll get that done. 
+>
+> On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> 
+> wrote: 
+> > One for the wish list: add a build target to generate and install docs. 
+> > 
+> > Fermin 
+> > 
+> > 
+> > On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote: 
+> >> 
+> >> This is a minor tweak on top of 108.00; 108.00.01 contains just some 
+> small 
+> >> build fixes for 64-bit platforms. 
+> >> 
+> >> Tarballs are on the bitbucket site. 
+> >> 
+> >> y 
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120607/c17b4434/attachment.html>
+
+From yminsky at gmail.com  Sat Jun  9 02:01:48 2012
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Fri, 8 Jun 2012 21:01:48 -0400
+Subject: 108.00.01 Released
+In-Reply-To: <8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+	<60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+	<CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+	<8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+Message-ID: <CADKNfhJ63oO6HyPNC7Yo6BxRn5gkjhFmvs57D+BMs8pAVH0fYw@mail.gmail.com>
+
+
+Yury is working on getting the ocamldoc generation cleaned up.  Stay tuned...
+
+On Thu, Jun 7, 2012 at 5:57 AM, Kakadu <kakadu.hafanana at gmail.com> wrote:
+> Btw, I can't generate docs for core-108.00.01. It says
+>
+> + ocamlfind ocamldoc -dump lib/core_map.odoc -package variantslib.syntax
+> -package variantslib -package unix -package threads -package sexplib.syntax
+> -package sexplib -package res -package pa_pipebang -package pa_ounit
+> -package fieldslib.syntax -package fieldslib -package bin_prot.syntax
+> -package bin_prot -package bigarray -syntax camlp4o -I +threads -I lib
+> lib/core_map.mli
+> ocamlfind: [WARNING] Package `threads' signals error: Missing -thread or
+> -vmthread switch
+> The type map could not be found in the signature of module Core_map.Poly.
+>
+>
+> Full log here: http://paste.in.ua/4332/raw/
+>
+> Have you already detected this problem?
+>
+> Best wishes,
+> Kakadu
+>
+>
+> On Saturday, June 2, 2012 6:50:05 PM UTC+4, Yaron Minsky wrote:
+>>
+>> Understood. ?We'll get that done.
+>>
+>> On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> wrote:
+>> > One for the wish list: add a build target to generate and install docs.
+>> >
+>> > Fermin
+>> >
+>> >
+>> > On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>> >>
+>> >> This is a minor tweak on top of 108.00; 108.00.01 contains just some
+>> >> small
+>> >> build fixes for 64-bit platforms.
+>> >>
+>> >> Tarballs are on the bitbucket site.
+>> >>
+>> >> y
+
+
+From seanmcl at gmail.com  Wed Jun 20 18:53:58 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 10:53:58 -0700
+Subject: can't build with ocaml 4.0
+Message-ID: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+
+
+Hi,
+
+I installed ocaml 4.0 today, and after updating findlib/oasis/etc.  I
+tried to build ocaml-core.  I got the following error message, due to
+some unused variable warnings in type-conv.  The warnings appear when
+compiling type-conv from the latest sourceforge version as well.
+
+Has anyone else had success with 4.0?
+
+/usr/local/src/ocaml-core
+$ ./build-and-install
+=> base/type_conv
+   * configuring
+   * compiling
+ocaml setup.ml -build
+ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+lib/pa_type_conv.cmo lib/pa_type_conv.ml
++ ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+lib/pa_type_conv.cmo lib/pa_type_conv.ml
+File "lib/pa_type_conv.ml", line 275, characters 19-1267:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a value that is not matched:
+(TyTypePol (_, _, _)|TyAnP _|TyAnM _)
+File "lib/pa_type_conv.ml", line 4, characters 0-11:
+Warning 33: unused open Lexing.
+File "lib/pa_type_conv.ml", line 12, characters 4-8:
+Warning 32: unused value both.
+File "lib/pa_type_conv.ml", line 1:
+Error: Error-enabled warnings (3 occurrences)
+Command exited with code 2.
+E: Failure("Command '/usr/local/bin/ocamlbuild lib/pa_type_conv.cma
+-tag debug' terminated with error code 10")
+make: *** [build] Error 1
+*** ERROR: Couldn't compile type_conv
+EXIT STATUS 1
+
+
+From seanmcl at gmail.com  Wed Jun 20 20:17:32 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 12:17:32 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+Message-ID: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+
+
+Thanks Yuri,
+
+The patch almost worked, though it breaks on host_and_port.ml.  When I
+applied the patch by hand on that one file, all the other patches are
+successful.  Then once the code was patched, it fails due to not
+knowing about the Ok constructor.   I added
+
+include Std_internal
+
+to bigstring.ml and core_mutex.ml
+
+That got me to linux_ext.ml, where it complained about
+
+File "lib/linux_ext.ml", line 45, characters 9-19:
+Error: Unbound type constructor file_descr
+
+Any idea what's going on here?
+
+
+From seanmcl at gmail.com  Wed Jun 20 21:37:20 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 13:37:20 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com> <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+Message-ID: <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+
+I've been using core/build-and-install.  I did it by hand in core and
+things went fine from there when I re-ran build-and-install.  Could
+--disable-linux be an option for this to build-and-install?
+
+Thanks,
+
+Sean
+
+On Wednesday, June 20, 2012, Yury Sulsky wrote:
+
+> Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+> don't need it, you can just pass --disable-linux to the configure
+> script in core; otherwise, I think the fixes are to replace
+> [file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+>  (or [open Std_internal]) in the LINUX_EXT branch of the code.
+>
+> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com>
+> wrote:
+> > Thanks Yuri,
+> >
+> > The patch almost worked, though it breaks on host_and_port.ml.  When I
+> > applied the patch by hand on that one file, all the other patches are
+> > successful.  Then once the code was patched, it fails due to not
+> > knowing about the Ok constructor.   I added
+> >
+> > include Std_internal
+> >
+> > to bigstring.ml and core_mutex.ml
+> >
+> > That got me to linux_ext.ml, where it complained about
+> >
+> > File "lib/linux_ext.ml", line 45, characters 9-19:
+> > Error: Unbound type constructor file_descr
+> >
+> > Any idea what's going on here?
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120620/af988f58/attachment.html>
+
+From seanmcl at gmail.com  Wed Jun 20 22:01:02 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 14:01:02 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+ <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com> <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+Message-ID: <CAO4dZbeUnnPAtkgcs8kN0x_0bnf5E2C6o1RgxreS8FoF-c6xZQ@mail.gmail.com>
+
+
+Note you also must disable
+
+--disable-posix-timers
+
+in core-extended
+
+On Wed, Jun 20, 2012 at 1:37 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> I've been using?core/build-and-install. ?I did it by hand in core and things
+> went fine from there when I re-ran build-and-install. ?Could --disable-linux
+> be an option for this to build-and-install?
+>
+> Thanks,
+>
+> Sean
+>
+>
+> On Wednesday, June 20, 2012, Yury Sulsky wrote:
+>>
+>> Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+>> don't need it, you can just pass --disable-linux to the configure
+>> script in core; otherwise, I think the fixes are to replace
+>> [file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+>> ?(or [open Std_internal]) in the LINUX_EXT branch of the code.
+>>
+>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com>
+>> wrote:
+>> > Thanks Yuri,
+>> >
+>> > The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>> > applied the patch by hand on that one file, all the other patches are
+>> > successful. ?Then once the code was patched, it fails due to not
+>> > knowing about the Ok constructor. ? I added
+>> >
+>> > include Std_internal
+>> >
+>> > to bigstring.ml and core_mutex.ml
+>> >
+>> > That got me to linux_ext.ml, where it complained about
+>> >
+>> > File "lib/linux_ext.ml", line 45, characters 9-19:
+>> > Error: Unbound type constructor file_descr
+>> >
+>> > Any idea what's going on here?
+
+
+From yury.sulsky at gmail.com  Wed Jun 20 19:18:41 2012
+From: yury.sulsky at gmail.com (Yury Sulsky)
+Date: Wed, 20 Jun 2012 14:18:41 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+Message-ID: <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+
+
+Hi Sean,
+
+Markus has a patch for building with ocaml 4.0; just apply
+ocaml-4.00-bc-fixes and ocaml-4.00-non-bc-fixes from
+https://bitbucket.org/mmottl/ocaml-core-submissions/src
+
+On Wed, Jun 20, 2012 at 1:53 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Hi,
+>
+> I installed ocaml 4.0 today, and after updating findlib/oasis/etc. ?I
+> tried to build ocaml-core. ?I got the following error message, due to
+> some unused variable warnings in type-conv. ?The warnings appear when
+> compiling type-conv from the latest sourceforge version as well.
+>
+> Has anyone else had success with 4.0?
+>
+> /usr/local/src/ocaml-core
+> $ ./build-and-install
+> => base/type_conv
+> ? * configuring
+> ? * compiling
+> ocaml setup.ml -build
+> ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+> camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+> lib/pa_type_conv.cmo lib/pa_type_conv.ml
+> + ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+> camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+> lib/pa_type_conv.cmo lib/pa_type_conv.ml
+> File "lib/pa_type_conv.ml", line 275, characters 19-1267:
+> Warning 8: this pattern-matching is not exhaustive.
+> Here is an example of a value that is not matched:
+> (TyTypePol (_, _, _)|TyAnP _|TyAnM _)
+> File "lib/pa_type_conv.ml", line 4, characters 0-11:
+> Warning 33: unused open Lexing.
+> File "lib/pa_type_conv.ml", line 12, characters 4-8:
+> Warning 32: unused value both.
+> File "lib/pa_type_conv.ml", line 1:
+> Error: Error-enabled warnings (3 occurrences)
+> Command exited with code 2.
+> E: Failure("Command '/usr/local/bin/ocamlbuild lib/pa_type_conv.cma
+> -tag debug' terminated with error code 10")
+> make: *** [build] Error 1
+> *** ERROR: Couldn't compile type_conv
+> EXIT STATUS 1
+
+
+From yury.sulsky at gmail.com  Wed Jun 20 20:37:48 2012
+From: yury.sulsky at gmail.com (Yury Sulsky)
+Date: Wed, 20 Jun 2012 15:37:48 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+Message-ID: <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+
+
+Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+don't need it, you can just pass --disable-linux to the configure
+script in core; otherwise, I think the fixes are to replace
+[file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+ (or [open Std_internal]) in the LINUX_EXT branch of the code.
+
+On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Thanks Yuri,
+>
+> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+> applied the patch by hand on that one file, all the other patches are
+> successful. ?Then once the code was patched, it fails due to not
+> knowing about the Ok constructor. ? I added
+>
+> include Std_internal
+>
+> to bigstring.ml and core_mutex.ml
+>
+> That got me to linux_ext.ml, where it complained about
+>
+> File "lib/linux_ext.ml", line 45, characters 9-19:
+> Error: Unbound type constructor file_descr
+>
+> Any idea what's going on here?
+
+
+From markus.mottl at gmail.com  Wed Jun 20 22:46:19 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Wed, 20 Jun 2012 17:46:19 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+Message-ID: <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+
+
+Hi Sean,
+
+you may want to try out my whole patch queue to see which patches are
+actually required.  Some don't commute with previous patches.  I also
+haven't tested the patch queue on any platform other than Mac OS X
+yet.  If there are issues on Linux, it's surely due to trivial things
+only.  There was some part that required preprocessing and wasn't done
+right for Mac OS X.  The fix may have broken Linux support.
+
+Feel free to clone my patch queue and to send me (or Jane Street) pull
+requests with fixes.  I'm pretty sure the mentioned problems can be
+fixed with little effort.  Thanks!
+
+Cheers,
+Markus
+
+On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Thanks Yuri,
+>
+> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+> applied the patch by hand on that one file, all the other patches are
+> successful. ?Then once the code was patched, it fails due to not
+> knowing about the Ok constructor. ? I added
+>
+> include Std_internal
+>
+> to bigstring.ml and core_mutex.ml
+>
+> That got me to linux_ext.ml, where it complained about
+>
+> File "lib/linux_ext.ml", line 45, characters 9-19:
+> Error: Unbound type constructor file_descr
+>
+> Any idea what's going on here?
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From seanmcl at gmail.com  Mon Jun 25 20:07:39 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Mon, 25 Jun 2012 12:07:39 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com> <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+Message-ID: <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+
+
+Hi,
+
+I cloned Markus' submissions repo, and pushed a change to
+
+  ocaml-4.00-bc-fixes
+
+When you clone ocaml-core and apply the entire patch queue, everything up
+through core compiles via ./build-and-install.  It falls over on
+core_extended with the following error message
+
++ ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+ocamlc.opt got signal and exited
+
+When I cd to base/core/extended and do
+
+ocaml setup.ml -build
+
+it builds cleanly though.  (The failing command also builds without a
+problem when run by hand.)
+
+Once core_extended is compiled by hand, the remaining libraries
+compile and install via
+build-and-install.
+
+Recap:
+
+hg clone ocaml-core
+hg clone ocaml-core-submissions
+ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+cd ocaml-core
+hg qpush -a
+./build-and-install # core succeeds, fails at core_extended
+cd base/core/extended
+ocaml setup.ml -build # succeeds
+cd ../../..
+./build-and-install # succeeds
+
+I've tried for over an hour to figure out why it fails when called
+from build-and-install, but not from ocaml setup.ml -build.  The
+former script seems to simply call the later command, and I'm stuck.
+If anyone has ideas what would be signaling the ocamlc.opt when run
+from the script, I'd be happy to hear them.
+
+I won't make this an official pull request until this issue is worked
+out, but it seems the code changes are working.  (e.g. linux_ext and
+posix_clock work).
+
+Sean
+
+
+
+
+
+
+
+
+
+
+On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> Hi Sean,
+>
+> you may want to try out my whole patch queue to see which patches are
+> actually required. ?Some don't commute with previous patches. ?I also
+> haven't tested the patch queue on any platform other than Mac OS X
+> yet. ?If there are issues on Linux, it's surely due to trivial things
+> only. ?There was some part that required preprocessing and wasn't done
+> right for Mac OS X. ?The fix may have broken Linux support.
+>
+> Feel free to clone my patch queue and to send me (or Jane Street) pull
+> requests with fixes. ?I'm pretty sure the mentioned problems can be
+> fixed with little effort. ?Thanks!
+>
+> Cheers,
+> Markus
+>
+> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>> Thanks Yuri,
+>>
+>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>> applied the patch by hand on that one file, all the other patches are
+>> successful. ?Then once the code was patched, it fails due to not
+>> knowing about the Ok constructor. ? I added
+>>
+>> include Std_internal
+>>
+>> to bigstring.ml and core_mutex.ml
+>>
+>> That got me to linux_ext.ml, where it complained about
+>>
+>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>> Error: Unbound type constructor file_descr
+>>
+>> Any idea what's going on here?
+>
+>
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From seanmcl at gmail.com  Mon Jun 25 20:22:14 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Mon, 25 Jun 2012 12:22:14 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+ <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com> <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+Message-ID: <CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+
+
+https://bitbucket.org/seanmcl/ocaml-core-submissions
+
+On Mon, Jun 25, 2012 at 12:07 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Hi,
+>
+> I cloned Markus' submissions repo, and pushed a change to
+>
+> ?ocaml-4.00-bc-fixes
+>
+> When you clone ocaml-core and apply the entire patch queue, everything up
+> through core compiles via ./build-and-install. ?It falls over on
+> core_extended with the following error message
+>
+> + ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+> ocamlc.opt got signal and exited
+>
+> When I cd to base/core/extended and do
+>
+> ocaml setup.ml -build
+>
+> it builds cleanly though. ?(The failing command also builds without a
+> problem when run by hand.)
+>
+> Once core_extended is compiled by hand, the remaining libraries
+> compile and install via
+> build-and-install.
+>
+> Recap:
+>
+> hg clone ocaml-core
+> hg clone ocaml-core-submissions
+> ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+> cd ocaml-core
+> hg qpush -a
+> ./build-and-install # core succeeds, fails at core_extended
+> cd base/core/extended
+> ocaml setup.ml -build # succeeds
+> cd ../../..
+> ./build-and-install # succeeds
+>
+> I've tried for over an hour to figure out why it fails when called
+> from build-and-install, but not from ocaml setup.ml -build. ?The
+> former script seems to simply call the later command, and I'm stuck.
+> If anyone has ideas what would be signaling the ocamlc.opt when run
+> from the script, I'd be happy to hear them.
+>
+> I won't make this an official pull request until this issue is worked
+> out, but it seems the code changes are working. ?(e.g. linux_ext and
+> posix_clock work).
+>
+> Sean
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>> Hi Sean,
+>>
+>> you may want to try out my whole patch queue to see which patches are
+>> actually required. ?Some don't commute with previous patches. ?I also
+>> haven't tested the patch queue on any platform other than Mac OS X
+>> yet. ?If there are issues on Linux, it's surely due to trivial things
+>> only. ?There was some part that required preprocessing and wasn't done
+>> right for Mac OS X. ?The fix may have broken Linux support.
+>>
+>> Feel free to clone my patch queue and to send me (or Jane Street) pull
+>> requests with fixes. ?I'm pretty sure the mentioned problems can be
+>> fixed with little effort. ?Thanks!
+>>
+>> Cheers,
+>> Markus
+>>
+>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>>> Thanks Yuri,
+>>>
+>>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>>> applied the patch by hand on that one file, all the other patches are
+>>> successful. ?Then once the code was patched, it fails due to not
+>>> knowing about the Ok constructor. ? I added
+>>>
+>>> include Std_internal
+>>>
+>>> to bigstring.ml and core_mutex.ml
+>>>
+>>> That got me to linux_ext.ml, where it complained about
+>>>
+>>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>>> Error: Unbound type constructor file_descr
+>>>
+>>> Any idea what's going on here?
+>>
+>>
+>>
+>> --
+>> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Wed Jun 27 02:37:58 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 26 Jun 2012 21:37:58 -0400
+Subject: Cannot compile type_conv on windows
+In-Reply-To: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+References: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+Message-ID: <CACLX4jS6xENWNrBOW2ZnNmmvZV_w35WZY9gWZ8Fk4wCSiBRF0A@mail.gmail.com>
+
+
+Thanks for the bug report.  We'll fix upstream.
+
+On Tue, Jun 26, 2012 at 7:58 PM, Sylvain Le Gall <sylvain at le-gall.net> wrote:
+> Hello,
+>
+> Here is the error:
+>
+> ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations -
+> package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+> Cannot open file Aemr-28
+> Exit code 2 while executing this command:
+> ?ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations
+> ?-package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+> E: Failure("Command 'C:\\ocaml312-vs2008\\bin\\ocamlbuild.EXE -classic-display -
+> no-log -no-links -install-lib-dir C:\\ocaml312-vs2008\\lib\\ocamlbuild -byte-plu
+> gin lib/pa_type_conv.cma -tag debug' terminated with error code 2")
+> make: *** [build] Error 1
+>
+> Just remove the A"-w"; A "@Aemr-28" in myocamlbuild.ml fix the issue.
+>
+> "@" is used to load extra command line argument in MS-DOS (I think).
+>
+> Regards
+> Sylvain
+
+
+From markus.mottl at gmail.com  Wed Jun 27 03:02:22 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 26 Jun 2012 22:02:22 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+	<CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+	<CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+	<CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+Message-ID: <CAP_800qkydSF9sE9EiTxoexdPqtgBEuAx7DxkdBecOBWJYVXsw@mail.gmail.com>
+
+
+Hi Sean,
+
+thanks for the updates, I have pulled them into my patch queue and
+sent a pull request upstream.  I have verified that the newest set of
+patches works on both Mac OS X and Linux now.
+
+Regards,
+Markus
+
+On Mon, Jun 25, 2012 at 3:22 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> https://bitbucket.org/seanmcl/ocaml-core-submissions
+>
+> On Mon, Jun 25, 2012 at 12:07 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>> Hi,
+>>
+>> I cloned Markus' submissions repo, and pushed a change to
+>>
+>> ?ocaml-4.00-bc-fixes
+>>
+>> When you clone ocaml-core and apply the entire patch queue, everything up
+>> through core compiles via ./build-and-install. ?It falls over on
+>> core_extended with the following error message
+>>
+>> + ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+>> ocamlc.opt got signal and exited
+>>
+>> When I cd to base/core/extended and do
+>>
+>> ocaml setup.ml -build
+>>
+>> it builds cleanly though. ?(The failing command also builds without a
+>> problem when run by hand.)
+>>
+>> Once core_extended is compiled by hand, the remaining libraries
+>> compile and install via
+>> build-and-install.
+>>
+>> Recap:
+>>
+>> hg clone ocaml-core
+>> hg clone ocaml-core-submissions
+>> ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+>> cd ocaml-core
+>> hg qpush -a
+>> ./build-and-install # core succeeds, fails at core_extended
+>> cd base/core/extended
+>> ocaml setup.ml -build # succeeds
+>> cd ../../..
+>> ./build-and-install # succeeds
+>>
+>> I've tried for over an hour to figure out why it fails when called
+>> from build-and-install, but not from ocaml setup.ml -build. ?The
+>> former script seems to simply call the later command, and I'm stuck.
+>> If anyone has ideas what would be signaling the ocamlc.opt when run
+>> from the script, I'd be happy to hear them.
+>>
+>> I won't make this an official pull request until this issue is worked
+>> out, but it seems the code changes are working. ?(e.g. linux_ext and
+>> posix_clock work).
+>>
+>> Sean
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>>> Hi Sean,
+>>>
+>>> you may want to try out my whole patch queue to see which patches are
+>>> actually required. ?Some don't commute with previous patches. ?I also
+>>> haven't tested the patch queue on any platform other than Mac OS X
+>>> yet. ?If there are issues on Linux, it's surely due to trivial things
+>>> only. ?There was some part that required preprocessing and wasn't done
+>>> right for Mac OS X. ?The fix may have broken Linux support.
+>>>
+>>> Feel free to clone my patch queue and to send me (or Jane Street) pull
+>>> requests with fixes. ?I'm pretty sure the mentioned problems can be
+>>> fixed with little effort. ?Thanks!
+>>>
+>>> Cheers,
+>>> Markus
+>>>
+>>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>>>> Thanks Yuri,
+>>>>
+>>>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>>>> applied the patch by hand on that one file, all the other patches are
+>>>> successful. ?Then once the code was patched, it fails due to not
+>>>> knowing about the Ok constructor. ? I added
+>>>>
+>>>> include Std_internal
+>>>>
+>>>> to bigstring.ml and core_mutex.ml
+>>>>
+>>>> That got me to linux_ext.ml, where it complained about
+>>>>
+>>>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>>>> Error: Unbound type constructor file_descr
+>>>>
+>>>> Any idea what's going on here?
+>>>
+>>>
+>>>
+>>> --
+>>> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From sylvain at le-gall.net  Wed Jun 27 00:58:20 2012
+From: sylvain at le-gall.net (Sylvain Le Gall)
+Date: Wed, 27 Jun 2012 01:58:20 +0200
+Subject: Cannot compile type_conv on windows
+Message-ID: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+
+
+Hello,
+
+Here is the error:
+
+ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations -
+package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+Cannot open file Aemr-28
+Exit code 2 while executing this command:
+  ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations
+ -package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+E: Failure("Command 'C:\\ocaml312-vs2008\\bin\\ocamlbuild.EXE -classic-display -
+no-log -no-links -install-lib-dir C:\\ocaml312-vs2008\\lib\\ocamlbuild -byte-plu
+gin lib/pa_type_conv.cma -tag debug' terminated with error code 2")
+make: *** [build] Error 1
+
+Just remove the A"-w"; A "@Aemr-28" in myocamlbuild.ml fix the issue.
+
+"@" is used to load extra command line argument in MS-DOS (I think).
+
+Regards
+Sylvain
+
+
+From kakadu.hafanana at gmail.com  Fri Jun  1 07:30:16 2012
+From: kakadu.hafanana at gmail.com (Kakadu)
+Date: Thu, 31 May 2012 23:30:16 -0700 (PDT)
+Subject: My linking issue with unix_stubs
+In-Reply-To: <CAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg@mail.gmail.com>
+References: <0236afb0-c23a-4352-a32a-607efdf1f096@googlegroups.com>
+ <CACLX4jTMBeDbcjp5gbUfuuGAqy20W27rYRj-3Ut_fKDo-Tjtqg@mail.gmail.com>
+ <bf9ec177-324a-46f9-b0ff-5483dc513047@googlegroups.com>
+ <CACLX4jQbQkGxGEsDeiCwLr+Kef2MB8rVL1+1csnJczc50PDD1w@mail.gmail.com>
+ <da428317-453f-4f6e-bd71-80842f48521e@googlegroups.com>
+ <CAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg@mail.gmail.com>
+Message-ID: <51d04630-6f69-4629-95d1-e84e57877bc9@googlegroups.com>
+
+It seems to be OK now.
+
+On Friday, June 1, 2012 12:59:32 AM UTC+4, Yury wrote:
+>
+> Thanks very much Kadaku! If you look at: 
+>
+> $ ocamlobjinfo $(ocamlfind query core)/core.cma|grep 'Extra C object 
+> files' 
+> Extra C object files: -lrt -lcore_stubs 
+>
+> Which is the wrong order. I wonder if gcc or ld have become stricter 
+> in this respect. We'll push a patch to fix this. In the meantime, you 
+> can apply this one: 
+>
+> --- a/base/core/myocamlbuild.ml 2012-05-31 16:57:05.000000000 -0400 
+> +++ b/base/core/myocamlbuild.ml 2012-05-31 16:55:52.000000000 -0400 
+> @@ -656,12 +656,12 @@ 
+>      flag ["mlh"; "ocaml"; "ocamldep"] (S[A"-ppopt"; A"-Ilib/"]); 
+>      flag ["mlh"; "ocaml"; "compile"]  (S[A"-ppopt"; A"-Ilib/"]); 
+>
+> +    dispatch_default e; 
+> + 
+>      if test "ld -lrt -shared -o /dev/null 2>/dev/null" then begin 
+>        flag ["ocamlmklib"; "c"]                      (S[A"-lrt"]); 
+>        flag ["use_libcore_stubs"; "link"] (S[A"-cclib"; A"-lrt"]); 
+> -    end; 
+> - 
+> -    dispatch_default e; 
+> +    end 
+>    | e -> dispatch_default e 
+>
+>  let () = Ocamlbuild_plugin.dispatch dispatch 
+>
+>
+> On Wed, May 30, 2012 at 12:18 PM, Kakadu <kakadu.hafanana at gmail.com> 
+> wrote: 
+> > Yaron, 
+> > 
+> > The same with tarballs. Btw, I've discoverd that it is 32bit only bug. 
+> > 
+> > Kakadu 
+> > 
+> > 
+> > On Wednesday, May 30, 2012 5:29:57 PM UTC+4, Yaron Minsky wrote: 
+> >> 
+> >> Have you tried the release tarballs?  Do they build and install 
+> cleanly? 
+> >> 
+> >> y 
+> >> 
+> >> On Wed, May 30, 2012 at 7:20 AM, Kakadu <kakadu.hafanana at gmail.com> 
+> wrote: 
+> >> >  Ubuntu 12.04 32bit. Core from bitbucket. OCaml from ubuntu. 
+> >> > 
+> >> > Best wishes, 
+> >> > Kakadu 
+> >> > 
+> >> > 
+> >> > 
+> >> > On Wednesday, May 30, 2012 2:54:22 PM UTC+4, Yaron Minsky wrote: 
+> >> >> 
+> >> >> More details please!  What platform are you running on? 
+> >> >> 
+> >> >> On Wed, May 30, 2012 at 5:49 AM, Kakadu <kakadu.hafanana at gmail.com> 
+> >> >> wrote: 
+> >> >> > Hallo, list! 
+> >> >> > 
+> >> >> > I have problem with using core. It seems that solution is very 
+> simple 
+> >> >> > but I 
+> >> >> > haven't found it yet. 
+> >> >> > 
+> >> >> > Best wishes, 
+> >> >> > Kakadu 
+> >> >> > 
+> >> >> > $ ocamlfind opt -thread -package unix,core,threads -linkpkg -ccopt 
+> >> >> > -lrt 
+> >> >> > main.ml 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_gettime': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:823: 
+> >> >> > undefined reference to `clock_gettime' 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_settime': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:834: 
+> >> >> > undefined reference to `clock_settime' 
+> >> >> > /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In 
+> >> >> > function 
+> >> >> > `unix_clock_getres': 
+> >> >> > 
+> /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:842: 
+> >> >> > undefined reference to `clock_getres' 
+> >> >> > collect2: ld returned 1 exit status 
+> >> >> > File "caml_startup", line 1, characters 0-1: 
+> >> >> > Error: Error during linking 
+> >> >> > 
+> >> >> > $ cat main.ml 
+> >> >> > open Core.Linux_ext 
+> >> >> > 
+> >> >> > let f = Clock.get_time 
+> >> >> > 
+> >> >> > $ 
+> >> >> > 
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120531/5db8e2be/attachment-0001.html>
+
+From yminsky at janestreet.com  Fri Jun  1 20:07:26 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 1 Jun 2012 15:07:26 -0400
+Subject: Distribution packaging
+Message-ID: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+
+Has anyone done any work on packaging the Core release for the various and
+sundry linux and mac distributions, and for GODI?  This seemed to have
+happened in the past without us knowing much about it, and it would be nice
+to try and figure out what we can do to make that as easy as possible.
+
+y
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120601/80ab2d83/attachment-0001.html>
+
+From markus.mottl at gmail.com  Fri Jun  1 21:46:17 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Fri, 1 Jun 2012 16:46:17 -0400
+Subject: Bitbucket patch queues
+In-Reply-To: <CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+References: <CAP_800qTA9LZQ873Kq6c=GGb1sErW-xevPgV7z=3wupoC5QiRw@mail.gmail.com>
+	<CACLX4jRVN=W5dQy+sHKtrzz+yxuHNckr_d7TxPCwFDtxqC2VCA@mail.gmail.com>
+	<CAP_800owLyUv8SbsKLV9E=r0VvpGfDhkM_7ECqQMVgp_abu+HA@mail.gmail.com>
+	<CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+Message-ID: <CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+
+
+On Wed, May 30, 2012 at 8:03 PM, Yaron Minsky <yminsky at gmail.com> wrote:
+> Well, that was easy enough. ?I just created it. ?So, the next step is a pull
+> request, I suppose?
+
+Thanks, it seems it's working out for me as a contributor so far.
+Here is what I had to do:
+
+  * Fork yminsky/ocaml-core-submissions.  The Bitbucket fork will only
+contain the version-controlled patches, nothing else.
+  * On my machine: hg qclone
+ssh://hg at bitbucket.org/yminsky/ocaml-core-submissions
+  * Add a default-push to .hg/patches/.hg/hgrc in the checked out
+repo, pointing it to (in my case):
+ssh://hg at bitbucket.org/mmottl/ocaml-core-submissions/.hg/patches
+
+The rest is pretty plain vanilla work with Mercurial queues and Bitbucket.
+
+Once everything works for your role as a maintainer, too, and once
+you've verified my workflow, you may want to put the above on the Wiki
+for other contributors.
+
+Let me know if there are issues applying patches.  I really hope
+maintenance is as easy as contributing now.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Fri Jun  1 22:46:29 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 1 Jun 2012 17:46:29 -0400
+Subject: Bitbucket patch queues
+In-Reply-To: <CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+References: <CAP_800qTA9LZQ873Kq6c=GGb1sErW-xevPgV7z=3wupoC5QiRw@mail.gmail.com>
+	<CACLX4jRVN=W5dQy+sHKtrzz+yxuHNckr_d7TxPCwFDtxqC2VCA@mail.gmail.com>
+	<CAP_800owLyUv8SbsKLV9E=r0VvpGfDhkM_7ECqQMVgp_abu+HA@mail.gmail.com>
+	<CADKNfhK9j=V1DtQL+Q07dV7G5fhphEtwRx7XXzWdNebCdQdbNw@mail.gmail.com>
+	<CAP_800q0MUZ1nBvjyBA3CJvq2edKVhs+rXdBnhX575_BjUOJog@mail.gmail.com>
+Message-ID: <CACLX4jTK9O2U7G37m8Tz24_3aENvs+v7TwnSy_FhDTekD3Ub+g@mail.gmail.com>
+
+
+I suspect applying patches will be dead easy.  I've done some quick
+experiments, and it looks good so far.
+
+On Fri, Jun 1, 2012 at 4:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Wed, May 30, 2012 at 8:03 PM, Yaron Minsky <yminsky at gmail.com> wrote:
+>> Well, that was easy enough. ?I just created it. ?So, the next step is a pull
+>> request, I suppose?
+>
+> Thanks, it seems it's working out for me as a contributor so far.
+> Here is what I had to do:
+>
+> ?* Fork yminsky/ocaml-core-submissions. ?The Bitbucket fork will only
+> contain the version-controlled patches, nothing else.
+> ?* On my machine: hg qclone
+> ssh://hg at bitbucket.org/yminsky/ocaml-core-submissions
+> ?* Add a default-push to .hg/patches/.hg/hgrc in the checked out
+> repo, pointing it to (in my case):
+> ssh://hg at bitbucket.org/mmottl/ocaml-core-submissions/.hg/patches
+>
+> The rest is pretty plain vanilla work with Mercurial queues and Bitbucket.
+>
+> Once everything works for your role as a maintainer, too, and once
+> you've verified my workflow, you may want to put the above on the Wiki
+> for other contributors.
+>
+> Let me know if there are issues applying patches. ?I really hope
+> maintenance is as easy as contributing now.
+>
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From fermin.reig at gmail.com  Sat Jun  2 14:31:47 2012
+From: fermin.reig at gmail.com (Fermin Reig)
+Date: Sat, 2 Jun 2012 06:31:47 -0700 (PDT)
+Subject: 108.00.01 Released
+In-Reply-To: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+Message-ID: <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+
+One for the wish list: add a build target to generate and install docs.
+
+Fermin
+
+On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>
+> This is a minor tweak on top of 108.00; 108.00.01 contains just some small 
+> build fixes for 64-bit platforms.
+>
+> Tarballs are on the bitbucket site.
+>
+> y
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120602/299efd98/attachment-0001.html>
+
+From yminsky at janestreet.com  Sat Jun  2 15:50:05 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Sat, 2 Jun 2012 10:50:05 -0400
+Subject: 108.00.01 Released
+In-Reply-To: <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+	<60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+Message-ID: <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+
+
+Understood.  We'll get that done.
+
+On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> wrote:
+> One for the wish list: add a build target to generate and install docs.
+>
+> Fermin
+>
+>
+> On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>>
+>> This is a minor tweak on top of 108.00; 108.00.01 contains just some small
+>> build fixes for 64-bit platforms.
+>>
+>> Tarballs are on the bitbucket site.
+>>
+>> y
+
+
+From markus.mottl at gmail.com  Mon Jun  4 03:13:37 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Sun, 3 Jun 2012 22:13:37 -0400
+Subject: Distribution packaging
+In-Reply-To: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+References: <CACLX4jQvYhPoJXTyJv8dHfJFBenVO8NabqB8eb_FaJY4kp_Kmg@mail.gmail.com>
+Message-ID: <CAP_800ra_dG+4HtY4-SSxDYrDWHmXKOS=-1mYTJaSo7VrsqL3w@mail.gmail.com>
+
+
+I've just updated the type_conv, sexplib, and bin_prot packages in
+Godi to refer to your Bitbucket version.  Feel free to use these
+packages as templates for adding your other libraries.
+
+Regards,
+Markus
+
+On Fri, Jun 1, 2012 at 3:07 PM, Yaron Minsky <yminsky at janestreet.com> wrote:
+> Has anyone done any work on packaging the Core release for the various and
+> sundry linux and mac distributions, and for GODI? ?This seemed to have
+> happened in the past without us knowing much about it, and it would be nice
+> to try and figure out what we can do to make that as easy as possible.
+>
+> y
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From kakadu.hafanana at gmail.com  Thu Jun  7 10:57:43 2012
+From: kakadu.hafanana at gmail.com (Kakadu)
+Date: Thu, 7 Jun 2012 02:57:43 -0700 (PDT)
+Subject: 108.00.01 Released
+In-Reply-To: <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+ <60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+ <CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+Message-ID: <8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+
+Btw, I can't generate docs for core-108.00.01. It says 
+
++ ocamlfind ocamldoc -dump lib/core_map.odoc -package variantslib.syntax -package variantslib -package unix -package threads -package sexplib.syntax -package sexplib -package res -package pa_pipebang -package pa_ounit -package fieldslib.syntax -package fieldslib -package bin_prot.syntax -package bin_prot -package bigarray -syntax camlp4o -I +threads -I lib lib/core_map.mli
+ocamlfind: [WARNING] Package `threads' signals error: Missing -thread or -vmthread switch
+The type map could not be found in the signature of module Core_map.Poly.
+
+
+Full log here: http://paste.in.ua/4332/raw/
+
+Have you already detected this problem?
+
+Best wishes,
+Kakadu
+
+On Saturday, June 2, 2012 6:50:05 PM UTC+4, Yaron Minsky wrote:
+>
+> Understood.  We'll get that done. 
+>
+> On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> 
+> wrote: 
+> > One for the wish list: add a build target to generate and install docs. 
+> > 
+> > Fermin 
+> > 
+> > 
+> > On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote: 
+> >> 
+> >> This is a minor tweak on top of 108.00; 108.00.01 contains just some 
+> small 
+> >> build fixes for 64-bit platforms. 
+> >> 
+> >> Tarballs are on the bitbucket site. 
+> >> 
+> >> y 
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120607/c17b4434/attachment-0001.html>
+
+From yminsky at gmail.com  Sat Jun  9 02:01:48 2012
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Fri, 8 Jun 2012 21:01:48 -0400
+Subject: 108.00.01 Released
+In-Reply-To: <8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+References: <CACLX4jSnBa2h1sHvte7XE8LmMQuN+3mTa6Nre1cEmseLtfY25Q@mail.gmail.com>
+	<60ddf722-454c-4a61-ac8f-ca79b011f00d@googlegroups.com>
+	<CACLX4jTRhBWA8Sx+OjfTbuVTHB4mFXUf-3Jp2YsL+yTkULxn5Q@mail.gmail.com>
+	<8b122c5f-d04d-49d3-a12e-f3d60d0e4a3e@googlegroups.com>
+Message-ID: <CADKNfhJ63oO6HyPNC7Yo6BxRn5gkjhFmvs57D+BMs8pAVH0fYw@mail.gmail.com>
+
+
+Yury is working on getting the ocamldoc generation cleaned up.  Stay tuned...
+
+On Thu, Jun 7, 2012 at 5:57 AM, Kakadu <kakadu.hafanana at gmail.com> wrote:
+> Btw, I can't generate docs for core-108.00.01. It says
+>
+> + ocamlfind ocamldoc -dump lib/core_map.odoc -package variantslib.syntax
+> -package variantslib -package unix -package threads -package sexplib.syntax
+> -package sexplib -package res -package pa_pipebang -package pa_ounit
+> -package fieldslib.syntax -package fieldslib -package bin_prot.syntax
+> -package bin_prot -package bigarray -syntax camlp4o -I +threads -I lib
+> lib/core_map.mli
+> ocamlfind: [WARNING] Package `threads' signals error: Missing -thread or
+> -vmthread switch
+> The type map could not be found in the signature of module Core_map.Poly.
+>
+>
+> Full log here: http://paste.in.ua/4332/raw/
+>
+> Have you already detected this problem?
+>
+> Best wishes,
+> Kakadu
+>
+>
+> On Saturday, June 2, 2012 6:50:05 PM UTC+4, Yaron Minsky wrote:
+>>
+>> Understood. ?We'll get that done.
+>>
+>> On Sat, Jun 2, 2012 at 9:31 AM, Fermin Reig <fermin.reig at gmail.com> wrote:
+>> > One for the wish list: add a build target to generate and install docs.
+>> >
+>> > Fermin
+>> >
+>> >
+>> > On Saturday, May 26, 2012 2:42:35 AM UTC+1, Yaron Minsky wrote:
+>> >>
+>> >> This is a minor tweak on top of 108.00; 108.00.01 contains just some
+>> >> small
+>> >> build fixes for 64-bit platforms.
+>> >>
+>> >> Tarballs are on the bitbucket site.
+>> >>
+>> >> y
+
+
+From seanmcl at gmail.com  Wed Jun 20 18:53:58 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 10:53:58 -0700
+Subject: can't build with ocaml 4.0
+Message-ID: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+
+
+Hi,
+
+I installed ocaml 4.0 today, and after updating findlib/oasis/etc.  I
+tried to build ocaml-core.  I got the following error message, due to
+some unused variable warnings in type-conv.  The warnings appear when
+compiling type-conv from the latest sourceforge version as well.
+
+Has anyone else had success with 4.0?
+
+/usr/local/src/ocaml-core
+$ ./build-and-install
+=> base/type_conv
+   * configuring
+   * compiling
+ocaml setup.ml -build
+ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+lib/pa_type_conv.cmo lib/pa_type_conv.ml
++ ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+lib/pa_type_conv.cmo lib/pa_type_conv.ml
+File "lib/pa_type_conv.ml", line 275, characters 19-1267:
+Warning 8: this pattern-matching is not exhaustive.
+Here is an example of a value that is not matched:
+(TyTypePol (_, _, _)|TyAnP _|TyAnM _)
+File "lib/pa_type_conv.ml", line 4, characters 0-11:
+Warning 33: unused open Lexing.
+File "lib/pa_type_conv.ml", line 12, characters 4-8:
+Warning 32: unused value both.
+File "lib/pa_type_conv.ml", line 1:
+Error: Error-enabled warnings (3 occurrences)
+Command exited with code 2.
+E: Failure("Command '/usr/local/bin/ocamlbuild lib/pa_type_conv.cma
+-tag debug' terminated with error code 10")
+make: *** [build] Error 1
+*** ERROR: Couldn't compile type_conv
+EXIT STATUS 1
+
+
+From seanmcl at gmail.com  Wed Jun 20 20:17:32 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 12:17:32 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+Message-ID: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+
+
+Thanks Yuri,
+
+The patch almost worked, though it breaks on host_and_port.ml.  When I
+applied the patch by hand on that one file, all the other patches are
+successful.  Then once the code was patched, it fails due to not
+knowing about the Ok constructor.   I added
+
+include Std_internal
+
+to bigstring.ml and core_mutex.ml
+
+That got me to linux_ext.ml, where it complained about
+
+File "lib/linux_ext.ml", line 45, characters 9-19:
+Error: Unbound type constructor file_descr
+
+Any idea what's going on here?
+
+
+From seanmcl at gmail.com  Wed Jun 20 21:37:20 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 13:37:20 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com> <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+Message-ID: <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+
+I've been using core/build-and-install.  I did it by hand in core and
+things went fine from there when I re-ran build-and-install.  Could
+--disable-linux be an option for this to build-and-install?
+
+Thanks,
+
+Sean
+
+On Wednesday, June 20, 2012, Yury Sulsky wrote:
+
+> Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+> don't need it, you can just pass --disable-linux to the configure
+> script in core; otherwise, I think the fixes are to replace
+> [file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+>  (or [open Std_internal]) in the LINUX_EXT branch of the code.
+>
+> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com>
+> wrote:
+> > Thanks Yuri,
+> >
+> > The patch almost worked, though it breaks on host_and_port.ml.  When I
+> > applied the patch by hand on that one file, all the other patches are
+> > successful.  Then once the code was patched, it fails due to not
+> > knowing about the Ok constructor.   I added
+> >
+> > include Std_internal
+> >
+> > to bigstring.ml and core_mutex.ml
+> >
+> > That got me to linux_ext.ml, where it complained about
+> >
+> > File "lib/linux_ext.ml", line 45, characters 9-19:
+> > Error: Unbound type constructor file_descr
+> >
+> > Any idea what's going on here?
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120620/af988f58/attachment-0001.html>
+
+From seanmcl at gmail.com  Wed Jun 20 22:01:02 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Jun 2012 14:01:02 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+ <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com> <CAO4dZbe_gsfsSVGmXd=TAtnYSe1CeKRbFD++6de4z0ZpnSwaNA@mail.gmail.com>
+Message-ID: <CAO4dZbeUnnPAtkgcs8kN0x_0bnf5E2C6o1RgxreS8FoF-c6xZQ@mail.gmail.com>
+
+
+Note you also must disable
+
+--disable-posix-timers
+
+in core-extended
+
+On Wed, Jun 20, 2012 at 1:37 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> I've been using?core/build-and-install. ?I did it by hand in core and things
+> went fine from there when I re-ran build-and-install. ?Could --disable-linux
+> be an option for this to build-and-install?
+>
+> Thanks,
+>
+> Sean
+>
+>
+> On Wednesday, June 20, 2012, Yury Sulsky wrote:
+>>
+>> Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+>> don't need it, you can just pass --disable-linux to the configure
+>> script in core; otherwise, I think the fixes are to replace
+>> [file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+>> ?(or [open Std_internal]) in the LINUX_EXT branch of the code.
+>>
+>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com>
+>> wrote:
+>> > Thanks Yuri,
+>> >
+>> > The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>> > applied the patch by hand on that one file, all the other patches are
+>> > successful. ?Then once the code was patched, it fails due to not
+>> > knowing about the Ok constructor. ? I added
+>> >
+>> > include Std_internal
+>> >
+>> > to bigstring.ml and core_mutex.ml
+>> >
+>> > That got me to linux_ext.ml, where it complained about
+>> >
+>> > File "lib/linux_ext.ml", line 45, characters 9-19:
+>> > Error: Unbound type constructor file_descr
+>> >
+>> > Any idea what's going on here?
+
+
+From yury.sulsky at gmail.com  Wed Jun 20 19:18:41 2012
+From: yury.sulsky at gmail.com (Yury Sulsky)
+Date: Wed, 20 Jun 2012 14:18:41 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+Message-ID: <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+
+
+Hi Sean,
+
+Markus has a patch for building with ocaml 4.0; just apply
+ocaml-4.00-bc-fixes and ocaml-4.00-non-bc-fixes from
+https://bitbucket.org/mmottl/ocaml-core-submissions/src
+
+On Wed, Jun 20, 2012 at 1:53 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Hi,
+>
+> I installed ocaml 4.0 today, and after updating findlib/oasis/etc. ?I
+> tried to build ocaml-core. ?I got the following error message, due to
+> some unused variable warnings in type-conv. ?The warnings appear when
+> compiling type-conv from the latest sourceforge version as well.
+>
+> Has anyone else had success with 4.0?
+>
+> /usr/local/src/ocaml-core
+> $ ./build-and-install
+> => base/type_conv
+> ? * configuring
+> ? * compiling
+> ocaml setup.ml -build
+> ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+> camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+> lib/pa_type_conv.cmo lib/pa_type_conv.ml
+> + ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package
+> camlp4.quotations -package camlp4.extend -syntax camlp4o -I lib -o
+> lib/pa_type_conv.cmo lib/pa_type_conv.ml
+> File "lib/pa_type_conv.ml", line 275, characters 19-1267:
+> Warning 8: this pattern-matching is not exhaustive.
+> Here is an example of a value that is not matched:
+> (TyTypePol (_, _, _)|TyAnP _|TyAnM _)
+> File "lib/pa_type_conv.ml", line 4, characters 0-11:
+> Warning 33: unused open Lexing.
+> File "lib/pa_type_conv.ml", line 12, characters 4-8:
+> Warning 32: unused value both.
+> File "lib/pa_type_conv.ml", line 1:
+> Error: Error-enabled warnings (3 occurrences)
+> Command exited with code 2.
+> E: Failure("Command '/usr/local/bin/ocamlbuild lib/pa_type_conv.cma
+> -tag debug' terminated with error code 10")
+> make: *** [build] Error 1
+> *** ERROR: Couldn't compile type_conv
+> EXIT STATUS 1
+
+
+From yury.sulsky at gmail.com  Wed Jun 20 20:37:48 2012
+From: yury.sulsky at gmail.com (Yury Sulsky)
+Date: Wed, 20 Jun 2012 15:37:48 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+Message-ID: <CAEDxudxbrCj==WAOdFajoe7iuTZP7Y4Tu7wcn6_oy5W196ZA3g@mail.gmail.com>
+
+
+Yeah, I think the patch doesn't work if LINUX_EXT is enabled. If you
+don't need it, you can just pass --disable-linux to the configure
+script in core; otherwise, I think the fixes are to replace
+[file_descr] with [Core_unix.File_descr.t] and to [open Result.Export]
+ (or [open Std_internal]) in the LINUX_EXT branch of the code.
+
+On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Thanks Yuri,
+>
+> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+> applied the patch by hand on that one file, all the other patches are
+> successful. ?Then once the code was patched, it fails due to not
+> knowing about the Ok constructor. ? I added
+>
+> include Std_internal
+>
+> to bigstring.ml and core_mutex.ml
+>
+> That got me to linux_ext.ml, where it complained about
+>
+> File "lib/linux_ext.ml", line 45, characters 9-19:
+> Error: Unbound type constructor file_descr
+>
+> Any idea what's going on here?
+
+
+From markus.mottl at gmail.com  Wed Jun 20 22:46:19 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Wed, 20 Jun 2012 17:46:19 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+Message-ID: <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+
+
+Hi Sean,
+
+you may want to try out my whole patch queue to see which patches are
+actually required.  Some don't commute with previous patches.  I also
+haven't tested the patch queue on any platform other than Mac OS X
+yet.  If there are issues on Linux, it's surely due to trivial things
+only.  There was some part that required preprocessing and wasn't done
+right for Mac OS X.  The fix may have broken Linux support.
+
+Feel free to clone my patch queue and to send me (or Jane Street) pull
+requests with fixes.  I'm pretty sure the mentioned problems can be
+fixed with little effort.  Thanks!
+
+Cheers,
+Markus
+
+On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Thanks Yuri,
+>
+> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+> applied the patch by hand on that one file, all the other patches are
+> successful. ?Then once the code was patched, it fails due to not
+> knowing about the Ok constructor. ? I added
+>
+> include Std_internal
+>
+> to bigstring.ml and core_mutex.ml
+>
+> That got me to linux_ext.ml, where it complained about
+>
+> File "lib/linux_ext.ml", line 45, characters 9-19:
+> Error: Unbound type constructor file_descr
+>
+> Any idea what's going on here?
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From seanmcl at gmail.com  Mon Jun 25 20:07:39 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Mon, 25 Jun 2012 12:07:39 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com> <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+Message-ID: <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+
+
+Hi,
+
+I cloned Markus' submissions repo, and pushed a change to
+
+  ocaml-4.00-bc-fixes
+
+When you clone ocaml-core and apply the entire patch queue, everything up
+through core compiles via ./build-and-install.  It falls over on
+core_extended with the following error message
+
++ ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+ocamlc.opt got signal and exited
+
+When I cd to base/core/extended and do
+
+ocaml setup.ml -build
+
+it builds cleanly though.  (The failing command also builds without a
+problem when run by hand.)
+
+Once core_extended is compiled by hand, the remaining libraries
+compile and install via
+build-and-install.
+
+Recap:
+
+hg clone ocaml-core
+hg clone ocaml-core-submissions
+ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+cd ocaml-core
+hg qpush -a
+./build-and-install # core succeeds, fails at core_extended
+cd base/core/extended
+ocaml setup.ml -build # succeeds
+cd ../../..
+./build-and-install # succeeds
+
+I've tried for over an hour to figure out why it fails when called
+from build-and-install, but not from ocaml setup.ml -build.  The
+former script seems to simply call the later command, and I'm stuck.
+If anyone has ideas what would be signaling the ocamlc.opt when run
+from the script, I'd be happy to hear them.
+
+I won't make this an official pull request until this issue is worked
+out, but it seems the code changes are working.  (e.g. linux_ext and
+posix_clock work).
+
+Sean
+
+
+
+
+
+
+
+
+
+
+On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> Hi Sean,
+>
+> you may want to try out my whole patch queue to see which patches are
+> actually required. ?Some don't commute with previous patches. ?I also
+> haven't tested the patch queue on any platform other than Mac OS X
+> yet. ?If there are issues on Linux, it's surely due to trivial things
+> only. ?There was some part that required preprocessing and wasn't done
+> right for Mac OS X. ?The fix may have broken Linux support.
+>
+> Feel free to clone my patch queue and to send me (or Jane Street) pull
+> requests with fixes. ?I'm pretty sure the mentioned problems can be
+> fixed with little effort. ?Thanks!
+>
+> Cheers,
+> Markus
+>
+> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>> Thanks Yuri,
+>>
+>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>> applied the patch by hand on that one file, all the other patches are
+>> successful. ?Then once the code was patched, it fails due to not
+>> knowing about the Ok constructor. ? I added
+>>
+>> include Std_internal
+>>
+>> to bigstring.ml and core_mutex.ml
+>>
+>> That got me to linux_ext.ml, where it complained about
+>>
+>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>> Error: Unbound type constructor file_descr
+>>
+>> Any idea what's going on here?
+>
+>
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From seanmcl at gmail.com  Mon Jun 25 20:22:14 2012
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Mon, 25 Jun 2012 12:22:14 -0700
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+ <CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+ <CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+ <CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com> <CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+Message-ID: <CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+
+
+https://bitbucket.org/seanmcl/ocaml-core-submissions
+
+On Mon, Jun 25, 2012 at 12:07 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> Hi,
+>
+> I cloned Markus' submissions repo, and pushed a change to
+>
+> ?ocaml-4.00-bc-fixes
+>
+> When you clone ocaml-core and apply the entire patch queue, everything up
+> through core compiles via ./build-and-install. ?It falls over on
+> core_extended with the following error message
+>
+> + ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+> ocamlc.opt got signal and exited
+>
+> When I cd to base/core/extended and do
+>
+> ocaml setup.ml -build
+>
+> it builds cleanly though. ?(The failing command also builds without a
+> problem when run by hand.)
+>
+> Once core_extended is compiled by hand, the remaining libraries
+> compile and install via
+> build-and-install.
+>
+> Recap:
+>
+> hg clone ocaml-core
+> hg clone ocaml-core-submissions
+> ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+> cd ocaml-core
+> hg qpush -a
+> ./build-and-install # core succeeds, fails at core_extended
+> cd base/core/extended
+> ocaml setup.ml -build # succeeds
+> cd ../../..
+> ./build-and-install # succeeds
+>
+> I've tried for over an hour to figure out why it fails when called
+> from build-and-install, but not from ocaml setup.ml -build. ?The
+> former script seems to simply call the later command, and I'm stuck.
+> If anyone has ideas what would be signaling the ocamlc.opt when run
+> from the script, I'd be happy to hear them.
+>
+> I won't make this an official pull request until this issue is worked
+> out, but it seems the code changes are working. ?(e.g. linux_ext and
+> posix_clock work).
+>
+> Sean
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>> Hi Sean,
+>>
+>> you may want to try out my whole patch queue to see which patches are
+>> actually required. ?Some don't commute with previous patches. ?I also
+>> haven't tested the patch queue on any platform other than Mac OS X
+>> yet. ?If there are issues on Linux, it's surely due to trivial things
+>> only. ?There was some part that required preprocessing and wasn't done
+>> right for Mac OS X. ?The fix may have broken Linux support.
+>>
+>> Feel free to clone my patch queue and to send me (or Jane Street) pull
+>> requests with fixes. ?I'm pretty sure the mentioned problems can be
+>> fixed with little effort. ?Thanks!
+>>
+>> Cheers,
+>> Markus
+>>
+>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>>> Thanks Yuri,
+>>>
+>>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>>> applied the patch by hand on that one file, all the other patches are
+>>> successful. ?Then once the code was patched, it fails due to not
+>>> knowing about the Ok constructor. ? I added
+>>>
+>>> include Std_internal
+>>>
+>>> to bigstring.ml and core_mutex.ml
+>>>
+>>> That got me to linux_ext.ml, where it complained about
+>>>
+>>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>>> Error: Unbound type constructor file_descr
+>>>
+>>> Any idea what's going on here?
+>>
+>>
+>>
+>> --
+>> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Wed Jun 27 02:37:58 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 26 Jun 2012 21:37:58 -0400
+Subject: Cannot compile type_conv on windows
+In-Reply-To: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+References: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+Message-ID: <CACLX4jS6xENWNrBOW2ZnNmmvZV_w35WZY9gWZ8Fk4wCSiBRF0A@mail.gmail.com>
+
+
+Thanks for the bug report.  We'll fix upstream.
+
+On Tue, Jun 26, 2012 at 7:58 PM, Sylvain Le Gall <sylvain at le-gall.net> wrote:
+> Hello,
+>
+> Here is the error:
+>
+> ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations -
+> package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+> Cannot open file Aemr-28
+> Exit code 2 while executing this command:
+> ?ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations
+> ?-package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+> E: Failure("Command 'C:\\ocaml312-vs2008\\bin\\ocamlbuild.EXE -classic-display -
+> no-log -no-links -install-lib-dir C:\\ocaml312-vs2008\\lib\\ocamlbuild -byte-plu
+> gin lib/pa_type_conv.cma -tag debug' terminated with error code 2")
+> make: *** [build] Error 1
+>
+> Just remove the A"-w"; A "@Aemr-28" in myocamlbuild.ml fix the issue.
+>
+> "@" is used to load extra command line argument in MS-DOS (I think).
+>
+> Regards
+> Sylvain
+
+
+From markus.mottl at gmail.com  Wed Jun 27 03:02:22 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 26 Jun 2012 22:02:22 -0400
+Subject: can't build with ocaml 4.0
+In-Reply-To: <CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+References: <CAO4dZberxsRf7mbaGrAFGiVe8OCBByC-PaQBxN3YBB--bXzP8w@mail.gmail.com>
+	<CAEDxudz5SBo2+e5s8Pui7v60QvMdFRDT4kgY=TH=w7Rr69sOZQ@mail.gmail.com>
+	<CAO4dZbcqPKVoxZZxuN02MjV=jSh7mwJJLNQraThbL_VTTjEjYg@mail.gmail.com>
+	<CAP_800rPT+mekLEnb7i0hDhmXZfkGDvp2zQ=iiiOwAzBYu-f6Q@mail.gmail.com>
+	<CAO4dZbdAvhtxukaQ-7yro5q9S8cmrMbv7LWpQZTAFKdu=a6xMA@mail.gmail.com>
+	<CAO4dZbds5Z0_3j5RhaVZb4+VEfq=PCSaDDibjwqx-4GKCndA4Q@mail.gmail.com>
+Message-ID: <CAP_800qkydSF9sE9EiTxoexdPqtgBEuAx7DxkdBecOBWJYVXsw@mail.gmail.com>
+
+
+Hi Sean,
+
+thanks for the updates, I have pulled them into my patch queue and
+sent a pull request upstream.  I have verified that the newest set of
+patches works on both Mac OS X and Linux now.
+
+Regards,
+Markus
+
+On Mon, Jun 25, 2012 at 3:22 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+> https://bitbucket.org/seanmcl/ocaml-core-submissions
+>
+> On Mon, Jun 25, 2012 at 12:07 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>> Hi,
+>>
+>> I cloned Markus' submissions repo, and pushed a change to
+>>
+>> ?ocaml-4.00-bc-fixes
+>>
+>> When you clone ocaml-core and apply the entire patch queue, everything up
+>> through core compiles via ./build-and-install. ?It falls over on
+>> core_extended with the following error message
+>>
+>> + ocamlfind ocamlc -pack ..... -o lib/core_extended.cmo
+>> ocamlc.opt got signal and exited
+>>
+>> When I cd to base/core/extended and do
+>>
+>> ocaml setup.ml -build
+>>
+>> it builds cleanly though. ?(The failing command also builds without a
+>> problem when run by hand.)
+>>
+>> Once core_extended is compiled by hand, the remaining libraries
+>> compile and install via
+>> build-and-install.
+>>
+>> Recap:
+>>
+>> hg clone ocaml-core
+>> hg clone ocaml-core-submissions
+>> ln -s $(pwd)/ocaml-core-submissions ocaml-core/.hg/patches
+>> cd ocaml-core
+>> hg qpush -a
+>> ./build-and-install # core succeeds, fails at core_extended
+>> cd base/core/extended
+>> ocaml setup.ml -build # succeeds
+>> cd ../../..
+>> ./build-and-install # succeeds
+>>
+>> I've tried for over an hour to figure out why it fails when called
+>> from build-and-install, but not from ocaml setup.ml -build. ?The
+>> former script seems to simply call the later command, and I'm stuck.
+>> If anyone has ideas what would be signaling the ocamlc.opt when run
+>> from the script, I'd be happy to hear them.
+>>
+>> I won't make this an official pull request until this issue is worked
+>> out, but it seems the code changes are working. ?(e.g. linux_ext and
+>> posix_clock work).
+>>
+>> Sean
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>>
+>> On Wed, Jun 20, 2012 at 2:46 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>>> Hi Sean,
+>>>
+>>> you may want to try out my whole patch queue to see which patches are
+>>> actually required. ?Some don't commute with previous patches. ?I also
+>>> haven't tested the patch queue on any platform other than Mac OS X
+>>> yet. ?If there are issues on Linux, it's surely due to trivial things
+>>> only. ?There was some part that required preprocessing and wasn't done
+>>> right for Mac OS X. ?The fix may have broken Linux support.
+>>>
+>>> Feel free to clone my patch queue and to send me (or Jane Street) pull
+>>> requests with fixes. ?I'm pretty sure the mentioned problems can be
+>>> fixed with little effort. ?Thanks!
+>>>
+>>> Cheers,
+>>> Markus
+>>>
+>>> On Wed, Jun 20, 2012 at 3:17 PM, Sean McLaughlin <seanmcl at gmail.com> wrote:
+>>>> Thanks Yuri,
+>>>>
+>>>> The patch almost worked, though it breaks on host_and_port.ml. ?When I
+>>>> applied the patch by hand on that one file, all the other patches are
+>>>> successful. ?Then once the code was patched, it fails due to not
+>>>> knowing about the Ok constructor. ? I added
+>>>>
+>>>> include Std_internal
+>>>>
+>>>> to bigstring.ml and core_mutex.ml
+>>>>
+>>>> That got me to linux_ext.ml, where it complained about
+>>>>
+>>>> File "lib/linux_ext.ml", line 45, characters 9-19:
+>>>> Error: Unbound type constructor file_descr
+>>>>
+>>>> Any idea what's going on here?
+>>>
+>>>
+>>>
+>>> --
+>>> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From sylvain at le-gall.net  Wed Jun 27 00:58:20 2012
+From: sylvain at le-gall.net (Sylvain Le Gall)
+Date: Wed, 27 Jun 2012 01:58:20 +0200
+Subject: Cannot compile type_conv on windows
+Message-ID: <CAOCAUGN9N=Ww3vv9LaqgR3_tLF9LVSiAVDSs9go7ehkRNUKEsg@mail.gmail.com>
+
+
+Hello,
+
+Here is the error:
+
+ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations -
+package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+Cannot open file Aemr-28
+Exit code 2 while executing this command:
+  ocamlfind ocamlc -c -g -w @Aemr-28 -strict-sequence -package camlp4.quotations
+ -package camlp4.extend -I lib -o lib/pa_type_conv.cmi lib/pa_type_conv.mli
+E: Failure("Command 'C:\\ocaml312-vs2008\\bin\\ocamlbuild.EXE -classic-display -
+no-log -no-links -install-lib-dir C:\\ocaml312-vs2008\\lib\\ocamlbuild -byte-plu
+gin lib/pa_type_conv.cma -tag debug' terminated with error code 2")
+make: *** [build] Error 1
+
+Just remove the A"-w"; A "@Aemr-28" in myocamlbuild.ml fix the issue.
+
+"@" is used to load extra command line argument in MS-DOS (I think).
+
+Regards
+Sylvain
+
+

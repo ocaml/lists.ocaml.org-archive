@@ -1,0 +1,197 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGip2OAzHk-kQtKF35ASvEmq432OtEf6K_ExfgzjxHyfQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000301.html">
+   <LINK REL="Next"  HREF="000306.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGip2OAzHk-kQtKF35ASvEmq432OtEf6K_ExfgzjxHyfQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Sun Mar 17 10:38:31 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000301.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000306.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#302">[ date ]</a>
+              <a href="thread.html#302">[ thread ]</a>
+              <a href="subject.html#302">[ subject ]</a>
+              <a href="author.html#302">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>The problem with this fixed-syntactic choice is that it hampers
+composability of namespaces.
+
+Assume you want to work with namespaces Foo and Bar at the same time.
+In a hierarchical setting you can build a namespace with two
+namespaces for Foo and Bar (eg. { A =&gt; Foo, B =&gt; Bar } ) and this has
+very simple properties (no conflict/shadowing involved). In a flat
+setting, or if you want to avoid adding one level of depth, you will
+rather use (A merge B). What happens then if both A and B have a
+Pervasives module?
+
+(The semantics model of the previous email simply says that both
+compilation units referred to by A#Pervasives and B#Pervasives should
+be in the open list of the namespace (A merge B).)
+
+I think there is a subtlety at play when you say that &quot;open namespace
+Foo in id&quot; is not the same as &quot;Foo#id&quot; anymore. The &quot;id&quot; in &quot;Foo#id&quot;
+may only be a compilation unit name (component). If &quot;Pervasives&quot; is a
+module rather than a subnamespace, &quot;open Foo#Pervasives&quot; may introduce
+only OCaml values, so in particular will not introduce new compilation
+units in the environments. So the purported semantics difference here
+is only a syntactical ambiguity: the meaning may change if you choose
+&quot;id&quot; in a lexical class common to compilation units and submodule
+names, and you see it as an internal module name in &quot;open namespace
+Foo in id&quot; and a compilation unit name in &quot;Foo#id&quot;: it's actually not
+the same identifier.
+
+(I still think it would be extremely fruitful to try to remove this
+syntactic ambiguity between compilation unit names and submodule
+names.)
+
+Regarding the proposal as a whole:
+- I'm curious and not sure: what is the reason to remove hierarchical
+namespaces from your proposal? At first I believed it was the ongoing
+tooling discussion with Alain, but he actually objects to
+non-canonicity of names (as permitted by aliasing) more than your
+foo-bar-baz hierarchical structure. Which perceived problems are
+solved by this change?
+- I believe the proposal is still inadequate, or at least
+underspecified, with regard to the internal name conflicts problem.
+What kind of conventions do you envision around your proposal to avoid
+such conflicts?
+
+On Fri, Mar 15, 2013 at 3:33 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+&gt;<i> This proposal makes me happy.
+</I>&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i> On Mar 15, 2013 9:43 AM, &quot;Leo White&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Following recent discussions, I would like to propose some changes to my
+</I>&gt;&gt;<i> previous proposal:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> ## Flat namespaces
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> It has occured to me that, while I have some good use cases for
+</I>&gt;&gt;<i> hierarchical namespaces, they are not critical for the *initial*
+</I>&gt;&gt;<i> implementation of namespaces in OCaml. Essentially, I'm changing my
+</I>&gt;&gt;<i> position from &quot;We should include support for hierarchical namespaces&quot; to
+</I>&gt;&gt;<i> &quot;We should make sure that we could easily add support for hierarchical
+</I>&gt;&gt;<i> namespaces in the future&quot;.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> ## Pervasive modules
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think that the simplest solution to Yaron's need for &quot;automatically
+</I>&gt;&gt;<i> opened&quot; modules is to say that:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>     open namespace Foo
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> will open the namespace Foo and then, if it exists, open the module
+</I>&gt;&gt;<i> Foo#Pervasives.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Members of Foo#Pervasives would not be accessible directly from Foo
+</I>&gt;&gt;<i> (i.e. Foo#id != Foo#Pervasives.id).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think this has the following benefits:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - This is basically a syntactic solution: we don't need to &quot;dirty&quot; the
+</I>&gt;&gt;<i>   semantics or specification of modules with the issue of automatically
+</I>&gt;&gt;<i>   opening modules.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - Only one Pervasives is opened, so conflicts between separate
+</I>&gt;&gt;<i>   specifications of a namespace should be obvious immediately. Its
+</I>&gt;&gt;<i>   relience on a specific name also makes the potential for conflicts
+</I>&gt;&gt;<i>   obvious to users.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - It is clearly a bit of a fudge, which will discourage its excessive
+</I>&gt;&gt;<i>   use, and prevent any percevied overlap bewteen namespaces and
+</I>&gt;&gt;<i>   modules. This also makes it seem less &quot;offensive&quot; that it slightly
+</I>&gt;&gt;<i>   breaks the idea that &quot;let open namespace Foo in id&quot; should be
+</I>&gt;&gt;<i>   basically the same as &quot;Foo#id&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - It fits in with the standard library's use of Pervasives. You could
+</I>&gt;&gt;<i>   consider current behaviour as simply opening the &quot;Std&quot; namespace
+</I>&gt;&gt;<i>   before every program.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think that simple solution is better than trying to find a generalised
+</I>&gt;&gt;<i> sematics for &quot;automatic opens&quot; in namespaces. As Gabriel's e-mail shows,
+</I>&gt;&gt;<i> these semantics are non-trivial. I think that it is better to solve a
+</I>&gt;&gt;<i> specific problem with a specific solution, rather than creating a
+</I>&gt;&gt;<i> generalised solution for its own sake.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Regards,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Leo
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000301.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000306.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#302">[ date ]</a>
+              <a href="thread.html#302">[ thread ]</a>
+              <a href="subject.html#302">[ subject ]</a>
+              <a href="author.html#302">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

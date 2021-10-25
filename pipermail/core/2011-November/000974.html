@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Making Async play better with others
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Making%20Async%20play%20better%20with%20others&In-Reply-To=%3CCADKNfhJ%2BtOuGKrKHNvpr0woe0NAk7wLYzEGMn9qk5M_JRT3FQA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000973.html">
+   <LINK REL="Next"  HREF="000977.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Making Async play better with others</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Making%20Async%20play%20better%20with%20others&In-Reply-To=%3CCADKNfhJ%2BtOuGKrKHNvpr0woe0NAk7wLYzEGMn9qk5M_JRT3FQA%40mail.gmail.com%3E"
+       TITLE="Making Async play better with others">yminsky at gmail.com
+       </A><BR>
+    <I>Tue Nov 22 03:35:36 GMT 2011</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000973.html">Making Async play better with others
+</A></li>
+        <LI>Next message: <A HREF="000977.html">Making Async play better with others
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#974">[ date ]</a>
+              <a href="thread.html#974">[ thread ]</a>
+              <a href="subject.html#974">[ subject ]</a>
+              <a href="author.html#974">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>So I guess that would mean ripping the Linux_ext module out of Core, right?
+
+While I agree about keeping conditional code localized and small, I don't
+quite see why the right answer is to have zero tolerance for conditional
+compilation of OCaml.  Imagine that you have different APIs on different
+platforms that require non-trivially different logic.  Now you're wedded to
+the idea of having non-trivial code that compiles conditionally.  The only
+question is, will you write that code in C or in OCaml?  Given that choice,
+I usually choose OCaml...
+
+Another way of dealing with some of these things is with runtime-tests that
+key-off of the platform, potentially using first-class modules.  i.e., you
+could have a value of the type:
+
+val os : [ `Windows of (module Windows_specific_API)
+         | `Linux   of (module Linux_specific_API)
+         | `BSD     of (module BSD_specific_API)
+         | `Posix   of (module Posix_specific_API) ]
+
+The obvious downside is that it's a bit slower to dispatch your code, but
+if you're doing a system call, maybe that doesn't matter.  And it has the
+nice property that all of your OCaml code is type-checked all the time.
+ You would just need some conditional compilation that chose the value of
+`os` at compile-time.  The upside is that it gives you a way of writing
+cross-platform programs that take advantage of the extra functionality when
+it's present.
+
+y
+
+On Mon, Nov 21, 2011 at 10:22 PM, Stephen Weeks &lt;<A HREF="http://lists.ocaml.org/listinfo/core">sweeks at janestreet.com</A>&gt;wrote:
+
+&gt;<i>
+</I>&gt;<i> &gt; Stephen, what do you think about Markus' proposal for how to organize
+</I>&gt;<i> &gt; it?
+</I>&gt;<i>
+</I>&gt;<i> I am highly skeptical of the approach of propagating Linux submodules and
+</I>&gt;<i> conditional compilation throughout the codebase.  I think it would be
+</I>&gt;<i> preferable
+</I>&gt;<i> to design a platform-agnostic interface at the OCaml/C boundary,
+</I>&gt;<i> implemented on
+</I>&gt;<i> the C side using platform-specific C files with minimal conditional
+</I>&gt;<i> compilation
+</I>&gt;<i> at the C level and no conditional compilation at the OCaml level.
+</I>&gt;<i>  Platforms
+</I>&gt;<i> that are unable to implement particular aspects of the interfaces should
+</I>&gt;<i> provide
+</I>&gt;<i> functions that raise exceptions.  Then all OCaml code compiles everywhere,
+</I>&gt;<i> and
+</I>&gt;<i> it one gets on each platform the maximum ability to run what is actually
+</I>&gt;<i> implemented.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20111121/5aad5d68/attachment-0001.html">http://lists.ocaml.org/pipermail/core/attachments/20111121/5aad5d68/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000973.html">Making Async play better with others
+</A></li>
+	<LI>Next message: <A HREF="000977.html">Making Async play better with others
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#974">[ date ]</a>
+              <a href="thread.html#974">[ thread ]</a>
+              <a href="subject.html#974">[ subject ]</a>
+              <a href="author.html#974">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

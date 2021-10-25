@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C514822A4.2040507%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000332.html">
+   <LINK REL="Next"  HREF="000334.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C514822A4.2040507%40lexifi.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Tue Mar 19 08:32:36 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000332.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000334.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#333">[ date ]</a>
+              <a href="thread.html#333">[ thread ]</a>
+              <a href="subject.html#333">[ subject ]</a>
+              <a href="author.html#333">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Consider the following piece of code:
+
+  module X = struct let x = 1 end
+  open namespace Foo
+  let a = X.x
+
+and assume that there is a module Foo#X.  Would X.x refer to this 
+module, or to the one defined defined on the first line?
+
+The least surprising semantics is probably the first one (opening a 
+namespace can hide local modules), but the other one can also be 
+justified by saying that namespaces only organize the lookup of 
+compilation units on the filesystem, which is (currently) done only when 
+modules cannot be resolved in the local environment.
+
+Moreover, the second semantics has nice properties:
+
+   (i) It is much easier to implement: one only needs to maintain a list 
+of opened namespaces in the typing environment, to be used during lookup 
+on the filesystem. I see only two ways to implement the first semantics:
+
+     - Scan the search path for all foo-*.cmi files when processing the 
+&quot;open namespace&quot; statement (i.e. use Sys.readdir, and not only 
+Sys.file_exists as today), in addition to the search path files.  This 
+would probably work ok with most current build systems, but it would 
+prevent from doing &quot;live&quot; discovery of dependencies by instrumentation 
+of system calls (I've created a few years ago a toy build tool based on 
+capturing calls to open/stat though LD_PRELOAD, and it worked quite well).
+
+     - Completely change the representation of the typing environments 
+to maintain a list of &quot;layers&quot; made either of local scopes or namespace 
+opens.
+
+   (ii) It allows to write more robust code w.r.t. to future additions 
+to namespaces.  With namespaces, library authors won't hesitate to use 
+&quot;short&quot; names for their modules and the risk is high that a &quot;open 
+namespace&quot; statement hide local modules when the library is extended.
+
+   (iii) It makes dependency analysis more precise (and code easier to 
+read).  In the example above, ocamldep knows (with the second semantics) 
+that there is no dependency to an external unit X.
+
+
+-- Alain
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000332.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000334.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#333">[ date ]</a>
+              <a href="thread.html#333">[ thread ]</a>
+              <a href="subject.html#333">[ subject ]</a>
+              <a href="author.html#333">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

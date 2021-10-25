@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Build help
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Build%20help&In-Reply-To=%3CCAAxsn%3DFLicyp8ckg0%2B7GxhYidPGc%3DCt3N%3DeQLF4B%2B5X8Tr8sfg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000223.html">
+   <LINK REL="Next"  HREF="000225.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Build help</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Build%20help&In-Reply-To=%3CCAAxsn%3DFLicyp8ckg0%2B7GxhYidPGc%3DCt3N%3DeQLF4B%2B5X8Tr8sfg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Build help">yallop at gmail.com
+       </A><BR>
+    <I>Mon Aug 15 12:34:59 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000223.html">[ocaml-ctypes] Build help
+</A></li>
+        <LI>Next message: <A HREF="000225.html">[ocaml-ctypes] Build help
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#224">[ date ]</a>
+              <a href="thread.html#224">[ thread ]</a>
+              <a href="subject.html#224">[ subject ]</a>
+              <a href="author.html#224">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Andre,
+
+On 10 August 2016 at 21:20, Andre Nathan &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andre at digirati.com.br</A>&gt; wrote:
+&gt;<i> I have working ctypes bindings for MariaDB's libmysqlclient at
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="https://github.com/andrenth/ocaml-mariadb">https://github.com/andrenth/ocaml-mariadb</A>
+</I>&gt;<i>
+</I>&gt;<i> I basically copied and adapted the project structure from
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="https://github.com/simonjbeaumont/ocaml-flock">https://github.com/simonjbeaumont/ocaml-flock</A>
+</I>&gt;<i>
+</I>&gt;<i> to get stub generation working. Currently I'm doing
+</I>&gt;<i>
+</I>&gt;<i>   let foreign name typ = foreign name typ
+</I>&gt;<i>     ~from:Dl.(dlopen ~filename:&quot;libmysqlclient.so&quot; ~flags:[RTLD_NOW])
+</I>&gt;<i>
+</I>&gt;<i> to avoid getting a build error:
+</I>
+If you're using stub generation (which I recommend), then you
+typically don't need to use the Dl module at all.  The usual approach
+is to use the 'foreign' function that comes from the argument to your
+bindings functor instead of the function from the top-level Foreign
+module.  In other words, instead of this:
+
+   module Foreign_bindings = struct
+     open Foreign
+
+     let foreign name typ = foreign name typ
+       ~from:Dl.(dlopen ~filename:&quot;libmysqlclient.so&quot; ~flags:[RTLD_NOW])
+
+     let mysql_library_init = foreign &quot;mysql_server_init&quot;
+       (int @-&gt; ptr_opt (ptr char) @-&gt; ptr_opt (ptr char) @-&gt; returning int)
+
+you'd write something like this:
+
+   module Foreign_bindings(F: Cstubs.FOREIGN) = struct
+     open F
+
+     let mysql_library_init = foreign &quot;mysql_server_init&quot;
+       (int @-&gt; ptr_opt (ptr char) @-&gt; ptr_opt (ptr char) @-&gt; returning int)
+
+In this second snippet 'foreign' refers to 'F.foreign', not 'Foreign.foreign'.
+
+Linking is generally much easier with this second approach.  Since
+names are resolved statically by the standard C toolchain there's no
+need to pass `-Wl,-no-as-needed`, set up LD_LIBRARY_PATH, etc.
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000223.html">[ocaml-ctypes] Build help
+</A></li>
+	<LI>Next message: <A HREF="000225.html">[ocaml-ctypes] Build help
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#224">[ date ]</a>
+              <a href="thread.html#224">[ thread ]</a>
+              <a href="subject.html#224">[ subject ]</a>
+              <a href="author.html#224">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

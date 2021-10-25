@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Managing $PKG_CONFIG_PATH in opam
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Managing%20%24PKG_CONFIG_PATH%20in%20opam&In-Reply-To=%3CCAC-LLDhi5jkQ6%3DcuM9z36xS4cGDGq%3DkgDyzNOg1dWSSP7LFSpQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001209.html">
+   <LINK REL="Next"  HREF="001211.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Managing $PKG_CONFIG_PATH in opam</H1>
+    <B>Tim Cuthbertson</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Managing%20%24PKG_CONFIG_PATH%20in%20opam&In-Reply-To=%3CCAC-LLDhi5jkQ6%3DcuM9z36xS4cGDGq%3DkgDyzNOg1dWSSP7LFSpQ%40mail.gmail.com%3E"
+       TITLE="[opam-devel] Managing $PKG_CONFIG_PATH in opam">tim at gfxmonk.net
+       </A><BR>
+    <I>Sat Sep 12 08:49:50 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001209.html">[opam-devel] What context do install an remove run in?
+</A></li>
+        <LI>Next message: <A HREF="001211.html">[opam-devel] Managing $PKG_CONFIG_PATH in opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1210">[ date ]</a>
+              <a href="thread.html#1210">[ thread ]</a>
+              <a href="subject.html#1210">[ subject ]</a>
+              <a href="author.html#1210">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On the MirageOS mailing list, I submitted some patches[0] to make some
+mirage libraries build without assuming a strict `opam` destination
+directory layout. Mainly this was about the build scripts explicitly
+setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+When building in a nixpkgs environment (using the `opam2nix` tool I'm
+building[1]), there is no such path, but that's OK - the build
+environment will have already set $PKG_CONFIG_PATH correctly.
+
+[0] <A HREF="http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html">http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html</A>
+[1] <A HREF="https://github.com/gfxmonk/opam2nix">https://github.com/gfxmonk/opam2nix</A>
+
+It was generally agreed that having the build scripts perform this
+task is not ideal, and Thomas Leonard suggested we could change `opam`
+itself to export $PKG_CONFIG_PATH, rather than having build scripts
+assume too much about their environment. That way a build script can
+assume its pkg-config dependencies are available without caring
+exactly where they live.
+
+This seems like a good idea to me, and I've written up a fairly simple
+patch which (I think) will do so:
+
+<A HREF="https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config">https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config</A>
+
+I have only superficially tested it, but in thinking about that it
+seems like this almost certainly won't be enough. All &quot;pure&quot; opam
+packages providing pkg-config libraries should work just fine, however
+there exist a large number of opam packages (conf-*) which exist
+solely to force installation of system packages, and therefore most of
+them actually rely on the system $PKG_CONFIG_PATH being used.
+
+We could make `opam` prefix the opam pkgconfig path with the system
+one, but this could lead to accidental impurity (in the case of these
+mirage libraries, it would mean that dependencies might accidentally
+be provided by the system rather than opam deps, which makes builds
+fragile).
+
+Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+scripts don't have to?
+
+(I've sent this to both the mirage &amp; opam lists - apologies if that
+causes too much noise, but I figure it affects both projects).
+
+Cheers,
+ - Tim.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001209.html">[opam-devel] What context do install an remove run in?
+</A></li>
+	<LI>Next message: <A HREF="001211.html">[opam-devel] Managing $PKG_CONFIG_PATH in opam
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1210">[ date ]</a>
+              <a href="thread.html#1210">[ thread ]</a>
+              <a href="subject.html#1210">[ subject ]</a>
+              <a href="author.html#1210">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Pointer to pointer and null check
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Pointer%20to%20pointer%20and%20null%20check&In-Reply-To=%3CCAAxsn%3DEdugcM%3Dyz9EZJZFeqMm-mL6H3T-_EiArPJz2ASv_vL9w%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000212.html">
+   <LINK REL="Next"  HREF="000214.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Pointer to pointer and null check</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Pointer%20to%20pointer%20and%20null%20check&In-Reply-To=%3CCAAxsn%3DEdugcM%3Dyz9EZJZFeqMm-mL6H3T-_EiArPJz2ASv_vL9w%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Pointer to pointer and null check">yallop at gmail.com
+       </A><BR>
+    <I>Thu Jul 21 22:35:02 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000212.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+        <LI>Next message: <A HREF="000214.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#213">[ date ]</a>
+              <a href="thread.html#213">[ thread ]</a>
+              <a href="subject.html#213">[ subject ]</a>
+              <a href="author.html#213">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Andre,
+
+On 21 July 2016 at 21:40, Andre Nathan &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andre at digirati.com.br</A>&gt; wrote:
+&gt;<i> I'm trying to write bindings to an API that in simplified form looks
+</I>&gt;<i> like this, for a given opaque type `foo_t`:
+</I>&gt;<i>
+</I>&gt;<i>   int foo_bar(foo_t **ret, foo_t *foo);
+</I>&gt;<i>
+</I>&gt;<i> In C it's used like this:
+</I>&gt;<i>
+</I>&gt;<i>   foo_t *foo = foo_new();
+</I>&gt;<i>   foo_t *ret;
+</I>&gt;<i>   int r = foo_bar(&amp;ret, foo);
+</I>&gt;<i>
+</I>&gt;<i>   if (r == 0) {
+</I>&gt;<i>     if (ret != NULL) {
+</I>&gt;<i>       /* success */
+</I>&gt;<i>     } else {
+</I>&gt;<i>       /* error */
+</I>&gt;<i>     }
+</I>&gt;<i>   } else {
+</I>&gt;<i>     /* not important */
+</I>&gt;<i>   }
+</I>&gt;<i>
+</I>&gt;<i> So if the return is 0, one has to check whether ret is NULL to determine
+</I>&gt;<i> failure or success.
+</I>&gt;<i>
+</I>&gt;<i> I have defined in the OCaml side:
+</I>&gt;<i>
+</I>&gt;<i>   type foo = unit ptr
+</I>&gt;<i>   let foo : foo typ = ptr void
+</I>&gt;<i>
+</I>&gt;<i>   let foo_bar = foreign &quot;foo_bar&quot; (ptr foo @-&gt; foo @-&gt; returning int)
+</I>&gt;<i>
+</I>&gt;<i>   let foo_bar x =
+</I>&gt;<i>     let ret = allocate foo x in
+</I>&gt;<i>     let r = foo_bar ret x in
+</I>&gt;<i>     (r, ret)
+</I>&gt;<i>
+</I>&gt;<i> Given that `ret` was allocated before the call, it will never be NULL
+</I>&gt;<i> after the call, so determining if there was an error becomes impossible.
+</I>
+Your code above is correct.  I think the apparent difficulty lies in
+the different roles of 'ret' in the C and OCaml fragments.
+
+In C, your ret is a pointer to foo_t:
+
+&gt;<i>   foo_t *ret;
+</I>
+You pass its address to foo_bar, which uses the address to modify ret.
+(You're passing '&amp;ret', so foo_bar modifies '*&amp;ret'.)
+
+In OCaml, your ret is a pointer to pointer to foo:
+
+&gt;<i>   let foo : foo typ = ptr void
+</I>[...]
+&gt;<i>     let ret = allocate foo x in
+</I>
+and so, correctly, you pass ret (rather than its address) to foo_bar,
+which can consequently only modify *ret, not ret.  (You're passing
+'ret', so foo_bar modifies '*ret'.)
+
+So to check for an error you should compare *ret, not ret, with NULL, like this:
+
+   ptr_compare !@ret null = 0
+
+&gt;<i> but of course I can't call `addr` on a `Ctypes_static.pointer`. Also,
+</I>&gt;<i> apparently the way to check for NULL is to use `ptr_opt`,
+</I>
+Indeed, that's an option, and perhaps better than explicit null
+comparisons.  Here's how you adapt your code to use ptr_opt:
+
+  type foo_opt = unit ptr option
+  let foo_opt : foo_opt typ = ptr_opt void
+
+  let foo_bar = foreign &quot;foo_bar&quot; (ptr foo_opt @-&gt; foo_opt @-&gt; returning int)
+
+  let foo_bar x =
+    let ret = allocate foo_opt (Some x) in
+    let r = foo_bar ret (Some x) in
+    (r, !@ret)
+
+Now foo_bar returns a pair
+
+    int * unit ptr option
+
+where the second element is 'None' if *ret was NULL after the call to
+foo_bar and 'Some p' for some p otherwise.
+
+I hope that helps,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000212.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+	<LI>Next message: <A HREF="000214.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#213">[ date ]</a>
+              <a href="thread.html#213">[ thread ]</a>
+              <a href="subject.html#213">[ subject ]</a>
+              <a href="author.html#213">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C51476876.5090104%40mjambon.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000328.html">
+   <LINK REL="Next"  HREF="000330.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Martin Jambon</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C51476876.5090104%40mjambon.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">martin at mjambon.com
+       </A><BR>
+    <I>Mon Mar 18 19:18:14 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000328.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000330.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#329">[ date ]</a>
+              <a href="thread.html#329">[ thread ]</a>
+              <a href="subject.html#329">[ subject ]</a>
+              <a href="author.html#329">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/18/2013 10:27 AM, Leo White wrote:
+&gt;&gt;&gt;<i> The problem is with shadowing where the order between definitions is not
+</I>&gt;&gt;&gt;<i> well specified.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I would argue that this should push us towards making namespace-opens
+</I>&gt;&gt;<i> well-defined in order by default.  I think that opening namespaces on
+</I>&gt;&gt;<i> the command-line should be viewed as a largely second-class operation,
+</I>&gt;&gt;<i> and it would make sense in my mind to restrict it to a single
+</I>&gt;&gt;<i> namespace, which goes before everything else.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> While the order of command-line namespace opens is another area where
+</I>&gt;<i> shadowing may be risky, they are not what I am referring to here.
+</I>&gt;<i>
+</I>&gt;&gt;&gt;<i> It is useful to be able to specify a namespace across multiple
+</I>&gt;&gt;&gt;<i> locations, for instance within two separate search path files. The
+</I>&gt;&gt;&gt;<i> ordering between &quot;automatically opened modules&quot; specified across these
+</I>&gt;&gt;&gt;<i> multiple locations will not be well specified (probably depending on the
+</I>&gt;&gt;&gt;<i> workings of your build system). This makes shadowing much riskier.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I see.  This is low on my list of priorities.  I would be happy to
+</I>&gt;&gt;<i> require namespaces to be specified all at once in a single location.
+</I>&gt;&gt;<i> That would ensure that namespaces always have a unique definition,
+</I>&gt;&gt;<i> which seems to make life simpler.
+</I>&gt;<i>
+</I>&gt;<i> Only for supporting multiple &quot;automatically opened modules&quot;.
+</I>&gt;<i>
+</I>&gt;&gt;<i> But in any case, as long as namespace opens are well-defined and the
+</I>&gt;&gt;<i> namespaces are well defined at the time of the open, I don't see the
+</I>&gt;&gt;<i> problem.
+</I>&gt;<i>
+</I>&gt;<i> Namespaces opens will be well-defined in the sense that they will have
+</I>&gt;<i> some kind of order. But that order may well depend on the workings of
+</I>&gt;<i> their build system, so they are not well defined in any meaningful
+</I>&gt;<i> sense.
+</I>&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> I basically don't see where your belief that automatically opened
+</I>&gt;&gt;&gt;&gt;<i> modules are semantically problematic and uncomposeable arises from.
+</I>&gt;&gt;&gt;&gt;<i> Certainly, my experience with packed modules argues in the other
+</I>&gt;&gt;&gt;&gt;<i> direction. Do you propose to delete the possibility of shadowing from
+</I>&gt;&gt;&gt;&gt;<i> the module language as well?
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Modules are defined in a single location, and can only be composed using
+</I>&gt;&gt;&gt;<i> &quot;include&quot; statements. These include statements have a clearly defined
+</I>&gt;&gt;&gt;<i> ordering.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Why can't we have the same clear ordering everywhere for namespaces?
+</I>&gt;&gt;<i> What's wrong with having namespaces take on the same kind of ordered
+</I>&gt;&gt;<i> semantics that modules have?
+</I>&gt;<i>
+</I>&gt;<i> This would require namespaces to have closed definitions. This would
+</I>&gt;<i> require a completely different model from the one I have proposed. It
+</I>&gt;<i> would be less flexible, less powerful, less lightweight, and probably
+</I>&gt;<i> harder to use. In exchange you would be able to safely define multiple
+</I>&gt;<i> auto-opened modules for each namespace (which I don't think anyone has
+</I>&gt;<i> actually asked for).
+</I>
+[pardon me if this has been discussed before, I'm just jumping in the 
+conversation and likely don't understand all the issues]
+
+I don't think it would require namespaces to have closed definitions, 
+which would defeat their purpose. It would only require to know which 
+libraries are being *used* by the current source file (library = ordered 
+collection of modules within the same namespace; different libraries can 
+use the same namespace).
+
+The following seems fairly natural to me:
+1. have an &quot;import&quot; keyword or similar for specifying which libraries 
+are being used, the order of the imports defining module order
+2. open namespaces and modules at will
+
+Point 1 defines locally the order of the visible modules without 
+requiring the namespaces to be closed. Also, it makes the program's 
+dependencies explicit and makes standalone programs self-buildable.
+
+import Theirnamespace.Theirlibrary
+import Othernamespace.Otherlibrary
+import Theirnamespace.Somelibrary
+
+(* assuming:
+    - auto-open of the above libraries
+    - no such thing as &quot;open namespace&quot;
+*)
+
+open ModuleA
+   (* look for ModuleA it in Theirnamespace.Somelibrary,
+      then in Othernamespace.Otherlibrary and finally in
+      Theirnamespace.Theirlibrary *)
+
+open Othernamespace#ModuleA
+   (* open ModuleA provided by Othernamespace *)
+
+
+Martin
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000328.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000330.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#329">[ date ]</a>
+              <a href="thread.html#329">[ thread ]</a>
+              <a href="subject.html#329">[ subject ]</a>
+              <a href="author.html#329">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

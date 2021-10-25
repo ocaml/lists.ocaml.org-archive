@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCACLX4jQE-%3D8Kk8bjfncLFNrwv%2BUCi2X_KCOeyJrUJoze7O8FmQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000229.html">
+   <LINK REL="Next"  HREF="000231.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCACLX4jQE-%3D8Kk8bjfncLFNrwv%2BUCi2X_KCOeyJrUJoze7O8FmQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] benchmarks">yminsky at janestreet.com
+       </A><BR>
+    <I>Fri Feb  8 01:18:23 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000229.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000231.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#230">[ date ]</a>
+              <a href="thread.html#230">[ thread ]</a>
+              <a href="subject.html#230">[ subject ]</a>
+              <a href="author.html#230">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Feb 7, 2013 at 4:22 PM, Gerd Stolpmann &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">info at gerd-stolpmann.de</A>&gt; wrote:
+&gt;<i> Am 07.02.2013 21:39:39 schrieb(en) Thomas Gazagnaire:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Hi all,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In my opinion as a *user* of camlp4, the main pitfall that I can see (and
+</I>&gt;&gt;<i> which has not yet been addressed) is that it is really slowing down the
+</I>&gt;&gt;<i> compilation process. To improve that, the usual methods are:
+</I>&gt;&gt;<i> 1. to use native syntax extensions
+</I>&gt;&gt;<i> 2. to statically link the syntax extensions into one preprocessor binary
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Well, Alain started with the suggestion to run all preprocessors as separate
+</I>&gt;<i> binaries. Of course, if you have many preprocessors or many files to
+</I>&gt;<i> preprocess, this will become slow. Under the most common assumption, though,
+</I>&gt;<i> namely that only a few files need preprocessing at all, this is no problem,
+</I>&gt;<i> and certainly the most flexible option.
+</I>
+I'm not sure this should be the basic assumption.  At Jane Street,
+essentially all of our files are processed by camlp4.  Extensions like
+sexplib and camlp4 are at their best when used fairly pervasively.
+
+That said, I could easily imagine that we would build a single, fast
+binary that combined all of our transformations into one, if that
+turns out to be a bottleneck.
+
+&gt;<i> Regarding dynloading. First, it's not only that native dynloading does not
+</I>&gt;<i> work on all platforms. Worse, not even bytecode dynloading works everywhere
+</I>&gt;<i> when it comes to loading external C libraries (which may be required here
+</I>&gt;<i> and there). Because of this, we should design without dynloading in mind,
+</I>&gt;<i> and at most consider this as an accelarator that is available on certain
+</I>&gt;<i> platforms only.
+</I>&gt;<i>
+</I>&gt;<i> In my opinion, there should be ppx drivers (= something that turns a
+</I>&gt;<i> preprocessor into a program suited for -ppx). The simple default driver just
+</I>&gt;<i> pipes the parsetree through the preprocessors, and these are running as
+</I>&gt;<i> subprocesses. But it should also be possible to link a custom ppx driver for
+</I>&gt;<i> the not-so-frequent cases that the preprocessors are needed often. And
+</I>&gt;<i> finally, there could also be a ppx driver that dynloads.
+</I>&gt;<i>
+</I>&gt;<i> I guess the details are not so complicated to figure out (e.g. define a
+</I>&gt;<i> module type a ppx preprocessor must satisfy, and have some utilities to
+</I>&gt;<i> &quot;make this a program&quot;, &quot;make this a dynloadable extension&quot;, and &quot;bind
+</I>&gt;<i> several ppx processors together&quot;).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> Currently, 1. is very broken  (natdynlink doesn't work on all platforms
+</I>&gt;&gt;<i> and most of the syntax packages do not install their native libraries
+</I>&gt;&gt;<i> anyway) and 2. is not very flexible because of lack of tooling, and so very
+</I>&gt;&gt;<i> rarely used.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So, if we decide to switch to a new preprocessing tool, I guess it's
+</I>&gt;&gt;<i> important to get these hings right:
+</I>&gt;&gt;<i> * it should be easy enough for external tools to statically build
+</I>&gt;&gt;<i> pre-processors.
+</I>&gt;&gt;<i> * the new preprocessor should be benchmarked on realistic examples to see
+</I>&gt;&gt;<i> how much time we gain vs. camlp4. A good example might be mirage which is
+</I>&gt;&gt;<i> using only pa_lwt and cstruct (or xen-api which is using only ocaml-rpc, or
+</I>&gt;&gt;<i> core but that maybe too much syntax in one go).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Fully agreed to both points.
+</I>&gt;<i>
+</I>&gt;<i> Gerd
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Best,
+</I>&gt;&gt;<i> Thomas
+</I>&gt;&gt;<i> PS: I'm not speaking about the bootstraping time of camlp4, which is
+</I>&gt;&gt;<i> indeed very painful, but which doesn't really affect the end-user once the
+</I>&gt;&gt;<i> compiler is installed.
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> ------------------------------------------------------------
+</I>&gt;<i> Gerd Stolpmann, Darmstadt, Germany    <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gerd at gerd-stolpmann.de</A>
+</I>&gt;<i> Creator of GODI and camlcity.org.
+</I>&gt;<i> Contact details:        <A HREF="http://www.camlcity.org/contact.html">http://www.camlcity.org/contact.html</A>
+</I>&gt;<i> Company homepage:       <A HREF="http://www.gerd-stolpmann.de">http://www.gerd-stolpmann.de</A>
+</I>&gt;<i> ------------------------------------------------------------
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000229.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000231.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#230">[ date ]</a>
+              <a href="thread.html#230">[ thread ]</a>
+              <a href="subject.html#230">[ subject ]</a>
+              <a href="author.html#230">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

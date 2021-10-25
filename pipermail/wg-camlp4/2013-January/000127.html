@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Meta Programming from the view of the implementaion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3C51093113.1080906%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000122.html">
+   <LINK REL="Next"  HREF="000128.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Meta Programming from the view of the implementaion</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3C51093113.1080906%40frisch.fr%3E"
+       TITLE="[wg-camlp4] Meta Programming from the view of the implementaion">alain at frisch.fr
+       </A><BR>
+    <I>Wed Jan 30 14:41:23 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000122.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000128.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#127">[ date ]</a>
+              <a href="thread.html#127">[ thread ]</a>
+              <a href="subject.html#127">[ subject ]</a>
+              <a href="author.html#127">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/30/2013 12:21 PM, Leo White wrote:
+&gt;&gt;<i>  - The closing delimiter is defined by the opening one, so you don't
+</I>&gt;&gt;<i> need any escaping convention.  (Imagine you want to write HTML code
+</I>&gt;&gt;<i> containing &quot;&gt;&gt;&quot;.)
+</I>&gt;<i>
+</I>&gt;<i> As I suggested in an earlier post, it is simple to allow this for &lt;: ... &gt;.
+</I>&gt;<i>
+</I>&gt;&gt;<i>  (@sedlex) match lexbuf with
+</I>&gt;&gt;<i>   | {{ xml_letter+ }} -&gt; ...
+</I>&gt;&gt;<i>   | {{ &quot;with&quot; }} -&gt; ...
+</I>&gt;&gt;<i>   | ...
+</I>&gt;<i>
+</I>&gt;<i> I suppose that it is sometimes useful to have an unnamed quotation. For
+</I>&gt;<i> this I think that camlp4 has &quot;&lt;&lt; ... &gt;&gt;&quot;, so we could just allow that.
+</I>
+The important point is not the fact that the quotation is unnamed, but 
+that it's scope is restricted to the smallest fragment which requires a 
+custom parser (left-hand side).  I'm fine if those regexps cannot be 
+highlighted very cleverly.  But what is important is that the right-hand 
+side, which are normal OCaml expressions, are understood as such by the 
+editor.  This cannot be the case with Hongbo's proposal of having the 
+whole think inside a quotation:
+
+{:lex|
+    xml_letter+ -&gt; ...
+  | &quot;with&quot; -&gt; ...
+|<i>}
+</I>
+
+So in this example:
+
+   (@sedlex) match lexbuf with
+    | {{ xml_letter+ }} -&gt; ...
+    | {{ &quot;with&quot; }} -&gt; ...
+    | ...
+
+the role of {{...}} is not to introduce something which will expand to 
+an expression or a pattern, it's just a way to avoid lexical rules on 
+OCaml string literals (so that we don't need to escape the &quot;).  The 
+important part is the (@sedlex) attribute, and I wouldn't be shocked to 
+use a different syntax to indicate that it really changes the 
+interpretation of the underlying expression (the whole match statement), 
+as opposed to some piece of information added to that expression.  The 
+syntax could be simply changing (@sedlex) to (:sedlex), or maybe to have 
+it look more like a delimiter with a clear scope:
+
+  (:sedlex
+     match lexbuf with
+     | {{ xml_letter+ }} -&gt; ...
+     | {{ &quot;with&quot; }} -&gt; ...
+     | ...
+  )
+
+but the content would still be parsed as an expression, unlike camlp4 
+quotations.
+
+
+&gt;&gt;<i> As a side note, whatever syntax we choose for quotations / non-parsed
+</I>&gt;&gt;<i> strings, we should avoid the one currently used by Camlp4, because for
+</I>&gt;&gt;<i> some time, people will continue to use both Camlp4 and -ppx rewriters.
+</I>&gt;<i>
+</I>&gt;<i> I disagree with this. It is not at all difficult to tell camlp4 to pass
+</I>&gt;<i> through unrecognised quotations onto the main compiler (and so to the
+</I>&gt;<i> other preprocessors). It would then be simple for quotation extensions
+</I>&gt;<i> to seamlessly switch from -pp to -ppx.
+</I>
+Ok, why not.  I still believe that real uses of &quot;quotations&quot; should be 
+really limited and that most interesting uses of -ppx would not need 
+them (or be independent from them, i.e. they should allow regular string 
+literals as well).
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000122.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000128.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#127">[ date ]</a>
+              <a href="thread.html#127">[ thread ]</a>
+              <a href="subject.html#127">[ subject ]</a>
+              <a href="author.html#127">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

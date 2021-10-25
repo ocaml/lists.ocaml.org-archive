@@ -1,0 +1,516 @@
+From Markus.Elfring at web.de  Mon Mar 17 11:51:40 2014
+From: Markus.Elfring at web.de (Markus Elfring)
+Date: Mon, 17 Mar 2014 12:51:40 +0100
+Subject: [ocaml-platform] Passing OPAM data to build parameters
+Message-ID: <5326E1CC.4000307@web.de>
+
+Hello,
+
+I am trying to become more familiar with software development tools for another
+programming language.
+How does the software "OCaml Package Manager" help to determine appropriate
+build parameters?
+Would you like to publish any more information about the cooperation of OPAM and
+a command like "ocamlfind ocamlc -package"?
+
+Regards,
+Markus
+
+From anil at recoil.org  Mon Mar 17 12:01:27 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 17 Mar 2014 12:01:27 +0000
+Subject: [ocaml-platform] Passing OPAM data to build parameters
+In-Reply-To: <5326E1CC.4000307@web.de>
+References: <5326E1CC.4000307@web.de>
+Message-ID: <140DF77C-29F6-4327-8398-C86ACBA29ED3@recoil.org>
+
+On 17 Mar 2014, at 11:51, Markus Elfring <Markus.Elfring at web.de> wrote:
+
+> Hello,
+> 
+> I am trying to become more familiar with software development tools for another
+> programming language.
+> How does the software "OCaml Package Manager" help to determine appropriate
+> build parameters?
+> Would you like to publish any more information about the cooperation of OPAM and
+> a command like "ocamlfind ocamlc -package"?
+
+OPAM 1.1 doesn't explicitly discover any build parameters.  Every package
+defines a set of shell commands that can be modified depending on the presence
+of dependent packages.  The package build system is responsible for parsing
+these command-line elements and turning them into a set of ocamlfind packages.
+
+This loose coupling was deliberate for OPAM 1.x, since it lets it work with
+a large variety of build systems.  Moving forward, there are tentative designs
+for tighter ocamlfind integration, but nothing beyond rough prototypes yet.
+
+cheers,
+Anil
+
+From Markus.Elfring at web.de  Mon Mar 17 12:20:12 2014
+From: Markus.Elfring at web.de (Markus Elfring)
+Date: Mon, 17 Mar 2014 13:20:12 +0100
+Subject: [ocaml-platform] Passing OPAM data to build parameters
+In-Reply-To: <140DF77C-29F6-4327-8398-C86ACBA29ED3@recoil.org>
+References: <5326E1CC.4000307@web.de>
+ <140DF77C-29F6-4327-8398-C86ACBA29ED3@recoil.org>
+Message-ID: <5326E87C.40309@web.de>
+
+> Moving forward, there are tentative designs for tighter ocamlfind integration,
+> but nothing beyond rough prototypes yet.
+
+I am curious about progress in this application area.
+
+I have got some learning challenges to determine appropriate build parameters
+for OCaml tools while extending my software development experience.
+How do you think about a few more hints?
+
+Regards,
+Markus
+
+From anil at recoil.org  Mon Mar 17 12:27:57 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 17 Mar 2014 12:27:57 +0000
+Subject: [ocaml-platform] Passing OPAM data to build parameters
+In-Reply-To: <5326E87C.40309@web.de>
+References: <5326E1CC.4000307@web.de>
+ <140DF77C-29F6-4327-8398-C86ACBA29ED3@recoil.org> <5326E87C.40309@web.de>
+Message-ID: <15AC4517-1D05-43F1-8D80-FC4910AC0894@recoil.org>
+
+On 17 Mar 2014, at 12:20, Markus Elfring <Markus.Elfring at web.de> wrote:
+
+>> Moving forward, there are tentative designs for tighter ocamlfind integration,
+>> but nothing beyond rough prototypes yet.
+> 
+> I am curious about progress in this application area.
+> 
+> I have got some learning challenges to determine appropriate build parameters
+> for OCaml tools while extending my software development experience.
+> How do you think about a few more hints?
+
+I'm writing up the results of some of my experiments, but it's not ready yet.
+
+Louis has another experimental branch of OPAM which turns compilers into
+packages, and that's also quite useful towards better integration of findlib.
+I'll leave Louis to explain that, however.
+
+-anil
+
+From anil at recoil.org  Tue Mar 25 16:40:01 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 25 Mar 2014 16:40:01 +0000
+Subject: [ocaml-platform] [ANN] Experiment: OCaml patch review on
+	github.com/ocaml/ocaml
+In-Reply-To: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+Message-ID: <A90103AF-43B9-4948-875A-2A5D77544D99@recoil.org>
+
+As a followup to this, I've written a script that syncs all the
+open pull requests against the compiler as OPAM compiler switches.
+This is now running live on the central OPAM respository.
+
+For instance, if you now `opam update` and look at your switches:
+
+$ opam switch --all
+--     -- 4.02.0dev+pr10              Add String.{split,rsplit}
+--     -- 4.02.0dev+pr13              Add String.{cut,rcut}.
+--     -- 4.02.0dev+pr14              Add absolute directory names to bytecode format for ocamldebug to use
+--     -- 4.02.0dev+pr15              replace String.blit by String.unsafe_blit
+--     -- 4.02.0dev+pr17              Cmm arithmetic optimisations
+--     -- 4.02.0dev+pr18              Patch for issue 5584
+--     -- 4.02.0dev+pr2               Parse -.x**2. (unary -.) as -.(x**2.).  Fix PR#3414
+--     -- 4.02.0dev+pr20              OCamlbuild: Fix the check of ocamlfind
+--     -- 4.02.0dev+pr3               Extend record punning to allow destructuring.
+--     -- 4.02.0dev+pr4               Fix for PR#4832 (Filling bigarrays may block out runtime)
+--     -- 4.02.0dev+pr6               Warn user when a type variable in a type constraint has been instantiated.
+--     -- 4.02.0dev+pr7               Extend ocamllex with actions before refilling
+--     -- 4.02.0dev+pr8               Adds a .gitignore to ignore all generated files during `make world.opt'
+--     -- 4.02.0dev+pr9               FreeBSD 10 uses clang by default, with gcc not available by default
+--     -- 4.02.0dev+trunk             latest trunk snapshot
+
+Each switch corresponds to the current development trunk, with the
+diff in the PR applied.  If the patch is sane, you can proceed to
+install OPAM packages in the experimental tree as usual without
+affecting your day-to-day compiler switch.
+
+Hope this is useful!  More details at:
+http://anil.recoil.org/2014/03/25/ocaml-github-and-opam.html
+
+It's set to run daily at the moment, and switches will be deleted once
+the corresponding pull request is closed.
+
+cheers,
+Anil
+
+On 30 Jan 2014, at 11:34, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+
+> TL;DR: During the six next months, we will follow pull requests (PR)
+> posted on the github mirror of the OCaml distribution, as an
+> alternative to the mantis bugtracker. This experiment hopes to attract
+> more people to participate in the extremely helpful and surprisingly
+> rewarding activity of patch reviews.
+> 
+> 
+> Dear OCaml community,
+> 
+> I think we need more people ready to review patches proposed for
+> inclusion in the OCaml compiler/distribution; lack of reviews is
+> currently one of the bottleneck in the development process -- among
+> others, such as the sheer difficulty to reach consensus on any change
+> to the language itself. Doing patch reviews is helpful, extremely
+> interesting, and an excellent way to get to know more about small
+> parts of the compiler.
+> 
+> There was a resurgence of discussions on caml-list (Yotam Barnoy's
+> [moving to github] and Adrien Nader's thoughtful proposal of
+> a [mailing-list for patch review]). Amir Chaudhry launched a poll to
+> record decreasing order of preference, and the [results] are
+> clear-cut: people hate Mantis' guts, and would rather use anything
+> else.
+> 
+> [moving to github]: http://alan.petitepomme.net/cwn/2013.12.24.html#5
+> [mailing-list for patch review]:
+> https://sympa.inria.fr/sympa/arc/caml-list/2014-01/msg00055.html
+> [results]: https://docs.google.com/forms/d/1QWhqJRv1yPvdi6E3AiqbvUwlqGorV_Wbk7h_JYuDUiQ/viewanalytics
+> 
+> I declare open the following experiment: for six months, starting
+> today upto late July, patches proposed for the OCaml distribution may
+> be submitted as a pull request (PR) on the [main github mirror], and
+> we warmly encourage anyone to review the proposed patches, and make
+> any comments they feel can help. Anything that can help improve the
+> contribution, or discuss potential issues (backward compatibility,
+> future-proofiness of the change, alternative designs...) will speed up
+> the time between a patch proposal and a clear decision to integrate it
+> or not.
+> 
+> [main github mirror]: https://github.com/ocaml/ocaml/
+> 
+> In six months, we will reconsider, the default choice being to stop
+> using github and revert to a mantis-only workflow. In the meantime,
+> I will mirror the github PRs on the mantis side, so that contributors
+> that do not wish to use the github interface can continue working as
+> before. Patches and reviews are of course still welcome on mantis.
+> 
+> Note that github will *not* be used for issue tracking, only for patch
+> reviews. If you want to submit a patch against a bug discussed in
+> Mantis, or want to re-submit a patch already in Mantis (in the wild
+> hope of more eyeballs), feel free to send a github PR and link to it
+> from the bugtracker. Finally, the github mirror remains *read-only*:
+> if patches are accepted, the PR will be closed but will be committed
+> to the SVN first, and synced in git as usual.
+> 
+> We're just trying things to see if it works better. I hope it does. In
+> any case, thanks in advance for your participation -- whichever tool
+> you use. Happy hacking!
+> 
+> .
+> 
+> PS: If you want to get notified for all Pull Requests sent, you
+> (need a github account and) can click on the "Watch" button in the top
+> right of http://github.com/ocaml/ocaml to register for
+> notifications. In the [notification settings] page of your account,
+> you can set up notifications to get send by email and/or to the
+> (mostly useless) github notification web interface.
+> 
+> [notification settings](https://github.com/settings/notifications)
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+> 
+
+
+From yotambarnoy at gmail.com  Tue Mar 25 21:34:11 2014
+From: yotambarnoy at gmail.com (Yotam Barnoy)
+Date: Tue, 25 Mar 2014 17:34:11 -0400
+Subject: [ocaml-platform] [ANN] Experiment: OCaml patch review on
+	github.com/ocaml/ocaml
+In-Reply-To: <A90103AF-43B9-4948-875A-2A5D77544D99@recoil.org>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+ <A90103AF-43B9-4948-875A-2A5D77544D99@recoil.org>
+Message-ID: <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+
+This is incredible! Now let's get them all compiling and running unit tests
+on Travis!
+
+Yotam
+
+
+
+On Tue, Mar 25, 2014 at 12:40 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> As a followup to this, I've written a script that syncs all the
+> open pull requests against the compiler as OPAM compiler switches.
+> This is now running live on the central OPAM respository.
+>
+> For instance, if you now `opam update` and look at your switches:
+>
+> $ opam switch --all
+> --     -- 4.02.0dev+pr10              Add String.{split,rsplit}
+> --     -- 4.02.0dev+pr13              Add String.{cut,rcut}.
+> --     -- 4.02.0dev+pr14              Add absolute directory names to
+> bytecode format for ocamldebug to use
+> --     -- 4.02.0dev+pr15              replace String.blit by
+> String.unsafe_blit
+> --     -- 4.02.0dev+pr17              Cmm arithmetic optimisations
+> --     -- 4.02.0dev+pr18              Patch for issue 5584
+> --     -- 4.02.0dev+pr2               Parse -.x**2. (unary -.) as
+> -.(x**2.).  Fix PR#3414
+> --     -- 4.02.0dev+pr20              OCamlbuild: Fix the check of
+> ocamlfind
+> --     -- 4.02.0dev+pr3               Extend record punning to allow
+> destructuring.
+> --     -- 4.02.0dev+pr4               Fix for PR#4832 (Filling bigarrays
+> may block out runtime)
+> --     -- 4.02.0dev+pr6               Warn user when a type variable in a
+> type constraint has been instantiated.
+> --     -- 4.02.0dev+pr7               Extend ocamllex with actions before
+> refilling
+> --     -- 4.02.0dev+pr8               Adds a .gitignore to ignore all
+> generated files during `make world.opt'
+> --     -- 4.02.0dev+pr9               FreeBSD 10 uses clang by default,
+> with gcc not available by default
+> --     -- 4.02.0dev+trunk             latest trunk snapshot
+>
+> Each switch corresponds to the current development trunk, with the
+> diff in the PR applied.  If the patch is sane, you can proceed to
+> install OPAM packages in the experimental tree as usual without
+> affecting your day-to-day compiler switch.
+>
+> Hope this is useful!  More details at:
+> http://anil.recoil.org/2014/03/25/ocaml-github-and-opam.html
+>
+> It's set to run daily at the moment, and switches will be deleted once
+> the corresponding pull request is closed.
+>
+> cheers,
+> Anil
+>
+> On 30 Jan 2014, at 11:34, Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+>
+> > TL;DR: During the six next months, we will follow pull requests (PR)
+> > posted on the github mirror of the OCaml distribution, as an
+> > alternative to the mantis bugtracker. This experiment hopes to attract
+> > more people to participate in the extremely helpful and surprisingly
+> > rewarding activity of patch reviews.
+> >
+> >
+> > Dear OCaml community,
+> >
+> > I think we need more people ready to review patches proposed for
+> > inclusion in the OCaml compiler/distribution; lack of reviews is
+> > currently one of the bottleneck in the development process -- among
+> > others, such as the sheer difficulty to reach consensus on any change
+> > to the language itself. Doing patch reviews is helpful, extremely
+> > interesting, and an excellent way to get to know more about small
+> > parts of the compiler.
+> >
+> > There was a resurgence of discussions on caml-list (Yotam Barnoy's
+> > [moving to github] and Adrien Nader's thoughtful proposal of
+> > a [mailing-list for patch review]). Amir Chaudhry launched a poll to
+> > record decreasing order of preference, and the [results] are
+> > clear-cut: people hate Mantis' guts, and would rather use anything
+> > else.
+> >
+> > [moving to github]: http://alan.petitepomme.net/cwn/2013.12.24.html#5
+> > [mailing-list for patch review]:
+> > https://sympa.inria.fr/sympa/arc/caml-list/2014-01/msg00055.html
+> > [results]:
+> https://docs.google.com/forms/d/1QWhqJRv1yPvdi6E3AiqbvUwlqGorV_Wbk7h_JYuDUiQ/viewanalytics
+> >
+> > I declare open the following experiment: for six months, starting
+> > today upto late July, patches proposed for the OCaml distribution may
+> > be submitted as a pull request (PR) on the [main github mirror], and
+> > we warmly encourage anyone to review the proposed patches, and make
+> > any comments they feel can help. Anything that can help improve the
+> > contribution, or discuss potential issues (backward compatibility,
+> > future-proofiness of the change, alternative designs...) will speed up
+> > the time between a patch proposal and a clear decision to integrate it
+> > or not.
+> >
+> > [main github mirror]: https://github.com/ocaml/ocaml/
+> >
+> > In six months, we will reconsider, the default choice being to stop
+> > using github and revert to a mantis-only workflow. In the meantime,
+> > I will mirror the github PRs on the mantis side, so that contributors
+> > that do not wish to use the github interface can continue working as
+> > before. Patches and reviews are of course still welcome on mantis.
+> >
+> > Note that github will *not* be used for issue tracking, only for patch
+> > reviews. If you want to submit a patch against a bug discussed in
+> > Mantis, or want to re-submit a patch already in Mantis (in the wild
+> > hope of more eyeballs), feel free to send a github PR and link to it
+> > from the bugtracker. Finally, the github mirror remains *read-only*:
+> > if patches are accepted, the PR will be closed but will be committed
+> > to the SVN first, and synced in git as usual.
+> >
+> > We're just trying things to see if it works better. I hope it does. In
+> > any case, thanks in advance for your participation -- whichever tool
+> > you use. Happy hacking!
+> >
+> > .
+> >
+> > PS: If you want to get notified for all Pull Requests sent, you
+> > (need a github account and) can click on the "Watch" button in the top
+> > right of http://github.com/ocaml/ocaml to register for
+> > notifications. In the [notification settings] page of your account,
+> > you can set up notifications to get send by email and/or to the
+> > (mostly useless) github notification web interface.
+> >
+> > [notification settings](https://github.com/settings/notifications)
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> >
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20140325/d306bc62/attachment.html>
+
+From francois.bobot at cea.fr  Wed Mar 26 09:00:21 2014
+From: francois.bobot at cea.fr (=?ISO-8859-1?Q?Fran=E7ois_Bobot?=)
+Date: Wed, 26 Mar 2014 10:00:21 +0100
+Subject: [ocaml-platform] [Caml-list] [ANN] Experiment: OCaml patch
+ review on github.com/ocaml/ocaml
+In-Reply-To: <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+ <A90103AF-43B9-4948-875A-2A5D77544D99@recoil.org>
+ <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+Message-ID: <53329725.90602@cea.fr>
+
+On 25/03/2014 22:34, Yotam Barnoy wrote:
+> This is incredible! Now let's get them all compiling and running unit tests on Travis!
+> On Tue, Mar 25, 2014 at 12:40 PM, Anil Madhavapeddy <anil at recoil.org <mailto:anil at recoil.org>> wrote:
+>     Each switch corresponds to the current development trunk, with the
+>     diff in the PR applied.  If the patch is sane, you can proceed to
+>     install OPAM packages in the experimental tree as usual without
+>     affecting your day-to-day compiler switch.
+> 
+>     Hope this is useful!  More details at:
+>     http://anil.recoil.org/2014/03/25/ocaml-github-and-opam.html
+
+It is awfully useful. I was trying to setup an OPAM repository for simplifying the review of PR#22,
+but you did it for me and all the others, thank you.
+
+ I'm just wondering if it is wise to add all these switches to the default OPAM repository. For
+casual ocaml user the useful switches are lost among all these PR.
+
+  Perhaps the default possible switches can be reduced to the last releases (for people that work on
+project that must support old version of ocaml) and to the beta and trunk for people that are
+curious of the accepted new features.
+
+  For ocaml compiler hackers a specific OPAM repository with all the svn branches and github PR can
+be setup.
+
+What do you think?
+
+-- 
+Fran?ois
+	
+
+
+
+From louis.gesbert at ocamlpro.com  Wed Mar 26 09:12:56 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 26 Mar 2014 10:12:56 +0100
+Subject: [ocaml-platform] [Caml-list] [ANN] Experiment: OCaml patch
+	review on github.com/ocaml/ocaml
+In-Reply-To: <53329725.90602@cea.fr>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+ <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+ <53329725.90602@cea.fr>
+Message-ID: <2026824.u9EsF9KS0J@agaric>
+
+Thanks Anil !
+
+> It is awfully useful. I was trying to setup an OPAM repository for simplifying the review of PR#22,
+> but you did it for me and all the others, thank you.
+> 
+>  I'm just wondering if it is wise to add all these switches to the default OPAM repository. For
+> casual ocaml user the useful switches are lost among all these PR.
+> 
+>   Perhaps the default possible switches can be reduced to the last releases (for people that work on
+> project that must support old version of ocaml) and to the beta and trunk for people that are
+> curious of the accepted new features.
+
+That's why in OPAM 1.1.1 we changed `opam switch list` to only display the default compilers, and you need to add `--all` to see all existing compiler descriptions. I think it's enough to address your concern.
+
+But that doesn't prevent a specific repo of course.
+
+
+From francois.bobot at cea.fr  Wed Mar 26 09:36:29 2014
+From: francois.bobot at cea.fr (=?ISO-8859-1?Q?Fran=E7ois_Bobot?=)
+Date: Wed, 26 Mar 2014 10:36:29 +0100
+Subject: [ocaml-platform] [Caml-list] [ANN] Experiment: OCaml patch
+ review on github.com/ocaml/ocaml
+In-Reply-To: <2026824.u9EsF9KS0J@agaric>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+ <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+ <53329725.90602@cea.fr> <2026824.u9EsF9KS0J@agaric>
+Message-ID: <53329F9D.5010201@cea.fr>
+
+On 26/03/2014 10:12, Louis Gesbert wrote:
+> Thanks Anil !
+> 
+>> It is awfully useful. I was trying to setup an OPAM repository for simplifying the review of PR#22,
+>> but you did it for me and all the others, thank you.
+>>
+>>  I'm just wondering if it is wise to add all these switches to the default OPAM repository. For
+>> casual ocaml user the useful switches are lost among all these PR.
+>>
+>>   Perhaps the default possible switches can be reduced to the last releases (for people that work on
+>> project that must support old version of ocaml) and to the beta and trunk for people that are
+>> curious of the accepted new features.
+> 
+> That's why in OPAM 1.1.1 we changed `opam switch list` to only display the default compilers, and you need to add `--all` to see all existing compiler descriptions. I think it's enough to address your concern.
+
+Nice. Perhaps the user can still be scared by "The following NEW compilers are available:" that list
+*all* the new switches. But my concerns are addressed, thanks.
+
+-- 
+Fran?ois
+
+From anil at recoil.org  Wed Mar 26 09:37:02 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 26 Mar 2014 09:37:02 +0000
+Subject: [ocaml-platform] [Caml-list] [ANN] Experiment: OCaml patch
+	review on github.com/ocaml/ocaml
+In-Reply-To: <2026824.u9EsF9KS0J@agaric>
+References: <CAPFanBH4fYEmgoXkNLwAfta1cRVSPjmA-gB1GdzjeTWRATGeCQ@mail.gmail.com>
+ <CAN6ygO=o5S2kO4cKUR9w6ZY3ec0_okcLS2UgVBVWeoQUVY61Sg@mail.gmail.com>
+ <53329725.90602@cea.fr> <2026824.u9EsF9KS0J@agaric>
+Message-ID: <8A99DF80-185B-4C74-9BA9-5FF0D7C994F1@recoil.org>
+
+On 26 Mar 2014, at 09:12, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+
+> Thanks Anil !
+> 
+>> It is awfully useful. I was trying to setup an OPAM repository for simplifying the review of PR#22,
+>> but you did it for me and all the others, thank you.
+>> 
+>> I'm just wondering if it is wise to add all these switches to the default OPAM repository. For
+>> casual ocaml user the useful switches are lost among all these PR.
+>> 
+>>  Perhaps the default possible switches can be reduced to the last releases (for people that work on
+>> project that must support old version of ocaml) and to the beta and trunk for people that are
+>> curious of the accepted new features.
+> 
+> That's why in OPAM 1.1.1 we changed `opam switch list` to only display the default compilers, and you need to add `--all` to see all existing compiler descriptions. I think it's enough to address your concern.
+> 
+> But that doesn't prevent a specific repo of course.
+
+I figured that for the course of Gabriel's experiment, we might as well keep it as simple as possible.  The only churn that casual users will see is a slightly more verbose 'opam update' as the switches come and go.
+
+If it transpires that the full force of Mantis bugs move over to a system like this in the future, then I agree that we should maintain a separate remote instead.
+
+-anil
+
+
+

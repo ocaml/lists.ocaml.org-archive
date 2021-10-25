@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Logging function calls
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAAxsn%3DFPsgeT7mb8zY5wDpwCJ2MJ%2BAkpgKDT3vh63qYxAjziUQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000095.html">
+   <LINK REL="Next"  HREF="000097.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Logging function calls</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAAxsn%3DFPsgeT7mb8zY5wDpwCJ2MJ%2BAkpgKDT3vh63qYxAjziUQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Logging function calls">yallop at gmail.com
+       </A><BR>
+    <I>Sat Sep 13 12:20:25 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000095.html">[ocaml-ctypes] Logging function calls
+</A></li>
+        <LI>Next message: <A HREF="000097.html">[ocaml-ctypes] Logging function calls
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#96">[ date ]</a>
+              <a href="thread.html#96">[ thread ]</a>
+              <a href="subject.html#96">[ subject ]</a>
+              <a href="author.html#96">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 12 September 2014 10:15, Thomas Braibant &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">thomas.braibant at gmail.com</A>&gt; wrote:
+&gt;<i> I would like to log function calls using something like the following code:
+</I>&gt;<i>
+</I>&gt;<i> let rec log:
+</I>&gt;<i> type a. a fn -&gt; a -&gt; a =
+</I>&gt;<i>     function
+</I>&gt;<i>     | Static.Returns ty -&gt;
+</I>&gt;<i>        fun result -&gt;
+</I>&gt;<i>        Printf.printf &quot;&lt;- %s\n%!&quot; (string_of ty result);
+</I>&gt;<i>        result
+</I>&gt;<i>     | Static.Function (ty, fn) -&gt;
+</I>&gt;<i>        fun f x -&gt;
+</I>&gt;<i>        Printf.printf &quot;-&gt; %s\n%!&quot; (string_of ty x);
+</I>&gt;<i>        log fn (f x)
+</I>&gt;<i>
+</I>&gt;<i> This works beautifully for simple enough function arguments. However,
+</I>&gt;<i> I would also like to display a bit more than what is currently
+</I>&gt;<i> available.
+</I>&gt;<i> Two quick examples come to mind.
+</I>&gt;<i>
+</I>&gt;<i> First, printing the name of manifest constants (e.g., defined in C
+</I>&gt;<i> using #define FOO 0x0001337). I would like to log FOO rather than its
+</I>&gt;<i> integer value. If I provide a correct printing function, it might even
+</I>&gt;<i> produces correct C code.
+</I>&gt;<i>
+</I>&gt;<i> Second, a bit more akward, printing the content of structs that are
+</I>&gt;<i> passed by reference to functions. I do not see a way to print that
+</I>&gt;<i> information as valid C, but it would be tremendously useful in my
+</I>&gt;<i> logs.
+</I>
+I think that you can do what you want by matching a little deeper on
+&quot;ty&quot;.  Here's a function that prints C values, dereferencing
+pointers-to-structures rather than just printing their addresses:
+
+  let rec format_val : type a. a typ -&gt; Format.formatter -&gt; a -&gt; unit =
+    fun t fmt -&gt; let open Static in match t with
+    | Pointer (Struct _ as s) -&gt;
+       fun v -&gt; Format.fprintf fmt &quot;pointer to %a&quot; (format_val s) !@v
+    | t -&gt; Ctypes.format t fmt
+
+You can then call format_val instead of string_of inside your log function:
+
+  let rec log:
+    type a. a fn -&gt; a -&gt; a =
+      function
+      | Static.Returns ty -&gt;
+         fun result -&gt;
+         Format.(fprintf std_formatter) &quot;&lt;- @[%a@]@\n%!&quot; (format_val ty) result;
+         result
+      | Static.Function (ty, fn) -&gt;
+         fun f x -&gt;
+         Format.(fprintf std_formatter) &quot;-&gt; @[%a@]@\n%!&quot; (format_val ty) x;
+         log fn (f x)
+
+Here are the results, logging the results of passing the address of an
+uninitialized struct to the identity function:
+
+   # let s = structure &quot;s&quot;;;
+   val s : '_a structure typ = struct s
+   # let i = field s &quot;i&quot; int;;
+   val i : (int, ('_a, [ `Struct ]) structured) field = &lt;abstr&gt;
+   # let j = field s &quot;j&quot; float;;
+   val j : (float, ('_a, [ `Struct ]) structured) field = &lt;abstr&gt;
+   # let () = seal s;;
+   # let v = make s;;
+   val v : ('_a, [ `Struct ]) structured = {
+       i = -486857096, j = 4.5857492245e-41
+     }
+   # log (ptr s @-&gt; returning (ptr s)) (fun x -&gt; x) (addr v);;
+   -&gt; pointer to { i = -486857096, j = 4.5857492245e-41  }
+   &lt;- pointer to { i = -486857096, j = 4.5857492245e-41  }
+   - : '_a structure ptr = (struct s*) 0x95fc40
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000095.html">[ocaml-ctypes] Logging function calls
+</A></li>
+	<LI>Next message: <A HREF="000097.html">[ocaml-ctypes] Logging function calls
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#96">[ date ]</a>
+              <a href="thread.html#96">[ thread ]</a>
+              <a href="subject.html#96">[ subject ]</a>
+              <a href="author.html#96">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

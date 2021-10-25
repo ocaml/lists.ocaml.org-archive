@@ -1,0 +1,434 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 2.0 features
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9F058C698%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001465.html">
+   <LINK REL="Next"  HREF="001467.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 2.0 features</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9F058C698%40Remus.metastack.local%3E"
+       TITLE="[opam-devel] OPAM 2.0 features">dra-news at metastack.com
+       </A><BR>
+    <I>Wed Jun  1 15:57:54 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001465.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+        <LI>Next message: <A HREF="001467.html">[opam-devel] OPAM 2.0 features
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1466">[ date ]</a>
+              <a href="thread.html#1466">[ thread ]</a>
+              <a href="subject.html#1466">[ subject ]</a>
+              <a href="author.html#1466">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Louis Gesbert wrote:
+
+&gt;<i> Le jeudi 26 mai 2016, 10:36:48 David Allsopp a &#233;crit :
+</I>
+&gt;<i> &gt; Hi (Louis mainly, I expect!),
+</I>
+&gt;<i> &gt;
+</I>
+&gt;<i> &gt;   I've rebased work I've been very slowly doing onto the OPAM 2.0
+</I>
+&gt;<i> alpha
+</I>
+&gt;<i> &gt; release and have been starting to get opam switch to work. There are a
+</I>
+&gt;<i> &gt; few things which I need to be able to do for this, and I'm wondering
+</I>
+&gt;<i> &gt; if there any opinions (or even existing features I've missed) as to
+</I>
+&gt;<i> &gt; mechanisms...
+</I>
+&gt;<i>
+</I>
+&gt;<i> Great! All feedback is very welcome at this stage.
+</I>
+
+
+Biggest feedback at the moment is that compilers-as-a-package is a fabulous innovation &#8211; I had originally expected to need to add lots of horrid Windows (and OCaml, therefore)-specific stuff to the OPAM program, but in fact all I've had to do is add generic features to OPAM and then handle the rest in the package itself, which is great!
+
+
+
+&gt;<i> &gt; 1. Downloading a package from several tarballs
+</I>
+&gt;<i> &gt;   I've not finished delving into the full details, but I think I'm
+</I>
+&gt;<i> &gt; correct that the url file / section can only specify a single archive,
+</I>
+&gt;<i> &gt; even if it can be made available by multiple transports? Bootstrapping
+</I>
+&gt;<i> &gt; OCaml on Windows requires two tarballs, so I was going to extend the
+</I>
+&gt;<i> &gt; url system to allow multiple tarballs to be specified (with control
+</I>
+&gt;<i> &gt; over where in the overall tree they are extracted), rather than
+</I>
+&gt;<i> &gt; hackily including the second one in files and extracting it using a
+</I>
+&gt;<i> build command.
+</I>
+&gt;<i>
+</I>
+&gt;<i> Some other compilers, e.g. metaOCaml, have the same requirement, since
+</I>
+&gt;<i> they consist of the official OCaml tarball plus a huge patch, so I have
+</I>
+&gt;<i> added a way to handle this.
+</I>
+&gt;<i>
+</I>
+&gt;<i> The `url` section or file still is a single source, and the commands are
+</I>
+&gt;<i> executed from its root (after extraction if necessary). But there is now
+</I>
+&gt;<i> also an opam field `extra-sources:` that you can use to download more
+</I>
+&gt;<i> files, unextracted, to the build directory. The format is:
+</I>
+&gt;<i>
+</I>
+&gt;<i>     extra-sources: [ [ &quot;URL&quot; { &quot;target-filename&quot; } &quot;MD5&quot; ] ... ]
+</I>
+&gt;<i>
+</I>
+&gt;<i> The &quot;target-filename&quot; part being optional. See for example
+</I>
+&gt;<i> <A HREF="http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam">http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam</A>
+</I>
+
+
+Ta, I came across it subsequently too! I've extended it (or rather, will shortly extend it), to allow it to refer to the URL of another package, as the ocaml package needs to pick up the sources of the flexdll package installed just before it in order to bootstrap correctly.
+
+
+
+&gt;<i> &gt; 2. Specifying package variables at opam switch install
+</I>
+&gt;<i> &gt;   I've extended the ocaml package variables to include three new ones:
+</I>
+&gt;<i> &gt; ocaml-arch (which is exactly the architecture determined by OCaml's
+</I>
+&gt;<i> &gt; configure script), ocaml-cc (which is &quot;cl&quot; for a Microsoft C compiler
+</I>
+&gt;<i> &gt; based OCaml or &quot;cc&quot; for the rest of the world), and ocaml-libc (which is
+</I>
+&gt;<i> &quot;msvc&quot;
+</I>
+&gt;<i> &gt; for the four native Windows OCaml ports and &quot;libc&quot; for the rest of the
+</I>
+&gt;<i> &gt; world).
+</I>
+&gt;<i> &gt;
+</I>
+&gt;<i> &gt;   At OPAM switch time, one selects which Windows port you get by
+</I>
+&gt;<i> &gt; specifying these three variables. So, for example, mingw64 is
+</I>
+&gt;<i> &gt; ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is
+</I>
+&gt;<i> &gt; ocaml-arch=i386, ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is
+</I>
+&gt;<i> &gt; ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=libc.
+</I>
+&gt;<i> &gt;
+</I>
+&gt;<i> &gt;   My question is how to specify these - the concept of &quot;architecture&quot;,
+</I>
+&gt;<i> &gt; &quot;C compiler type&quot; and &quot;C runtime library&quot; is generic enough that it
+</I>
+&gt;<i> &gt; doesn't feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0
+</I>
+&gt;<i> &gt; and have the package initialise ocaml-arch, etc. based on those
+</I>
+&gt;<i> &gt; globally available variables. However, is there any plan (or existing
+</I>
+&gt;<i> &gt; feature) for a more generic way of specifying package input variables?
+</I>
+&gt;<i> &gt; (discussed in <A HREF="https://github.com/ocaml/opam/issues/2247">https://github.com/ocaml/opam/issues/2247</A>).
+</I>
+&gt;<i>
+</I>
+&gt;<i> a) for the _output_ variables, you can define them in your `PKG.config`
+</I>
+&gt;<i> variable (automatically installed by opam if present in your build dir).
+</I>
+&gt;<i> Note that, at the moment, variables defined by the compiler package get
+</I>
+&gt;<i> exported as global variables (so you can access e.g. `ocaml-version`
+</I>
+&gt;<i> anywhere), but there are limitations due to this and it is likely to
+</I>
+&gt;<i> disappear from the final release (see
+</I>
+&gt;<i> <A HREF="https://github.com/ocaml/opam/issues/2537">https://github.com/ocaml/opam/issues/2537</A> for details). You can always
+</I>
+&gt;<i> access them through `ocaml:VAR` inside the script parts though.
+</I>
+&gt;<i>
+</I>
+&gt;<i> b) nothing yet for _input_ variables, but #2247 is still something I need
+</I>
+&gt;<i> to work on. You can define global variables through `opam config set`,
+</I>
+&gt;<i> though, so an option in the meantime could be to use `opam switch install
+</I>
+&gt;<i> --empty`, set the variables, then install the compiler (the option to
+</I>
+&gt;<i> install and mark as compiler is missing at the moment, though, for that
+</I>
+&gt;<i> you'll have to edit
+</I>
+&gt;<i> `SWITCH/.opam-switch/switch-state`)
+</I>
+
+
+I've gone with the command line options for now (with an error check to ensure that they're only given when installing a switch). At the moment, they define three global variables switch-cc, switch-libc and switch-arch which are only available during the switch installation, so if they want to be kept, the compiler package has to capture them in its own .config file. ocaml.system remains a horrible hack under this mechanism (the script identifies that it's in a switch named &quot;system&quot; and uses that fact to probe switch-cc, switch-libc, and switch-arch...)
+
+
+
+It's not particularly pretty, but it does seem to work in the absence of something more general for now. In particular, I've restructured the base packages and added a package called compiler whose purpose is to store variables (in particular, compiler:o, compiler:so and compiler:a giving important file extensions for object files, etc., which are necessary for writing generic package specifications). The only bug I had to fix with that so far is to thread the config files correctly through parallel_apply (before they were only re-loaded at the end of the installation), but there is a comment in the code that you already aware of problems there!
+
+
+
+&gt;<i> &gt; 3. Upgrading dependent packages for the root
+</I>
+&gt;<i> &gt;   Any Windows OCaml installation will depend upon FlexDLL objects
+</I>
+&gt;<i> &gt; compiled with the specific C compiler combination. Although in
+</I>
+&gt;<i> &gt; principle these could be shared between multiple switches (the object
+</I>
+&gt;<i> &gt; files vary according ocaml-cc, ocaml-libc and ocaml-arch; not
+</I>
+&gt;<i> &gt; ocaml-version), it makes sense to compile these two object files
+</I>
+&gt;<i> &gt; per-switch, rather than introduce yet another installation layer.
+</I>
+&gt;<i> &gt;
+</I>
+&gt;<i> &gt;   This means that in addition to the base packages, the Windows OCaml
+</I>
+&gt;<i> &gt; package depends on a flexdll package. Is there any philosophical
+</I>
+&gt;<i> &gt; reason for that not to be part of opam upgrade? Obviously, one doesn't
+</I>
+&gt;<i> &gt; want to be trying to upgrade the ocaml package, but why lock its
+</I>
+&gt;<i> &gt; dependencies at a given version? It would be quite nice if a new
+</I>
+&gt;<i> &gt; version of flexdll is released to be able to have opam upgrade notice
+</I>
+&gt;<i> &gt; that flexdll can be upgraded, determine that the root package must
+</I>
+&gt;<i> &gt; therefore be recompiled and so automatically recompile the entire
+</I>
+&gt;<i> switch.
+</I>
+&gt;<i> &gt;
+</I>
+&gt;<i> &gt;   Is it just for philosophical reasons that the dependencies of the
+</I>
+&gt;<i> &gt; root package are not considered for upgrade or is there a technical
+</I>
+&gt;<i> &gt; consideration?
+</I>
+&gt;<i>
+</I>
+&gt;<i> Yes, just philosophical, there is no constraint here besides the arbitrary
+</I>
+&gt;<i> &quot;I don't want to recompile the compiler, ever&quot;.
+</I>
+
+
+I've spent the last couple of days working through this, and I think it's definitely worth relaxing that restriction. I've altered opam switch so that only the root package is the compiler package &#8211; so only ocaml.version is in the compiler section of switch-state. Have a look at this transcript:
+
+
+[opam:system] [git:windows] C:\DRA\opam&gt;opam switch 4.02.0 --arch=x64
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexdll.0.31] <A HREF="http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz">http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz</A> downloaded
+[flexlink.0.31] <A HREF="http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz">http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz</A> downloaded
+[ocaml.4.02.0] <A HREF="http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz">http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz</A> downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#10038;  installed base-bigarray.base
+&#10038;  installed base-threads.base
+&#10038;  installed base-unix.base
+&#10038;  installed compiler.base
+&#10038;  installed flexdll.0.31
+&#10038;  installed ocaml.4.02.0
+&#10038;  installed flexlink.0.31
+Done.
+
+At this stage, that's a mingw64 native Windows port installed with flexlink 0.31 (several versions behind, but the current version when 4.02.0 was released). Now opam upgrade correctly offers to recompile everything (I'm going to tweak it so that it will only do it explicitly &#8211; i.e. opam upgrade flexdll):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam&gt;opam upgrade
+The following actions will be performed:
+  &#8593;  upgrade   flexdll  0.31 to 0.34
+  &#8597;  recompile ocaml    4.02.0                [uses flexdll]
+  &#8593;  upgrade   flexlink 0.31 to 0.34
+===== &#8597;  1   &#8593;  2 =====
+Do you want to continue ? [Y/n] n
+
+The really cool thing &#8211; principally for Alain Frisch (!) - is that it means you can pin the packages. So first I can pin the linker (the flexlink package depends on ocaml, not the other way around):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam&gt;opam pin add C:\DRA\flexlink --kind=path --yes
+[flexlink.0.31] <A HREF="file://C:\DRA\flexlink/">file://C:\DRA\flexlink/</A> synchronized
+flexlink is now pinned to <A HREF="file://C:\DRA\flexlink">file://C:\DRA\flexlink</A> (version 0.35)
+
+The following actions will be performed:
+  &#8593;  upgrade flexlink 0.31 to 0.35*
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexlink.0.35] <A HREF="file://C:\DRA\flexlink/">file://C:\DRA\flexlink/</A> already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#216;  removed   flexlink.0.31
+&#10038;  installed flexlink.0.35
+Done.
+
+but then I can also pin flexdll:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam&gt;opam pin add C:\DRA\flexdll --kind=path --yes
+[flexdll.0.31] <A HREF="file://C:\DRA\flexdll/">file://C:\DRA\flexdll/</A> synchronized
+flexdll is now pinned to <A HREF="file://C:\DRA\flexdll">file://C:\DRA\flexdll</A> (version 0.35)
+
+The following actions will be performed:
+  &#8593;  upgrade   flexdll  0.31 to 0.35*
+  &#8597;  recompile ocaml    4.02.0                [uses flexdll]
+  &#8597;  recompile flexlink 0.35*                 [uses flexdll]
+===== &#8597;  2   &#8593;  1 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[ocaml.4.02.0] <A HREF="http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz">http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz</A> downloaded
+[flexdll.0.35] <A HREF="file://C:\DRA\flexdll/">file://C:\DRA\flexdll/</A> already up-to-date
+[flexlink.0.35] <A HREF="file://C:\DRA\flexlink/">file://C:\DRA\flexlink/</A> already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#216;  removed   flexlink.0.35
+[WARNING] Directory C:\Users\DRA\Documents\.opam\4.02.0\lib\ocaml is not empty, not removing
+&#216;  removed   ocaml.4.02.0
+&#216;  removed   flexdll.0.31
+&#10038;  installed flexdll.0.35
+&#10038;  installed ocaml.4.02.0
+&#10038;  installed flexlink.0.35
+Done.
+
+then add ocamlfind (tweaked slightly as at present it doesn't explicitly depend on the ocaml package &#8211; that presumably will be part of a big repository conversion when OPAM 2 is actually released):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam&gt;opam install ocamlfind --yes
+The following actions will be performed:
+  &#10038;  install conf-pkg-config 1.0              [required by conf-ncurses]
+  &#10038;  install conf-m4         1                [required by ocamlfind]
+  &#10038;  install conf-ncurses    1                [required by ocamlfind]
+  &#10038;  install ocamlfind       1.6.2
+===== &#10038;  4 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[ocamlfind.1.6.2] <A HREF="http://download.camlcity.org/download/findlib-1.6.2.tar.gz">http://download.camlcity.org/download/findlib-1.6.2.tar.gz</A> downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#10038;  installed conf-m4.1
+&#10038;  installed conf-pkg-config.1.0
+&#10038;  installed conf-ncurses.1
+[WARNING] C:\Users\DRA\Documents\.opam\4.02.0\bin\safe_camlp4 is a script; the command won't be available
+&#10038;  installed ocamlfind.1.6.2
+Done.
+
+and then I can unpin flexdll (aspcud of course identifies the upgrade from 0.31-&gt;0.34) and watch the entire switch recompile itself again:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src&gt;opam pin remove flexdll --yes
+flexdll is no longer pinned to <A HREF="file://C:\DRA\flexdll">file://C:\DRA\flexdll</A> (version 0.35)
+The following actions will be performed:
+  &#8595;  downgrade flexdll   0.35 to 0.34
+  &#8597;  recompile ocaml     4.02.0               [uses flexdll]
+  &#8597;  recompile ocamlfind 1.6.2                [uses ocaml]
+  &#8597;  recompile flexlink  0.35*                [uses flexdll]
+===== &#8597;  3   &#8595;  1 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexdll.0.34] <A HREF="http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz">http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz</A> downloaded
+[ocaml.4.02.0] <A HREF="http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz">http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz</A> downloaded
+[flexdll.0.35] <A HREF="file://C:\DRA\flexdll/">file://C:\DRA\flexdll/</A> already up-to-date
+[flexlink.0.35] <A HREF="file://C:\DRA\flexlink/">file://C:\DRA\flexlink/</A> already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#216;  removed   flexlink.0.35
+&#216;  removed   ocamlfind.1.6.2
+[WARNING] Directory C:\Users\DRA\Documents\.opam\4.02.0\lib\ocaml is not empty, not removing
+&#216;  removed   ocaml.4.02.0
+&#216;  removed   flexdll.0.35
+&#10038;  installed flexdll.0.34
+&#10038;  installed ocaml.4.02.0
+&#10038;  installed flexlink.0.35
+[WARNING] C:\Users\DRA\Documents\.opam\4.02.0\bin\safe_camlp4 is a script; the command won't be available
+&#10038;  installed ocamlfind.1.6.2
+Done.
+
+then, finally, I can remove the flexlink pin:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src&gt;opam pin remove flexlink --yes
+flexlink is no longer pinned to <A HREF="file://C:\DRA\flexlink">file://C:\DRA\flexlink</A> (version 0.35)
+The following actions will be performed:
+  &#8595;  downgrade flexlink 0.35 to 0.34
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexlink.0.34] <A HREF="http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz">http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz</A> downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+&#216;  removed   flexlink.0.35
+&#10038;  installed flexlink.0.34
+Done.
+
+That seems a potentially very useful thing to be able to do &#8211; and you don't lose the safety of the &quot;compiler&quot; packages &#8211; opam remove flexdll (or base-unix, etc.) will still complain that this would involve removing the compiler:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src&gt;opam remove flexdll
+Your request can't be satisfied:
+  - Package ocaml is part of the base for this compiler and can't be changed
+
+No solution found, exiting
+
+
+David
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20160601/2850e78f/attachment-0001.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20160601/2850e78f/attachment-0001.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001465.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+	<LI>Next message: <A HREF="001467.html">[opam-devel] OPAM 2.0 features
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1466">[ date ]</a>
+              <a href="thread.html#1466">[ thread ]</a>
+              <a href="subject.html#1466">[ subject ]</a>
+              <a href="author.html#1466">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

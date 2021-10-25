@@ -1,0 +1,227 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512CC272.8010707%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000123.html">
+   <LINK REL="Next"  HREF="000108.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512CC272.8010707%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Tue Feb 26 14:10:58 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000123.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000108.html">[ocaml-platform] Is this mandatory to continue this discussion [was: on the need and design of OCaml namespaces]
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#130">[ date ]</a>
+              <a href="thread.html#130">[ thread ]</a>
+              <a href="subject.html#130">[ subject ]</a>
+              <a href="author.html#130">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+&gt;<i> Modules are namespaces !
+</I>
+I think that this assertion is misleading (and wrong), as it confuses the
+word &quot;namespaces&quot; that refers to a specific proposal that could be called
+&quot;foo&quot; and the intuitive meaning of namespaces that refers to expression
+&quot;name management&quot;.  In the later sense, yes modules are doing some form of name
+management. But in the former sense, no, modules are not doing the same kind
+of name management as foo (namespaces).
+
+&gt;<i>    They are containers for names and two identical names in two different
+</I>&gt;<i>    modules are not deemed equal, that defines a namespace for me. A good
+</I>&gt;<i>    deal of the module system is about managing names and their
+</I>&gt;<i>    dissemination in the program. Modules are, however, as Yaron points
+</I>&gt;<i>    out, much more than that.
+</I>
+Yes, there are similarities:
+
+  - modules manage _internal_ names: names of values, names of types, and
+    names of submodules.  They manage names of objects visible in the OCaml
+    world.  They cannot speak about the outer world and of course not manage
+    it.
+
+  - namespaces manage names of toplevel modules, of collections of modules.
+    They connect the outer world (files in the environment) with the inner
+    world of OCaml, but cannot see the the world of OCaml. Modules are
+    atomic/opaque objects for namespaces.
+
+So they are similarities, but already some significant differences when just
+comparing them in terms of name manipulation.
+
+Moreover, as you noticed, modules do a lot more, and do so simultaneously:
+they manage types, generativity, consistency of imports, keep the objects
+closed, etc.  Because of this additional invariants in module objects, there
+are operations that modules cannot do with names that namespaces can do.
+For instance, modules cannot insert a new submodule inside an existing
+module, or pick a module from a submodule to and rebuild a new module from
+the component outside of its original context/closure: this could break
+types, abstraction, (and bindings!)---unless you change the way modules are
+typechecked, e.g. using mixin modules to keep track of some internal
+dependencies make a difference between before/after linking status.
+
+Namespaces can do almost arbitrary manipulations of toplevel modules and
+collection of modules, because they see modules as atomic/opaque objects and
+cannot change them.  If namespaces mess up with module names the compiler
+and linker may pick the wrong objects but it will catch up those mistakes
+because module objects are checked against module objects independently of
+the names that were used to pick them.
+
+So the rigid name manipulation of modules with strong invariants combined
+with the arbirtrary name manipulation of namespaces remains sound---and with
+a clear semantics.
+
+Modules are a very sophisticated concept (think of their meta-theory).
+Namespaces are a very trivial concept (trivial tree manipulation).
+
+The complexity of Modules + Namespaces is just the max of the two, that is
+the complexity of Modules. Namespaces do not add complexity.
+
+So, I think that the separation of concerns is quite healthly here.  Each
+concept can do powerful but different sorts of things in its own world
+and the combination remains simple, because they is a clear separation.
+
+&gt;<i> Well my own *naturalism* leads me to believe that since a good part of
+</I>&gt;<i> modules is about managing names and given their recursive definition
+</I>&gt;<i> (modules can contain modules) I find it natural to try to use them at the
+</I>&gt;<i> library level.
+</I>
+I am not sure what you mean by *naturalism*.  Keeping a minimal set of
+orthogonal features is probably something to seek for in the design of a
+programming language.
+
+So if namespaces were modules, they should not be added, but they are
+an orthogonal concept.
+
+If you wished to mix the power of modules and namespaces together as a
+single concept, you probably need something like mixin modules (that can
+reason about open modules and linking) whose metatheory is even harder than
+that of modules plus an additional mechanism to be able to keep track in
+mixins of which components can be stripped off at link time.
+
+So *minimalism* in this situation is probably to keep two separate concepts.
+At least, this is feasible in the short term.  The mixin approach may
+perhaps be superior in the long term, but it cannot be a short term goal.
+
+Besides, namespaces is not a new concept. They already exists in OCaml in a
+trivial way, via the canonical mapping of the external file name in which a
+module and its interface are implemented and the internal OCaml name of the
+module object, plus the search path in which OCaml looks for module objects
+to build its initial namespace.
+
+This design choice was an excellent choice in the early days of OCaml when
+applications were small and the focus was more on the power of the module
+language than on dealing with a large industrial community of users.
+
+Today, this choice shows its limitations.
+
+The proposal is just to relax this rigid rule for building the initial
+namespace (i.e. mapping from external file names to internal module
+objects).  At the same time, using a tree-like structure rather than a flat
+structure would allow for even more flexibility, but conceptually, it is not
+significantly different from the flat map.
+
+     Didier
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000123.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000108.html">[ocaml-platform] Is this mandatory to continue this discussion [was: on the need and design of OCaml namespaces]
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#130">[ date ]</a>
+              <a href="thread.html#130">[ thread ]</a>
+              <a href="subject.html#130">[ subject ]</a>
+              <a href="author.html#130">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

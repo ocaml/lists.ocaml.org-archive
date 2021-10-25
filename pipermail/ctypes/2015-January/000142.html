@@ -1,0 +1,93 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20OCaml%20Ctypes%20and%20allocating%20a%20pointer%20to%20a%20type&In-Reply-To=%3C8D6EEB96-346B-4532-B859-014D36D27503%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000143.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type</H1>
+    <B>Tim McGilchrist</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20OCaml%20Ctypes%20and%20allocating%20a%20pointer%20to%20a%20type&In-Reply-To=%3C8D6EEB96-346B-4532-B859-014D36D27503%40gmail.com%3E"
+       TITLE="[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type">timmcgil at gmail.com
+       </A><BR>
+    <I>Fri Jan  2 23:01:43 GMT 2015</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000143.html">[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I'm trying to call some C code from OCaml where I need to supply an allocated pointer to my type yaml_parser_t. But I'm not sure how I should be allocating a valid pointer. The example code is below.
+
+Ideally I'd like to not have to supply a concrete implementation for yaml_parser_t as well, since I don't need to inspect it's internals, just pass it into and out of various functions. Plus the description of yaml_parser_t is large and I don't want to spend my time mapping it if I don't have to. I was initially following the time_t example from Real World OCaml but they seem to be using the time function to allocate which I don't have here. 
+
+open PosixTypes;;
+open Ctypes;;
+open Foreign;;
+
+type yaml_parser_t = unit;;
+let yaml_parser_t : yaml_parser_t typ = void;;
+
+(* To get it working in utop, specify the name of the library *)
+let libyaml = Dl.(dlopen ~filename:&quot;libyaml.dylib&quot; ~flags:[RTLD_NOW]);;
+
+let init = foreign &quot;yaml_parser_initialize&quot; (ptr yaml_parser_t @-&gt; returning int);;
+
+let make =
+    let p_ptr = allocate yaml_parser_t (from_voidp yaml_parser) in
+    let _ = init p_ptr in
+    p_ptr;;
+
+How can I allocate a yaml_parser_t without having to map the entire structure in ctypes?
+
+Thanks
+
+-----------------------------------------------------
+Tim McGilchrist
+
+@lambda_foo
+<A HREF="http://github.com/tmcgilchrist">http://github.com/tmcgilchrist</A>
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20150103/b5575305/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20150103/b5575305/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000143.html">[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

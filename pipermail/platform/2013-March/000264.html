@@ -1,0 +1,187 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCACLX4jQz53MQPpGOR_NKPGaggdENa57NDSQR98-i3%3DLpVOqA4g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000261.html">
+   <LINK REL="Next"  HREF="000267.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCACLX4jQz53MQPpGOR_NKPGaggdENa57NDSQR98-i3%3DLpVOqA4g%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Mar 12 22:19:10 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000261.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000267.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#264">[ date ]</a>
+              <a href="thread.html#264">[ thread ]</a>
+              <a href="subject.html#264">[ subject ]</a>
+              <a href="author.html#264">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, Mar 12, 2013 at 5:26 PM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;<i> I have no objection to specifying that Core#Common should be connected
+</I>&gt;&gt;<i> to the Core package within the build system.  But it's important to us
+</I>&gt;&gt;<i> that namespace manipulations be observable by the programmer by
+</I>&gt;&gt;<i> reading the code.  If I understand correctly, Leo's proposal involves
+</I>&gt;&gt;<i> stashing that away in the build system, which undermines that goal.
+</I>&gt;<i>
+</I>&gt;<i> To be clear, I'm only proposing to stash default opens in the build
+</I>&gt;<i> system, as oposed to stashing them in the namespace system. I think this
+</I>&gt;<i> makes sense since it is about controlling the initial naming environment
+</I>&gt;<i> of a program, just like the search path.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Another thing which may not be obvious is that one sometimes in the
+</I>&gt;&gt;<i> same file wants to access just Core.Std in some scopes in the file,
+</I>&gt;&gt;<i> and Async.Std in other scopes.
+</I>&gt;<i>
+</I>&gt;<i> Do any of the values or types opened automatically by Async conflict
+</I>&gt;<i> with those opened automatically by Core? If there aren't then opening
+</I>&gt;<i> the default modules globally shouldn't be a problem.
+</I>
+There are conflicts.  Core exposes blocking operations, and Async.Std
+hides them.
+
+But shadowing and conflicts are a distraction.  The main issue is that
+we want namespaces to be explicit in the source, and possibly
+explicitly different in different sub-bits of the same file.  Having
+namespace opening be a special-case thing that only happens on the
+file level and that is hidden from the source3 just seems like an
+unfortunate special-casing of a namespace manipulation tool (like let
+and open) that should be available generally.
+
+&gt;&gt;<i> Full control of the namespace is
+</I>&gt;&gt;<i> important, and something we do at multiple scopes within a file.
+</I>&gt;&gt;<i> Being able to control this only at the file level, and only from
+</I>&gt;&gt;<i> within the build system, is a poor match for our needs.
+</I>&gt;<i>
+</I>&gt;<i> You can always control it more explcitly by using Core#Common and
+</I>&gt;<i> Async#Common directly to ensure that the right values are used in the
+</I>&gt;<i> right scopes.
+</I>
+Just to be clear: we will not use auto-opens driven from the build
+system.  They undermine our ability to understand the code from
+reading the source.  So, yeah, we can open Async#Common explicitly,
+but that means lots of files will start with
+
+   open namespace Core
+   open Core#Common
+
+and others will start with
+
+   open namespace Core
+   open Core#Common
+   open namespace Async
+   open Async#Common
+
+and yet others will start with
+
+   open namespace Core
+   open Core#Common
+   open namespace Async
+   open Async#Common
+   open namespace My_framework_namespace
+   open My_framework_namespace#Common
+
+I'd rather these read like this:
+
+   open namespace Core
+   open namespace Async
+   open namespace My_framework_namespace
+
+&gt;&gt;<i> If the proposal lands in the way Leo describes, I would think we would
+</I>&gt;&gt;<i> write a ppx extension that, for a certain whitelist of namespaces,
+</I>&gt;&gt;<i> would convert:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    open namespace Core
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> into
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    open namespace Core
+</I>&gt;&gt;<i>    open Core#Common
+</I>&gt;<i>
+</I>&gt;<i> That seems reasonable.
+</I>
+It's reasonable, but fairly depressing.  I feel like we're proposing a
+new namespace system that from the get-go doesn't satisfy the needs of
+some of the major users, and needs to be hacked around to get it
+there.
+
+&gt;&gt;<i> Given that this is easy enough to do at the ppx level, I find it hard
+</I>&gt;&gt;<i> to see what difficulties would be raised by integrating this with the
+</I>&gt;&gt;<i> namespace system.
+</I>&gt;<i>
+</I>&gt;<i> I think the awkwardness is more related to how you treat things like:
+</I>&gt;<i>
+</I>&gt;<i>    Core#Foo
+</I>&gt;<i>
+</I>&gt;<i> where Foo might be a sub-module of Core#Common.
+</I>
+Can you elaborate a bit?  Why is this case problematic?  I can kind of
+see why this is weird, but other than making an explicit requirement
+of having an ordered semantics (which to me seems like the right
+answer anyway, since it's more in tune with how OCaml's other
+namespace manipulation operators work), it seems fairly
+straight-ahead.  But I'm probably missing something important.
+
+y
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000261.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000267.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#264">[ date ]</a>
+              <a href="thread.html#264">[ thread ]</a>
+              <a href="subject.html#264">[ subject ]</a>
+              <a href="author.html#264">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

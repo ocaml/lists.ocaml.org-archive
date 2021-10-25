@@ -1,0 +1,49 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;Jeremy,&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;The&nbsp;allocate/coerce&nbsp;idea&nbsp;sounds&nbsp;great,&nbsp;however&nbsp;that&nbsp;won&#39;t&nbsp;play&nbsp;nicely&nbsp;with&nbsp;my&nbsp;cross-platform&nbsp;needs...&nbsp;(unless&nbsp;I&nbsp;am&nbsp;misunderstanding&nbsp;something).&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Do&nbsp;you&nbsp;have&nbsp;a&nbsp;vague-eta&nbsp;for&nbsp;the&nbsp;struct-layout-from-C-work?&nbsp;Depending&nbsp;on&nbsp;the&nbsp;timeline,&nbsp;perhaps&nbsp;it&nbsp;is&nbsp;better&nbsp;for&nbsp;me&nbsp;to&nbsp;finish&nbsp;up&nbsp;the&nbsp;library&nbsp;for&nbsp;unix&nbsp;then&nbsp;deal&nbsp;with&nbsp;porting&nbsp;it&nbsp;after&nbsp;that&nbsp;feature&nbsp;is&nbsp;ready.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Thank&nbsp;you.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Trevor&lt;/div&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Mon,&nbsp;Oct&nbsp;20,&nbsp;2014&nbsp;at&nbsp;4:25&nbsp;AM,&nbsp;Jeremy&nbsp;Yallop&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:yallop@gmail.com&quot;&nbsp;target=&quot;_blank&quot;&gt;yallop@gmail.com&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;&lt;span&nbsp;class=&quot;&quot;&gt;On&nbsp;18&nbsp;October&nbsp;2014&nbsp;12:49,&nbsp;Trevor&nbsp;Smith&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:trevorsummerssmith@gmail.com&quot;&gt;trevorsummerssmith@gmail.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;Your&nbsp;suggestion&nbsp;makes&nbsp;sense.&nbsp;If&nbsp;I&nbsp;were&nbsp;to&nbsp;do&nbsp;that&nbsp;--&nbsp;any&nbsp;suggestions&nbsp;of&nbsp;how&lt;br&gt;<br>
+&gt;&nbsp;to&nbsp;deal&nbsp;with&nbsp;freeing&nbsp;that&nbsp;memory?&nbsp;Ideally,&nbsp;without&nbsp;adding&nbsp;a&nbsp;lifecycle&nbsp;&quot;free&quot;&lt;br&gt;<br>
+&gt;&nbsp;call&nbsp;to&nbsp;the&nbsp;user&nbsp;library.&nbsp;My&nbsp;thoughts&nbsp;would&nbsp;be&nbsp;to&nbsp;store&nbsp;the&nbsp;cstruct&lt;br&gt;<br>
+&gt;&nbsp;reference&nbsp;(malloced&nbsp;by&nbsp;C)&nbsp;in&nbsp;a&nbsp;ref&nbsp;in&nbsp;OCaml,&nbsp;then&nbsp;attach&nbsp;a&nbsp;finalizer&nbsp;to&nbsp;the&lt;br&gt;<br>
+&gt;&nbsp;OCaml&nbsp;ref&nbsp;that&nbsp;would&nbsp;call&nbsp;the&nbsp;corresponding&nbsp;C&nbsp;free.&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;That&nbsp;approach&nbsp;should&nbsp;work,&nbsp;I&nbsp;think.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Another&nbsp;possibility&nbsp;to&nbsp;allocate&nbsp;the&nbsp;struct&nbsp;using&nbsp;Ctypes.allocate&nbsp;or&lt;br&gt;<br>
+Ctypes.allocate_n&nbsp;--&nbsp;e.g.&nbsp;by&nbsp;allocating&nbsp;an&nbsp;array&nbsp;of&nbsp;char&nbsp;and&nbsp;coercing&lt;br&gt;<br>
+the&nbsp;result:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; &nbsp;val&nbsp;allocate&nbsp;:&nbsp;?finalise:(&#39;a&nbsp;ptr&nbsp;-&gt;&nbsp;unit)&nbsp;-&gt;&nbsp;&#39;a&nbsp;typ&nbsp;-&gt;&nbsp;&#39;a&nbsp;-&gt;&nbsp;&#39;a&nbsp;ptr&lt;br&gt;<br>
+ &nbsp; &nbsp;&lt;a&nbsp;href=&quot;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate&quot;&nbsp;target=&quot;_blank&quot;&gt;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; &nbsp;val&nbsp;allocate_n&nbsp;:&nbsp;?finalise:(&#39;a&nbsp;ptr&nbsp;-&gt;&nbsp;unit)&nbsp;-&gt;&nbsp;&#39;a&nbsp;typ&nbsp;-&gt;&nbsp;count:int&nbsp;-&gt;&nbsp;&#39;a&nbsp;ptr&lt;br&gt;<br>
+ &nbsp; &nbsp;&lt;a&nbsp;href=&quot;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n&quot;&nbsp;target=&quot;_blank&quot;&gt;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; &nbsp;val&nbsp;coerce&nbsp;:&nbsp;&#39;a&nbsp;typ&nbsp;-&gt;&nbsp;&#39;b&nbsp;typ&nbsp;-&gt;&nbsp;&#39;a&nbsp;-&gt;&nbsp;&#39;b&lt;br&gt;<br>
+ &nbsp; &nbsp;&lt;a&nbsp;href=&quot;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce&quot;&nbsp;target=&quot;_blank&quot;&gt;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+The&nbsp;memory&nbsp;allocated&nbsp;by&nbsp;&#39;allocate&#39;&nbsp;will&nbsp;be&nbsp;freed&nbsp;automatically&nbsp;when&lt;br&gt;<br>
+there&nbsp;are&nbsp;no&nbsp;OCaml&nbsp;references&nbsp;to&nbsp;the&nbsp;object. &nbsp;The&nbsp;optional&nbsp;&#39;finalise&#39;&lt;br&gt;<br>
+argument&nbsp;is&nbsp;for&nbsp;associating&nbsp;additional&nbsp;cleanup&nbsp;functions,&nbsp;not&nbsp;for&lt;br&gt;<br>
+freeing&nbsp;the&nbsp;memory. &nbsp;You&nbsp;may&nbsp;be&nbsp;able&nbsp;to&nbsp;use&nbsp;it&nbsp;to&nbsp;call&nbsp;uv_loop_close,&lt;br&gt;<br>
+for&nbsp;example.&lt;br&gt;<br>
+&lt;span&nbsp;class=&quot;&quot;&gt;&lt;br&gt;<br>
+&gt;&nbsp;Aside:&nbsp;I&nbsp;wonder&nbsp;if&nbsp;ctypes&nbsp;could&nbsp;be&nbsp;extended&nbsp;to&nbsp;deal&nbsp;with&nbsp;this&nbsp;cross&nbsp;platform&lt;br&gt;<br>
+&gt;&nbsp;issue&nbsp;fully&nbsp;in&nbsp;ctypes-land?&nbsp;Have&nbsp;others&nbsp;thought&nbsp;about&nbsp;this?&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;Yes:&nbsp;we&#39;re&nbsp;planning&nbsp;to&nbsp;add&nbsp;support&nbsp;for&nbsp;obtaining&nbsp;struct&nbsp;layout&nbsp;from&nbsp;C,&lt;br&gt;<br>
+much&nbsp;as&nbsp;generated&nbsp;functions&nbsp;stubs&nbsp;are&nbsp;checked&nbsp;against&nbsp;C&nbsp;declarations:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; &nbsp;&lt;a&nbsp;href=&quot;https://github.com/ocamllabs/ocaml-ctypes/issues/62&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/ocamllabs/ocaml-ctypes/issues/62&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+The&nbsp;feature&nbsp;is&nbsp;taking&nbsp;a&nbsp;little&nbsp;while&nbsp;longer&nbsp;than&nbsp;anticipated&nbsp;to&nbsp;land,&lt;br&gt;<br>
+unfortunately.&lt;br&gt;<br>
+&lt;span&nbsp;class=&quot;&quot;&gt;&lt;br&gt;<br>
+&gt;&nbsp;Also:&nbsp;are&nbsp;the&nbsp;maintainers&nbsp;open&nbsp;to&nbsp;documentation&nbsp;contributions?&nbsp;I&nbsp;noticed&lt;br&gt;<br>
+&gt;&nbsp;that&nbsp;a&nbsp;lot&nbsp;of&nbsp;these&nbsp;questions&nbsp;on&nbsp;the&nbsp;FAQ&nbsp;are&nbsp;currently&nbsp;unanswered.&nbsp;I&nbsp;would&lt;br&gt;<br>
+&gt;&nbsp;be&nbsp;happy&nbsp;to&nbsp;throw&nbsp;a&nbsp;couple&nbsp;commits&nbsp;with&nbsp;documentation&nbsp;suggestions&nbsp;for&nbsp;the&lt;br&gt;<br>
+&gt;&nbsp;problems&nbsp;that&nbsp;I&nbsp;am&nbsp;running&nbsp;into.&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;Yes:&nbsp;documentation&nbsp;contributions&nbsp;are&nbsp;very&nbsp;welcome.&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

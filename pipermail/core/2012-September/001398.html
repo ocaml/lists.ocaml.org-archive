@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Lwt/Async abstraction for HTTP library
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3C20120905232951.GA17109%40dark.recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Lwt/Async abstraction for HTTP library</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3C20120905232951.GA17109%40dark.recoil.org%3E"
+       TITLE="Lwt/Async abstraction for HTTP library">anil at recoil.org
+       </A><BR>
+    <I>Thu Sep  6 00:29:51 BST 2012</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1398">[ date ]</a>
+              <a href="thread.html#1398">[ thread ]</a>
+              <a href="subject.html#1398">[ subject ]</a>
+              <a href="author.html#1398">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On Thu, Aug 23, 2012 at 09:01:52AM +0100, David House wrote:
+&gt;<i> On Tue, Aug 21, 2012 at 3:11 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+</I>&gt;<i> &gt; So my question is what to do with:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;   (* TODO: how to run write () as a background task? *)
+</I>&gt;<i> &gt;   let _ = write () in
+</I>&gt;<i> &gt;   rd
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Does write() need to be registered with something to be a &quot;proper&quot;
+</I>&gt;<i> &gt; background task for accounting purposes, or to run a cleanup function if
+</I>&gt;<i> &gt; the Reader pipe terminates early?
+</I>&gt;<i> 
+</I>&gt;<i> As Yaron points out, it is more idiomatic to say [whenever (write
+</I>&gt;<i> ())], or in the newer version of async, [don't_wait_for (write ())].
+</I>&gt;<i> For example, the stuff below &quot;TODO&quot; in Client.read_response might be
+</I>&gt;<i> written:
+</I>&gt;<i> 
+</I>&gt;<i> if close then don't_wait_for (
+</I>&gt;<i>   Pipe.closed body_rd
+</I>&gt;<i>   &gt;&gt;= fun () -&gt;
+</I>&gt;<i>   Reader.close ic
+</I>&gt;<i>   &gt;&gt;= fun () -&gt;
+</I>&gt;<i>   Writer.close oc)
+</I>&gt;<i> 
+</I>&gt;<i> There is no need to register background processes with the scheduler.
+</I>&gt;<i> Your code is already correct in the case of early termination by the
+</I>&gt;<i> consumer: one of the [Pipe.write_when_ready] calls will terminate with
+</I>&gt;<i> `Closed, and your loop will exit.
+</I>&gt;<i> 
+</I>&gt;<i> P.s. I see in your code that you open Deferred. Why is this? All of
+</I>&gt;<i> the infix operators, plus [return] and a few others, are already in
+</I>&gt;<i> the scope of Async.Std, so there is no need to go opening anything
+</I>&gt;<i> else.
+</I>&gt;<i> 
+</I>
+David, thanks for all these hints.  I was opening Deferred due to missing
+the Async.Std, so I've reverted all that now.
+
+&gt;<i> Also, two more stylistic points:
+</I>&gt;<i> 
+</I>&gt;<i> 1. If the code on the right-hand side of a bind does not return a
+</I>&gt;<i> deferred, it is common to use &gt;&gt;| instead of &gt;&gt;=, and then delete all
+</I>&gt;<i> the &quot;return&quot;s on the right-hand side. E.g. in read_response.
+</I>&gt;<i> 
+</I>&gt;<i> 2. All code between two binds is guaranteed to execute atomically,
+</I>&gt;<i> without being interleaved with any other code. This is a very nice
+</I>&gt;<i> feature of async, and really simplifies thinking about concurrent
+</I>&gt;<i> code. Because of this, it is idiomatic to put all of your binds
+</I>&gt;<i> flush-left, so that they stick out visually. (This is not quite
+</I>&gt;<i> universal in our code base, but is certainly to be encouraged.) You
+</I>&gt;<i> can see that in my snippet above.
+</I>
+Ack.  I've been tidying up <A HREF="http://github.com/avsm/ocaml-cohttp">http://github.com/avsm/ocaml-cohttp</A> to work
+across Async, Lwt_unix and Mirage via functors. The result is a reasonably
+good HTTP/1.1 (w/ pipelining) client/server for all these threading
+systems.
+
+Many of my other thoughts on Async shortcomings seem to be addressed by
+the upcoming new release (such as Async equivalents of Core modules such
+as Option.  I'll play around with them shortly.
+
+I'm just going to finish up SSL bindings for Async to get it to
+feature-parity with the Lwt version, and then port the Github API bindings
+(<A HREF="http://github.com/avsm/ocaml-github">http://github.com/avsm/ocaml-github</A>).  It's quite useful having two
+different threading libraries to really force a good structure between
+protocol modules.
+
+Most of these will be packaged up in OPAM by the end of the week, for our
+upcoming CUFP tutorial next week.
+
+-- 
+Anil Madhavapeddy                                 <A HREF="http://anil.recoil.org">http://anil.recoil.org</A>
+
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1398">[ date ]</a>
+              <a href="thread.html#1398">[ thread ]</a>
+              <a href="subject.html#1398">[ subject ]</a>
+              <a href="author.html#1398">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

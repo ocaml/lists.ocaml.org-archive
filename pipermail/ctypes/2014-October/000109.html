@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] [Caml-list] Library recompilation with OCamljava
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20%5BCaml-list%5D%20Library%20recompilation%20with%20OCamljava&In-Reply-To=%3CCAAxsn%3DEO-ZfK03%2Bi2s5DQRfmLv0OK4SbhJyiDVyrvSLb8Zkp6A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000131.html">
+   <LINK REL="Next"  HREF="000119.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] [Caml-list] Library recompilation with OCamljava</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20%5BCaml-list%5D%20Library%20recompilation%20with%20OCamljava&In-Reply-To=%3CCAAxsn%3DEO-ZfK03%2Bi2s5DQRfmLv0OK4SbhJyiDVyrvSLb8Zkp6A%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] [Caml-list] Library recompilation with OCamljava">yallop at gmail.com
+       </A><BR>
+    <I>Mon Oct 20 10:44:44 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000131.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+        <LI>Next message: <A HREF="000119.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#109">[ date ]</a>
+              <a href="thread.html#109">[ thread ]</a>
+              <a href="subject.html#109">[ subject ]</a>
+              <a href="author.html#109">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>[+cc <A HREF="http://lists.ocaml.org/listinfo/ctypes">ctypes at lists.ocaml.org</A>]
+
+On Sat, Oct 18, 2014 at 5:09 AM, <A HREF="http://lists.ocaml.org/listinfo/ctypes">forum at x9c.fr</A> &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">forum at x9c.fr</A>&gt; wrote:
+&gt;&gt;<i> I think a neat way to use a C library from an ocamljava-compiled
+</I>&gt;&gt;<i> program would be to have a Java &quot;backend&quot; for Jeremy Yallop's
+</I>&gt;&gt;<i> ctypes (<A HREF="https://github.com/ocamllabs/ocaml-ctypes">https://github.com/ocamllabs/ocaml-ctypes</A>).  I never had
+</I>&gt;&gt;<i> the time to implement that, but toyed with this idea and think the
+</I>&gt;&gt;<i> best way to implement it would be to go through JNA
+</I>&gt;&gt;<i> (<A HREF="https://github.com/twall/jna">https://github.com/twall/jna</A>) rather than JNI.  JNA includes a
+</I>&gt;&gt;<i> &quot;dlopen&quot;-like mechanism, and automatically maps simple types from
+</I>&gt;&gt;<i> Java to C. My knowledge of ctypes is quite limited, but I see no
+</I>&gt;&gt;<i> showstopper.
+</I>
+On 18/10/2014, Kenneth Adam Miller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">kennethadammiller at gmail.com</A>&gt; wrote:
+&gt;<i> Precisely! ocaml-ctypes is exactly what's being used by the library
+</I>&gt;<i> that I'm porting to call into C sub libraries. It would be really
+</I>&gt;<i> sweet if the ocamljava compiler could detect the ocaml-ctypes and
+</I>&gt;<i> generate these mappings automatically. This would eliminate a lot of
+</I>&gt;<i> error prone code, since C code tends to interpret data raw at some
+</I>&gt;<i> point... How might I got about writing this to boot? I'm moderately
+</I>&gt;<i> new to ocaml, lacking deep expertise in it, but I'm an aggressive
+</I>&gt;<i> learner. Please explain the best path forward, I want to create a
+</I>&gt;<i> robust and reusable solution.
+</I>
+OCaml-Java support is on the wish list for ctypes
+
+    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/13">https://github.com/ocamllabs/ocaml-ctypes/issues/13</A>
+
+but we don't have the resources to implement it at present.  Adding
+support would mostly likely only involve changing ctypes itself, not
+OCaml-Java, and is likely to involve writing OCaml-Java
+implementations of the following components:
+
+  (1) memory access, i.e. functions for allocating blocks, for reading
+and writing scalar values to arbitrary addresses, and for viewing C
+objects as bigarrays:
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/memory_stubs.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/memory_stubs.ml</A>
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/bigarray_stubs.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/bigarray_stubs.ml</A>
+
+  (2) functions for printing primitive (scalar) values:
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/value_printing_stubs.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/value_printing_stubs.ml</A>
+
+  (3) implementations of signed and unsigned integer types of various sizes:
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/signed.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/signed.ml</A>
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/unsigned.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/unsigned.ml</A>
+
+  (4) functions for converting between OCaml and C string representations
+     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/std_view_stubs.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/std_view_stubs.ml</A>
+
+plus one of the following approaches for calling functions
+
+  (a) a &quot;dynamic&quot; approach, which resolves symbols and constructs call
+frames at runtime, like the ctypes Foreign module.  This involves two
+components: a dynamic loading interface along the
+      following lines
+      <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/dl.mli">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/dl.mli</A>
+      and primitives for dynamically constructing and making calls:
+      <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/ffi_stubs.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/ffi_stubs.ml</A>
+
+  (b) a &quot;static&quot; approach, which generates code to be compiled by the
+standard toolchain:
+      <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/cstubs/cstubs.mli">https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/cstubs/cstubs.mli</A>
+
+Note that most of the links above are to internal Ctypes modules, not
+to the interface, which I'd expect to remain largely unchanged.
+
+As Xavier suggests, JNA may be a good starting point for some or all
+of the above.  If someone would like to look at adding OCaml-Java
+support, please feel free to ask questions, either on the GitHub issue
+tracker, or on the ctypes mailing list.
+
+Jeremy.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000131.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+	<LI>Next message: <A HREF="000119.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#109">[ date ]</a>
+              <a href="thread.html#109">[ thread ]</a>
+              <a href="subject.html#109">[ subject ]</a>
+              <a href="author.html#109">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

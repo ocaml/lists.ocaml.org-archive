@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCANcqPu6HjyvpRSG5AOiYEPnLYjeJwT2iTL6gV_MtO45L_UUDtA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000222.html">
+   <LINK REL="Next"  HREF="000234.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCANcqPu6HjyvpRSG5AOiYEPnLYjeJwT2iTL6gV_MtO45L_UUDtA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Thu Feb  7 19:50:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000222.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000234.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#225">[ date ]</a>
+              <a href="thread.html#225">[ thread ]</a>
+              <a href="subject.html#225">[ subject ]</a>
+              <a href="author.html#225">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Feb 7, 2013 at 11:37 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt;wrote:
+
+&gt;<i> On 2/7/2013 3:56 PM, Hongbo Zhang wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I don't follow. We are talking, basically, about adding simple
+</I>&gt;<i> constructions to the AST, like:
+</I>&gt;<i>
+</I>&gt;<i>   Pexp_annotation of expression * expression
+</I>&gt;<i>   Pexp_extension of string * expression
+</I>&gt;<i>
+</I>&gt;<i> and you were suggesting that this would almost kill Camlp4/Fan. Why?
+</I>&gt;<i>
+</I>&gt;<i> The problem is that I am a bit unclear how to encode them in the
+</I>meta-level, since the introduced constructs will not be consumed by the
+type checker, they are provided for the convenience of ppx, but does not
+exist in real world.  I think camlp5 and Coq maintainers will also
+appreciate that we are a bit conservative in the compiler part.
+
+&gt;<i>
+</I>&gt;<i> E is defined in Ast_mapper:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/trunk/**">http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/trunk/**</A>
+</I>&gt;<i> parsing/ast_mapper.mli?view=**markup&lt;<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup</A>&gt;
+</I>&gt;<i>
+</I>&gt;<i> For instance, let_ is defined very cleverly as:
+</I>&gt;<i>
+</I>&gt;<i> let mk ?(loc = Location.none) x = {pexp_desc = x; pexp_loc = loc}
+</I>&gt;<i> ...
+</I>&gt;<i> let let_ ?loc a b c = mk ?loc (Pexp_let (a, b, c))
+</I>&gt;<i>
+</I>&gt;<i> There is absolutely no magic.
+</I>&gt;<i>
+</I>&gt;<i> First, I guess most people will seldom write ppx, and they have to
+</I>remember all those function names for once use a year. Quosi-quotation is
+so intuitive that you don't need remember anything.
+
+Second, as I said, quosi-quotation works so nice with IDE or Emacs, since
+you can expand code any time you want, just one key binding, the expanded
+code just show up in my emacs buffer, the experience is exactly the same as
+slime in lisp, it's impossible to expand the code using arbitrary functions.
+
+Third, this way to construct code is very limited, think about how you
+encode the ast, &quot;{:expr| {:expr| a + b|} |}&quot;
+
+
+&gt;<i> This is a valid point, and I believe there would not be any strong
+</I>&gt;<i> opposition to move some desugaring logic from parser.mly into the
+</I>&gt;<i> typechecker, i.e. make Parsetree look more like a parse tree than an AST.
+</I>&gt;<i>
+</I>&gt;<i> That said, I've no idea what
+</I>&gt;<i>
+</I>&gt;<i>  `Bigarray (a,b,c)
+</I>&gt;<i>
+</I>&gt;<i> means.
+</I>
+In Fan, the transformation between concrete syntax and abstract syntax is
+bijective(at least the design goal), so there is no ambiguity here, but for
+parsetree, it's hard to draw a line here, if you prevent all the syntax
+desguaring, that might introduces too much unnecessary complexity for the
+type checker
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Will you introduce in Fan the notion of attributes attached to every
+</I>&gt;<i> possible category and represented explicitly in the (Fan) AST?  I thought
+</I>&gt;<i> you only had the intention to extend the syntax of OCaml with a single
+</I>&gt;<i> construct {:xxx| ... |}  with  .... being left unparsed.  I don't see how
+</I>&gt;<i> you can simulate &quot;ignorable attributes&quot; with that. Can you elaborate?
+</I>&gt;<i>
+</I>&gt;<i> I am pretty open-minded here, actually I thought it for a while, I am more
+</I>inclined to do this in the parsing stage by providing some plugins without
+cluttering the ast too much.
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>&gt;<i>
+</I>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/1fc6fd85/attachment-0001.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/1fc6fd85/attachment-0001.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000222.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000234.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#225">[ date ]</a>
+              <a href="thread.html#225">[ thread ]</a>
+              <a href="subject.html#225">[ subject ]</a>
+              <a href="author.html#225">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

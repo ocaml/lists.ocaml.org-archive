@@ -1,0 +1,102 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Finalising data
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DGyt-XhDdSm0Xw5E-L%2BgFTdvX52T3-mUB%2B2GY266XfUOA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000085.html">
+   <LINK REL="Next"  HREF="000089.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Finalising data</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DGyt-XhDdSm0Xw5E-L%2BgFTdvX52T3-mUB%2B2GY266XfUOA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Finalising data">yallop at gmail.com
+       </A><BR>
+    <I>Wed May 28 03:47:28 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000085.html">[ocaml-ctypes] Finalising data
+</A></li>
+        <LI>Next message: <A HREF="000089.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#87">[ date ]</a>
+              <a href="thread.html#87">[ thread ]</a>
+              <a href="subject.html#87">[ subject ]</a>
+              <a href="author.html#87">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 27 May 2014 01:21, Florian Pichlmeier &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">florian.pichlmeier at mytum.de</A>&gt; wrote:
+&gt;<i> i changed the representation of zframe_t
+</I>&gt;<i>
+</I>&gt;<i> type frame
+</I>&gt;<i> type t = frame structure ptr
+</I>&gt;<i> let zframe_t : frame structure typ = structure &quot;_zframe_t&quot;
+</I>
+Looks good!
+
+&gt;&gt;<i> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+</I>&gt;&gt;<i> complete, so pointer arithmetic (with +@ etc.) should work as you
+</I>&gt;&gt;<i> expect.
+</I>&gt;<i>
+</I>&gt;<i> I tried this approach with pointer arithmetic (+@), but i still get
+</I>&gt;<i> the Static.IncompleteType exception when i call the destroy function.
+</I>&gt;<i>
+</I>&gt;<i> let destroy (msg : t) =
+</I>&gt;<i>   let stub = foreign &quot;zframe_destroy&quot; ((ptr zframe_t) @-&gt; returning int) in
+</I>&gt;<i>   stub (msg +@ 0)
+</I>&gt;<i>
+</I>&gt;<i> Another problem is, that the zframe_destroy function expects **zframe_t as input,
+</I>&gt;<i> but with msg +@ 0 i only get *zframe_t. Does it suffice to declare the function
+</I>&gt;<i> like i did above, or do i need another approach?
+</I>
+Right: this is the source of the difficulty.  The argument to the C
+function is a pointer to pointer:
+
+   void zframe_destroy(frame_t **)
+
+and so the argument in the ctypes binding needs two 'ptr' applications:
+
+   let stub = foreign &quot;zframe_destroy&quot; (ptr (ptr zframe_t) @-&gt; returning void)
+
+In order to call the function you'll need to store the argument in
+addressable memory.  For example, you might write:
+
+  let p = allocate (ptr zframe_t) msg in
+  stub p
+
+Jeremy.
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000085.html">[ocaml-ctypes] Finalising data
+</A></li>
+	<LI>Next message: <A HREF="000089.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#87">[ date ]</a>
+              <a href="thread.html#87">[ thread ]</a>
+              <a href="subject.html#87">[ subject ]</a>
+              <a href="author.html#87">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

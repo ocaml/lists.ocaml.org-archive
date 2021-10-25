@@ -1,0 +1,203 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Cross-compiling%20OCaml%2C%20Mirage%20OS%20for%20rumprun%2C%0A%09OPAM%20integration&In-Reply-To=%3Cead9b8457cfa0007dd71c32655cc6bf1%40whitequark.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001080.html">
+   <LINK REL="Next"  HREF="001083.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration</H1>
+    <B>Peter Zotov</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Cross-compiling%20OCaml%2C%20Mirage%20OS%20for%20rumprun%2C%0A%09OPAM%20integration&In-Reply-To=%3Cead9b8457cfa0007dd71c32655cc6bf1%40whitequark.org%3E"
+       TITLE="[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration">whitequark at whitequark.org
+       </A><BR>
+    <I>Tue May 19 12:09:03 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001080.html">[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration
+</A></li>
+        <LI>Next message: <A HREF="001083.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1081">[ date ]</a>
+              <a href="thread.html#1081">[ thread ]</a>
+              <a href="subject.html#1081">[ subject ]</a>
+              <a href="author.html#1081">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2015-05-19 11:50, Martin Lucina wrote:
+&gt;<i> Rumprun provides a unikernel stack with a POSIXy (NetBSD-HEAD) 
+</I>&gt;<i> userspace
+</I>&gt;<i> and can run on Xen, QEMU/KVM, bare metal and POSIX userspace.  The
+</I>&gt;<i> resulting Mirage + rumprun unikernel will thus be able to run on all of 
+</I>&gt;<i> the
+</I>&gt;<i> platforms rumprun supports.
+</I>
+Nice!
+
+&gt;<i>     $ OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -configure --prefix
+</I>&gt;<i> /home/mato/.opam/system/x86_64-rumprun-netbsd/ --disable-libev
+</I>&gt;<i> 
+</I>&gt;<i> Results in:
+</I>&gt;<i> 
+</I>&gt;<i>     not checking for pkg-config
+</I>&gt;<i>     not checking for libev
+</I>&gt;<i>     testing for pthread: ........................... unavailable
+</I>&gt;<i>     not checking for glib
+</I>&gt;<i> 
+</I>&gt;<i>     The following recquired C libraries are missing: pthread.
+</I>&gt;<i> 
+</I>&gt;<i> The reason this happens is that discover.ml is invoking the following
+</I>&gt;<i> compile command:
+</I>&gt;<i> 
+</I>&gt;<i> /home/mato/projects/rumpkernel/rumprun/app-tools/rumprun-xen-cc
+</I>&gt;<i> -fno-defer-pop -Wall -D_FILE_OFFSET_BITS=64 -D_REENTRANT -c
+</I>&gt;<i> -I/usr/include -o /tmp/lwt_stubf12ac7.o
+</I>&gt;<i> -I/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/ocaml
+</I>&gt;<i> /tmp/lwt_stubf12ac7.c
+</I>&gt;<i> 
+</I>&gt;<i> Note the inclusion of -I/usr/include -- this is presumably there so 
+</I>&gt;<i> that
+</I>&gt;<i> the system OCaml compiler's headers are available, however it results 
+</I>&gt;<i> in a
+</I>&gt;<i> conflict between the NetBSD headers provided by rumprun and the system
+</I>&gt;<i> headers.
+</I>&gt;<i> 
+</I>&gt;<i> What can be done to fix the above? Should I be using a host compiler 
+</I>&gt;<i> built
+</I>&gt;<i> and installed by OPAM rather than the system compiler 
+</I>&gt;<i> (4.02.1-1ppa3~precise
+</I>&gt;<i> on Debian wheezy). [I'll try this and see if it helps...]
+</I>
+No. This is an issue with Lwt's discover.ml script. You're going in
+the right direction below, though using --enable-android-target
+for this is a bit awkward.
+
+&gt;<i> 
+</I>&gt;<i> I tried to hack around the problem by using --enable-android-target, 
+</I>&gt;<i> that
+</I>&gt;<i> causes discover.ml to succeed and the build then proceeds, failing on a
+</I>&gt;<i> different problem:
+</I>&gt;<i> 
+</I>&gt;<i> E: Failure(&quot;Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+</I>&gt;<i> doesn't exist.&quot;)
+</I>&gt;<i> 
+</I>&gt;<i> This is expected; the rumprun toolchain does not support dynamic 
+</I>&gt;<i> linking
+</I>&gt;<i> and I have configured the ocaml-rumprun compiler with -no-shared-libs. 
+</I>&gt;<i> Is
+</I>&gt;<i> there some way to tell OASIS to not expect any shared libraries to be
+</I>&gt;<i> built?
+</I>
+Nope. OASIS is painfully inflexible, especially when cross-compiling.
+You can probably patch setup.ml so that it thinks that the current
+OCaml is built without dynlink, but this is package-specific.
+
+&gt;<i> 
+</I>&gt;<i> General questions:
+</I>&gt;<i> 
+</I>&gt;<i> 1) Is this the right strategy for building an OCaml cross-compiler and
+</I>&gt;<i> integrating with OPAM?
+</I>&gt;<i> 
+</I>&gt;<i> AFAICS there are multiple approaches being used in the wild and OCaml
+</I>&gt;<i> upstream *claims* to include support for cross-compiling via -host and
+</I>&gt;<i> -target, however that support is not actually functional?
+</I>
+Cross-compiling is not there yet. The switches are only half functional,
+if you're lucky.
+
+&gt;<i> 
+</I>&gt;<i> For the rumprun support to be as user-friendly as possible, we need an 
+</I>&gt;<i> easy
+</I>&gt;<i> way of switching the backend rumprun cross-compiler and linker used by
+</I>&gt;<i> ocaml when the user wants to switch platforms or architectures. The
+</I>&gt;<i> approach used by the android repository I based my work off implies 
+</I>&gt;<i> either:
+</I>&gt;<i> 
+</I>&gt;<i> a) the user would have to *reinstall* the cross compiler (specifying 
+</I>&gt;<i> eg.
+</I>&gt;<i> RUMPRUN_CC in the environment) and all packages using native code 
+</I>&gt;<i> whenever
+</I>&gt;<i> they want to switch the backend compiler.
+</I>
+Correct. This is what opam-android uses.
+
+&gt;<i> 
+</I>&gt;<i> b) we would have to provide different opam packages of the compiler and
+</I>&gt;<i> native libraries (Lwt) for each platform/arch combination supported by
+</I>&gt;<i> rumprun. This is unmanageable.
+</I>
+This could be done with a script (horrible but functional).
+
+There was some talk over teaching OPAM that one package might be 
+installed
+in several 'variants', but there is no code to do that yet at all, and 
+it
+will probably be a substantial amount of work to integrate this with
+the dependency solver.
+
+opam-android would /greatly/ benefit from that as well, for much
+the same reasons.
+
+&gt;<i> 
+</I>&gt;<i> 2) Is there an easy way to switch ocamlc and the various other parts of 
+</I>&gt;<i> the
+</I>&gt;<i> build system(s) involved into a verbose mode so that I can see what
+</I>&gt;<i> compilers are being invoked and why they fail? At the moment I'm using
+</I>&gt;<i> `strace' for this :-/
+</I>
+ocamlfind c -verbose; ocamlc -verbose
+
+&gt;<i> 
+</I>&gt;<i> All ideas and help much appreciated,
+</I>&gt;<i> 
+</I>&gt;<i> Cheers,
+</I>&gt;<i> 
+</I>&gt;<i> Martin
+</I>&gt;<i> 
+</I>&gt;<i> [1] <A HREF="http://wiki.rumpkernel.org/Repo%3A-rumprun">http://wiki.rumpkernel.org/Repo%3A-rumprun</A>
+</I>&gt;<i> [2] <A HREF="https://github.com/whitequark/opam-android">https://github.com/whitequark/opam-android</A>
+</I>
+-- 
+Peter Zotov
+</PRE>
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001080.html">[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration
+</A></li>
+	<LI>Next message: <A HREF="001083.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1081">[ date ]</a>
+              <a href="thread.html#1081">[ thread ]</a>
+              <a href="subject.html#1081">[ subject ]</a>
+              <a href="author.html#1081">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

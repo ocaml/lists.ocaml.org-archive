@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] 'provides' field design proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%27provides%27%20field%20design%20proposal&In-Reply-To=%3CD42DF089-AF41-42C0-A502-A83A4A7BF205%40gazagnaire.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000883.html">
+   <LINK REL="Next"  HREF="000885.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] 'provides' field design proposal</H1>
+    <B>Thomas Gazagnaire</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%27provides%27%20field%20design%20proposal&In-Reply-To=%3CD42DF089-AF41-42C0-A502-A83A4A7BF205%40gazagnaire.org%3E"
+       TITLE="[opam-devel] 'provides' field design proposal">thomas at gazagnaire.org
+       </A><BR>
+    <I>Wed Jan  7 09:09:10 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000883.html">[opam-devel] 'provides' field design proposal
+</A></li>
+        <LI>Next message: <A HREF="000885.html">[opam-devel] 'provides' field design proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#884">[ date ]</a>
+              <a href="thread.html#884">[ thread ]</a>
+              <a href="subject.html#884">[ subject ]</a>
+              <a href="author.html#884">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> * checking concrete dependencies: not sure how that would be covered by 'provides', as it is the conjunction of several packages that provides the new one (cohttp + lwt =&gt; cohttp-lwt). It seems closer to the 'features' stuff, but you can't _depend_ on a feature with the current design (restricting features definitions to package formulas may make it possible though; I'll think about it)...
+</I>&gt;<i>  Another possibility, maybe (but interaction with cudf would need to be carefully studied, because we are getting out of what is supported), would be to have additional formulas on 'provides':
+</I>&gt;<i>  cohttp/ provides: [ &quot;cohttp-lwt&quot; { lwt } ]
+</I>&gt;<i>  In terms of rewriting it doesn't seem much more difficult, virtual package cohttp-lwt would include (&quot;cohttp&quot; &amp; &quot;lwt&quot;) in its depends disjunction instead of just &quot;cohttp&quot;. Anyway, we can easily leave that part for later.
+</I>
+Not sure I understand that part. Would it be simpler to always require that &quot;provides&quot; contains the name(s) of concrete package(s)? Supporting &quot;virtual packages&quot; means that we have 2 ways to do the same things: depots and provides. Which means it is harder to explain to the user what to use when.
+
+I think the goal of &quot;provides&quot; should be &quot;just&quot; a simple way to provide slightly patched opam packages without requiring hackish pining, not a way to expose in the &quot;provides&quot; all the modules/implementations provided by an opam package (although it could be a good idea too, but I think should be kept out of the scope of that proposal).
+
+Thomas
+
+&gt;<i> 
+</I>&gt;<i> * new question: if I have several packages providing Foo, should I recompile a package depending on Foo whenever one of them changes ? I'd say yes...
+</I>&gt;<i> 
+</I>&gt;<i> * Location of design documents: not sure at all this is best, because versionning of the design document (at least during the design phase) doesn't need to be synchronized with the source, but it has its advantages, and I don't like github's wikis much. Seemed more practical for something in-depth than just an issue. Do you suggest another option ? Adding headers is a good idea.
+</I>&gt;<i> 
+</I>&gt;<i> Cheers!
+</I>&gt;<i> Louis
+</I>&gt;<i> 
+</I>&gt;&gt;<i> - Anil Madhavapeddy, 06/01/2015 15:39 -
+</I>&gt;&gt;<i> Looks great, Louis!  My immediate thoughts:
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> - This does have the potential to complicating pinning quite a lot, which
+</I>&gt;&gt;<i> needs to be balanced against the better upgrade messages.  Do you think 
+</I>&gt;&gt;<i> this will need a package selection priority the way that apt-pinning in
+</I>&gt;&gt;<i> Debian works (e.g. so that ocaml-tls can be selected ahead of openssl-tls
+</I>&gt;&gt;<i> for the TLS package).
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> - The forking and providing replacements would be really useful for Mirage,
+</I>&gt;&gt;<i> where we're having an active discussion about how to provide Xen-specific
+</I>&gt;&gt;<i> versions of certain packages such as Zarith.  Thomas (with any surname),
+</I>&gt;&gt;<i> opinions on this?
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> - How much damage will this do to the internal solver heuristics?
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> -anil
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> On 5 Jan 2015, at 08:36, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> Hi all, and happy new year !
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> I just added to opam a design proposal to open discussion on the implementation of the 'provides' field and its use-cases.
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> It's at <A HREF="https://github.com/ocaml/opam/blob/master/doc/design/provides.md">https://github.com/ocaml/opam/blob/master/doc/design/provides.md</A>
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> Cheers,
+</I>&gt;&gt;&gt;<i> Louis
+</I>&gt;&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;&gt;<i> opam-devel mailing list
+</I>&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000883.html">[opam-devel] 'provides' field design proposal
+</A></li>
+	<LI>Next message: <A HREF="000885.html">[opam-devel] 'provides' field design proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#884">[ date ]</a>
+              <a href="thread.html#884">[ thread ]</a>
+              <a href="subject.html#884">[ subject ]</a>
+              <a href="author.html#884">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

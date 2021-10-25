@@ -1,0 +1,308 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [ANN] opam-fmt 1.0
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BANN%5D%20opam-fmt%201.0&In-Reply-To=%3CCAPFanBG4UuTc9evdnsAYrbNBis2TJv9cRcoKpTY_P6jOfJPeeQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001267.html">
+   <LINK REL="Next"  HREF="001269.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [ANN] opam-fmt 1.0</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BANN%5D%20opam-fmt%201.0&In-Reply-To=%3CCAPFanBG4UuTc9evdnsAYrbNBis2TJv9cRcoKpTY_P6jOfJPeeQ%40mail.gmail.com%3E"
+       TITLE="[opam-devel] [ANN] opam-fmt 1.0">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Sun Nov 22 20:55:23 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001267.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+        <LI>Next message: <A HREF="001269.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1268">[ date ]</a>
+              <a href="thread.html#1268">[ thread ]</a>
+              <a href="subject.html#1268">[ subject ]</a>
+              <a href="author.html#1268">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> - Any chance you could use cmdliner instead of Arg?  Fairly minor, but
+</I>&gt;<i>   all the other plugins use it and it's nice to have the same behaviours
+</I>&gt;<i>   for OPAM plugins where possible.
+</I>
+I'm fond of Daniel's design work, so I would gladly move to
+Cmdliner -- Arg was just what I could easily use &quot;in anger&quot; for
+a first try.
+
+&gt;<i> - How does this behave on pre-1.2 files?  I think it's about time that
+</I>&gt;<i>   we deprecate pre-1.2 so that we can have clean metadata standards
+</I>&gt;<i>   about the new fields such as dev-repo.
+</I>
+opam-fmt updates older opam files to its own support version -- and
+refuses to work on newer files. Two things:
+
+I think it would be a better design to have a family of scripts
+opam-fmt-1.0, opam-fmt-1.1, opam-fmt-1.2 etc. and a &quot;mother script&quot;
+opam-fmt that calls the right reformatter according to the file
+version&#185;. However, that requires changes in the packaging of opam-lib,
+so that the package for distinct versions can be installed
+simultaneously (they would be separate packages
+opam-lib-VER, and ocamlfind packages as well).
+
+&#185;: another option would be for opam-lib to also support pairs of parsing
+and printing functions for older format version specifically, but that
+is an invasive choice to make in a codebase. Right now there is a tiny
+bit of logic to know which fields are 1.0 or 1.1-specific, but this
+would be much more ambitious.
+
+There are various warnings implemented in opam-lib that could be emitted
+during the processing of files by opam-fmt -- they may be already
+available depending on the OPAMDEBUG variable or something, but an
+explicit support in the interface could be nice. When I tested
+reformatting opam-repository, I observed that a large part of its opam
+files raise such warnings (so indeed there seems to be a metadata
+problem in the repository today).
+
+&gt;<i> - Having a bot regularly go through and reformat the entire repository
+</I>&gt;<i>   also seems quite legit.  The alternative would be to reformat at the
+</I>&gt;<i>   merge point, but this would require a staging branch.
+</I>
+I'm not sure what you call &quot;merge point&quot;; my idea was to put the burden
+of reformatting onto users submitting PRs against the
+repository. (Regular reformatting are a sensible idea, but they run in
+the problem of loss of information, whether distributed manual
+reformatting keeps humans closer in the loop)
+
+&gt;<i> - I would really like opam-fmt to be lossless, so preserving comments
+</I>&gt;<i>   seems like an extension that we should implement.  Ideally everyone
+</I>&gt;<i>   can just call it on their packages without thinking about it.
+</I>
+I have mixed feelings about trying to be lossless. At the very least,
+one should recognize that setting this as a design goal would impose
+a significant burden on the developers of the parsing/printing functions
+in opam-lib.
+
+Some human choices (alignment of string fields for example) are rather
+difficult and fragile to recognize -- and they could complexify the
+codebase. Even for comments, right now you cannot tell to which
+configuration item an element is attached. There are several ways around
+this, which are interesting to consider but also involve a fair amount
+of work:
+
+- You could use ocamldoc-like placement rules: &quot;always after the
+  relevant field&quot; (a first comment would be a file-global comment), or
+  &quot;either before or after, but an empty line between the comment and
+  a non-relevant field&quot;; this seems painful and not-that-easy to
+  implement.
+
+- You could move to a docstring-like (or attribute-like) syntax where
+  comments are explicitly attached to an AST node; from a language
+  design point of view this would be my preference, but it may require
+  a change in concrete syntax.
+
+- Finally, the choices you can make in this design space depend a lot on
+  whether reformatting will be performed by humans or by bots. If your
+  comments-attachment rules are obscure, humans have the opportunity to
+  reformat, see that they got them wrong, and reiterate. Bots will just
+  put stuff at the wrong place.
+
+I think that the people that maintain this corner of opam today are
+those that will pay the greater cost if &quot;lossless&quot; becomes a design
+goal, so it should be their choice to make.
+
+
+In the meantime, it would be interesting to have a look at how opam
+files in the repository actually use comments. With
+
+  find packages -name 'opam' | xargs grep --color=always &quot; #&quot;
+
+I see 75 occurences of comments, 38 of which are just &quot;TODO fixme&quot;. The
+37 others seem rather interesting, below are a few representative examples:
+
+packages/arakoon/arakoon.1.8.6/opam:
+&gt;<i>   &quot;lwt&quot; { = &quot;2.4.8&quot; }  # 2.4.9 had an incompatible API change
+</I>
+Having textual exaplanations for choice of bound is a reasonable
+use-case for attributes.
+
+packages/camlp4/camlp4.4.01/opam:
+&gt;<i>   build: [] # dummy package
+</I>
+This could be replaced by a dedicated note/comment field.
+
+packages/frama-c/frama-c.20150201/opam:
+&gt;<i>   &quot;lablgtk&quot; { &gt;= &quot;2.18.2&quot; } #for ocaml &gt;= 4.02.1
+</I>
+I don't understand the semantics of this one.
+
+packages/git/git.1.6.0/opam:
+&gt;<i>   depopts: [
+</I>&gt;<i>     # --enable-mirage
+</I>&gt;<i>     &quot;mirage-types-lwt&quot;
+</I>&gt;<i>     &quot;mirage-http&quot;
+</I>&gt;<i>     &quot;mirage-flow&quot;
+</I>&gt;<i>     &quot;channel&quot;
+</I>&gt;<i>     # --enable-unix
+</I>&gt;<i>     &quot;cohttp&quot;
+</I>&gt;<i>     &quot;conduit&quot;
+</I>&gt;<i>     &quot;base-unix&quot;
+</I>&gt;<i>   ]
+</I>
+This usage is very interesting, it seems to call for a hierarchy inside
+the &quot;depopts&quot; list (and &quot;dependencies&quot; as well, I suppose), with
+annotations on sub-groups of dependencies.
+
+packages/gsl/gsl.1.18.2/opam:
+&gt;<i>   depends: [
+</I>&gt;<i>     &quot;base-bigarray&quot;
+</I>&gt;<i>     &quot;camlp4&quot;
+</I>&gt;<i>     &quot;ocamlfind&quot; {&gt;= &quot;1.3.1&quot;}
+</I>&gt;<i>     # Included from _opam file
+</I>&gt;<i>     &quot;conf-gsl&quot;
+</I>&gt;<i>   ]
+</I>
+I don't know what this comment means.
+
+packages/lz4/lz4.1.0.0/opam:
+&gt;<i> depexts: [
+</I>&gt;<i>   [[&quot;debian&quot;] [&quot;liblz4-dev&quot;]]
+</I>&gt;<i>   # [[&quot;ubuntu&quot;] [&quot;liblz4-dev&quot;]] reenable when CI updates its Ubuntu
+</I>&gt;<i>   [[&quot;source&quot;] [&quot;<A HREF="https://.../install.sh">https://.../install.sh</A>&quot;]]
+</I>&gt;<i> ]
+</I>
+Again, this would require annotations.
+
+packages/ppx_deriving/ppx_deriving.0.3/opam:
+&gt;<i> build: [
+</I>&gt;<i>   # If there is no native dynlink, we can't use native builds
+</I>&gt;<i>   &quot;ocaml&quot; &quot;pkg/build.ml&quot; &quot;native=true&quot;
+</I>&gt;<i>                          &quot;native-dynlink=true&quot;
+</I>&gt;<i> ]
+</I>
+packages/frama-c-e-acsl/frama-c-e-acsl.0.5/opam:
+&gt;<i> build: [
+</I>&gt;<i>   [&quot;ocaml&quot; &quot;run_autoconf_if_needed.ml&quot;] #when used in pinned mode the configure *can* not yet be generated
+</I>&gt;<i>   [&quot;./configure&quot; &quot;--prefix&quot; prefix]
+</I>&gt;<i>   [make]
+</I>&gt;<i> ]
+</I>
+packages/clangml/clangml.0.5.2/opam:
+&gt;<i> depexts: [
+</I>&gt;<i>   [[&quot;debian&quot;] [&quot;libboost-dev&quot; &quot;llvm-3.4-dev&quot; &quot;clang-3.4&quot; &quot;libclang-3.4-dev&quot; &quot;binutils-dev&quot;]]
+</I>&gt;<i>   [[&quot;ubuntu&quot;] [&quot;libboost-dev&quot; &quot;llvm-3.4-dev&quot; &quot;clang-3.4&quot; &quot;libclang-3.4-dev&quot; &quot;binutils-dev&quot;]]
+</I>&gt;<i>   [[&quot;gentoo&quot;] [&quot;dev-libs/boost&quot; &quot;sys-devel/llvm-3.4.1-r2&quot; &quot;sys-devel/clang-3.4.0-r100&quot; &quot;sys-devel/binutils&quot;]]
+</I>&gt;<i>   # archlinux has no package providing llvm and clang 3.4.1
+</I>&gt;<i>   [[&quot;archlinux&quot;] [&quot;boost&quot; &quot;binutils&quot;]]
+</I>&gt;<i> ]
+</I>
+packages/mtime/mtime.0.8.1/opam:
+&gt;<i> depends: [ &quot;ocamlfind&quot;
+</I>&gt;<i>            &quot;js_of_ocaml&quot; # FIXME should become a deptopt
+</I>&gt;<i> ]
+</I>
+On Sun, Nov 22, 2015 at 8:09 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">anil at recoil.org</A>&gt; wrote:
+&gt;<i> Thanks for this Gabriel! Quick notes:
+</I>&gt;<i>
+</I>&gt;<i> - I would really like opam-fmt to be lossless, so preserving comments
+</I>&gt;<i>   seems like an extension that we should implement.  Ideally everyone
+</I>&gt;<i>   can just call it on their packages without thinking about it.
+</I>&gt;<i>
+</I>&gt;<i> - Having a bot regularly go through and reformat the entire repository
+</I>&gt;<i>   also seems quite legit.  The alternative would be to reformat at the
+</I>&gt;<i>   merge point, but this would require a staging branch.
+</I>&gt;<i>
+</I>&gt;<i> - Any chance you could use cmdliner instead of Arg?  Fairly minor, but
+</I>&gt;<i>   all the other plugins use it and it's nice to have the same behaviours
+</I>&gt;<i>   for OPAM plugins where possible.
+</I>&gt;<i>
+</I>&gt;<i> - How does this behave on pre-1.2 files?  I think it's about time that
+</I>&gt;<i>   we deprecate pre-1.2 so that we can have clean metadata standards
+</I>&gt;<i>   about the new fields such as dev-repo.
+</I>&gt;<i>
+</I>&gt;<i> regards,
+</I>&gt;<i> Anil
+</I>&gt;<i>
+</I>&gt;&gt;<i> On 21 Nov 2015, at 21:53, Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Hi opam-devel,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> As part of the discussion in
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>  bulk addition of 'ocamlbuild {build}' dependencies
+</I>&gt;&gt;<i>  <A HREF="https://github.com/ocaml/opam-repository/pull/5140">https://github.com/ocaml/opam-repository/pull/5140</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> it became apparent that performing bulk updates on opam-repository is
+</I>&gt;&gt;<i> made harder by the fact that the parse-print roundtrip does not
+</I>&gt;&gt;<i> preserve human-formatted opam files. For my proposed patch I tried to
+</I>&gt;&gt;<i> separate the reformatting of opam file (to follow the opam-lib printer
+</I>&gt;&gt;<i> convention) from the actual changes in two separate commits, but that
+</I>&gt;&gt;<i> means more work for script authors, and also creates patches that are
+</I>&gt;&gt;<i> harder to review. (If (re)formatting was controlled by the maintainer
+</I>&gt;&gt;<i> of the OPAM packages instead of authors of bulk updates, we would be
+</I>&gt;&gt;<i> more confident in its correctness.)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In order to move that discussion forward (how to maintain opam
+</I>&gt;&gt;<i> metadata in a way that is easy for both human and scripts to work
+</I>&gt;&gt;<i> with?), I propose the opam-fmt script that can be found at
+</I>&gt;&gt;<i>  <A HREF="https://github.com/gasche/opam-fmt/">https://github.com/gasche/opam-fmt/</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I wrote it in the last few days and there are probably some rough
+</I>&gt;&gt;<i> edges. Once I feel that it should work, I may try to package it on the
+</I>&gt;&gt;<i> opam-repo (in the meantime, clone then pin).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This suggests one possible way forward: publicize opam-fmt, encourage
+</I>&gt;&gt;<i> users to reformat their opam files using it, adapt the opam-repository
+</I>&gt;&gt;<i> QA to call `opam fmt --check` on opam files proposed in PR to enforce
+</I>&gt;&gt;<i> it, and after some time (once we trust it works as expected thanks to
+</I>&gt;&gt;<i> the human guinea pigs) reformat all older opam files to get a perfect
+</I>&gt;&gt;<i> round-trip on all files of the repository.
+</I>&gt;&gt;<i> It is not clear to me that this is the best way forward. (For example
+</I>&gt;&gt;<i> it means that, in the current state of the opam file parsing/printing
+</I>&gt;&gt;<i> code, comments in opam files would always be erased by reformatting.
+</I>&gt;&gt;<i> Should we remove comments from the valid syntax of opam files, or
+</I>&gt;&gt;<i> attach them to configuration lines to re-print them correctly later,
+</I>&gt;&gt;<i> or maybe refuse to work on files with comments?) Opam developers and
+</I>&gt;&gt;<i> repository maintainers may decide that the cost of caring about
+</I>&gt;&gt;<i> reformatting outweigh the benefits in terms of scriptability.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What do you think?
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> opam-devel mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001267.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+	<LI>Next message: <A HREF="001269.html">[opam-devel] [ANN] opam-fmt 1.0
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1268">[ date ]</a>
+              <a href="thread.html#1268">[ thread ]</a>
+              <a href="subject.html#1268">[ subject ]</a>
+              <a href="author.html#1268">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

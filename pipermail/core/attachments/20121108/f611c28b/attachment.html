@@ -1,0 +1,53 @@
+<tt>
+I&nbsp;correctly&nbsp;get&nbsp;an&nbsp;exception&nbsp;with&nbsp;OCaml&nbsp;3.12.1,&nbsp;Core&nbsp;108.00.02,&nbsp;on&nbsp;Mac&nbsp;OS&nbsp;X&nbsp;10.7.5.&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Thu,&nbsp;Nov&nbsp;8,&nbsp;2012&nbsp;at&nbsp;12:04&nbsp;PM,&nbsp;Markus&nbsp;Mottl&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:markus.mottl@gmail.com&quot;&nbsp;target=&quot;_blank&quot;&gt;markus.mottl@gmail.com&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;<br>
+<br>
+&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;Hi,&lt;br&gt;<br>
+&lt;br&gt;<br>
+I&#39;ve&nbsp;run&nbsp;into&nbsp;a&nbsp;segfault&nbsp;on&nbsp;Mac&nbsp;OS&nbsp;X&nbsp;with&nbsp;a&nbsp;very&nbsp;trivial&nbsp;program&nbsp;that&lt;br&gt;<br>
+basically&nbsp;just&nbsp;links&nbsp;with&nbsp;Jane&nbsp;Street&nbsp;Core.&nbsp; Here&nbsp;is&nbsp;the&nbsp;file&nbsp;&lt;a&nbsp;href=&quot;http://test.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;test.ml&lt;/a&gt;:&lt;br&gt;<br>
+&lt;br&gt;<br>
+----------&lt;br&gt;<br>
+module&nbsp;X&nbsp;=&nbsp;Core&lt;br&gt;<br>
+&lt;br&gt;<br>
+let&nbsp;()&nbsp;=&nbsp;[||].(0)&nbsp;&lt;-&nbsp;42&lt;br&gt;<br>
+----------&lt;br&gt;<br>
+&lt;br&gt;<br>
+You&nbsp;can&nbsp;build&nbsp;it&nbsp;as&nbsp;follows:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp;ocamlbuild&nbsp;-use-ocamlfind&nbsp;-cflag&nbsp;-thread&nbsp;-lflag&nbsp;-thread&nbsp;-pkgs&nbsp;core&nbsp;test.native&lt;br&gt;<br>
+&lt;br&gt;<br>
+Running&nbsp;test.native&nbsp;will&nbsp;give&nbsp;you&nbsp;a&nbsp;segfault.&nbsp; Here&nbsp;is&nbsp;the&nbsp;stack&nbsp;backtrace:&lt;br&gt;<br>
+&lt;br&gt;<br>
+----------&lt;br&gt;<br>
+#0&nbsp; 0x00007fff90fa78a5&nbsp;in&nbsp;misaligned_stack_error_entering_dyld_stub_binder&nbsp;()&lt;br&gt;<br>
+#1&nbsp; 0x0000000000000103&nbsp;in&nbsp;??&nbsp;()&lt;br&gt;<br>
+#2&nbsp; 0x0000000101c0a088&nbsp;in&nbsp;pvars&nbsp;()&lt;br&gt;<br>
+#3&nbsp; 0x0000000101bddedd&nbsp;in&nbsp;caml_raise&nbsp;()&lt;br&gt;<br>
+#4&nbsp; 0x0000000101bddf99&nbsp;in&nbsp;caml_array_bound_error&nbsp;()&lt;br&gt;<br>
+#5&nbsp; 0x00000001019b6aca&nbsp;in&nbsp;.L101&nbsp;()&lt;br&gt;<br>
+----------&lt;br&gt;<br>
+&lt;br&gt;<br>
+The&nbsp;program&nbsp;should&nbsp;just&nbsp;raise&nbsp;an&nbsp;exception&nbsp;due&nbsp;to&nbsp;the&nbsp;illegal&nbsp;array&lt;br&gt;<br>
+access.&nbsp; Merely&nbsp;raising&nbsp;an&nbsp;exception&nbsp;directly&nbsp;doesn&#39;t&nbsp;trigger&nbsp;the&lt;br&gt;<br>
+problem.&nbsp; The&nbsp;program&nbsp;won&#39;t&nbsp;segfault&nbsp;either&nbsp;if&nbsp;the&nbsp;&quot;module&nbsp;X&nbsp;=&nbsp;Core&quot;&lt;br&gt;<br>
+line&nbsp;is&nbsp;commented&nbsp;out,&nbsp;i.e.&nbsp;Core&nbsp;has&nbsp;to&nbsp;be&nbsp;linked&nbsp;in.&nbsp; Other&nbsp;libraries&lt;br&gt;<br>
+apparently&nbsp;also&nbsp;don&#39;t&nbsp;cause&nbsp;this&nbsp;issue.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Could&nbsp;another&nbsp;Mac&nbsp;OS&nbsp;X&nbsp;user&nbsp;here&nbsp;please&nbsp;verify&nbsp;the&nbsp;problem?&nbsp; I&#39;m&nbsp;using&lt;br&gt;<br>
+OCaml&nbsp;4.00.1&nbsp;with&nbsp;Opam&nbsp;and&nbsp;the&nbsp;latest&nbsp;release&nbsp;of&nbsp;Core&nbsp;in&nbsp;there.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Maybe&nbsp;somebody&nbsp;more&nbsp;knowledgeable&nbsp;about&nbsp;stack&nbsp;alignment&nbsp;and&nbsp;linking&lt;br&gt;<br>
+issues&nbsp;on&nbsp;Mac&nbsp;OS&nbsp;X&nbsp;has&nbsp;an&nbsp;idea&nbsp;what&#39;s&nbsp;going&nbsp;wrong&nbsp;here.&nbsp; I&nbsp;suspect&lt;br&gt;<br>
+it&#39;s&nbsp;a&nbsp;code&nbsp;generation,&nbsp;linking&nbsp;or&nbsp;even&nbsp;runtime&nbsp;issue&nbsp;that&nbsp;may&nbsp;need&nbsp;to&lt;br&gt;<br>
+be&nbsp;fixed&nbsp;in&nbsp;the&nbsp;compiler.&nbsp; Or&nbsp;there&nbsp;could&nbsp;be&nbsp;a&nbsp;bug&nbsp;in&nbsp;some&nbsp;module&lt;br&gt;<br>
+initialization&nbsp;in&nbsp;Core&nbsp;that&nbsp;is&nbsp;using&nbsp;C-bindings&nbsp;(less&nbsp;likely,&nbsp;I&#39;m&nbsp;not&lt;br&gt;<br>
+aware&nbsp;of&nbsp;anything&nbsp;that&nbsp;could&nbsp;cause&nbsp;this).&lt;br&gt;<br>
+&lt;br&gt;<br>
+Regards,&lt;br&gt;<br>
+Markus&lt;br&gt;<br>
+&lt;br&gt;<br>
+--&lt;br&gt;<br>
+Markus&nbsp;Mottl&nbsp; &nbsp; &nbsp; &nbsp; &lt;a&nbsp;href=&quot;http://www.ocaml.info&quot;&nbsp;target=&quot;_blank&quot;&gt;http://www.ocaml.info&lt;/a&gt;&nbsp; &nbsp; &nbsp; &nbsp; &lt;a&nbsp;href=&quot;mailto:markus.mottl@gmail.com&quot;&gt;markus.mottl@gmail.com&lt;/a&gt;&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

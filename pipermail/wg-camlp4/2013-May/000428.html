@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Raw representation of literals in the parsetree
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Raw%20representation%20of%20literals%20in%20the%20parsetree&In-Reply-To=%3CCANcqPu4EqvbcLZtaWoU8iT_LOcmN27hEtzSHOKejyfy5i9-LmQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000427.html">
+   <LINK REL="Next"  HREF="000419.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Raw representation of literals in the parsetree</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Raw%20representation%20of%20literals%20in%20the%20parsetree&In-Reply-To=%3CCANcqPu4EqvbcLZtaWoU8iT_LOcmN27hEtzSHOKejyfy5i9-LmQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Raw representation of literals in the parsetree">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Thu May 23 17:15:11 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000427.html">[wg-camlp4] Raw representation of literals in the parsetree
+</A></li>
+        <LI>Next message: <A HREF="000419.html">[wg-camlp4] nested quotation lexing problem?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#428">[ date ]</a>
+              <a href="thread.html#428">[ thread ]</a>
+              <a href="subject.html#428">[ subject ]</a>
+              <a href="author.html#428">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi, Jeremie, I think it's reasonable to change the lexer.
+FYI, camlp4's lexer works this way
+
+
+On Thu, May 23, 2013 at 11:26 AM, Jeremie Dimino &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">jdimino at janestreet.com</A>&gt;wrote:
+
+&gt;<i> We discussed it further with Alain but it turns out it doesn't work
+</I>&gt;<i> very well.  A constant may be composed of several tokens so it is not
+</I>&gt;<i> possible to have the exact raw representation.  And for strings one
+</I>&gt;<i> can use the new quoted strings which are already treated as raw
+</I>&gt;<i> strings.
+</I>&gt;<i>
+</I>&gt;<i> Another possibility would be to modify the lexer so that it doesn't
+</I>&gt;<i> 'evaluate' tokens immediately and let the parser do it.  At least it
+</I>&gt;<i> would avoid this kind of thing:
+</I>&gt;<i>
+</I>&gt;<i>   # max_int;;
+</I>&gt;<i>   - : int = 4611686018427387903
+</I>&gt;<i>   # 4611686018427387904;;
+</I>&gt;<i>   - : int = -4611686018427387904
+</I>&gt;<i>
+</I>&gt;<i> On Thu, May 2, 2013 at 2:00 PM, Gabriel Scherer
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; I think it is very reasonable, and would be a good fit for Alain's
+</I>&gt;<i> branch.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; On Thu, May 2, 2013 at 1:35 PM, Jeremie Dimino &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">jdimino at janestreet.com</A>&gt;
+</I>&gt;<i> wrote:
+</I>&gt;<i> &gt;&gt; Hi,
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; We recently felt the need to write a new extension that would check
+</I>&gt;<i> &gt;&gt; integer literals.  The goal is to verify that ones containing
+</I>&gt;<i> &gt;&gt; underscores match a specific regular expression.  Namely digits are
+</I>&gt;<i> &gt;&gt; grouped by 3.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; We can do that for instance with a camlp4 token filter, but we wanted
+</I>&gt;<i> &gt;&gt; to try with ppx.  It is currently not possible to do it by looking at
+</I>&gt;<i> &gt;&gt; the parsetree since constants are already evaluated (integers are
+</I>&gt;<i> &gt;&gt; represented by an OCaml int) and the raw form is lost.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; One solution would be to add the raw representation of constants in
+</I>&gt;<i> &gt;&gt; the parsetree. For instance by changing Asttypes.constant to:
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; ,----
+</I>&gt;<i> &gt;&gt; | type constant_value =
+</I>&gt;<i> &gt;&gt; |     Const_int of int
+</I>&gt;<i> &gt;&gt; |   | Const_char of char
+</I>&gt;<i> &gt;&gt; |   | Const_string of string
+</I>&gt;<i> &gt;&gt; |   | Const_float of string
+</I>&gt;<i> &gt;&gt; |   | Const_int32 of int32
+</I>&gt;<i> &gt;&gt; |   | Const_int64 of int64
+</I>&gt;<i> &gt;&gt; |   | Const_nativeint of nativeint
+</I>&gt;<i> &gt;&gt; |
+</I>&gt;<i> &gt;&gt; | type constant = constant_value * string
+</I>&gt;<i> &gt;&gt; `----
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; I believe it could also be useful for other rewriters, especially ones
+</I>&gt;<i> &gt;&gt; dealing with strings since they would be able to compute the correct
+</I>&gt;<i> &gt;&gt; location inside a string. And maybe also for printing: Pprintast could
+</I>&gt;<i> &gt;&gt; use the representation choosed by the programmer instead of a
+</I>&gt;<i> &gt;&gt; standardized one.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Do people thinks that this a reasonable thing to add to the OCaml
+</I>&gt;<i> &gt;&gt; parsetree? If yes I can do the modification.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Jeremie
+</I>&gt;<i> &gt;&gt; _______________________________________________
+</I>&gt;<i> &gt;&gt; wg-camlp4 mailing list
+</I>&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Jeremie
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130523/5577b50b/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130523/5577b50b/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000427.html">[wg-camlp4] Raw representation of literals in the parsetree
+</A></li>
+	<LI>Next message: <A HREF="000419.html">[wg-camlp4] nested quotation lexing problem?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#428">[ date ]</a>
+              <a href="thread.html#428">[ thread ]</a>
+              <a href="subject.html#428">[ subject ]</a>
+              <a href="author.html#428">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

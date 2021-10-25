@@ -1,0 +1,877 @@
+From andi.m.mcclure at gmail.com  Mon Aug 10 06:05:00 2015
+From: andi.m.mcclure at gmail.com (Andi McClure)
+Date: Sun, 9 Aug 2015 22:05:00 -0700
+Subject: [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+In-Reply-To: <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+References: <CAJDLOY+9OjHtkGp8stmZhDT1dhj6KmtCfhNyNKDM8mORt+DvCA@mail.gmail.com>
+ <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+Message-ID: <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+
+Hello?
+
+Thanks Jeremy for this response. After some time I've been able to come
+back and try these things out. I do have some new questions :) I might
+write this out a little more verbosely than I need to just to be certain
+I'm speaking precisely.
+
+I have a test program with a c function
+
+    int increment3(int x) { return x + 3; }
+
+On the OCaml side, this is accessed as
+
+    let increment3 = foreign "increment3" (int @-> returning int) in
+    increment3 3
+
+And that works and I'm happy with it. Actually, after playing with the
+foreign / "@->" interface, I'm finding it seems to be about as good as I
+need, and I'm trying to figure out if I can use that instead of having to
+work with the low-level interfaces (which as discussed before are not
+necessarily directly exposed at this time anyway).
+
+Anyway, I'm trying to set up my OCaml-implemented interpreter, so that this
+line of code in Emily is equivalent to the "let increment3" above:
+
+    (* Just pretend .int is shorthand for "int" *)
+    increment3 = package.emily.ffi.c.function [ name = .increment3; args =
+[ .int, ]; return = .int ]
+
+The syntax could use some work :P But never mind that. I've so far got it
+where when you invoke ffi.c.function, the function specification you
+provided gets piped into OCaml and turned into this OCaml data structure:
+
+    type foreignSpec = { name : string; args : string list; returning:
+string; }
+
+This seems like a straightforward representation of the information @->
+encodes; it seems something parsing a header would need to represent the
+data the same way.
+
+My naive impulse is to imagine that this is straightforward, and I need to
+just build up a typ variable by repeatedly chaining @->, something like:
+
+    let typeConvert = function "void" -> void | "int" -> int | _ ->
+failwith "??"
+    let functionFrom spec =
+        foreign spec.name ( List.fold_right
+            ( @-> )
+            ( List.map typeConvert wrap.args )
+            ( returning ( typeConvert wrap.returning ) ) )
+
+If I start trying to implement this, OCaml immediately objects that even
+just typeConvert is impossible to compile:
+
+    Error: This expression has type int Ctypes.typ = int Ctypes_static.typ
+           but an expression was expected of type
+             unit Ctypes.typ = unit Ctypes_static.typ
+           Type int is not compatible with type unit
+
+This seems to make immediate sense: I don't fully understand what the type
+of the thing @-> returns is (Merlin says it's '_a -> '_b -> '_c ...) but it
+seems like whatever @-> may be doing, in all cases @-> or foreign actually
+gets used, the type of that @->'s return must be something known at the
+call site at compile time-- because when OCaml code invokes "foreign" OCaml
+will need to statically compile a statically typed result. So I can't
+possibly store one of the typs in a variable which could contain sometimes
+"int" and sometimes "void". I'm assuming this works something like C++
+template arguments, which are something I have a little more familiarity
+with than OCaml type variables.
+
+It seems like, if I really understood what @-> is doing, I might be able to
+maybe make this work anyway. In Emily I currently have only one "type", a
+big variant which is modeled in OCaml like:
+
+type value = Null | True | FloatValue of float | StringValue of string |
+AtomValue of string
+    | BuiltinFunctionValue of (value -> value)
+
+I eventually intend for the ffi.c.function implementation to return a
+BuiltinFunctionValue that takes an argument; either unpacks it from a
+"value" into the correct tagged type or throws an error; then packs the
+return back into an appropriately tagged "value". The "value" pack and
+unpack functions will know their types statically, so maybe in principle
+they can work in participation with whatever type-chaining trick @-> does
+and still produce well-typed code. But it's very unclear to me how to get
+started with that, or whether it will ultimately work.
+
+Do you have any thoughts on this? Is this approach (engaging foreign / @->
+directly) one which can eventually work, or should I back off and attempt
+one of the lower-level approaches mentioned in your previous email? Your
+previous email proposed building out a Ctypes_untyped with a slightly
+different interface, but it was not clear to me what implementation of that
+would look like.
+
+Thanks!
+
+ - Andi
+
+On Mon, Jun 29, 2015 at 4:16 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> Hi Andi,
+>
+> Please excuse the slow response.
+>
+> On 27 June 2015 at 14:25, Andi McClure <andi.m.mcclure at gmail.com> wrote:
+> > Hello, I have a project which is a programming language (
+> > http://emilylang.org/ ) and the current interpreter is implemented in
+> ocaml.
+> > I want to add a C FFI, and I am looking at ocaml-ctypes, but I am having
+> > trouble figuring out how best to use the ocaml-ctypes library given my
+> > project's specific needs as a language.
+>
+> Well, using ocaml-ctypes to build an FFI for another language is a bit
+> different from the usual use case of exposing a particular C library
+> to OCaml, so it'll be interesting to see how things turn out.
+>
+> > Basically: ocaml-ctypes seems to take libFFI and recast its operations in
+> > terms of ocaml idioms and primitives. This looks great if I am writing an
+> > ocaml program. However, my goal is to present an interface to libffi (or
+> > something like it) in terms of *Emily* idioms and primitives (Emily
+> being my
+> > language) so that I can write an Emily program. This means directly
+> wrapping
+> > ocaml-ctypes probably won't work out well (the ocaml idioms ocaml-ctypes
+> > uses can't all be directly represented in my language, and they might
+> come
+> > across as weird to the language users who are probably not ocaml users).
+> >
+> > My initial thought was that what I probably wanted to do was try to
+> present
+> > an interface between the interpreter and interpreted code that closely
+> > tracks the programming interface of libffi. Then I could write an
+> > in-language library on top of this with a friendlier/more idiomatic
+> > interface. (The reason I believe I want the interpreter-interpreted
+> > interface to resemble libffi is that I might someday switch from ocaml to
+> > another language, and libffi will probably be available in other contexts
+> > but ocaml-ctypes will not). Looking over the ctypes code it looked like a
+> > "raw" libffi-flavored interface might be possible using
+> > ctypes-foreign-base/ctypes_ffi.mli and the function_of_pointer interface,
+> > but it looks like this mli is present in the code but not exposed in the
+> > opam package.
+>
+> Right: that module is intended to be internal-only.  However, some of
+> the functionality is expressible via the public interface.  For
+> example, here are alternative implementations of function_of_pointer
+> and pointer_of_function using only functions that are currently
+> publicly exposed:
+>
+>   let function_of_pointer ?name ~abi ~check_errno ~release_runtime_lock fn
+> p =
+>     Ctypes.coerce (ptr void)
+>       (Foreign.funptr ?name ~abi ~check_errno
+> ~runtime_lock:release_runtime_lock fn)
+>       p
+>
+>   let pointer_of_function ~abi ~acquire_runtime_lock fn f =
+>     Ctypes.coerce (Foreign.funptr ~abi ~runtime_lock:acquire_runtime_lock
+> fn)
+>       (ptr void)
+>       f
+>
+> > What would you recommend in this case?
+>
+> I can think of three approaches that are not obviously wrong, and it's
+> likely that there are others.
+>
+> First, you might do what you've been considering already -- i.e. using
+> the low-level parts of ctypes as a basis for a more Emily-flavoured
+> libffi binding.  The two essential modules are probably
+> Ctypes_memory_stubs (src/ctypes/ctypes_memory_stubs.ml), which
+> provides an untyped API for accessing C-managed memory, and
+> Ctypes_ffi_stubs (src/ctypes-foreign-base/ctypes_ffi_stubs.ml), which
+> provides a fairly direct OCaml binding onto libffi.  Neither of these
+> modules is exposed directly, but it should be reasonably
+> straightforward to make them available by tweaking the Makefile to add
+> them to the appropriate '.public' list.
+>
+> Second, you might find some way to massage the ctypes API into a form
+> that's more suitable for use in Emily.  For example, I can imagine the
+> type parameters causing problems if you want to use the type
+> representations (for int, float, etc.) in a more uniform way.  It
+> probably wouldn't be too much work to build an 'untyped' interface on
+> top of ctypes along the following lines
+>
+>   module Ctypes_untyped :
+>   sig
+>     type typ
+>     val int : typ
+>     val float : typ
+>     val (@->) :  typ -> typ -> typ
+>     (* ... *)
+>
+> This is just a guess, of course, and perhaps there are other OCaml
+> idioms that aren't so easy to factor out.
+>
+> Finally, you might use ctypes to build a binding to libffi -- i.e.
+> just treat libffi like any other C library and describe its interface
+> using ctypes, ignoring the fact that ctypes uses libffi internally.
+> This approach isn't as absurd as it might sound at first, since recent
+> versions of ctypes make it possible to bind to C libraries by
+> generating C and OCaml code rather than by routing calls through
+> libffi, so you wouldn't necessarily end up using libffi twice.
+>
+> Feel free to ask if you'd like more detail on any of the above!
+>
+> Kind regards,
+>
+> Jeremy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150809/9d2853dd/attachment.html>
+
+From yallop at gmail.com  Tue Aug 11 10:41:28 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 11 Aug 2015 10:41:28 +0100
+Subject: [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+In-Reply-To: <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+References: <CAJDLOY+9OjHtkGp8stmZhDT1dhj6KmtCfhNyNKDM8mORt+DvCA@mail.gmail.com>
+ <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+ <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+Message-ID: <CAAxsn=Gp+XoPvhhErM3HYx3q-vj3KMibHg+ZQ6_Tkv+-iTAt5w@mail.gmail.com>
+
+On 10/08/2015, Andi McClure <andi.m.mcclure at gmail.com> wrote:
+> The syntax could use some work :P But never mind that. I've so far got it
+> where when you invoke ffi.c.function, the function specification you
+> provided gets piped into OCaml and turned into this OCaml data structure:
+>
+>     type foreignSpec = { name : string; args : string list; returning:
+> string; }
+>
+> This seems like a straightforward representation of the information @->
+> encodes; it seems something parsing a header would need to represent the
+> data the same way.
+>
+> My naive impulse is to imagine that this is straightforward, and I need to
+> just build up a typ variable by repeatedly chaining @->, something like:
+>
+>     let typeConvert = function "void" -> void | "int" -> int | _ ->
+> failwith "??"
+
+Right: it should be possible to do things like that once you've dealt
+with the typing problem you describe.
+
+The easiest approach to dealing with the fact that 'int', 'void', etc.
+have different types is to use an existential type.  Existential types
+in OCaml are a sort of variant, but defined with a different syntax;
+instead of writing something like this:
+
+   type t = A of x
+          | B of y
+
+you give the type signature for each constructor, like this:
+
+   type t = A : x -> t
+          | B : y -> t
+
+By itself that doesn't give you any extra power, and you can actually
+write any variant type definition this way.  The distinctive feature
+of existential types is that you can mention type variables on the
+right of the '=' that don't appear in the type parameters on the left.
+Here's an example:
+
+   type ty = Ty : 'a Ctypes.typ -> ty
+
+As the type signature says, 'Ty' takes a value of type 'a Ctypes.typ'
+for any type 'a' and builds a value of type 'ty'.  You can therefore
+use 'Ty' to wrap Ctypes.typ values of different types up as 'ty'
+values.  For example, you can build a list of typs:
+
+   # [Ty void; Ty int];;
+   - : ty list = [Ty void; Ty int]
+
+and you can wrap the variously-typed results of your 'typeConvert'
+function so that they all have the same type 'ty':
+
+   let typeConvert = function
+       "void" -> Ty void
+     | "int" -> Ty int
+     | _ -> failwith "??"
+
+The same difficulty arises with 'Ctypes.fn' and your 'functionFrom'
+definition, which needs to build function type descriptions of all
+sorts of different types.  Here's a second existential type which
+wraps 'Ctypes.fn':
+
+   type fn = Fn : ('a -> 'b) Ctypes.fn -> fn
+
+This time the type signature says that 'Fn' takes a value of type '(a
+-> b) Ctypes.fn' for any types 'a' and 'b' and builds a value of type
+'fn'.  It should be possible to build something like 'functionFrom'
+that wraps and unwraps intermediate values using 'Ty' and 'Fn' to deal
+with the immediate typing problems (leaving the interesting question
+of how to turn the function returned by 'Foreign.foreign' into
+something that can be called from your interpreter).
+
+I hope that helps a bit.
+
+Kind regards,
+
+Jeremy.
+
+From andi.m.mcclure at gmail.com  Fri Aug 14 22:58:26 2015
+From: andi.m.mcclure at gmail.com (Andi McClure)
+Date: Fri, 14 Aug 2015 14:58:26 -0700
+Subject: [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+In-Reply-To: <CAAxsn=Gp+XoPvhhErM3HYx3q-vj3KMibHg+ZQ6_Tkv+-iTAt5w@mail.gmail.com>
+References: <CAJDLOY+9OjHtkGp8stmZhDT1dhj6KmtCfhNyNKDM8mORt+DvCA@mail.gmail.com>
+ <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+ <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+ <CAAxsn=Gp+XoPvhhErM3HYx3q-vj3KMibHg+ZQ6_Tkv+-iTAt5w@mail.gmail.com>
+Message-ID: <CAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag@mail.gmail.com>
+
+Thanks again? I have an update and then another question or three.
+
+With help from people on IRC, I have a working version of this now. You can
+find it here:
+https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default
+And a demo of the code running:
+https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large
+
+What I have is a module FfiSupport. It is based around functions
+cToValueFor and a valueToCFor, which given a type name can spit out a
+converter from any specified C type to my "value" variant, or a converter
+from my "value" variant to any specified C type. The 'ctype->value (or vice
+versa) "converter" function comes paired with a ctypes typ, so I can pass
+that directly into 'foreign'. The key part is:
+
+      let ValueToCFn (argType, argConvert) = valueToCFor argTypeName in
+      let CToValueFn (retType, retConvert) = cToValueFor retTypeName in
+      let ffi_binding = foreign name (argType @-> returning retType) in
+      fun arg -> retConvert (ffi_binding (argConvert arg))
+
+So that is very satisfying, but there is an obvious problem, which is that
+this only works for unary functions. I need it to work for functions of any
+arity.
+
+I have an intuition about how to do this, but a couple of days of tinkering
+have gotten me nowhere and I am very concerned about whether, if I
+completed my implementation, OCaml could type it. I'd like to describe this
+possibly-unworkable solution, and then ask a question.
+
+My thought is this: If I have for example a 2-ary function, I feel like I
+need to construct two things, an ocaml-ctypes type spec ('a typ @-> 'b typ
+@-> returning 'c typ), and a function ('a -> 'b ->
+'c)->(value->value->value).
+
+So maybe the way I achieve this is I construct a base function ('a ->
+'b)->(value->value), and then I construct a "successor" function which
+transforms
+('b typ @-> ... @-> returning 'z typ) and ('b -> ... ->
+'z)->(value->...->value)
+into
+('a typ @-> 'b typ @-> ... @-> returning 'z typ) and ('a->'b -> ... ->
+'z)->(value->value->...->value).
+I hope, if I could implement this "successor" function, it would all stay
+within what the existential types feature can type sensibly, and this will
+compile :) but, I am feeling stymied, and in my tries so far I haven't
+really even succeeded in formulating the ('a->'b)->(value->value) "base
+case". (This is as far as I got
+https://bitbucket.org/runhello/test-emily-game/src/86e8bf4598e64ef0e1288f5cc6b86f70287d378b/src/internalPackage.ml?at=default
+and
+line 56 is... wrong.) The problem seems to be that the OCaml type system is
+not set up to describe curried functions of indeterminate arity; I have no
+idea what the type signature for my "successor" function would even look
+like.
+
+So, my question is: How would you recommend attacking the n-arity case? Do
+you think this will even be possible?
+
+OCaml-ctypes must have a solution to this kind of problem because it itself
+works with functions of arbitrary arity. Could I unify my implementation
+approach better with OCaml-ctypes's?
+
+I notice that OCaml-ctypes on the inside seems to be working with a thing
+like:
+type _ fn =
+  | Returns  : 'a typ   -> 'a fn
+  | Function : 'a typ * 'b fn  -> ('a -> 'b) fn
+This looks much superior to what I am doing, which is pure noodly function
+manipulation. It seems like I would benefit a lot from using something like
+that, with my retConvert and argConvert list embedded in the structure. But
+it is unclear to me how to get from what I have to there (GADTs are very
+new to me) and, I'm not sure if THAT will ultimately be permitted by the
+OCaml type checker either!
+
+Any advice welcome, in the meantime I am going to try just starting by
+manually writing out 2-ary, 3-ary, 4-ary implementations to unblock this
+particular project in the short term, and probably reading the Types and
+Programming Languages chapter on existential types to see if it leaves me
+less confused. >_>
+
+One last thing. You mentioned in a previous email the idea of a
+"Ctypes_untyped"
+module. I think if I got this working, it would *probably* be something
+that could be generalized by making a first-class module paramerizing the
+value type and the "constructor factory" functions. It seems like a is a
+useful thing. If this eventually worked, would it be eventually worth
+submitting that parameterized Ctypes_variant back to ocaml-ctypes as a pull
+request?
+
+Thanks again!
+
+- Andi
+
+On Tue, Aug 11, 2015 at 2:41 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 10/08/2015, Andi McClure <andi.m.mcclure at gmail.com> wrote:
+> > The syntax could use some work :P But never mind that. I've so far got it
+> > where when you invoke ffi.c.function, the function specification you
+> > provided gets piped into OCaml and turned into this OCaml data structure:
+> >
+> >     type foreignSpec = { name : string; args : string list; returning:
+> > string; }
+> >
+> > This seems like a straightforward representation of the information @->
+> > encodes; it seems something parsing a header would need to represent the
+> > data the same way.
+> >
+> > My naive impulse is to imagine that this is straightforward, and I need
+> to
+> > just build up a typ variable by repeatedly chaining @->, something like:
+> >
+> >     let typeConvert = function "void" -> void | "int" -> int | _ ->
+> > failwith "??"
+>
+> Right: it should be possible to do things like that once you've dealt
+> with the typing problem you describe.
+>
+> The easiest approach to dealing with the fact that 'int', 'void', etc.
+> have different types is to use an existential type.  Existential types
+> in OCaml are a sort of variant, but defined with a different syntax;
+> instead of writing something like this:
+>
+>    type t = A of x
+>           | B of y
+>
+> you give the type signature for each constructor, like this:
+>
+>    type t = A : x -> t
+>           | B : y -> t
+>
+> By itself that doesn't give you any extra power, and you can actually
+> write any variant type definition this way.  The distinctive feature
+> of existential types is that you can mention type variables on the
+> right of the '=' that don't appear in the type parameters on the left.
+> Here's an example:
+>
+>    type ty = Ty : 'a Ctypes.typ -> ty
+>
+> As the type signature says, 'Ty' takes a value of type 'a Ctypes.typ'
+> for any type 'a' and builds a value of type 'ty'.  You can therefore
+> use 'Ty' to wrap Ctypes.typ values of different types up as 'ty'
+> values.  For example, you can build a list of typs:
+>
+>    # [Ty void; Ty int];;
+>    - : ty list = [Ty void; Ty int]
+>
+> and you can wrap the variously-typed results of your 'typeConvert'
+> function so that they all have the same type 'ty':
+>
+>    let typeConvert = function
+>        "void" -> Ty void
+>      | "int" -> Ty int
+>      | _ -> failwith "??"
+>
+> The same difficulty arises with 'Ctypes.fn' and your 'functionFrom'
+> definition, which needs to build function type descriptions of all
+> sorts of different types.  Here's a second existential type which
+> wraps 'Ctypes.fn':
+>
+>    type fn = Fn : ('a -> 'b) Ctypes.fn -> fn
+>
+> This time the type signature says that 'Fn' takes a value of type '(a
+> -> b) Ctypes.fn' for any types 'a' and 'b' and builds a value of type
+> 'fn'.  It should be possible to build something like 'functionFrom'
+> that wraps and unwraps intermediate values using 'Ty' and 'Fn' to deal
+> with the immediate typing problems (leaving the interesting question
+> of how to turn the function returned by 'Foreign.foreign' into
+> something that can be called from your interpreter).
+>
+> I hope that helps a bit.
+>
+> Kind regards,
+>
+> Jeremy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150814/f8e1a4de/attachment.html>
+
+From yallop at gmail.com  Mon Aug 17 11:20:34 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 17 Aug 2015 11:20:34 +0100
+Subject: [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+In-Reply-To: <CAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag@mail.gmail.com>
+References: <CAJDLOY+9OjHtkGp8stmZhDT1dhj6KmtCfhNyNKDM8mORt+DvCA@mail.gmail.com>
+ <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+ <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+ <CAAxsn=Gp+XoPvhhErM3HYx3q-vj3KMibHg+ZQ6_Tkv+-iTAt5w@mail.gmail.com>
+ <CAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag@mail.gmail.com>
+Message-ID: <CAAxsn=FxTtC55YhdEQ-kZ5jW3jYMgPypgyDE6GnJ_+qk8LviEg@mail.gmail.com>
+
+On 14/08/2015, Andi McClure <andi.m.mcclure at gmail.com> wrote:
+> With help from people on IRC, I have a working version of this now. You can
+> find it here:
+> https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default
+> And a demo of the code running:
+> https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large
+
+Thanks for the update!  It's great to see the foreign call working end-to-end.
+
+> What I have is a module FfiSupport. It is based around functions
+> cToValueFor and a valueToCFor, which given a type name can spit out a
+> converter from any specified C type to my "value" variant, or a converter
+> from my "value" variant to any specified C type. The 'ctype->value (or vice
+> versa) "converter" function comes paired with a ctypes typ, so I can pass
+> that directly into 'foreign'. The key part is:
+>
+>       let ValueToCFn (argType, argConvert) = valueToCFor argTypeName in
+>       let CToValueFn (retType, retConvert) = cToValueFor retTypeName in
+>       let ffi_binding = foreign name (argType @-> returning retType) in
+>       fun arg -> retConvert (ffi_binding (argConvert arg))
+
+This looks like a sensible scheme.
+
+> So that is very satisfying, but there is an obvious problem, which is that
+> this only works for unary functions. I need it to work for functions of any
+> arity.
+
+I think that should be possible.
+
+> I have an intuition about how to do this, but a couple of days of tinkering
+> have gotten me nowhere and I am very concerned about whether, if I
+> completed my implementation, OCaml could type it. I'd like to describe this
+> possibly-unworkable solution, and then ask a question.
+>
+> My thought is this: If I have for example a 2-ary function, I feel like I
+> need to construct two things, an ocaml-ctypes type spec ('a typ @-> 'b typ
+> @-> returning 'c typ), and a function ('a -> 'b ->
+> 'c)->(value->value->value).
+
+Yes, except that things will become easier if you give the second thing the type
+
+   ('a -> 'b -> 'c) -> value
+
+by applying the BuiltinFunctionValue constructor at appropritate
+points, since then every bound function will have the same type,
+regardless of arity.
+
+> So maybe the way I achieve this is I construct a base function ('a ->
+> 'b)->(value->value), and then I construct a "successor" function which
+> transforms
+> ('b typ @-> ... @-> returning 'z typ) and ('b -> ... ->
+> 'z)->(value->...->value)
+> into
+> ('a typ @-> 'b typ @-> ... @-> returning 'z typ) and ('a->'b -> ... ->
+> 'z)->(value->value->...->value).
+
+Right.  So, more concretely, if you're building a binding to a C
+function of type
+
+   void(float, int)
+
+you want to build a Ctypes type representation
+
+   float @-> int @-> returning void
+
+and a conversion function of type
+
+   (float -> int -> unit) -> value
+
+for turning the function returned from Foreign.foreign into an Emily
+value, like this:
+
+   let ffi_binding = foreign name (argType @-> returning retType) in
+   convert ffi_binding
+
+So the "successor" function should turn the type representation from this
+
+   int @-> returning void
+
+into this
+
+   float @-> int @-> returning void
+
+and it should turn the OCaml-to-Emily conversion function from
+something of this type
+
+  (int -> unit) -> value
+
+into something of this type
+
+  (float -> int -> unit) -> value
+
+Converting the type representation is the easy part, since you can
+just use '@->' to add the new argument type:
+
+  let unary = int @-> returning void in
+    float @-> unary
+
+Converting the OCaml-to-Emily function involves writing something of type
+
+  ((int -> unit) -> value) -> (float -> int -> unit) -> value
+
+i.e. something that looks like this:
+
+  fun
+   (f : ((int -> unit) -> value))
+   (g : (float -> int -> unit)) ->
+      (... : value)
+
+where the '...' is somehow built from 'f' and 'g' and has type
+'value'.  Of course, filling in the '...' is the tricky part, but the
+types help quite a bit.  First, since you're extending the conversion
+function to take an extra argument you know that the result should be
+constructed using BuiltinFunctionValue:
+
+  fun
+   (f : ((int -> unit) -> value))
+   (g : (float -> int -> unit)) ->
+      (BuiltinFunctionValue
+        (fun (x : value) -> (... : value)))
+
+Next, you know that x should hold a float, so you can unpack it:
+
+  let float_of_value = function
+    Value.FloatValue y -> y
+  | _ -> failwith "type error"
+
+  fun
+   (f : ((int -> unit) -> value))
+   (g : (float -> int -> unit)) ->
+      (BuiltinFunctionValue
+         (fun (x : value) ->
+            let y = float_of_value x in
+               (... : value)))
+
+What can you do with 'y'?  There's only one function around that takes
+a float, namely 'g', so you can pass 'y' to 'g'. (Thinking through
+this decision a little more carefully reveals that it is actually the
+right thing to do, since 'g' is the function returned from
+'Foreign.foreign', and 'y' is the argument passed in to that function
+from an Emily program.)
+
+  fun
+   (f : ((int -> unit) -> value))
+   (g : (float -> int -> unit)) ->
+      (BuiltinFunctionValue
+         (fun (x : value) ->
+            let y = float_of_value x in
+            let h : int -> unit = g y in
+               (... : value)))
+
+Finally, we have a value, 'h', of type 'int -> unit', and there's
+exactly one obvious thing to do with it (which once again also turns
+out to be the correct thing): pass it to 'f' to build a 'value':
+
+  fun
+   (f : ((int -> unit) -> value))
+   (g : (float -> int -> unit)) ->
+      (BuiltinFunctionValue
+         (fun (x : value) ->
+            let y = float_of_value x in
+            let h : int -> unit = g y in
+              (f h : value)))
+
+This is sufficient to support this particular example ('float -> int
+-> unit'), and it's not difficult to generalise it to handle extending
+functions of any arity and type by removing the type ascriptions and
+turning the 'float_of_value' function into a parameter:
+
+  let extend_fn =
+     fun of_value f g ->
+      (BuiltinFunctionValue
+         (fun x ->
+            let y = of_value x in
+            let h = g y in
+              f h))
+
+which can be written more simply as
+
+   let extend_fn of_value f g = BuiltinFunctionValue (fun x -> f (g
+(of_value x)))
+
+Now 'extend_fn' can be used to build conversions between functions of
+arbitrary arity.  For example:
+
+   # extend_fn float_of_value value_of_string;;
+   - : (float -> string) -> value = <fun>
+   # extend_fn string_of_value (extend_fn float_of_value value_of_string);;
+   - : (string -> float -> string) -> value = <fun>
+   # extend_fn string_of_value (extend_fn string_of_value (extend_fn
+float_of_value value_of_string));;
+   - : (string -> string -> float -> string) -> value = <fun>
+
+Kind regards,
+
+Jeremy.
+
+From yallop at gmail.com  Mon Aug 17 11:24:13 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 17 Aug 2015 11:24:13 +0100
+Subject: [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+In-Reply-To: <CAAxsn=FxTtC55YhdEQ-kZ5jW3jYMgPypgyDE6GnJ_+qk8LviEg@mail.gmail.com>
+References: <CAJDLOY+9OjHtkGp8stmZhDT1dhj6KmtCfhNyNKDM8mORt+DvCA@mail.gmail.com>
+ <CAAxsn=FataxoOXh+haz1E3a6XXNVhjxiWw6O6wCsr+qM+=Lrkw@mail.gmail.com>
+ <CAJDLOYK=QaFYMLc_DJOjiDOW2G8tMvyA9GRuuOjpVbb8Z001Sw@mail.gmail.com>
+ <CAAxsn=Gp+XoPvhhErM3HYx3q-vj3KMibHg+ZQ6_Tkv+-iTAt5w@mail.gmail.com>
+ <CAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag@mail.gmail.com>
+ <CAAxsn=FxTtC55YhdEQ-kZ5jW3jYMgPypgyDE6GnJ_+qk8LviEg@mail.gmail.com>
+Message-ID: <CAAxsn=HHr85tCkG3dR4tDdfhR0ZNEbhL2-JW=qJxKdX_2LA8yg@mail.gmail.com>
+
+I thought I'd rejig the conversions a bit and put together a complete
+working example.
+
+First, the value type definition from an earlier message:
+
+   type value =
+      Null
+    | True
+    | FloatValue of float
+    | StringValue of string
+    | AtomValue of string
+    | BuiltinFunctionValue of (value -> value)
+
+Next, a module for converting back and forth between Emily values and
+OCaml values.  This combines the two conversions that you currently
+store in the 'valueToCFn' and 'cToValueFn' types.
+
+  module Conversion :
+  sig
+     type 'a t
+     (** A value of type 'a t' can be used to convert between
+         the types 'value' and 'a' *)
+
+     val val_of : 'a t -> ('a -> value)
+     val of_val : 'a t -> (value -> 'a)
+
+     val float : float t
+     (** Conversions for floats *)
+
+     val (^->) : 'a t -> 'b t -> ('a -> 'b) t
+     (** Conversions for functions *)
+  end =
+  struct
+    type 'a t = { val_of: 'a -> value;
+                  of_val: value -> 'a }
+
+    (* If you're not keen on puns, you can write
+       'let val_of c = c.val_of' etc. instead *)
+    let val_of {val_of} = val_of
+    let of_val {of_val} = of_val
+
+    let value_of_float f = FloatValue f
+
+    let float_of_value = function
+      | FloatValue f -> f
+      | _ -> failwith "Expected float"
+
+    let float = { val_of = value_of_float;
+                  of_val = float_of_value }
+
+    let value_of_function arg ret f =
+       BuiltinFunctionValue (fun x -> val_of ret (f (of_val arg x)))
+
+    let function_of_value arg ret = function
+      | BuiltinFunctionValue f -> (fun x -> of_val ret (f (val_of arg x)))
+      | _ -> failwith "Expected function"
+
+    let (^->) arg ret = { val_of = value_of_function arg ret;
+                          of_val = function_of_value arg ret }
+  end
+
+(I've chosen '^->' for the Conversion.t function value because
+operators beginning with '^' associate right, so 'x ^-> y ^-> z' means
+'x ^-> (y ^-> z)' rather than '(x ^-> y) ^-> z', just as in the
+corresponding OCaml function types.)
+
+Here's the conversion module in action:
+
+   # Conversion.(of_val (float ^-> float));;
+   - : value -> float -> float = <fun>
+   # Conversion.(val_of (float ^-> float));;
+   - : (float -> float) -> value = <fun>
+   # Conversion.(val_of (float ^-> float ^-> float));;
+   - : (float -> float -> float) -> value = <fun>
+   # Conversion.(of_val ((float ^-> float) ^-> float));;
+   - : value -> (float -> float) -> float = <fun>
+
+Let's use these conversions to write the general function that binds C
+functions using Ctypes and exposes them to Emily.  The following two
+types play a similar role to valueToCFn etc., combining a type
+representation and a conversion function:
+
+   type ty = Ty : 'a Ctypes.typ * 'a Conversion.t -> ty
+   type fn = Fn : ('a -> 'b) Ctypes.fn * ('a -> 'b) Conversion.t -> fn
+
+Here's the analogue of your 'typeConvert' function:
+
+   let typeConvert = function
+       "float" -> Ty (Ctypes.float, Conversion.float)
+     | _ -> failwith "??"
+
+Next comes a slightly irritating part.  Since 'Foreign.foreign'
+doesn't support nullary functions the base case for binding is the one
+argument function type.  So for a function with arguments 'a', 'b',
+'c' and 'd' and return type 'e' we'll need to to build an initial
+function specification from 'd' and 'e', then fold in the other
+argument types ('a', 'b', 'c').  Towards that goal here's a function
+which splits a list into its initial elements and last element:
+
+   (* 'a list -> 'a list * 'a *)
+  let split_last l =
+  let rec loop aux = function
+      [] -> invalid_arg "split_last"
+    | [x] -> List.rev aux, x
+    | x :: xs -> loop (x :: aux) xs
+  in loop [] l
+
+  # split_last ['a'; 'b'; 'c'; 'd'];;
+  - : char list * char = (['a'; 'b'; 'c'], 'd')
+
+We now have all the bits we need to write the binding function.  The
+following builds type representations and conversions in parallel,
+then combines them at the end, like your 'valueForeignUnary':
+
+  (* val functionFrom : string -> string list -> string -> value *)
+  let functionFrom name args returning =
+    let args, last_arg = split_last args in
+    let Ty (rty, r) = typeConvert returning in
+    let Ty (aty, a) = typeConvert last_arg in
+    let Fn (fnty, fn) = List.fold_right
+      (fun arg (Fn (fty, f)) ->
+        let Ty (tty, t) = typeConvert arg in
+        Fn (Ctypes.(tty @-> fty), Conversion.(t ^-> f)))
+      args
+      (Fn (Ctypes.(aty @-> returning rty), Conversion.(a ^-> r)))
+    in Conversion.val_of fn (Foreign.foreign name fnty)
+
+In order to test it'll be helpful to have an 'apply' function:
+
+   (* val ( $ ) : value -> value -> value *)
+   let ($) f p = match f with
+       BuiltinFunctionValue f -> f p
+     | _ -> failwith "Application of non-function"
+
+Here's an example of using 'functionFrom' to call a unary function
+from the C standard library:
+
+   # let expf = functionFrom "expf" ["float"] "float";;
+   val expf : value = BuiltinFunctionValue <fun>
+   # expf $ FloatValue 1.0;;
+   - : value = FloatValue 2.71828174591064453
+
+And here's a call to a binary function:
+
+   # let powf = functionFrom "powf" ["float"; "float"] "float";;
+   val powf : value = BuiltinFunctionValue <fun>
+   # powf $ FloatValue 2.0 $ FloatValue 3.0;;
+   - : value = FloatValue 8.
+
+I hope that helps, but feel free to follow up on anything that's unclear!
+
+Kind regards,
+
+Jeremy.
+

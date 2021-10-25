@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> build-and-install
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20build-and-install&In-Reply-To=%3CCACLX4jRi7U4CZVMR81B8tamMNPWGM3VveS%3D97FfQT%2B2apjhnQA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001068.html">
+   <LINK REL="Next"  HREF="001071.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>build-and-install</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20build-and-install&In-Reply-To=%3CCACLX4jRi7U4CZVMR81B8tamMNPWGM3VveS%3D97FfQT%2B2apjhnQA%40mail.gmail.com%3E"
+       TITLE="build-and-install">yminsky at janestreet.com
+       </A><BR>
+    <I>Sat Jan 28 12:25:34 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001068.html">build-and-install
+</A></li>
+        <LI>Next message: <A HREF="001071.html">build-and-install
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1070">[ date ]</a>
+              <a href="thread.html#1070">[ thread ]</a>
+              <a href="subject.html#1070">[ subject ]</a>
+              <a href="author.html#1070">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I can confirm that I can build from Markus' tree (except for Async, which
+I'm still working on).  Right now it looks like native-code executables
+work (at least, very trivial ones do), but byte-code using core fails right
+out of the gate:
+
+unique1 $ ./unique
+Fatal error: unknown C primitive `unix_get_terminal_size'
+
+Looks to me like we've got some more portability issues to resolve.
+
+By the way, we've done some more work we've done of late on how to deal
+with non-portable code.  We're going to start having functions that are
+platform dependent show up as possibly being absent explicitly in the
+signature.  So, you might have a function like:
+
+  val some_linux_specific_hack : (float -&gt; int -&gt; bool) Or_error.t
+
+Which means that your code can now at run-time respond to whether or not
+the functionality in question is there or not.  This should make it so that
+the IFDEFs required are restricted to the module that implements the
+functionality, and the rest of the codebase can operated using ordinary
+OCaml.
+
+y
+
+On Thu, Jan 26, 2012 at 8:51 PM, Markus Mottl &lt;<A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>&gt;wrote:
+
+&gt;<i> Hi everybody,
+</I>&gt;<i>
+</I>&gt;<i> I have managed to completely build all libraries on my Mac using my
+</I>&gt;<i> fork of ocaml-core (ocaml-core-mmottl).  This fork incorporates all
+</I>&gt;<i> changes from the previously &quot;official&quot; releases of type-conv,
+</I>&gt;<i> bin-prot, and sexplib on OCaml Forge.
+</I>&gt;<i>
+</I>&gt;<i> Sadly, there still seem to be issues with Oasis (I'm using 0.2.0, the
+</I>&gt;<i> one in Godi) that lead to incorrect link flags.  It is hence still not
+</I>&gt;<i> possible to actually build applications.  Sylvain, could you please
+</I>&gt;<i> look into this?  It seems the library linker (ocamlc/ocamlopt -a) gets
+</I>&gt;<i> an extra library argument that shouldn't be there.  E.g.
+</I>&gt;<i> lib/libbin_prot.a in the following build log entry of bin-prot:
+</I>&gt;<i>
+</I>&gt;<i>  ocamlfind ocamlopt -a -cclib -lbin_prot lib/bin_prot.cmx
+</I>&gt;<i> lib/libbin_prot.a -o lib/bin_prot.cmxa
+</I>&gt;<i>
+</I>&gt;<i> I think it is related to the following myocamlbuild.ml lines:
+</I>&gt;<i>
+</I>&gt;<i> ----------
+</I>&gt;<i>  (* When ocaml link something that use the C library, then one
+</I>&gt;<i>      need that file to be up to date.
+</I>&gt;<i>    *)
+</I>&gt;<i>    dep  [&quot;link&quot;; &quot;ocaml&quot;; &quot;use_lib&quot;^lib]
+</I>&gt;<i>      [dir/&quot;lib&quot;^lib^&quot;.&quot;^(!Options.ext_lib)];
+</I>&gt;<i> ----------
+</I>&gt;<i>
+</I>&gt;<i> &quot;link&quot; used to be &quot;compile&quot; in a different version of Oasis, not sure
+</I>&gt;<i> which one.  It seemed to work there.  It would be great if we could
+</I>&gt;<i> all agree on the Oasis version to use, preferably the one in Godi,
+</I>&gt;<i> which is easy to install.
+</I>&gt;<i>
+</I>&gt;<i> Regards,
+</I>&gt;<i> Markus
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Markus Mottl        <A HREF="http://www.ocaml.info">http://www.ocaml.info</A>        <A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120128/155a4516/attachment-0001.html">http://lists.ocaml.org/pipermail/core/attachments/20120128/155a4516/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001068.html">build-and-install
+</A></li>
+	<LI>Next message: <A HREF="001071.html">build-and-install
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1070">[ date ]</a>
+              <a href="thread.html#1070">[ thread ]</a>
+              <a href="subject.html#1070">[ subject ]</a>
+              <a href="author.html#1070">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

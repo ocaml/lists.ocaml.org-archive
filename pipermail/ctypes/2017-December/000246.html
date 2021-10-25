@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with strings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C1A47B410-EF50-455C-B549-3CF320C33469%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000245.html">
+   <LINK REL="Next"  HREF="000247.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with strings</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C1A47B410-EF50-455C-B549-3CF320C33469%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] Help with strings">skaller at internode.on.net
+       </A><BR>
+    <I>Mon Dec 25 21:44:57 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000245.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+        <LI>Next message: <A HREF="000247.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#246">[ date ]</a>
+              <a href="thread.html#246">[ thread ]</a>
+              <a href="subject.html#246">[ subject ]</a>
+              <a href="author.html#246">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi!
+
+I have not been able to understand well enough how the
+memory management protocols work.
+
+In C, there is a problem that pointed at objects, especially char*
+and char** are used as parameters and return values but the
+type does not specify ownership. This has to be done in comments.
+
+The method of binding is different. For example
+
+	char const *get_version();
+	char *get_buffer();
+	char *strdup(char *);
+
+
+The first function returns a pointer to an immutable global object.
+The second to a mutable part of a buffer.
+The third to a freshly malloc()ed copy of a NTBS.
+
+Also, strdup is accepting a string argument which it does not own
+so the caller must free it if the caller allocated it. The return value
+belongs to the caller so must be freed.
+
+Obviously &#8220;returning string&#8221; Ctypes spec is not going to work for
+all three of these return types and it isn&#8217;t clear how &#8220;string&#8221;
+works for the strdup argument. The string would be invisible to
+the Ocaml caller, so how does it get freed? Ctypes can&#8217;t know
+when to free it. 
+
+Here&#8217;s another example:
+
+	memcpy (a,b,n)
+
+which returns a copy of b, the output buffer pointer. And another
+
+	void add_opt (char **, char*)
+
+which adds the second argument to an array of NTBS (terminated
+by a NULL pointer).
+
+C types had better not delete the argument char* it creates for a string
+argument, but on the other hand, the client CANNOT delete it because
+it is hidden. Either we get a crash or a leak.
+
+So roughly, if you wanted to do it right, Ctypes &#8220;type&#8221; system is inadequate.
+The &#8220;types&#8221; must contain mutablility and ownership information.
+For example
+
+	immutable_lend_noincrementable_nonnull_pointer_char
+
+
+is better, but STILL not enough to ensure that a char const * passed to
+a function can be freed after Ctypes creates a copy of the Ocaml string
+contents (because the candidate function could return the pointer).
+
+Basically the programmer has to tell Ctypes the access method of
+every (non-scalar) object. 
+
+Of course I can do that by passing a char ptr manually created
+(C types can do that I think), copying Ocaml string contents manually
+(how?), and then manually free-ing it (C types can do that?)
+
+So roughly .. when is it safe to use &#8220;string&#8221;?
+At the moment the answer for me is &#8220;never&#8221; because I don&#8217;t understand the
+memory management protocol.
+
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000245.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+	<LI>Next message: <A HREF="000247.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#246">[ date ]</a>
+              <a href="thread.html#246">[ thread ]</a>
+              <a href="subject.html#246">[ subject ]</a>
+              <a href="author.html#246">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

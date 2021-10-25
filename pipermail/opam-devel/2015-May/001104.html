@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3CCAOCAUGP99HhCT8zbb9tAAn_ZWLqr87j2%2BtgeXkuFE3pSnZxdaA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001099.html">
+   <LINK REL="Next"  HREF="001082.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration</H1>
+    <B>Sylvain Le Gall</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3CCAOCAUGP99HhCT8zbb9tAAn_ZWLqr87j2%2BtgeXkuFE3pSnZxdaA%40mail.gmail.com%3E"
+       TITLE="[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration">sylvain+ocaml at le-gall.net
+       </A><BR>
+    <I>Thu May 21 08:00:14 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001099.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+        <LI>Next message: <A HREF="001082.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1104">[ date ]</a>
+              <a href="thread.html#1104">[ thread ]</a>
+              <a href="subject.html#1104">[ subject ]</a>
+              <a href="author.html#1104">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le mer. 20 mai 2015 &#224; 12:02, Martin Lucina &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">martin at lucina.net</A>&gt; a &#233;crit :
+
+&gt;<i> On Tuesday, 19.05.2015 at 15:58, Martin Lucina wrote:
+</I>&gt;<i> &gt; &gt; &gt;E: Failure(&quot;Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+</I>&gt;<i> &gt; &gt; &gt;doesn't exist.&quot;)
+</I>&gt;<i> &gt; &gt; &gt;
+</I>&gt;<i> &gt; &gt; &gt;This is expected; the rumprun toolchain does not support dynamic
+</I>&gt;<i> &gt; &gt; &gt;linking
+</I>&gt;<i> &gt; &gt; &gt;and I have configured the ocaml-rumprun compiler with
+</I>&gt;<i> &gt; &gt; &gt;-no-shared-libs. Is
+</I>&gt;<i> &gt; &gt; &gt;there some way to tell OASIS to not expect any shared libraries to be
+</I>&gt;<i> &gt; &gt; &gt;built?
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; Nope. OASIS is painfully inflexible, especially when cross-compiling.
+</I>&gt;<i> &gt; &gt; You can probably patch setup.ml so that it thinks that the current
+</I>&gt;<i> &gt; &gt; OCaml is built without dynlink, but this is package-specific.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Turns out it's a two-line patch, at least in the case of Lwt:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> <A HREF="https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433">https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433</A>
+</I>&gt;<i>
+</I>&gt;<i> Getting further through the list of Mirage dependencies, trying to get
+</I>&gt;<i> sexplib building for rumprun hits another different problem with OASIS:
+</I>&gt;<i>
+</I>&gt;<i> I use the following commands to build sexplib-rumprun, similar to what the
+</I>&gt;<i> android build does:
+</I>&gt;<i>
+</I>&gt;<i>   [&quot;ocaml&quot; &quot;setup.ml&quot; &quot;-configure&quot; &quot;--prefix&quot;
+</I>&gt;<i> &quot;${prefix}/x86_64-rumprun-netbsd&quot; &quot;--disable-syntax&quot;]
+</I>&gt;<i>   [&quot;ocamlbuild&quot; &quot;-use-ocamlfind&quot; &quot;-just-plugin&quot;]
+</I>&gt;<i>   [&quot;env&quot; &quot;OCAMLFIND_TOOLCHAIN=rumprun&quot; &quot;ocaml&quot; &quot;setup.ml&quot; &quot;-build&quot;]
+</I>&gt;<i>   [&quot;env&quot; &quot;OCAMLFIND_TOOLCHAIN=rumprun&quot; &quot;ocaml&quot; &quot;setup.ml&quot; &quot;-install&quot;]
+</I>&gt;<i>   [&quot;find&quot; sexplib:lib &quot;-name&quot; &quot;pa_sexp_conv.*&quot; &quot;-exec&quot; &quot;ln&quot; &quot;-sf&quot; &quot;{}&quot;
+</I>&gt;<i> &quot;%{prefix}%/x86_64-rumprun-netbsd/lib/sexplib/&quot; &quot;;&quot;] {
+</I>&gt;<i> type_conv-rumprun:installed }
+</I>&gt;<i>
+</I>&gt;<i> Now, sexplib tries to build a .cmxs which won't work with the rumprun
+</I>&gt;<i> toolchain, so I've patched its setup.ml to force native_dynlink to be
+</I>&gt;<i> false:
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch">https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>I think it would be far easier to add '--override native_dynlink false' to
+the configure step.
+
+
+&gt;<i> The problem I'm seeing is that if I run &quot;opam install sexplib-rumprun
+</I>&gt;<i> --verbose&quot;, it fails in the setup.ml -install setup with a stack overflow:
+</I>&gt;<i>
+</I>&gt;<i> - Installed
+</I>&gt;<i> /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/sexplib_unix.cmx
+</I>&gt;<i> - Installed
+</I>&gt;<i> /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/META
+</I>&gt;<i> - E: Stack overflow
+</I>&gt;<i> [ERROR] The compilation of sexplib-rumprun failed at &quot;env
+</I>&gt;<i>         OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -install&quot;.
+</I>&gt;<i>
+</I>&gt;<i> However: If I run the OPAM build commands from a shell in the build
+</I>&gt;<i> directory for sexplib, the install step works fine.
+</I>&gt;<i>
+</I>&gt;<i> Any ideas?
+</I>&gt;<i>
+</I>&gt;<i> Martin
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150521/9e66020e/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150521/9e66020e/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001099.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+	<LI>Next message: <A HREF="001082.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1104">[ date ]</a>
+              <a href="thread.html#1104">[ thread ]</a>
+              <a href="subject.html#1104">[ subject ]</a>
+              <a href="author.html#1104">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

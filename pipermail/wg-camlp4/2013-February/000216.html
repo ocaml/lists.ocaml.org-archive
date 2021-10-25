@@ -1,0 +1,273 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CPrayer.1.3.5.1302061811120.12086%40hermes-1.csi.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000215.html">
+   <LINK REL="Next"  HREF="000217.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CPrayer.1.3.5.1302061811120.12086%40hermes-1.csi.cam.ac.uk%3E"
+       TITLE="[wg-camlp4] Time for a summary?">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Feb  6 18:11:12 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000215.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000217.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#216">[ date ]</a>
+              <a href="thread.html#216">[ thread ]</a>
+              <a href="subject.html#216">[ subject ]</a>
+              <a href="author.html#216">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> Maybe a single post
+</I>&gt;<i>summarizing the main proposals and points of contention?
+</I>
+I will attempt a summary of the parts of the discussion that I remember. In 
+no particular order the following has been discussed:
+
+
+1. Current uses of camlp4
+
+ There were many examples of current uses of camlp4 given. Gabriel put a 
+ summary of them on a wiki:
+
+  <A HREF="https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases">https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases</A>
+
+ Anil also posted a list of all the extensions used by OPAM packages:
+
+  <A HREF="https://github.com/avsm/opam-camlp4-analysis/wiki">https://github.com/avsm/opam-camlp4-analysis/wiki</A>
+
+ I don't think anyone has systematically gone through these yet, but I 
+ think that it is important, before any concrete proposal is made by this 
+ working group, to make clear which of these extensions we intend to 
+ support and how we intend to support them.
+
+
+2. New syntaxes needed for ppx:
+
+ There seems to be general agreement that, for ppx to replace camlp4 for 
+its
+ most common uses, at least the following three kinds of syntax are needed:
+
+ a) A &quot;template&quot; syntax along the lines of (:longid expr). This syntax 
+    could be used as an expression, a pattern, a structure item, etc.
+    For example Sedlex could be:
+       (:sedlex
+          match buf with
+          | number -&gt; ..
+          | letter, Star ('A'..'Z' | 'a'..'z' | digit) -&gt; ..
+       )
+ b) An &quot;attribute&quot; syntax along the lines of (@ expr). This syntax allows 
+    you to attach expressions to other expressions, patterns, etc. Unlike 
+    the template syntax, the type-checker can silently ignore any of these 
+    that don't get translated. For example Bisect could be:
+
+      let f x =
+        match List.map foo [x; a x; b x] with
+        | [y1; y2; y3] -&gt; tata
+        | _ -&gt; (@ Bisect.visit) assert false
+
+      (@ Bisect.ignore)
+      let unused = ()
+    
+    It has also been suggested that there might need to be different syntax 
+    for &quot;post-fix&quot; and &quot;pre-fix&quot;. Gabriel suggested that whether an 
+    attribute in a particular syntactic position is pre-fix or post-fix be 
+    decided on a case by case basis.
+
+ c) A quotation syntax like {x{ .. }x} (where x is any operator symbol) 
+    that could be used for quoting non-OCaml syntax. For example sedlex 
+    with a more compact notation for regular expressions:
+
+      (:sedlex
+         match lexbuf with
+         | {{ xml_letter+ }} -&gt; ...
+         | {{ &quot;with&quot; }} -&gt; ...
+         | ...
+      )
+
+ There has also been some agreement, and no strong objection, to including 
+ some abbreviated forms of the above syntaxes. Some of the suggested forms 
+ include:
+
+ a) Template + quotation: 
+     {:id x{ str }x}  ==  (:id {x{ str }x})
+
+ b) Template + let: 
+      let:id x = .. in ...  ==  (:id let x = .. in ... )
+
+ c) Template + match:
+      match:id exp with ..  ==  (:id match exp with .. )
+
+ d) Type-conv style attribute:
+      type t = ... with foo, bar( expr ) == type t = ... (@foo) (@bar expr)
+
+ e) Anonymous template:
+      (# expr)  ==  (:(*no id*) expr)
+
+
+3. Anti-quotations
+
+ There has been some discussion about how to support anti-quotations:
+
+ - Fabrice suggested using a standardised format for anti-quotations, but 
+   some people were against that because they use &quot;$&quot; in their camlp4 
+   quotation extensions.
+
+   I suggested that if we provided functions which took a predicate 
+   function and then parsed an OCaml phrase up until the next *unnested* 
+   location that made the predicate true, then we could support general 
+   anti-quotations for ppx.
+
+ - Hongbo suggested that AST lifting was necessary for supporting 
+   anti-quotations, citing this paper:
+
+     <A HREF="http://dl.acm.org/citation.cfm?id=1291211">http://dl.acm.org/citation.cfm?id=1291211</A>
+
+   I suggested that it isn't necessarily needed, and that if people wanted 
+   it then it could be provided using a type-conv style extension or 
+   run-time types.
+
+
+4. On the use of &quot;quotations&quot;
+
+ There has also been some discussion about when it is a good idea to use a 
+ camlp4-style quasi-quotation:
+
+ - Alain suggested that they should not be used for extensions that are 
+   &quot;mostly valid OCaml code&quot;. He pointed out that doing so causes you to 
+   lose all editor and tool support.
+
+   Hongbo disagreed saying that in Fan extensions like sedlex would be 
+   implement as quasi-quotation and that editor support was fine.
+
+   After this there seems to have been some agreement that it would be 
+   better to implement such extensions as &quot;templates&quot; (see section 2 of 
+   this post) rather than quasi-quotations.
+
+ - Alain then went further, suggesting that quotations were not even 
+   suitable for encoding foreign languages in OCaml.
+
+   Gabriel disagreed, saying that for domain-specific foreign languages 
+   (e.g. SQL) quotations allow you to have a domain expert maintain the 
+   foreign code even if they didn't know OCaml.
+
+   Other people also said that they liked using quotations for foreign 
+   syntax.
+
+
+5. Alternatives to ppx
+
+ There have been some proposals for alternatives and variations to using 
+ ppx for extensions:
+
+ a) Hongbo suggests that his Fan project is a better alternative to camlp4 
+    than ppx:
+
+      <A HREF="https://github.com/bobzhang/Fan">https://github.com/bobzhang/Fan</A>
+
+ b) Xavier Clerc suggested that attributes might be declared and typed, as 
+    in Java. So before an attribute could be used:
+
+      (@ MyAnnot {a=1, b=&quot;two&quot;})
+
+    &quot;MyAnnot&quot; would have to be declared with fields &quot;a&quot; (of type &quot;int&quot;) and 
+    &quot;b&quot; (of type &quot;string&quot;). He points out that this may protect the user 
+    from some typos and other obvious errors.
+
+    Alain suggested that this would be a much more complicated system, and 
+    might be too restrictive for some uses of attributes.
+
+ c) Sebastien Mondet suggested that run-time types or dyntype might be 
+    sufficient without ppx for many extensions.
+
+    Markus Mottl pointed out that there are runtime performance 
+    implications for using those solutions.
+
+ d) Jeremy suggested that rather than implementing extensions as AST 
+    transformers that operate over the whole AST they might be implemented 
+    as transformers only for the part of the AST that they were to operate 
+    on. So an extension used like this:
+
+      (:perform
+          x &lt;-- m;
+          y &lt;-- n;
+          return (x y))
+
+    would be implemented as a function with type:
+
+      val perform : Parsetree.expression -&gt; Parsetree.expression
+
+    He suggests that this may help with scoping, safety and 
+    compositionality.
+
+    Alain pointed out that some legitimate uses of ppx don't work nicely 
+    with the constraint that they can operate only on a marked fragment. He 
+    also pointed out that handling extensions as those extensions are found 
+    within the source forces a top-down expansion order, which is not 
+    necessarily desirable.
+
+ e) I suggested an extension to Jeremy's proposal. This involves giving the 
+    expansion functions in their own kind of file (&quot;.mlq&quot; - compiled to 
+    &quot;.cmq&quot;), referring to them using a namespace mechanism, and then having 
+    the compiler itself perform the expansion of the extensions.
+
+    There are more details in my blog post:
+
+      <A HREF="http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html">http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html</A>
+
+    Since such a solution would take a while to implement, and since moving 
+    an extension from ppx to it would be trivial, I proposed using ppx for 
+    the short/medium term.
+
+    I suggested that such a mechanism might improving tooling and make it 
+    easier for average users to use extensions.
+
+    Both Gabriel and Alain suggested that the use of namespaces might be 
+    unnecessary and too heavyweight. Alain also questioned the need for 
+    special &quot;.mlq&quot; files.
+
+
+There are probably other parts of the discussion that I've forgotten. I'm 
+sure someone will fill-in any important details I've missed.
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000215.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000217.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#216">[ date ]</a>
+              <a href="thread.html#216">[ thread ]</a>
+              <a href="subject.html#216">[ subject ]</a>
+              <a href="author.html#216">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

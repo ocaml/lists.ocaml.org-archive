@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C51149780.1010302%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000230.html">
+   <LINK REL="Next"  HREF="000232.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C51149780.1010302%40lexifi.com%3E"
+       TITLE="[wg-camlp4] benchmarks">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Feb  8 06:13:20 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000230.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000232.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#231">[ date ]</a>
+              <a href="thread.html#231">[ thread ]</a>
+              <a href="subject.html#231">[ subject ]</a>
+              <a href="author.html#231">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/7/2013 9:39 PM, Thomas Gazagnaire wrote:
+&gt;<i> In my opinion as a *user* of camlp4, the main pitfall that I can see
+</I>&gt;<i> (and which has not yet been addressed) is that it is really slowing
+</I>&gt;<i> down the compilation process.
+</I> &gt;
+&gt;<i> So, if we decide to switch to a new preprocessing tool, I guess it's important to get these hings right:
+</I>&gt;<i> * it should be easy enough for external tools to statically build pre-processors.
+</I>&gt;<i> * the new preprocessor should be benchmarked on realistic examples to see how much time we gain vs. camlp4. A good example might be mirage which is using only pa_lwt and cstruct (or xen-api which is using only ocaml-rpc, or core but that maybe too much syntax in one go).
+</I>
+It is certainly a good idea to do some benchmarks with the -ppx, I'll 
+try to find some time to do so.
+
+*If* performance is not satisfactory,  one should then identify the 
+respective contributions of:
+
+  1. Marshaling / demarshaling AST on the process boundaries.
+  2. Spawning new processes.
+  3. Traversing the AST with the ast_mapper class (overhead of method 
+dispatch) and rebuilding a new AST in memory.
+
+I doubt 3 would be a problem even with a lot of ppx rewriters, 
+especially because they can be native code programs on platforms which 
+support ocamlopt (even if native dynlink is not supported). *If* 1 or 2 
+become a bottleneck,  one should indeed consider ways to avoid them.
+
+The current version of ast_mapper:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup</A>
+
+provides a very simple &quot;registration&quot; API:
+
+=========================================================================
+val register_function: (string -&gt; (string list -&gt; mapper) -&gt; unit) ref
+
+val register: string -&gt; (string list -&gt; #mapper) -&gt; unit
+
+     (** Apply the [register_function].  The default behavior is to run
+         the mapper immediately, taking arguments from the process
+         command line.  This is to support a scenario where a mapper is
+         linked as a stand-alone executable.
+
+         It is possible to overwrite the [register_function] to define
+         &quot;-ppx drivers&quot;, which combine several mappers in a single
+         process.  Typically, a driver starts by defining
+         [register_function] to a custom implementation, then lets ppx
+         rewriters (linked statically or dynamically) register
+         themselves, and then run all or some of them.  It is also
+         possible to have -ppx drivers apply rewriters to only specific
+         parts of an AST.  *)
+=========================================================================
+
+The main program of a typical ppx tool would look like:
+
+
+let mapper _args =
+    object
+       inherit Ast_mapper.mapper
+       method! expr = ...
+    end
+
+let () = Ast_mapper.register &quot;foo&quot; mapper
+
+
+When linked as a stand-alone program, this produces something which can 
+be readily used as a -ppx rewriter.  But it is also possible to create 
+&quot;ppx drivers&quot; which link code as above statically or dynamically (and 
+then decide to run it or not).  It would even be possible to provide a 
+hook in the compiler so as to make it possible (through compiler-libs) 
+to link statically custom versions of ocamldep.opt / ocamlc.opt / 
+ocamlopt.opt with statically linked &quot;ppx rewriters&quot; (avoiding any 
+marshaling of the AST or any extra process).  I can imagine that for 
+huge code base, this could be considered.
+
+
+Alain
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000230.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000232.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#231">[ date ]</a>
+              <a href="thread.html#231">[ thread ]</a>
+              <a href="subject.html#231">[ subject ]</a>
+              <a href="author.html#231">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

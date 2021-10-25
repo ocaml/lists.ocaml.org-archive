@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] Problem (and fix) with Unix.create_process in windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Problem%20%28and%20fix%29%20with%20Unix.create_process%20in%20windows&In-Reply-To=%3CCAF%3DojbVBciLiwREy3MrbA-b63C-dXnPAxC7LCQQt-fnyRimR9A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000049.html">
+   <LINK REL="Next"  HREF="000042.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] Problem (and fix) with Unix.create_process in windows</H1>
+    <B>Leonardo Laguna</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Problem%20%28and%20fix%29%20with%20Unix.create_process%20in%20windows&In-Reply-To=%3CCAF%3DojbVBciLiwREy3MrbA-b63C-dXnPAxC7LCQQt-fnyRimR9A%40mail.gmail.com%3E"
+       TITLE="[wg-windows] Problem (and fix) with Unix.create_process in windows">modlfo at gmail.com
+       </A><BR>
+    <I>Tue Sep  1 14:01:55 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000049.html">[wg-windows] Minimal virtual machine for OCaml
+</A></li>
+        <LI>Next message: <A HREF="000042.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#41">[ date ]</a>
+              <a href="thread.html#41">[ thread ]</a>
+              <a href="subject.html#41">[ subject ]</a>
+              <a href="author.html#41">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+I have spent some hours trying to find a problem when using
+Unix.create_process in windows.
+
+The problem shows when trying to create a process in which the path of the
+executable and one of the arguments have spaces, for example:
+
+let cmd = &quot;C:/Program Files/Something/something.exe&quot; ;;
+let args = [&quot;arg1&quot;; &quot;arg2&quot;; &quot;C:/Program Files/arg3&quot;] ;;
+
+let pid = Unix.create_process cmd (cmd::args |&gt; Array.of_list) Unix.stdin
+Unix.stdout Unix.stderr ;;
+
+Unix.waitpid [] pid ;;
+
+As soon as there's an argument with spaces, the process fails to run. I
+tried many different combinations with quoting, backlashes, forwardslashes,
+backslashed space, etc, but nothing seemed to work.
+
+I saw that ocaml calls CreateProcess from the windows API, which has many
+weird things in the documentation.
+
+When calling CreateProcess you need to supply (optionally) the path to the
+application and then the full command line call. For example:
+
+CreateProcess(&quot;C:/some.exe&quot;,&quot;\&quot;C:/some.exe\&quot; arg1 arg2&quot;,.........);
+
+Note that you need to pass in the full command line the name of the
+application quoted.
+
+The only way of fixing my problem was to pass NULL as first argument:
+
+CreateProcess(NULL&quot;,&quot;\&quot;C:/some.exe\&quot; arg1 arg2&quot;,.........);
+
+After making this change all calls work fine for me.
+
+Has anyone had these kind of problems?
+
+Is is possible to get this change in the ocaml code?
+
+Leonardo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-windows/attachments/20150901/bd4fd452/attachment.html">http://lists.ocaml.org/pipermail/wg-windows/attachments/20150901/bd4fd452/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000049.html">[wg-windows] Minimal virtual machine for OCaml
+</A></li>
+	<LI>Next message: <A HREF="000042.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#41">[ date ]</a>
+              <a href="thread.html#41">[ thread ]</a>
+              <a href="subject.html#41">[ subject ]</a>
+              <a href="author.html#41">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

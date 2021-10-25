@@ -1,0 +1,1432 @@
+From markus.mottl at gmail.com  Sun Apr  1 03:00:28 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Sat, 31 Mar 2012 22:00:28 -0400
+Subject: sexp_default
+In-Reply-To: <CACLX4jQDYugo6mLJY8+oegG9YMHDa9CZ51+JUtR-NxY7N=5GpA@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<CACLX4jRJbVF7Qk7+ZJ1JQq0bKzXeE_aF+m75qoFN+FHK2W9DEw@mail.gmail.com>
+	<CAP_800r3W-rKR2RjUnaaVPDJyU3G+whvoCyGnssiWd8CJ1YWsA@mail.gmail.com>
+	<CACLX4jQZW9TX94ohh3XxUa7jGpPCsaV_ObKdWkH2RPTWGOP46g@mail.gmail.com>
+	<CAP_800os1P_OnUCCBAhQXFRf0c6vp+MoaYzhaDA0Q_DCfVGEbQ@mail.gmail.com>
+	<CACLX4jQbkDNS+sbU8BndJ8rL+5JBX94Umm+9uODox7VVfunZhw@mail.gmail.com>
+	<CAP_800r81mhsuYsDKsWFqw7gUmHfYQdfhZVDExhjj4vEiwc3MA@mail.gmail.com>
+	<CACLX4jQDYugo6mLJY8+oegG9YMHDa9CZ51+JUtR-NxY7N=5GpA@mail.gmail.com>
+Message-ID: <CAP_800pHvLofeVTVPjhoBC5saD=oC7UH3jrofWe5t5hLUPx-1g@mail.gmail.com>
+
+
+On Sat, Mar 31, 2012 at 07:50, Yaron Minsky <yminsky at janestreet.com> wrote:
+> On Fri, Mar 30, 2012 at 6:09 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>> I'd therefore suggest to use polymorphic equality for the while being.
+>> ?If it really turns out to cause issues in practice, you can always
+>> add the mentioned optional equality function later.
+>
+> That sounds pretty reasonable. ?Another option would be to use
+> physical equality, which would have the property that if you left the
+> default unmodified, it would work, but otherwise would re-output the
+> value. ?That's got its own set of surprising issues as well, though.
+
+I've given it some more thought and may have an even better idea: the
+user can optionally specify a function which, when evaluated on the
+current field value, returns a boolean to indicate whether the field
+should be included.  This is more general and useful than a mere
+equivalence check against the default value.  This way a program could
+even choose at runtime which fields should be included.  I'll
+implement this once I have some more time.  I've pushed my preliminary
+patch for the current approach, which will likely change
+significantly.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Mon Apr  2 13:56:49 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Mon, 2 Apr 2012 08:56:49 -0400
+Subject: sexp_default
+In-Reply-To: <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+Message-ID: <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+
+
+On Mon, Apr 2, 2012 at 04:33, Thomas Gazagnaire
+<thomas.gazagnaire at gmail.com> wrote:
+>> ?type t = { foo : int sexp_default(42) } with sexp
+>
+> Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+
+In fact, this is exactly what I'm intending to do.  My current idea is
+the following:
+
+  type t = { foo : int with sexp_default(42) } with sexp
+
+The "with" extension would be part of type_conv again and would allow
+you to record arbitrary "tags" in a hashtable for a specific location
+(record field).  Such tags could then be optionally associated with
+expressions.  I'm not sure other syntactic constructs (modules, etc.)
+should also be allowed.  I guess for the while being expressions would
+be sufficient.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From thomas.gazagnaire at gmail.com  Mon Apr  2 09:33:39 2012
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Mon, 2 Apr 2012 10:33:39 +0200
+Subject: sexp_default
+In-Reply-To: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+Message-ID: <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+
+
+>  type t = { foo : int sexp_default(42) } with sexp
+
+Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+
+--
+Thomas
+
+
+
+From thomas.gazagnaire at gmail.com  Mon Apr  2 14:12:16 2012
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Mon, 2 Apr 2012 15:12:16 +0200
+Subject: sexp_default
+In-Reply-To: <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com> <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com> <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+Message-ID: <E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+
+
+>>>  type t = { foo : int sexp_default(42) } with sexp
+>> 
+>> Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+> 
+> In fact, this is exactly what I'm intending to do.  My current idea is
+> the following:
+> 
+>  type t = { foo : int with sexp_default(42) } with sexp
+> 
+> The "with" extension would be part of type_conv again and would allow
+> you to record arbitrary "tags" in a hashtable for a specific location
+> (record field).  Such tags could then be optionally associated with
+> expressions. 
+
+so why not simply using:
+
+ type t = { foo : int with default(42) } with sexp, binprot, ...
+
+ie, using the same "default" field mean that the same default value can also be used by binprot (and others type converters).
+
+>  I'm not sure other syntactic constructs (modules, etc.)
+> should also be allowed.  I guess for the while being expressions would
+> be sufficient.
+
+Indeed, expressions would be sufficient.
+
+--
+Thomas
+
+From markus.mottl at gmail.com  Wed Apr  4 03:30:01 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 3 Apr 2012 22:30:01 -0400
+Subject: sexp_default
+In-Reply-To: <E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+	<CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+	<E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+Message-ID: <CAP_800q8Bj+7re9jK2st=-L6E399KtqPaiPEWTUJU0zgACWiRg@mail.gmail.com>
+
+
+On Mon, Apr 2, 2012 at 09:12, Thomas Gazagnaire
+<thomas.gazagnaire at gmail.com> wrote:
+> so why not simply using:
+>
+> ?type t = { foo : int with default(42) } with sexp, binprot, ...
+>
+> ie, using the same "default" field mean that the same default value can also be used by binprot (and others type converters).
+
+Though defaults would be useless with bin_prot due to the nature of
+the protocol, I agree that this would be more generic.  I have
+therefore made the "default" tag part of type_conv.  It is now trivial
+for extensions using type_conv to add new handlers for record fields
+or access the default expression for a given field.
+
+>> ?I'm not sure other syntactic constructs (modules, etc.)
+>> should also be allowed. ?I guess for the while being expressions would
+>> be sufficient.
+>
+> Indeed, expressions would be sufficient.
+
+The solution is fully generic now, too.  This means one could pass
+arbitrary OCaml code (e.g. module names, etc.) as arguments, assuming
+the registered tag can handle it.  In fact, part of the solution
+already existed in type_conv for the usual "with" extension.
+
+Sexplib will now behave as expected with e.g.:
+
+  type t = { foo : int with default(42) } with sexp
+
+Two more tags are available, too.  The first one is "sexp_drop_default", e.g.:
+
+  type t = { foo : int with default(42), sexp_drop_default } with sexp
+
+This will drop record fields that are (polymorphically) equivalent to
+their default.  The second tag is "sexp_drop_if", e.g.:
+
+  type t = { foo : int with sexp_drop_if((=) 3) } with sexp
+
+"sexp_drop_if" specifies a function, which takes the current record
+field value as argument and must return "true" if the field should be
+dropped.  It can be combined with "default", but not with
+"sexp_drop_default".  This solution makes it possible to configure
+emission of record fields at runtime.
+
+I have pushed the changes to my fork.  Please let me know if you have
+any further suggestions.  Otherwise we can probably already merge
+this.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Tue Apr 24 21:38:13 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 24 Apr 2012 16:38:13 -0400
+Subject: New comment syntax in Sexplib
+Message-ID: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+
+
+Hi,
+
+I have fixed a long-standing shortcoming of the S-expression library.
+When the S-expression syntax was conceived, the future popularity of
+Sexplib wasn't anticipated.  This lead to the omission of block
+comments, which makes it considerably harder to comment out sections
+in S-expression files.  Scheme/Lisp also introduced another kind of
+comment a few years ago, which allows users to quickly comment out
+syntactically correct S-expressions.
+
+These two new syntactic constructs for introducing comments are now in
+my fork of Sexplib (Core) and work as follows (mostly similar to
+popular Lisp/Scheme dialects):
+
+Block comment example:
+
+  #|
+    Even semicolons can be here;
+    "Note that quoted strings need to be balanced"
+    #| We can also "nest" block comments |#
+  |#
+
+The above is quite similar to the way OCaml-comments work (e.g. wrt.
+quoted strings).
+
+Examples for S-expression comments (could also span across several
+lines as e.g. with large, deeply nested lists):
+
+  #; (this (nested list) will be ignored) (this (one) not)
+  #; "this quoted atom will be ignored" "this one not"
+  #; ignored-atom present-atom
+
+I have also added a new Vim-syntax file to Sexplib, which will
+highlight the above comment syntax and also flag incorrect constructs
+(e.g. now illegal atoms).
+
+The above improvements can theoretically break old S-expression files.
+ I took some syntax design decisions that make this highly unlikely.
+The new comment sequences ("#|", "|#", "#;") by themselves should be
+extremely unlikely in unquoted atoms in existing S-expression files.
+
+In order to make the syntax work with little chance of breaking
+anything, some forms of unquoted atoms are now illegal, e.g.:
+
+  foo#|bar    bar|#foo    |#bla
+
+The above, as pretty much any unquoted atom containing either "#|" or
+"|#", will raise parsing exceptions.  A "#" or "|" in an unquoted atom
+without the offending second character is perfectly acceptable.
+
+  #|bla
+
+The above would introduce a comment and quite surely also raise a
+parsing exception, since it is not very likely to be properly
+balanced.  The sequence "#;" would only appear at a location where the
+user already put a comment right after an unquoted single-character
+hash.  This, again, is exceptionally unlikely, and even if it
+occurred, it would very likely be flagged due to broken structure.
+
+Old systems are able to read new files as long as the new-style
+comments are not used, which should be the case for all automatically
+printed (using Sexplib) S-expressions.  The only difference could be
+some extra quotes around atoms, which is perfectly consistent with old
+syntax.  If any unlikely conflicts arose with new systems due to badly
+formatted old files, it should be trivial to rewrite these files
+automatically to the new syntax.
+
+Given that the syntax improvements are almost certainly going to work
+well with the vast majority of existing systems and files, I'd
+therefore suggest adopting them.  The productivity gains for human
+editors of large S-expression files should be noticeable.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Wed Apr 25 15:14:30 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Wed, 25 Apr 2012 10:14:30 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+Message-ID: <CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+
+
+On Wed, Apr 25, 2012 at 05:33, David House <dhouse at janestreet.com> wrote:
+> I like this idea, although editor support has always been sufficiently
+> good to make this basically pointless for me.
+
+I agree that using editor macros to comment out a whole S-expression
+is feasible.  But not everybody uses Emacs or a sufficiently powerful
+editor or knows how to use it correctly.  Furthermore, the converse
+(i.e. uncommenting) could cause problems, e.g.:
+
+  (
+    ; some comment
+    foo bar
+  )
+
+This would presumably end up as something like this:
+
+  ;(
+  ;  ; some comment
+  ; foo bar
+  ;)
+
+Besides looking ugly, having extra semicolons might invite people,
+some of whom might not even know about your macro, to remove them.
+This would break the S-expression once you run your uncommenting macro
+on it again.  I don't even want to know what the result would look
+like if a commented-out S-expression contains other commented-out
+S-expressions.  The new comment parser will even work with recursively
+used S-expression comments.
+
+The semicolons might also prevent you from spotting incorrectly
+specified S-expressions.  E.g. I might have two alternatives in a file
+and comment out one.  Then I might want to modify the latter, but
+accidentally introduce syntactic errors.  This problem won't be
+spotted until somebody wants to actually try out the alternative.  It
+may then be tedious to fix the problem.
+
+S-expression comments ("#;") require considerably less effort,
+especially for people using lesser editors, and don't reformat your
+file.  They are also much safer, since the intent of the original
+author is clear.  No guess work whether some semicolon is meant to add
+a comment or just eliminates part of an S-expression.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From dhouse at janestreet.com  Wed Apr 25 10:33:01 2012
+From: dhouse at janestreet.com (David House)
+Date: Wed, 25 Apr 2012 10:33:01 +0100
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+Message-ID: <CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+
+
+On Tue, Apr 24, 2012 at 9:38 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> Block comment example:
+>
+> ?#|
+> ? ?Even semicolons can be here;
+> ? ?"Note that quoted strings need to be balanced"
+> ? ?#| We can also "nest" block comments |#
+> ?|#
+>
+> The above is quite similar to the way OCaml-comments work (e.g. wrt.
+> quoted strings).
+>
+> Examples for S-expression comments (could also span across several
+> lines as e.g. with large, deeply nested lists):
+>
+> ?#; (this (nested list) will be ignored) (this (one) not)
+> ?#; "this quoted atom will be ignored" "this one not"
+> ?#; ignored-atom present-atom
+
+I like this idea, although editor support has always been sufficiently
+good to make this basically pointless for me.
+
+In Emacs, one can do C-M-@ (mark-sexp) followed by M-;
+(comment-region) to comment out an s-expression. In your example:
+
+(this (nested list) will be ignored) (this (one) not)
+
+  C-M-@ M-;
+
+;; (this (nested list) will be ignored)
+(this (one) not)
+
+In fact, M-; is normally bound to `comment-dwim' ("do what I mean"),
+and is a very powerful command. M-; without any region ("selected
+text" in modern GUI parlance) will insert a comment and the end of the
+line. With a region, it will comment out exactly that region. It is
+clever enough to work in languages that only have line-based
+commenting, like s-expressions, as you can see above. It has other
+features but they are not relevant here.
+
+
+From yminsky at janestreet.com  Thu Apr 26 11:51:10 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 06:51:10 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+Message-ID: <CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+
+
+Having played around with the new syntax a bit in emacs, it is really
+nice (and, importantly, is already supported in emacs.  If emacs
+doesn't support an s-expression syntax, it can't be all that common in
+the lisp/scheme world...)
+
+So yeah, barring issues with the implementation, we'll accept the change.
+
+y
+
+On Wed, Apr 25, 2012 at 10:14 AM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Wed, Apr 25, 2012 at 05:33, David House <dhouse at janestreet.com> wrote:
+>> I like this idea, although editor support has always been sufficiently
+>> good to make this basically pointless for me.
+>
+> I agree that using editor macros to comment out a whole S-expression
+> is feasible. ?But not everybody uses Emacs or a sufficiently powerful
+> editor or knows how to use it correctly. ?Furthermore, the converse
+> (i.e. uncommenting) could cause problems, e.g.:
+>
+> ?(
+> ? ?; some comment
+> ? ?foo bar
+> ?)
+>
+> This would presumably end up as something like this:
+>
+> ?;(
+> ?; ?; some comment
+> ?; foo bar
+> ?;)
+>
+> Besides looking ugly, having extra semicolons might invite people,
+> some of whom might not even know about your macro, to remove them.
+> This would break the S-expression once you run your uncommenting macro
+> on it again. ?I don't even want to know what the result would look
+> like if a commented-out S-expression contains other commented-out
+> S-expressions. ?The new comment parser will even work with recursively
+> used S-expression comments.
+>
+> The semicolons might also prevent you from spotting incorrectly
+> specified S-expressions. ?E.g. I might have two alternatives in a file
+> and comment out one. ?Then I might want to modify the latter, but
+> accidentally introduce syntactic errors. ?This problem won't be
+> spotted until somebody wants to actually try out the alternative. ?It
+> may then be tedious to fix the problem.
+>
+> S-expression comments ("#;") require considerably less effort,
+> especially for people using lesser editors, and don't reformat your
+> file. ?They are also much safer, since the intent of the original
+> author is clear. ?No guess work whether some semicolon is meant to add
+> a comment or just eliminates part of an S-expression.
+>
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Thu Apr 26 13:45:36 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 26 Apr 2012 08:45:36 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+	<CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+Message-ID: <CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 06:51, Yaron Minsky <yminsky at janestreet.com> wrote:
+> Having played around with the new syntax a bit in emacs, it is really
+> nice (and, importantly, is already supported in emacs. ?If emacs
+> doesn't support an s-expression syntax, it can't be all that common in
+> the lisp/scheme world...)
+
+Interesting, good to know that Emacs also already supports it well.
+
+> So yeah, barring issues with the implementation, we'll accept the change.
+
+Sounds good.  The patches also contain some minor bug fixes for older
+code (e.g. more accurate error locations; better detection of broken
+S-expression files, etc.).
+
+Now that this feature as well as the previous one for record field
+defaults are implemented, I don't have any plans for further feature
+extensions to type_conv, bin_prot, and sexplib.  Unless I run into
+bugs or you find any issues with the new features, the libraries
+should be pretty much stable.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Thu Apr 26 18:57:09 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 13:57:09 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+	<CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+	<CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+Message-ID: <CACLX4jTd8M_oJqhbD_hkB5p6-sEwx_jiaK8Ehe=K0OLmXF7dFA@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 8:45 AM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Thu, Apr 26, 2012 at 06:51, Yaron Minsky <yminsky at janestreet.com> wrote:
+>> Having played around with the new syntax a bit in emacs, it is really
+>> nice (and, importantly, is already supported in emacs. ?If emacs
+>> doesn't support an s-expression syntax, it can't be all that common in
+>> the lisp/scheme world...)
+>
+> Interesting, good to know that Emacs also already supports it well.
+>
+>> So yeah, barring issues with the implementation, we'll accept the change.
+>
+> Sounds good. ?The patches also contain some minor bug fixes for older
+> code (e.g. more accurate error locations; better detection of broken
+> S-expression files, etc.).
+>
+> Now that this feature as well as the previous one for record field
+> defaults are implemented, I don't have any plans for further feature
+> extensions to type_conv, bin_prot, and sexplib. ?Unless I run into
+> bugs or you find any issues with the new features, the libraries
+> should be pretty much stable.
+
+Sounds great.
+
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From agarwal1975 at gmail.com  Thu Apr 26 22:50:57 2012
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 26 Apr 2012 17:50:57 -0400
+Subject: installation mess
+Message-ID: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+
+We are experiencing problems installing core because it depends on
+oasis-0.3 (not in godi), which depends on type-conv, which is in core.
+Looks like a circular dependency.
+
+What is the plan for all the libraries embedded within core, e.g.
+type-conv, sexplib, etc. Are the copies within core meant to be the master
+versions of these? Will they ever be extracted out and distributed
+separately again? I hope so.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120426/817fa77c/attachment.html>
+
+From yminsky at janestreet.com  Thu Apr 26 23:22:15 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 18:22:15 -0400
+Subject: installation mess
+In-Reply-To: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+Message-ID: <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+
+
+Yes, the copies in Core are intended to be the master copies.  That
+said, we are happy to also distribute them as separate tarballs.
+Right now, Markus' versions of typeconv and sexplib and such are a bit
+ahead of ours, but we hope to resolve that soon.
+
+In any case, we expect to put out release tarballs soon, which will
+not require Oasis at all to build.  That should simplify matters
+considerably.
+
+Sorry that this has been so painful.  We'll try to clean this story up
+entirely in the next few weeks.
+
+y
+
+On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> We are experiencing problems installing core because it depends on oasis-0.3
+> (not in godi), which depends on type-conv, which is in core. Looks like a
+> circular dependency.
+>
+> What is the plan for all the libraries embedded within core, e.g. type-conv,
+> sexplib, etc. Are the copies within core meant to be the master versions of
+> these? Will they ever be extracted out and distributed separately again? I
+> hope so.
+>
+
+
+From agarwal1975 at gmail.com  Thu Apr 26 23:48:34 2012
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 26 Apr 2012 18:48:34 -0400
+Subject: installation mess
+In-Reply-To: <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+ <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+Message-ID: <CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+
+Okay, so the source code of all sub-libraries will remain in the core
+repository, but several packages for distribution will be generated from
+this repo. I suppose that's fine. I was worried about there being multiple
+inconsistent versions of libraries floating around.
+
+I'm looking forward to a release! We're in a jam now and doing some ugly
+hacking just to compile multiple production libraries.
+
+
+On Thu, Apr 26, 2012 at 6:22 PM, Yaron Minsky <yminsky at janestreet.com>wrote:
+
+> Yes, the copies in Core are intended to be the master copies.  That
+> said, we are happy to also distribute them as separate tarballs.
+> Right now, Markus' versions of typeconv and sexplib and such are a bit
+> ahead of ours, but we hope to resolve that soon.
+>
+> In any case, we expect to put out release tarballs soon, which will
+> not require Oasis at all to build.  That should simplify matters
+> considerably.
+>
+> Sorry that this has been so painful.  We'll try to clean this story up
+> entirely in the next few weeks.
+>
+> y
+>
+> On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com>
+> wrote:
+> > We are experiencing problems installing core because it depends on
+> oasis-0.3
+> > (not in godi), which depends on type-conv, which is in core. Looks like a
+> > circular dependency.
+> >
+> > What is the plan for all the libraries embedded within core, e.g.
+> type-conv,
+> > sexplib, etc. Are the copies within core meant to be the master versions
+> of
+> > these? Will they ever be extracted out and distributed separately again?
+> I
+> > hope so.
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120426/0eba45f7/attachment.html>
+
+From yminsky at janestreet.com  Fri Apr 27 11:05:44 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 27 Apr 2012 06:05:44 -0400
+Subject: installation mess
+In-Reply-To: <CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+	<CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+	<CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+Message-ID: <CACLX4jSafGmHngJ8SVJwnq8MPZ+GC82uEmNy=1m1XL1So8R4gw@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 6:48 PM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> Okay, so the source code of all sub-libraries will remain in the core
+> repository, but several packages for distribution will be generated from
+> this repo. I suppose that's fine. I was worried about there being multiple
+> inconsistent versions of libraries floating around.
+
+Yeah.  We're behind on merging in Markus' latest work, which is the
+only reason there are multiple versions right now.  Doing the merging
+in of changes from the external repo turned out to be more challenging
+to automate than we expected, and that has set us back.
+
+But that will resolve soon I expect.
+
+> I'm looking forward to a release! We're in a jam now and doing some ugly
+> hacking just to compile multiple production libraries.
+
+Indeed!  My apologies for the pain.
+
+y
+
+>
+> On Thu, Apr 26, 2012 at 6:22 PM, Yaron Minsky <yminsky at janestreet.com>
+> wrote:
+>>
+>> Yes, the copies in Core are intended to be the master copies. ?That
+>> said, we are happy to also distribute them as separate tarballs.
+>> Right now, Markus' versions of typeconv and sexplib and such are a bit
+>> ahead of ours, but we hope to resolve that soon.
+>>
+>> In any case, we expect to put out release tarballs soon, which will
+>> not require Oasis at all to build. ?That should simplify matters
+>> considerably.
+>>
+>> Sorry that this has been so painful. ?We'll try to clean this story up
+>> entirely in the next few weeks.
+>>
+>> y
+>>
+>> On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com>
+>> wrote:
+>> > We are experiencing problems installing core because it depends on
+>> > oasis-0.3
+>> > (not in godi), which depends on type-conv, which is in core. Looks like
+>> > a
+>> > circular dependency.
+>> >
+>> > What is the plan for all the libraries embedded within core, e.g.
+>> > type-conv,
+>> > sexplib, etc. Are the copies within core meant to be the master versions
+>> > of
+>> > these? Will they ever be extracted out and distributed separately again?
+>> > I
+>> > hope so.
+>> >
+>
+>
+
+
+From markus.mottl at gmail.com  Sun Apr  1 03:00:28 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Sat, 31 Mar 2012 22:00:28 -0400
+Subject: sexp_default
+In-Reply-To: <CACLX4jQDYugo6mLJY8+oegG9YMHDa9CZ51+JUtR-NxY7N=5GpA@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<CACLX4jRJbVF7Qk7+ZJ1JQq0bKzXeE_aF+m75qoFN+FHK2W9DEw@mail.gmail.com>
+	<CAP_800r3W-rKR2RjUnaaVPDJyU3G+whvoCyGnssiWd8CJ1YWsA@mail.gmail.com>
+	<CACLX4jQZW9TX94ohh3XxUa7jGpPCsaV_ObKdWkH2RPTWGOP46g@mail.gmail.com>
+	<CAP_800os1P_OnUCCBAhQXFRf0c6vp+MoaYzhaDA0Q_DCfVGEbQ@mail.gmail.com>
+	<CACLX4jQbkDNS+sbU8BndJ8rL+5JBX94Umm+9uODox7VVfunZhw@mail.gmail.com>
+	<CAP_800r81mhsuYsDKsWFqw7gUmHfYQdfhZVDExhjj4vEiwc3MA@mail.gmail.com>
+	<CACLX4jQDYugo6mLJY8+oegG9YMHDa9CZ51+JUtR-NxY7N=5GpA@mail.gmail.com>
+Message-ID: <CAP_800pHvLofeVTVPjhoBC5saD=oC7UH3jrofWe5t5hLUPx-1g@mail.gmail.com>
+
+
+On Sat, Mar 31, 2012 at 07:50, Yaron Minsky <yminsky at janestreet.com> wrote:
+> On Fri, Mar 30, 2012 at 6:09 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+>> I'd therefore suggest to use polymorphic equality for the while being.
+>> ?If it really turns out to cause issues in practice, you can always
+>> add the mentioned optional equality function later.
+>
+> That sounds pretty reasonable. ?Another option would be to use
+> physical equality, which would have the property that if you left the
+> default unmodified, it would work, but otherwise would re-output the
+> value. ?That's got its own set of surprising issues as well, though.
+
+I've given it some more thought and may have an even better idea: the
+user can optionally specify a function which, when evaluated on the
+current field value, returns a boolean to indicate whether the field
+should be included.  This is more general and useful than a mere
+equivalence check against the default value.  This way a program could
+even choose at runtime which fields should be included.  I'll
+implement this once I have some more time.  I've pushed my preliminary
+patch for the current approach, which will likely change
+significantly.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Mon Apr  2 13:56:49 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Mon, 2 Apr 2012 08:56:49 -0400
+Subject: sexp_default
+In-Reply-To: <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+Message-ID: <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+
+
+On Mon, Apr 2, 2012 at 04:33, Thomas Gazagnaire
+<thomas.gazagnaire at gmail.com> wrote:
+>> ?type t = { foo : int sexp_default(42) } with sexp
+>
+> Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+
+In fact, this is exactly what I'm intending to do.  My current idea is
+the following:
+
+  type t = { foo : int with sexp_default(42) } with sexp
+
+The "with" extension would be part of type_conv again and would allow
+you to record arbitrary "tags" in a hashtable for a specific location
+(record field).  Such tags could then be optionally associated with
+expressions.  I'm not sure other syntactic constructs (modules, etc.)
+should also be allowed.  I guess for the while being expressions would
+be sufficient.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From thomas.gazagnaire at gmail.com  Mon Apr  2 09:33:39 2012
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Mon, 2 Apr 2012 10:33:39 +0200
+Subject: sexp_default
+In-Reply-To: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+Message-ID: <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+
+
+>  type t = { foo : int sexp_default(42) } with sexp
+
+Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+
+--
+Thomas
+
+
+
+From thomas.gazagnaire at gmail.com  Mon Apr  2 14:12:16 2012
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Mon, 2 Apr 2012 15:12:16 +0200
+Subject: sexp_default
+In-Reply-To: <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com> <A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com> <CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+Message-ID: <E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+
+
+>>>  type t = { foo : int sexp_default(42) } with sexp
+>> 
+>> Why it this extension related to S-Exp and not type-conv directly? I mean, it would be nice if any type-conv plugin could use it (that's something that atdgen is doing for instance).
+> 
+> In fact, this is exactly what I'm intending to do.  My current idea is
+> the following:
+> 
+>  type t = { foo : int with sexp_default(42) } with sexp
+> 
+> The "with" extension would be part of type_conv again and would allow
+> you to record arbitrary "tags" in a hashtable for a specific location
+> (record field).  Such tags could then be optionally associated with
+> expressions. 
+
+so why not simply using:
+
+ type t = { foo : int with default(42) } with sexp, binprot, ...
+
+ie, using the same "default" field mean that the same default value can also be used by binprot (and others type converters).
+
+>  I'm not sure other syntactic constructs (modules, etc.)
+> should also be allowed.  I guess for the while being expressions would
+> be sufficient.
+
+Indeed, expressions would be sufficient.
+
+--
+Thomas
+
+From markus.mottl at gmail.com  Wed Apr  4 03:30:01 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 3 Apr 2012 22:30:01 -0400
+Subject: sexp_default
+In-Reply-To: <E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+References: <CAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g@mail.gmail.com>
+	<A44A5C21-1B24-4B7B-A4D0-FDDB9289246C@gmail.com>
+	<CAP_800q6_H3oQy1ieUxDyLWWexaQQE9M9zFB41qutmpwi5Y=GA@mail.gmail.com>
+	<E3900CB5-D9B8-483C-A7F7-79E9D76ABF26@gmail.com>
+Message-ID: <CAP_800q8Bj+7re9jK2st=-L6E399KtqPaiPEWTUJU0zgACWiRg@mail.gmail.com>
+
+
+On Mon, Apr 2, 2012 at 09:12, Thomas Gazagnaire
+<thomas.gazagnaire at gmail.com> wrote:
+> so why not simply using:
+>
+> ?type t = { foo : int with default(42) } with sexp, binprot, ...
+>
+> ie, using the same "default" field mean that the same default value can also be used by binprot (and others type converters).
+
+Though defaults would be useless with bin_prot due to the nature of
+the protocol, I agree that this would be more generic.  I have
+therefore made the "default" tag part of type_conv.  It is now trivial
+for extensions using type_conv to add new handlers for record fields
+or access the default expression for a given field.
+
+>> ?I'm not sure other syntactic constructs (modules, etc.)
+>> should also be allowed. ?I guess for the while being expressions would
+>> be sufficient.
+>
+> Indeed, expressions would be sufficient.
+
+The solution is fully generic now, too.  This means one could pass
+arbitrary OCaml code (e.g. module names, etc.) as arguments, assuming
+the registered tag can handle it.  In fact, part of the solution
+already existed in type_conv for the usual "with" extension.
+
+Sexplib will now behave as expected with e.g.:
+
+  type t = { foo : int with default(42) } with sexp
+
+Two more tags are available, too.  The first one is "sexp_drop_default", e.g.:
+
+  type t = { foo : int with default(42), sexp_drop_default } with sexp
+
+This will drop record fields that are (polymorphically) equivalent to
+their default.  The second tag is "sexp_drop_if", e.g.:
+
+  type t = { foo : int with sexp_drop_if((=) 3) } with sexp
+
+"sexp_drop_if" specifies a function, which takes the current record
+field value as argument and must return "true" if the field should be
+dropped.  It can be combined with "default", but not with
+"sexp_drop_default".  This solution makes it possible to configure
+emission of record fields at runtime.
+
+I have pushed the changes to my fork.  Please let me know if you have
+any further suggestions.  Otherwise we can probably already merge
+this.
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Tue Apr 24 21:38:13 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Tue, 24 Apr 2012 16:38:13 -0400
+Subject: New comment syntax in Sexplib
+Message-ID: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+
+
+Hi,
+
+I have fixed a long-standing shortcoming of the S-expression library.
+When the S-expression syntax was conceived, the future popularity of
+Sexplib wasn't anticipated.  This lead to the omission of block
+comments, which makes it considerably harder to comment out sections
+in S-expression files.  Scheme/Lisp also introduced another kind of
+comment a few years ago, which allows users to quickly comment out
+syntactically correct S-expressions.
+
+These two new syntactic constructs for introducing comments are now in
+my fork of Sexplib (Core) and work as follows (mostly similar to
+popular Lisp/Scheme dialects):
+
+Block comment example:
+
+  #|
+    Even semicolons can be here;
+    "Note that quoted strings need to be balanced"
+    #| We can also "nest" block comments |#
+  |#
+
+The above is quite similar to the way OCaml-comments work (e.g. wrt.
+quoted strings).
+
+Examples for S-expression comments (could also span across several
+lines as e.g. with large, deeply nested lists):
+
+  #; (this (nested list) will be ignored) (this (one) not)
+  #; "this quoted atom will be ignored" "this one not"
+  #; ignored-atom present-atom
+
+I have also added a new Vim-syntax file to Sexplib, which will
+highlight the above comment syntax and also flag incorrect constructs
+(e.g. now illegal atoms).
+
+The above improvements can theoretically break old S-expression files.
+ I took some syntax design decisions that make this highly unlikely.
+The new comment sequences ("#|", "|#", "#;") by themselves should be
+extremely unlikely in unquoted atoms in existing S-expression files.
+
+In order to make the syntax work with little chance of breaking
+anything, some forms of unquoted atoms are now illegal, e.g.:
+
+  foo#|bar    bar|#foo    |#bla
+
+The above, as pretty much any unquoted atom containing either "#|" or
+"|#", will raise parsing exceptions.  A "#" or "|" in an unquoted atom
+without the offending second character is perfectly acceptable.
+
+  #|bla
+
+The above would introduce a comment and quite surely also raise a
+parsing exception, since it is not very likely to be properly
+balanced.  The sequence "#;" would only appear at a location where the
+user already put a comment right after an unquoted single-character
+hash.  This, again, is exceptionally unlikely, and even if it
+occurred, it would very likely be flagged due to broken structure.
+
+Old systems are able to read new files as long as the new-style
+comments are not used, which should be the case for all automatically
+printed (using Sexplib) S-expressions.  The only difference could be
+some extra quotes around atoms, which is perfectly consistent with old
+syntax.  If any unlikely conflicts arose with new systems due to badly
+formatted old files, it should be trivial to rewrite these files
+automatically to the new syntax.
+
+Given that the syntax improvements are almost certainly going to work
+well with the vast majority of existing systems and files, I'd
+therefore suggest adopting them.  The productivity gains for human
+editors of large S-expression files should be noticeable.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Wed Apr 25 15:14:30 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Wed, 25 Apr 2012 10:14:30 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+Message-ID: <CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+
+
+On Wed, Apr 25, 2012 at 05:33, David House <dhouse at janestreet.com> wrote:
+> I like this idea, although editor support has always been sufficiently
+> good to make this basically pointless for me.
+
+I agree that using editor macros to comment out a whole S-expression
+is feasible.  But not everybody uses Emacs or a sufficiently powerful
+editor or knows how to use it correctly.  Furthermore, the converse
+(i.e. uncommenting) could cause problems, e.g.:
+
+  (
+    ; some comment
+    foo bar
+  )
+
+This would presumably end up as something like this:
+
+  ;(
+  ;  ; some comment
+  ; foo bar
+  ;)
+
+Besides looking ugly, having extra semicolons might invite people,
+some of whom might not even know about your macro, to remove them.
+This would break the S-expression once you run your uncommenting macro
+on it again.  I don't even want to know what the result would look
+like if a commented-out S-expression contains other commented-out
+S-expressions.  The new comment parser will even work with recursively
+used S-expression comments.
+
+The semicolons might also prevent you from spotting incorrectly
+specified S-expressions.  E.g. I might have two alternatives in a file
+and comment out one.  Then I might want to modify the latter, but
+accidentally introduce syntactic errors.  This problem won't be
+spotted until somebody wants to actually try out the alternative.  It
+may then be tedious to fix the problem.
+
+S-expression comments ("#;") require considerably less effort,
+especially for people using lesser editors, and don't reformat your
+file.  They are also much safer, since the intent of the original
+author is clear.  No guess work whether some semicolon is meant to add
+a comment or just eliminates part of an S-expression.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From dhouse at janestreet.com  Wed Apr 25 10:33:01 2012
+From: dhouse at janestreet.com (David House)
+Date: Wed, 25 Apr 2012 10:33:01 +0100
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+Message-ID: <CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+
+
+On Tue, Apr 24, 2012 at 9:38 PM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> Block comment example:
+>
+> ?#|
+> ? ?Even semicolons can be here;
+> ? ?"Note that quoted strings need to be balanced"
+> ? ?#| We can also "nest" block comments |#
+> ?|#
+>
+> The above is quite similar to the way OCaml-comments work (e.g. wrt.
+> quoted strings).
+>
+> Examples for S-expression comments (could also span across several
+> lines as e.g. with large, deeply nested lists):
+>
+> ?#; (this (nested list) will be ignored) (this (one) not)
+> ?#; "this quoted atom will be ignored" "this one not"
+> ?#; ignored-atom present-atom
+
+I like this idea, although editor support has always been sufficiently
+good to make this basically pointless for me.
+
+In Emacs, one can do C-M-@ (mark-sexp) followed by M-;
+(comment-region) to comment out an s-expression. In your example:
+
+(this (nested list) will be ignored) (this (one) not)
+
+  C-M-@ M-;
+
+;; (this (nested list) will be ignored)
+(this (one) not)
+
+In fact, M-; is normally bound to `comment-dwim' ("do what I mean"),
+and is a very powerful command. M-; without any region ("selected
+text" in modern GUI parlance) will insert a comment and the end of the
+line. With a region, it will comment out exactly that region. It is
+clever enough to work in languages that only have line-based
+commenting, like s-expressions, as you can see above. It has other
+features but they are not relevant here.
+
+
+From yminsky at janestreet.com  Thu Apr 26 11:51:10 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 06:51:10 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+Message-ID: <CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+
+
+Having played around with the new syntax a bit in emacs, it is really
+nice (and, importantly, is already supported in emacs.  If emacs
+doesn't support an s-expression syntax, it can't be all that common in
+the lisp/scheme world...)
+
+So yeah, barring issues with the implementation, we'll accept the change.
+
+y
+
+On Wed, Apr 25, 2012 at 10:14 AM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Wed, Apr 25, 2012 at 05:33, David House <dhouse at janestreet.com> wrote:
+>> I like this idea, although editor support has always been sufficiently
+>> good to make this basically pointless for me.
+>
+> I agree that using editor macros to comment out a whole S-expression
+> is feasible. ?But not everybody uses Emacs or a sufficiently powerful
+> editor or knows how to use it correctly. ?Furthermore, the converse
+> (i.e. uncommenting) could cause problems, e.g.:
+>
+> ?(
+> ? ?; some comment
+> ? ?foo bar
+> ?)
+>
+> This would presumably end up as something like this:
+>
+> ?;(
+> ?; ?; some comment
+> ?; foo bar
+> ?;)
+>
+> Besides looking ugly, having extra semicolons might invite people,
+> some of whom might not even know about your macro, to remove them.
+> This would break the S-expression once you run your uncommenting macro
+> on it again. ?I don't even want to know what the result would look
+> like if a commented-out S-expression contains other commented-out
+> S-expressions. ?The new comment parser will even work with recursively
+> used S-expression comments.
+>
+> The semicolons might also prevent you from spotting incorrectly
+> specified S-expressions. ?E.g. I might have two alternatives in a file
+> and comment out one. ?Then I might want to modify the latter, but
+> accidentally introduce syntactic errors. ?This problem won't be
+> spotted until somebody wants to actually try out the alternative. ?It
+> may then be tedious to fix the problem.
+>
+> S-expression comments ("#;") require considerably less effort,
+> especially for people using lesser editors, and don't reformat your
+> file. ?They are also much safer, since the intent of the original
+> author is clear. ?No guess work whether some semicolon is meant to add
+> a comment or just eliminates part of an S-expression.
+>
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From markus.mottl at gmail.com  Thu Apr 26 13:45:36 2012
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 26 Apr 2012 08:45:36 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+	<CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+Message-ID: <CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 06:51, Yaron Minsky <yminsky at janestreet.com> wrote:
+> Having played around with the new syntax a bit in emacs, it is really
+> nice (and, importantly, is already supported in emacs. ?If emacs
+> doesn't support an s-expression syntax, it can't be all that common in
+> the lisp/scheme world...)
+
+Interesting, good to know that Emacs also already supports it well.
+
+> So yeah, barring issues with the implementation, we'll accept the change.
+
+Sounds good.  The patches also contain some minor bug fixes for older
+code (e.g. more accurate error locations; better detection of broken
+S-expression files, etc.).
+
+Now that this feature as well as the previous one for record field
+defaults are implemented, I don't have any plans for further feature
+extensions to type_conv, bin_prot, and sexplib.  Unless I run into
+bugs or you find any issues with the new features, the libraries
+should be pretty much stable.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From yminsky at janestreet.com  Thu Apr 26 18:57:09 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 13:57:09 -0400
+Subject: New comment syntax in Sexplib
+In-Reply-To: <CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+References: <CAP_800oFu7gRgjjv_uyCtrW8UWULoOtxAy3BZ-FOOfqPAoJH6A@mail.gmail.com>
+	<CAK=fH+iFFa7P90OP+7q6UvemHZh=nNATWASdvZOMGD2n-OfFcA@mail.gmail.com>
+	<CAP_800qYZjn8fRkgoF6PGs0jET6UYLr8SG5q41zscg2Q0=ghJg@mail.gmail.com>
+	<CACLX4jQwL59v=4bCTuDBfzX5bRjXq7dtFz+dfjgFes_Hk7bZcQ@mail.gmail.com>
+	<CAP_800p7jbmWe4JykozCZp0p511H59RV43wroMrxpa3S6ZqtGA@mail.gmail.com>
+Message-ID: <CACLX4jTd8M_oJqhbD_hkB5p6-sEwx_jiaK8Ehe=K0OLmXF7dFA@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 8:45 AM, Markus Mottl <markus.mottl at gmail.com> wrote:
+> On Thu, Apr 26, 2012 at 06:51, Yaron Minsky <yminsky at janestreet.com> wrote:
+>> Having played around with the new syntax a bit in emacs, it is really
+>> nice (and, importantly, is already supported in emacs. ?If emacs
+>> doesn't support an s-expression syntax, it can't be all that common in
+>> the lisp/scheme world...)
+>
+> Interesting, good to know that Emacs also already supports it well.
+>
+>> So yeah, barring issues with the implementation, we'll accept the change.
+>
+> Sounds good. ?The patches also contain some minor bug fixes for older
+> code (e.g. more accurate error locations; better detection of broken
+> S-expression files, etc.).
+>
+> Now that this feature as well as the previous one for record field
+> defaults are implemented, I don't have any plans for further feature
+> extensions to type_conv, bin_prot, and sexplib. ?Unless I run into
+> bugs or you find any issues with the new features, the libraries
+> should be pretty much stable.
+
+Sounds great.
+
+> Regards,
+> Markus
+>
+> --
+> Markus Mottl? ? ? ? http://www.ocaml.info? ? ? ? markus.mottl at gmail.com
+
+
+From agarwal1975 at gmail.com  Thu Apr 26 22:50:57 2012
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 26 Apr 2012 17:50:57 -0400
+Subject: installation mess
+Message-ID: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+
+We are experiencing problems installing core because it depends on
+oasis-0.3 (not in godi), which depends on type-conv, which is in core.
+Looks like a circular dependency.
+
+What is the plan for all the libraries embedded within core, e.g.
+type-conv, sexplib, etc. Are the copies within core meant to be the master
+versions of these? Will they ever be extracted out and distributed
+separately again? I hope so.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120426/817fa77c/attachment-0001.html>
+
+From yminsky at janestreet.com  Thu Apr 26 23:22:15 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Thu, 26 Apr 2012 18:22:15 -0400
+Subject: installation mess
+In-Reply-To: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+Message-ID: <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+
+
+Yes, the copies in Core are intended to be the master copies.  That
+said, we are happy to also distribute them as separate tarballs.
+Right now, Markus' versions of typeconv and sexplib and such are a bit
+ahead of ours, but we hope to resolve that soon.
+
+In any case, we expect to put out release tarballs soon, which will
+not require Oasis at all to build.  That should simplify matters
+considerably.
+
+Sorry that this has been so painful.  We'll try to clean this story up
+entirely in the next few weeks.
+
+y
+
+On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> We are experiencing problems installing core because it depends on oasis-0.3
+> (not in godi), which depends on type-conv, which is in core. Looks like a
+> circular dependency.
+>
+> What is the plan for all the libraries embedded within core, e.g. type-conv,
+> sexplib, etc. Are the copies within core meant to be the master versions of
+> these? Will they ever be extracted out and distributed separately again? I
+> hope so.
+>
+
+
+From agarwal1975 at gmail.com  Thu Apr 26 23:48:34 2012
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 26 Apr 2012 18:48:34 -0400
+Subject: installation mess
+In-Reply-To: <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+ <CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+Message-ID: <CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+
+Okay, so the source code of all sub-libraries will remain in the core
+repository, but several packages for distribution will be generated from
+this repo. I suppose that's fine. I was worried about there being multiple
+inconsistent versions of libraries floating around.
+
+I'm looking forward to a release! We're in a jam now and doing some ugly
+hacking just to compile multiple production libraries.
+
+
+On Thu, Apr 26, 2012 at 6:22 PM, Yaron Minsky <yminsky at janestreet.com>wrote:
+
+> Yes, the copies in Core are intended to be the master copies.  That
+> said, we are happy to also distribute them as separate tarballs.
+> Right now, Markus' versions of typeconv and sexplib and such are a bit
+> ahead of ours, but we hope to resolve that soon.
+>
+> In any case, we expect to put out release tarballs soon, which will
+> not require Oasis at all to build.  That should simplify matters
+> considerably.
+>
+> Sorry that this has been so painful.  We'll try to clean this story up
+> entirely in the next few weeks.
+>
+> y
+>
+> On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com>
+> wrote:
+> > We are experiencing problems installing core because it depends on
+> oasis-0.3
+> > (not in godi), which depends on type-conv, which is in core. Looks like a
+> > circular dependency.
+> >
+> > What is the plan for all the libraries embedded within core, e.g.
+> type-conv,
+> > sexplib, etc. Are the copies within core meant to be the master versions
+> of
+> > these? Will they ever be extracted out and distributed separately again?
+> I
+> > hope so.
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/core/attachments/20120426/0eba45f7/attachment-0001.html>
+
+From yminsky at janestreet.com  Fri Apr 27 11:05:44 2012
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 27 Apr 2012 06:05:44 -0400
+Subject: installation mess
+In-Reply-To: <CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+References: <CAMu2m2L=HZSutfPt2SArjTJKFBOzPaVU4G2REB-NELbQsw0ong@mail.gmail.com>
+	<CACLX4jRqVSu8euuNEpf7Y_WahpHvt56OwvcAgUBxUVwTfuAVTA@mail.gmail.com>
+	<CAMu2m2L100YsTegJROhQp2QkyfX=H-xzcsuJ6X845VA4uX5Sag@mail.gmail.com>
+Message-ID: <CACLX4jSafGmHngJ8SVJwnq8MPZ+GC82uEmNy=1m1XL1So8R4gw@mail.gmail.com>
+
+
+On Thu, Apr 26, 2012 at 6:48 PM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> Okay, so the source code of all sub-libraries will remain in the core
+> repository, but several packages for distribution will be generated from
+> this repo. I suppose that's fine. I was worried about there being multiple
+> inconsistent versions of libraries floating around.
+
+Yeah.  We're behind on merging in Markus' latest work, which is the
+only reason there are multiple versions right now.  Doing the merging
+in of changes from the external repo turned out to be more challenging
+to automate than we expected, and that has set us back.
+
+But that will resolve soon I expect.
+
+> I'm looking forward to a release! We're in a jam now and doing some ugly
+> hacking just to compile multiple production libraries.
+
+Indeed!  My apologies for the pain.
+
+y
+
+>
+> On Thu, Apr 26, 2012 at 6:22 PM, Yaron Minsky <yminsky at janestreet.com>
+> wrote:
+>>
+>> Yes, the copies in Core are intended to be the master copies. ?That
+>> said, we are happy to also distribute them as separate tarballs.
+>> Right now, Markus' versions of typeconv and sexplib and such are a bit
+>> ahead of ours, but we hope to resolve that soon.
+>>
+>> In any case, we expect to put out release tarballs soon, which will
+>> not require Oasis at all to build. ?That should simplify matters
+>> considerably.
+>>
+>> Sorry that this has been so painful. ?We'll try to clean this story up
+>> entirely in the next few weeks.
+>>
+>> y
+>>
+>> On Thu, Apr 26, 2012 at 5:50 PM, Ashish Agarwal <agarwal1975 at gmail.com>
+>> wrote:
+>> > We are experiencing problems installing core because it depends on
+>> > oasis-0.3
+>> > (not in godi), which depends on type-conv, which is in core. Looks like
+>> > a
+>> > circular dependency.
+>> >
+>> > What is the plan for all the libraries embedded within core, e.g.
+>> > type-conv,
+>> > sexplib, etc. Are the copies within core meant to be the master versions
+>> > of
+>> > these? Will they ever be extracted out and distributed separately again?
+>> > I
+>> > hope so.
+>> >
+>
+>
+
+

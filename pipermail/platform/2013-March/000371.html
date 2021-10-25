@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C86li9hzso5.fsf%40cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000370.html">
+   <LINK REL="Next"  HREF="000374.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C86li9hzso5.fsf%40cam.ac.uk%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 20 21:07:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000370.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000374.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#371">[ date ]</a>
+              <a href="thread.html#371">[ thread ]</a>
+              <a href="subject.html#371">[ subject ]</a>
+              <a href="author.html#371">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;&gt;<i> If omake continues to use &quot;ocamldep -modules&quot; then it will have to
+</I>&gt;&gt;<i> implement the resolution strategy. To support *search path files* this
+</I>&gt;&gt;<i> will involve either parsing them itself or using the proposed &quot;ocamlns
+</I>&gt;&gt;<i> ... -resolve Foo#Bar&quot;.
+</I>&gt;<i>
+</I>&gt;<i> With my proposal, ocamldep -modules will emit two kinds of dependencies: file dependencies for namespaces modules
+</I>&gt;<i> (resolved by ocamldep itself, using search path files) and module dependencies (for non-namespaced modules), to be
+</I>&gt;<i> resolved by the build exactly as of today (only using -I 
+</I>&gt;<i> directories, ignoring search path files).  Basically, we keep the legacy behavior (-I directories) for non-namespaced
+</I>&gt;<i> modules, and we provide a simpler API between ocamldep and the build system for namespaced modules (equivalent to
+</I>&gt;<i> &quot;ocamldep&quot; without -modules, but precise even in presence of generated source files or &quot;renamed&quot; units).  There will be
+</I>&gt;<i> no new resolution strategy to be implemented in, say, omake, just a trivial adaptation of the &quot;ocamldep -module&quot;
+</I>&gt;<i> postprocessing to accept file dependency directly.
+</I>
+This is the strategy I have referred to as &quot;regular ocamldep with
+generated search path files&quot;, it works just as well with simple
+namespaces. The only difference is that the build system generates the
+search path file to give to ocamldep, rather than making the user write
+it by hand.
+
+As a side note, I think that &quot;ocamldep -modules&quot; should continue to be a
+purely syntactic version that ignores the search path. It is regular
+ocamldep that should be used for this purpose.
+
+&gt;&gt;<i> I'm not particularly worried about hypothetical build systems. If you
+</I>&gt;&gt;<i> want to implement such a build system then you should really add hooks
+</I>&gt;&gt;<i> into the OCaml compiler. This argument also assumes that catching
+</I>&gt;&gt;<i> &quot;Sys.file_exists&quot; is fine but catching &quot;Sys.readdir&quot; is impossible.
+</I>&gt;<i>
+</I>&gt;<i> No, this argument does not assume that.  But catching Sys.readdir is useless, since you don't know which files the
+</I>&gt;<i> compiler is interested in. The tool would have to assume that the dependency is on the entire directory, which is of
+</I>&gt;<i> course way too weak.
+</I>
+The tool would only have to know what files it could produce, but it
+should already know that to answer Sys.file_exists queries.
+
+&gt;<i> I've done an experiment with a build system based on capturing open/stat calls, and it worked really well, not only for
+</I>&gt;<i> ocaml, but also for C code.
+</I>
+This assumes that a C compiler won't read a directory (say to cache its
+contents) in order to check for the existence of a file. It is not
+exactly the most robust basis for a build system, which is probably why
+it is only a hypothetical build system.
+
+&gt;<i> Sorry, I maintain that my strategy will allow to have a better ocamldep which will result in simpler support in, say,
+</I>&gt;<i> omake and ocamlbuild.
+</I>
+It doesn't allow better ocamldep results, the results are the same. You
+simply pass in a search path file, generated by the build system, that
+lists all the target files.
+
+&gt;<i> I also maintain that people using simple namespaces could have weird behaviors of their build
+</I>&gt;<i> system (errors appearing or disappearing after a 'make clean') even
+</I>&gt;<i> though dependencies are &quot;correct&quot;.
+</I>
+Depending on how it is implemented, they *may* fail to get a warning
+that they should get, but only in a situation where the warning is
+irrelevant.
+
+&gt;<i>  And I maintain that a
+</I>&gt;<i> build system based on capturing file system accesses could be a viable strategy, and that this wouldn't work any more if
+</I>&gt;<i> the compiler starts to load whole directories.
+</I>
+And I maintain that if checking for a file's existence by reading the
+contents of a directory breaks it then it is not a viable build system.
+
+&gt;<i> Consider this piece of code:
+</I>&gt;<i>
+</I>&gt;<i>  open namespace Foo
+</I>&gt;<i>  module X = Bar
+</I>&gt;<i>
+</I>&gt;<i> You decide to rename the namespace Foo in your project to Baz but you forget to update this file.  You still have a
+</I>&gt;<i> foo-bar.cmi in your directory, even though this file is now out of scope of your build system (it considers it as
+</I>&gt;<i> &quot;source&quot;).  When you compile the wrong code above, the compiler does not complain, and the build system probably
+</I>&gt;<i> considers that foo-bar.cmi is a dependency of this code. Now you &quot;make clean&quot;, and boom, the code does not compile any
+</I>&gt;<i> more.  (Or you commit your changes and other people from your update and get the same error.) Or, even worse, you start
+</I>&gt;<i> changing some more code, and you get incomprehensible &quot;Interface mismatch&quot; because you still use the &quot;dead&quot; foo-bar.cmi.
+</I>
+This kind of behaviour already exists in OCaml. Consider this piece of code:
+
+    type t = Bar.t (* Bar only contains type definitions *)
+
+If you rename bar.mli to baz.mli but don't remove bar.cmi then it will
+continue to compile until you run &quot;make clean&quot;. The moral of the story
+is don't leave old .cmi files lying around.
+
+I really don't think that preventing a very unlikely scenario, which can
+already happen anyway, is a good reason to make namespaces significantly
+less convenient for the average user.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000370.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000374.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#371">[ date ]</a>
+              <a href="thread.html#371">[ thread ]</a>
+              <a href="subject.html#371">[ subject ]</a>
+              <a href="author.html#371">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

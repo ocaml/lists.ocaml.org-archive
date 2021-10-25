@@ -1,0 +1,231 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5130AA94.9070008%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000204.html">
+   <LINK REL="Next"  HREF="000207.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5130AA94.9070008%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Fri Mar  1 13:18:12 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000204.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000207.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#205">[ date ]</a>
+              <a href="thread.html#205">[ thread ]</a>
+              <a href="subject.html#205">[ subject ]</a>
+              <a href="author.html#205">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;&gt;<i> 2) However, you cannot open several nodes at the same time without
+</I>&gt;&gt;<i>     specifying an ordering between those nodes.
+</I>&gt;<i>
+</I>&gt;<i> What does it mean to open several nodes &quot;at the same time&quot;?  I would
+</I>&gt;<i> have thought that opening of nodes would always be ordered, since the
+</I>&gt;<i> open statements would need to be written in some order.
+</I>
+If Core has two auto-open subnodes (e.g Std and Pervasives), then opening
+core will open the two auto-open subnodes at the same time. This is what I
+meant.
+
+In this case, you write with the auto-open semantics
+
+         open Core
+
+and what happens is equivalent to (without the auto-open semantics)
+
+         open Core
+         open Std
+         open Pervasives
+or
+         open Core
+         open Std
+         open Pervasives
+
+So the edges Std and Pervasives need both leaving from Core need to be
+ordered in the namespace.
+
+&gt;&gt;<i> The * is the auto-open flag, as used in Gabriel's description.
+</I>&gt;&gt;<i> Sorry for leaving this implicit.
+</I>&gt;<i>
+</I>&gt;<i> Got it.  That's quite helpful, though I'm still a little lost about
+</I>&gt;<i> the problem you're describing.  It sounds to me like the issue dervies
+</I>&gt;<i> from the fact that you're proposing opening up a parent namespace as
+</I>&gt;<i> an operation that opens all children as well.  Is that right?
+</I>
+Yes, an operation that opens all children marked auto-open.
+
+&gt;<i> I hadn't even begun to imagine wanting that feature, so maybe that isn't a
+</I>&gt;<i> real issue at all?  Or perhaps I'm just confused....
+</I>
+I thought this is what you where asked for when saying that you want
+
+         open Core
+
+to behaves as
+
+         open Core
+         open Std
+         open Pervasives
+
+because you have marked Std and Pervasives as auto-open.
+
+&gt;&gt;<i> I think namespaces should be unordered to scale up.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> You would like to be able to represent all available libraries in the OCaml
+</I>&gt;&gt;<i> world as a namespace, with libraries coming from many different sources and
+</I>&gt;&gt;<i> there is no natural order on these, i.e. no order that could be given a
+</I>&gt;&gt;<i> meaningful semantics.  Would you put World#JaneStreet before World#Lexify or
+</I>&gt;&gt;<i> the other way round?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> If name spaces are unordered, it is also easy to populate them by reading
+</I>&gt;&gt;<i> and merging different sources in a strict way: name spaces are meant to
+</I>&gt;&gt;<i> avoid conflicting names to start with, so if a merge introduces conflicts,
+</I>&gt;&gt;<i> this is really the right place to fix it by renaming one side or
+</I>&gt;&gt;<i> reorganizing the hierarchy rather than do some silent overriding.
+</I>&gt;<i>
+</I>&gt;<i> I wonder if this all comes down to different thoughts about hierarchy.
+</I>&gt;<i> I guess I wouldn't think the namespace World#JaneStreet would be
+</I>&gt;<i> ordered compared to World#Lexify, but the module aliases and opens
+</I>&gt;<i> contained in a namespace would, I thought, have been ordered.  And
+</I>&gt;<i> surely, when you open multiple namespaces in your environment, you can
+</I>&gt;<i> be including the same name multiple times, at which point I believe
+</I>&gt;<i> the proper semantics is shadowing.
+</I>
+Here, you are reasoning in Alain's model where a namespace file is just a
+sequence of operations (alias or open).  So you don't have a proper notion
+of namespace model and instead understand a namespace file as its immediate
+action on the current scope.
+
+This is find to reason in the small, to reason about the imports of a
+module source file.
+
+But I don't think this is a good model that would scale to providing a
+unified view of all available libraries where you wish to construct
+namespaces a posteriori by combining existing ones.
+
+&gt;&gt;<i> Hope this helps,
+</I>&gt;<i>
+</I>&gt;<i> I think what I'm mostly confused about is what is the nature of the
+</I>&gt;<i> hierarchical namespace system you're thinking about. What are the
+</I>&gt;<i> operations available?
+</I>
+The model is what has been described by Gabriel:
+
+   <A HREF="http://gallium.inria.fr/~scherer/namespaces/spec.pdf">http://gallium.inria.fr/~scherer/namespaces/spec.pdf</A>
+
+and
+
+   <A HREF="http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html">http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html</A>
+
+&gt;<i> Do you intend to have namespace opens also recursively open all children?
+</I>
+I thought this was your wish.
+But I think it is more a drawback than a convenience.
+
+&gt;<i> Is there an operation for merging namespaces?
+</I>
+Yes.
+
+&gt;<i> Aliasing upper namespaces?
+</I>
+Yes, you can have several paths leading to the same module object.
+
+&gt;<i> Right now, I lack both a precise mental model of what you mean by
+</I>&gt;<i> hierarchical namespaces,
+</I>
+   <A HREF="http://gallium.inria.fr/~scherer/namespaces/spec.pdf">http://gallium.inria.fr/~scherer/namespaces/spec.pdf</A>
+
+&gt;<i> and an understanding of the language features that motivate this
+</I>&gt;<i> hierarchy.
+</I>
+Although you do not say it clearly, I think you wish at least Alain's
+2-level hierarchal model.
+
+This may be fine from your point of view:
+
+         level 1 is for JaneStreet different libraries
+         level 2 is for the modules of each library
+
+Most of your libraries are for internal use. So in a way you do not have to
+share your namespaces with the rest of the world. I think the problem comes
+when people want to share the namespaces.
+
+For instance, there could be two actors Foo and Bar proposing complementary
+set of libraries for programming the web.
+
+When doing web programming I may wish to use parts of both providers
+Then, I may wish to structure names as
+
+         Web
+             Foo
+                 Lib1
+                    &lt;list of modules&gt;
+                 Lib2
+                    &lt;list of modules&gt;
+             Bar
+
+In the 2-level model I would be forced to rename namespace files
+to avoid clashes and get some long list of namespace_files that would look
+like:
+
+         Web_Foo_Lib1
+         Web_Foo_Lib2
+         Web_Bar
+
+In this model, the reorganization of namespaces exported by users Foo and
+Bar has into my own view has to be done manually.  The fact that names carry
+some implicit structure is an indication that one has some hierarchy in
+mind.
+
+In the hierachical view, it would suffice to assemble them within the
+language of namespaces, using operations like merge, perhaps pruning, etc..
+
+Besides, I do not think that a 2-level model is so much simpler than a
+hierarchical one.  The apparent simplificty of Alain's proposal is more I
+think in the fact that he does not manipulate namespaces explicitly (such as
+pruning, merging, etc.)
+
+     Didier
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000204.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000207.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#205">[ date ]</a>
+              <a href="thread.html#205">[ thread ]</a>
+              <a href="subject.html#205">[ subject ]</a>
+              <a href="author.html#205">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

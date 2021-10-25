@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Reconciling Merlin and ppx
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Reconciling%20Merlin%20and%20ppx&In-Reply-To=%3C5277B5A6.7080207%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000482.html">
+   <LINK REL="Next"  HREF="000485.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Reconciling Merlin and ppx</H1>
+    <B>Fr&#233;d&#233;ric Bour</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Reconciling%20Merlin%20and%20ppx&In-Reply-To=%3C5277B5A6.7080207%40gmail.com%3E"
+       TITLE="[wg-camlp4] Reconciling Merlin and ppx">defree at gmail.com
+       </A><BR>
+    <I>Mon Nov  4 14:56:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000482.html">[wg-camlp4] Reconciling Merlin and ppx
+</A></li>
+        <LI>Next message: <A HREF="000485.html">[wg-camlp4] Reconciling Merlin and ppx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#484">[ date ]</a>
+              <a href="thread.html#484">[ thread ]</a>
+              <a href="subject.html#484">[ subject ]</a>
+              <a href="author.html#484">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On 04/11/2013 15:06, Alain Frisch wrote:
+&gt;<i> On 11/04/2013 02:46 PM, Fr&#233;d&#233;ric Bour wrote:
+</I>&gt;&gt;<i> Merlin is used in an interactive context (were we expect a response in
+</I>&gt;&gt;<i> less than ~ 60ms, on average).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> If we retransform the whole AST during each invocation, we also need to
+</I>&gt;&gt;<i> retype the whole AST after.
+</I>&gt;<i>
+</I>&gt;<i> I assume there is already some logic to detect from which point the 
+</I>&gt;<i> code has changed, and to resume type-checking from the start of the 
+</I>&gt;<i> phrase, using some kind of snapshot.  Couldn't this logic be applied 
+</I>&gt;<i> after the preprocessing?
+</I>
+The process is roughly the following:
+&#8722; Each chunk has an ending position.
+&#8722; The editor tells the coordinates of the first character that changed.
+&#8722; Merlin drops everything ending after that position then notify the 
+editor of the ending position of the last chunk on merlin side.
+&#8722; The editor is expected to tell the rest of the buffer (up to the 
+cursor) starting from this last chunk.
+
+So the &quot;detection logic&quot; has more to do with the editor than with the AST.
+&gt;<i> Still, calling the PPX transformers as external processes might 
+</I>&gt;<i> already be too slow (there is always the option to link them in).
+</I>Constantly invoking external processes should be fast enough in merlin's 
+case, as long as the work to do is not proportional to the size of the file.
+
+&gt;<i>
+</I>&gt;<i> &gt; Then an &quot;open Core.Std&quot; alone is enough to
+</I>&gt;&gt;<i> blow up the time budget. (And this existimation is done on a desktop
+</I>&gt;&gt;<i> computer, some users have EEE).
+</I>&gt;<i>
+</I>&gt;<i> For this specific example, this patch might help:
+</I>&gt;<i> <A HREF="http://caml.inria.fr/mantis/view.php?id=5916">http://caml.inria.fr/mantis/view.php?id=5916</A>
+</I>&gt;<i> (I'm still waiting for a reproducible case before accepting the patch...)
+</I>
+Merlin's actually use a patch to make substitution lazy, guaranteeing 
+&quot;open&quot; time proportional to the number of identifier introduced, not to 
+the number of path substituted.
+So &quot;open Core.Std&quot; is instantaneous (except on cold start, where the 
+vast majority of the time is spent unmarshalling data on C-side).
+
+I can't tell if this is the same approach as in the patch you linked, 
+but it works well for Merlin.
+
+&gt;<i>
+</I>&gt;&gt;<i> However, I wonder how this state threading would be handled in the 
+</I>&gt;&gt;<i> REPL ?
+</I>&gt;<i>
+</I>&gt;<i> Currently, it's not.  See:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="http://caml.inria.fr/mantis/view.php?id=5904#c8797">http://caml.inria.fr/mantis/view.php?id=5904#c8797</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Even though some rewriters might need to maintain state (or even have 
+</I>&gt;<i> access to the whole unit), many of them (and in particular those 
+</I>&gt;<i> corresponding to the extensions currently supported by Merlin) won't 
+</I>&gt;<i> probably need it.
+</I>
+Ok. So if some work had to be done to ensure proper compatibility 
+between merlin and ppx, it would be for supporting stateful rewriters.
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000482.html">[wg-camlp4] Reconciling Merlin and ppx
+</A></li>
+	<LI>Next message: <A HREF="000485.html">[wg-camlp4] Reconciling Merlin and ppx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#484">[ date ]</a>
+              <a href="thread.html#484">[ thread ]</a>
+              <a href="subject.html#484">[ subject ]</a>
+              <a href="author.html#484">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

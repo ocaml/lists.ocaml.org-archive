@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20proper%20way%20of%20wrapping%20syscalls%20concerning%0A%09%28check_%29errno&In-Reply-To=%3CCANdk5Lbg7Hb-xH-J%2BGCxQNy20sWwijAwm2J-9h9mJWiAAn94OQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000182.html">
+   <LINK REL="Next"  HREF="000184.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno</H1>
+    <B>Jan Doms</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20proper%20way%20of%20wrapping%20syscalls%20concerning%0A%09%28check_%29errno&In-Reply-To=%3CCANdk5Lbg7Hb-xH-J%2BGCxQNy20sWwijAwm2J-9h9mJWiAAn94OQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno">jan.doms at gmail.com
+       </A><BR>
+    <I>Fri Jul 17 10:29:12 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000182.html">[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno
+</A></li>
+        <LI>Next message: <A HREF="000184.html">[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#183">[ date ]</a>
+              <a href="thread.html#183">[ thread ]</a>
+              <a href="subject.html#183">[ subject ]</a>
+              <a href="author.html#183">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 17 July 2015 at 01:04, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+&gt;<i> On 7 July 2015 at 09:57, Jan Doms &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">jan.doms at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> The documentation mentions the following in regards to check_errno:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> &quot;The value ?check_errno, which defaults to false, indicates whether
+</I>&gt;&gt;<i> Unix.Unix_error should be raised if the C function modifies errno.
+</I>&gt;&gt;<i> Please note that a function that succeeds is allowed to change errno.
+</I>&gt;&gt;<i> So use this option with caution. &quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> According to the pread manpage <A HREF="http://linux.die.net/man/2/pread">http://linux.die.net/man/2/pread</A> errno
+</I>&gt;&gt;<i> should be checked when the return value is -1.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> According to wikipedia <A HREF="https://en.wikipedia.org/wiki/Errno.h">https://en.wikipedia.org/wiki/Errno.h</A>
+</I>&gt;&gt;<i> &quot;Most functions indicate that they detected an error by returning a
+</I>&gt;&gt;<i> special value, typically NULL for functions that return pointers, and
+</I>&gt;&gt;<i> &#8722;1 for functions that return integers.&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So I was wondering: what is the proper way to wrap the pread syscall
+</I>&gt;&gt;<i> with ctypes?
+</I>&gt;<i>
+</I>&gt;<i> Thanks for raising this.  The support for errno in ctypes isn't quite
+</I>&gt;<i> right at present, and it's worth discussing how to improve it.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Would it make sense to replace the ~(check_errno : bool) argument with e.g.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> type check_errno =
+</I>&gt;&gt;<i>  | OnMinusOne (* raise based on errno if the return value is -1 *)
+</I>&gt;&gt;<i>  | OnNullPointer (* raise based on errno if the return value is a null
+</I>&gt;&gt;<i> pointer *)
+</I>&gt;&gt;<i>  | WhenChanged (* current behaviour *)
+</I>&gt;<i>
+</I>&gt;<i> This isn't a bad idea, but it's difficult to be exhaustive.  For
+</I>&gt;<i> example, some mathematical functions return HUGE_VAL and set errno on
+</I>&gt;<i> overflow errors, which isn't properly covered by these three cases.
+</I>&gt;<i>
+</I>&gt;<i> One alternative approach is to make it possible to return both errno
+</I>&gt;<i> and the function's return value to OCaml.  It should then be possible
+</I>&gt;<i> to write reusable functions which correspond to the error handling
+</I>&gt;<i> strategies in your check_errno type.
+</I>
+It is indeed not exhaustive, and making it exhaustive in the way I
+suggested is probably impossible / not a good way forward.
+
+How about just having an accessor (and maybe also a setter) for errno?
+If I'm not mistaken such operations can not currently be written with
+ctypes and need a bit of C, right?
+
+Once you have those it should be easy to implement the idea you had in
+mind (returning both errno and the function return value).
+One could then also implement the following functions in ocaml:
+check_errno (* reads errno and raises appropriate exception if it's
+different from 0 *)
+returning_with_errno                  (* what you had in mind *)
+returning_check_errno_changed (* behaviour like the current ~check_errno:true *)
+returning_check_errno_on_minus_one
+returning_check_errno_on_null
+returning_check_errno_on_huge_val
+...
+
+
+&gt;<i>
+</I>&gt;&gt;<i> Maybe I'm worrying for nothing, as probably the kernel doesn't change
+</I>&gt;&gt;<i> errno when no error occured, right?
+</I>&gt;<i>
+</I>&gt;<i> In many cases that's true, but it's best not to rely on that if at all possible.
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000182.html">[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno
+</A></li>
+	<LI>Next message: <A HREF="000184.html">[ocaml-ctypes] proper way of wrapping syscalls concerning	(check_)errno
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#183">[ date ]</a>
+              <a href="thread.html#183">[ thread ]</a>
+              <a href="subject.html#183">[ subject ]</a>
+              <a href="author.html#183">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

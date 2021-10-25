@@ -1,0 +1,199 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] On domain-specific foreign syntaxes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3CCAPFanBH%2B0kyAqBZCqmzM9jiEC%3DikM1fO30h3F4jV3QvEK2EN9g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000167.html">
+   <LINK REL="Next"  HREF="000150.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] On domain-specific foreign syntaxes</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3CCAPFanBH%2B0kyAqBZCqmzM9jiEC%3DikM1fO30h3F4jV3QvEK2EN9g%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] On domain-specific foreign syntaxes">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Jan 31 13:48:31 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000167.html">[wg-camlp4] Supporting traditional quotations
+</A></li>
+        <LI>Next message: <A HREF="000150.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#162">[ date ]</a>
+              <a href="thread.html#162">[ thread ]</a>
+              <a href="subject.html#162">[ subject ]</a>
+              <a href="author.html#162">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> When fragments of JSON/XML/etc are created programatically, this is often done &quot;piece by piece&quot;,
+</I>&gt;<i> with very small fragments involving a high density of anti-quotations.
+</I>&gt;<i> The benefits of using the foreign syntax here are not clear to me.
+</I>
+This is an argument that I would very much like to be convinced of,
+but that does not really match my experience. I have found this style
+of piece-by-piece code difficult to understand and maintain, and when
+I find the time to do things properly I very much try to have a
+central piece of code that reflects the foreign structure (as a
+quasiquotation when possible, or a dense expression using combinators
+otherwise), preceded by the auxiliary definitions. (It's not always
+possible or easy when you need data to flow from some part of the
+generated AST to others).
+
+As an example, you are probably familiar with the following piece of
+code in the OCaml type-checker, that builds a non-trivial part of
+typedtree in a semi-piecewise way to handle a corner case of optional
+argument functions (and is probably going away someday), from L2784 to
+L2813 here:
+  <A HREF="https://github.com/ocaml/ocaml/blob/1b5d02346c8e477dbe38dd883d3b6f430924190d/typing/typecore.ml#L2784">https://github.com/ocaml/ocaml/blob/1b5d02346c8e477dbe38dd883d3b6f430924190d/typing/typecore.ml#L2784</A>
+
+This code is, quite frankly, quite painful to make sense of, and I
+think this is in a large part related by the fact that it builds the
+typedtree piecewise (relatively; it could be even more fine-grained)
+instead of building the entire expression, that is (in approximative
+Camlp{4,5} syntax)
+  &lt;:texp&lt;
+     let $x,tty$ = $texp$ in
+     (fun $y,targ$ -&gt; $x$ $list:zip labels none$ $y,targ$)
+  &gt;&gt;;
+that said, a smart combinator library could produce an equally (or
+more, or less, depending on who you ask) readable example, for
+example:
+  tlet x tty (fun x -&gt;
+    tfun y targ (fun y -&gt;
+      tnapp x (zip labels none @ [y])))
+and in this case the &quot;domain-specific syntax&quot; argument does not hold.
+
+
+Anil's counter-point (converting specialized embeddings to build-time
+code generation) is interesting as well. He did not (by modesty?) cite
+his ocaml-orm-sqlite project (
+<A HREF="https://github.com/avsm/ocaml-orm-sqlite">https://github.com/avsm/ocaml-orm-sqlite</A> ) which is doing much of the
+same thing in the database field. Maybe my &quot;Use cases for syntax
+extensions&quot; wikipage could be augmented with &quot;Non-use cases for syntax
+extensions&quot; example?
+
+On Thu, Jan 31, 2013 at 2:11 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 01/31/2013 01:44 PM, Gabriel Scherer wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The point of quoting foreign languages is to translate them into a
+</I>&gt;&gt;<i> form that exercize the OCaml type-checker to produce rich typing
+</I>&gt;&gt;<i> information. With (parse_json &quot;...&quot;) you have no static typing
+</I>&gt;&gt;<i> information on the parsed value, while with a quotation you can expect
+</I>&gt;&gt;<i> to get, say, a (&lt; streetAdress : string &gt; Json.t) expression.
+</I>&gt;&gt;<i> Supporting antiquotations there allows you to write those foreign
+</I>&gt;&gt;<i> values in a composable way, eg. using &lt;:json&lt; { streetAddress: $addr$
+</I>&gt;&gt;<i> } &gt;&gt; with (addr : string Json.t).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This is essentially a nice concrete syntax on top of the typed
+</I>&gt;&gt;<i> combinators (point 1. in your message quoted below); indeed, good
+</I>&gt;&gt;<i> extensions should embed as few domain knowledge as possible and defer
+</I>&gt;&gt;<i> that to the pure-ocaml library providing the combinators.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> There are two very different topic here: syntax and type-checking.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Clever type-checking of the DSL can be done either with combinators, and
+</I>&gt;<i> when this is not possible, it makes sense to have some &quot;pre-processors&quot;
+</I>&gt;<i> doing clever stuff like adding type annotations.  When we write:
+</I>&gt;<i>
+</I>&gt;<i>  (:json { streetAddress: &quot;21 2snd Street&quot; })
+</I>&gt;<i>
+</I>&gt;<i> or even:
+</I>&gt;<i>
+</I>&gt;<i>  (:json M[&quot;streetAdress&quot;, S &quot;21 2snd Street&quot;])
+</I>&gt;<i>
+</I>&gt;<i> this can be expanded to something more clever than just untyped
+</I>&gt;<i> constructors.  But there is no reason to force using the concrete syntax of
+</I>&gt;<i> the foreign language (which is not really true, because you want to allow
+</I>&gt;<i> anti-quotations which are not part of that syntax).  The syntax of OCaml is
+</I>&gt;<i> rich enough that a lot of other languages can be encoded in it.  The
+</I>&gt;<i> downside is that we need to make it clear syntactically that a fragment will
+</I>&gt;<i> be interpreted in a special way.  The upside is that no &quot;parsing technology&quot;
+</I>&gt;<i> is involved, which simplifies the design (choice of a syntax for
+</I>&gt;<i> anti-quotations), the implementation (writing a parser and calling back the
+</I>&gt;<i> OCaml parser on anti-quotations, with careful tracking of locations) and the
+</I>&gt;<i> user experience (support from editors, learning details of a concrete syntax
+</I>&gt;<i> [you might want to write JSON producers on an abstract level, and benefit
+</I>&gt;<i> from clever type-checking, but without knowing exactly how strings have to
+</I>&gt;<i> be escaped in concrete JSON]).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> Furthermore, the bare approach of using combinators directly is not
+</I>&gt;&gt;<i> always desirable in situations where you want the code to be used by
+</I>&gt;&gt;<i> non-domain-experts. &quot;Templates&quot; in web programming are an entire
+</I>&gt;&gt;<i> cottage industry made of preprocessing HTML-looking quasiquotations,
+</I>&gt;&gt;<i> to help the role separation between designers and programmers.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> When non-programmers have to write some HTML code, this code rarely ends up
+</I>&gt;<i> in OCaml source code.  Usually, it stays in its own HTML file, which is then
+</I>&gt;<i> processed (statically or dynamically) by the (OCaml) code.
+</I>&gt;<i>
+</I>&gt;<i> When fragments of JSON/XML/etc are created programatically, this is often
+</I>&gt;<i> done &quot;piece by piece&quot;, with very small fragments involving a high density of
+</I>&gt;<i> anti-quotations.  The benefits of using the foreign syntax here are not
+</I>&gt;<i> clear to me.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> This is maybe less visible for non-programmable data description
+</I>&gt;&gt;<i> languages such as JSON, but I suspect this still holds. For example,
+</I>&gt;&gt;<i> if you distribute a protocol library built on top of JSON and bridging
+</I>&gt;&gt;<i> over many programming languages, you want the same maintainer to be
+</I>&gt;&gt;<i> able to quickly reflect changes to the protocol schema over all
+</I>&gt;&gt;<i> implements. This is vastly easier if they respect the domain-specific
+</I>&gt;&gt;<i> syntax instead of each having an embedding following the concrete
+</I>&gt;&gt;<i> syntax of the corresponding language.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I understand the theoretical argument, but I don't think it would apply in
+</I>&gt;<i> practice to many OCaml projects.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000167.html">[wg-camlp4] Supporting traditional quotations
+</A></li>
+	<LI>Next message: <A HREF="000150.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#162">[ date ]</a>
+              <a href="thread.html#162">[ thread ]</a>
+              <a href="subject.html#162">[ subject ]</a>
+              <a href="author.html#162">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

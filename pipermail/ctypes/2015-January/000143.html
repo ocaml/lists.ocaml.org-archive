@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20OCaml%20Ctypes%20and%20allocating%20a%20pointer%20to%20a%20type&In-Reply-To=%3CCAAxsn%3DFM0aBeL1V7evkRuPovovn54MVWJ1QVT8K55JctEpaZdA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000142.html">
+   <LINK REL="Next"  HREF="000144.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20OCaml%20Ctypes%20and%20allocating%20a%20pointer%20to%20a%20type&In-Reply-To=%3CCAAxsn%3DFM0aBeL1V7evkRuPovovn54MVWJ1QVT8K55JctEpaZdA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type">yallop at gmail.com
+       </A><BR>
+    <I>Sun Jan  4 00:19:33 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000142.html">[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+</A></li>
+        <LI>Next message: <A HREF="000144.html">[ocaml-ctypes] Converting between primitive and ocaml types
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#143">[ date ]</a>
+              <a href="thread.html#143">[ thread ]</a>
+              <a href="subject.html#143">[ subject ]</a>
+              <a href="author.html#143">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2 January 2015 at 23:01, Tim McGilchrist &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">timmcgil at gmail.com</A>&gt; wrote:
+&gt;<i> I'm trying to call some C code from OCaml where I need to supply an
+</I>&gt;<i> allocated pointer to my type yaml_parser_t. But I'm not sure how I should be
+</I>&gt;<i> allocating a valid pointer. The example code is below.
+</I>&gt;<i>
+</I>&gt;<i> Ideally I'd like to not have to supply a concrete implementation for
+</I>&gt;<i> yaml_parser_t as well, since I don't need to inspect it's internals, just
+</I>&gt;<i> pass it into and out of various functions.
+</I>
+There are a few ways to approach this.  If you have some way of
+finding out the size of a yaml_parser_t (e.g. via a configure script)
+then you can just allocate a buffer of that size and use it at an
+appropriate type.  For example, you might describe a parser as an
+struct type without actually specifying any fields:
+
+  type yaml_parser_t = [`yaml_parser_s] structure
+  let parser_t : yaml_parser_t typ = structure &quot;yaml_parser_s&quot;
+
+and then allocate parser_t values using something like the following:
+
+  let make_parser () =
+    coerce (ptr char) (ptr parser_t) (allocate_n ~count:parser_size char)
+
+(A couple of things that you might wonder about: allocate_n returns
+properly aligned memory, just like C's malloc(), so this is safe in
+terms of alignment; the buffer returned by allocate_n will be released
+automatically when you no longer have a reference to it).
+
+You can use the definition above in your &quot;foreign&quot; bindings, of course:
+
+   let init = foreign &quot;yaml_parser_initialize&quot; (ptr parser_t @-&gt; returning int)
+
+Another possibility, if you're happy to work with the bleeding edge
+(i.e. unreleased Ctypes from GitHub) is to use &quot;struct stubs&quot;, which
+will retrieve the size information for you without requiring you to
+describe parts of the structure that you're not going to use.  The
+functions for describing structures are essentially the same as what's
+described in Real World OCaml, but the build process is a little more
+complex.
+
+Here's an example of the struct stubs approach.  The main thing you
+need to do is describe the bits of the structure that you're
+interested in and put the description inside a functor with argument
+type Cstubs.Types.TYPE.
+
+  module Bindings(S : Cstubs.Types.TYPE) =
+  struct
+    open S
+    let yaml_parser_s : [`yaml_parser_s] structure typ =
+      structure &quot;yaml_parser_s&quot;
+    let () = seal yaml_parser_s
+  end
+
+You can then pass the functor to the write_c function to generate some
+C code which will determine the layout of the structure:
+
+   (* write the C code to stdout with the appropriate header: *)
+   print_endline &quot;#include &lt;yaml.h&gt;&quot;;
+   Cstubs.Types.write_c Format.std_formatter (module Bindings)
+
+Compiling and running the C code will generate an OCaml module with
+the size and alignment information inlined:
+
+   ocamlfind ocamlc -c -package ctypes.stubs generated_c.c
+   gcc generated_c.o -o generated_c
+   ./generated_c &gt; generated_module.ml
+   ocamlfind ocamlc -c -package ctypes.stubs generated_module.ml
+
+Finally you can apply the Bindings functor to the generated module to
+bring the layout information into your program:
+
+    # #load &quot;generated_module.cmo&quot;;;
+    # include Bindings(Generated_module);;
+    val yaml_parser_s : [ `yaml_parser_s ] structure typ =
+      Static.Struct
+       {Static.tag = &quot;yaml_parser_s&quot;;
+        spec = Static.Complete {Static.size = 480; align = 8}; fields = []}
+
+and you can immediately query the layout:
+
+    # sizeof yaml_parser_s;;
+    - : int = 480
+
+and allocate objects of the yaml_parser_s type:
+
+    # make yaml_parser_s;;
+    - : ([ `yaml_parser_s ], [ `Struct ]) structured =
+    {Static.structured = Static.CPointer &lt;abstr&gt;}
+
+I hope that helps!
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000142.html">[ocaml-ctypes] OCaml Ctypes and allocating a pointer to a type
+</A></li>
+	<LI>Next message: <A HREF="000144.html">[ocaml-ctypes] Converting between primitive and ocaml types
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#143">[ date ]</a>
+              <a href="thread.html#143">[ thread ]</a>
+              <a href="subject.html#143">[ subject ]</a>
+              <a href="author.html#143">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

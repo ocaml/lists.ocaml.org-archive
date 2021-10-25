@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] How to memcpy?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20How%20to%20memcpy%3F&In-Reply-To=%3CCAAxsn%3DGb9C7XQaMSATZtnrJAWEuXO%3DNKdz%2BPAg-gdpTd%2BxMJrg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000216.html">
+   <LINK REL="Next"  HREF="000218.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] How to memcpy?</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20How%20to%20memcpy%3F&In-Reply-To=%3CCAAxsn%3DGb9C7XQaMSATZtnrJAWEuXO%3DNKdz%2BPAg-gdpTd%2BxMJrg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] How to memcpy?">yallop at gmail.com
+       </A><BR>
+    <I>Tue Jul 26 23:26:50 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000216.html">[ocaml-ctypes] How to memcpy?
+</A></li>
+        <LI>Next message: <A HREF="000218.html">[ocaml-ctypes] How to memcpy?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#217">[ date ]</a>
+              <a href="thread.html#217">[ thread ]</a>
+              <a href="subject.html#217">[ subject ]</a>
+              <a href="author.html#217">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Andre,
+
+On 26 July 2016 at 18:24, Andre Nathan &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andre at digirati.com.br</A>&gt; wrote:
+&gt;<i> Say I have a C struct that looks like this:
+</I>&gt;<i>
+</I>&gt;<i>   struct thing {
+</I>&gt;<i>     void *buffer;
+</I>&gt;<i>     unsigned long length;
+</I>&gt;<i>   }
+</I>&gt;<i>
+</I>&gt;<i> This struct is used to pass values of multiple types to a function. For
+</I>&gt;<i> example, given
+</I>&gt;<i>
+</I>&gt;<i>   struct thing *t = malloc(...);
+</I>&gt;<i>   unsigned long len;
+</I>&gt;<i>
+</I>&gt;<i> you do something like
+</I>&gt;<i>
+</I>&gt;<i>   int x = 42;
+</I>&gt;<i>   len = sizeof(int);
+</I>&gt;<i>   t-&gt;length = len;
+</I>&gt;<i>   t-&gt;buffer = malloc(len);
+</I>&gt;<i>   memcpy(t-&gt;buffer, &amp;x, len);
+</I>&gt;<i>
+</I>&gt;<i> or
+</I>&gt;<i>
+</I>&gt;<i>   char *s = &quot;foo&quot;;
+</I>&gt;<i>   len = strlen(s);
+</I>&gt;<i>   t-&gt;length = len;
+</I>&gt;<i>   t-&gt;buffer = malloc(len);
+</I>&gt;<i>   memcpy(t-&gt;buffer, s, len);
+</I>&gt;<i>
+</I>&gt;<i> In OCaml I'm representing the struct as
+</I>&gt;<i>
+</I>&gt;<i>   module Thing = struct
+</I>&gt;<i>     type t
+</I>&gt;<i>     type t = thing structure
+</I>&gt;<i>     let t : t typ = structure &quot;thing&quot;
+</I>&gt;<i>     let buffer = field t &quot;buffer&quot; (ptr void)
+</I>&gt;<i>     let length = field t &quot;length&quot; ulong
+</I>&gt;<i>   end
+</I>&gt;<i>
+</I>&gt;<i> What I couldn't figure out was how do do the equivalent of the memcpy()
+</I>&gt;<i> step using Ctypes. I've found Stubs.memcpy but it doesn't seem to be
+</I>&gt;<i> exported.
+</I>
+In many cases you'll be able to avoid the call to 'memcpy' by using
+'allocate' to create an initialized object, like this:
+
+   let p = allocate int 42 in
+   setf v buffer (coerce (ptr int) (ptr void) p)
+
+But if you encounter a situation where you really need something like
+'memcpy' then you may find the following little library useful:
+
+   <A HREF="https://github.com/yallop/ocaml-memcpy">https://github.com/yallop/ocaml-memcpy</A>
+
+The library provides several flavours of memcpy, with and without
+bounds checking, and to and from various kinds of objects including
+OCaml bytes buffers, bigarrays, and arbitrary memory addressed by
+ctypes pointers.
+
+For completeness, I should mention that there are tricks to do the
+equivalent of memcpy using just ctypes, without additional libraries,
+by coercing pointers to arrays of char of appropriately sizes, but I
+recommend the library approach as a better starting point.
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000216.html">[ocaml-ctypes] How to memcpy?
+</A></li>
+	<LI>Next message: <A HREF="000218.html">[ocaml-ctypes] How to memcpy?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#217">[ date ]</a>
+              <a href="thread.html#217">[ thread ]</a>
+              <a href="subject.html#217">[ subject ]</a>
+              <a href="author.html#217">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] On domain-specific foreign syntaxes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3C510A8C53.7080903%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000164.html">
+   <LINK REL="Next"  HREF="000173.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] On domain-specific foreign syntaxes</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3C510A8C53.7080903%40lexifi.com%3E"
+       TITLE="[wg-camlp4] On domain-specific foreign syntaxes">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Jan 31 15:22:59 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000164.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+        <LI>Next message: <A HREF="000173.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#171">[ date ]</a>
+              <a href="thread.html#171">[ thread ]</a>
+              <a href="subject.html#171">[ subject ]</a>
+              <a href="author.html#171">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/31/2013 02:57 PM, Hongbo Zhang wrote:
+&gt;<i>
+</I>&gt;<i>        let x = foo &lt;&lt; &quot; &gt;&gt; bar
+</I>&gt;<i>
+</I>&gt;<i> This is unfair, how do you overcome this problem in ppx. The same thing,
+</I>&gt;<i> except that you don't use it
+</I>
+The discussion here is not about ppx vs camlp4, but whether it is a good 
+idea to use quotations with &quot;ocaml code in them&quot;.  My argument is that 
+it is a very bad idea, because the only decent way to support quotation 
+in editor modes is to ignore them (which is not currently the case).
+
+I hope, for instance, that the ocaml emacs mode will be adapted to 
+whatever syntax for quotation we choose to support natively in OCaml. 
+Once this is done, emacs will no longer be confused with examples as the 
+one above (good!), but it will no longer provide any assistance if OCaml 
+code had to be written inside the quotation (bad! but only if we 
+implement sedlex as you suggest, with a big quotation around the whole 
+lexer definition, including actions).  If quotations are purely used to 
+inject code in foreign syntax (with very simple anti-quotations which 
+don't really benefit from editor support), this correct behavior of 
+editors is no longer a problem.
+
+Let me clarify my position about quotations:
+
+The whole point of quotations, for me, is to escape from OCaml lexical 
+convention.  If we have to embed fragments of foreign language syntax 
+which works fine with OCaml rules (e.g. fragments which don't need 
+double quotes or backslashes), strings are just fine:
+
+fun x -&gt; (:sql &quot;select * from table where id = $x&quot;)
+
+So the most important criterion of the syntax for quotations is that 
+they actually allow to write an arbitrary piece of foreign syntax, and 
+the simplest way to achieve that is to avoid putting any constraint on 
+the closing delimiter.  That's why I suggest that the opening delimiter 
+defines what the closing delimiter is explicitly, without too much 
+restriction.
+
+  {!{ ... }!}
+  {x{ ... }x}
+  {{ ... }}     assuming the content does not use }}
+
+
+I'm not against quotations per se, but I argue:
+
+  - Against their use such as the one suggested by Honbgo for sedlex 
+(including the whole lexer definition, including potentially large OCaml 
+expressions, inside a big quotation).
+
+  - Against the idea that the syntactic aspect of quotations has 
+anything to do with the notion of extension node to be expanded to AST 
+fragments by some code.  They are just independent notions:
+
+     * if the extension node can benefit from the OCaml syntax, this is 
+really good (no need to write any parsing code in the &quot;expander&quot;, and 
+good editor support);
+
+    begin(:sedlex) match lexbuf with
+    | ... -&gt; e1
+    end
+
+(I've used a syntax which make it clearer what the scope of the 
+extension node is, and which dissociates the extension marker e1 from 
+its content e2:  begin(:e1) e2 end)
+
+     * quotations can be useful independently from any &quot;expander&quot;, 
+simply because they provide a different convenient style of writing 
+strings which does not require escaping of double quotes and backslashes:
+
+     failwith {{I &quot;like&quot; double quotes.}}
+
+     * both notions can be combined if needed (an extension node whose 
+content really has to be written in foreign syntax with a lot of double 
+quotes or backslashes)
+
+    begin(:sedlex) begin match lexbuf with
+    | {{ '&quot;' }} -&gt; QUOTE
+    | {{ '\' }} -&gt; BACKSLASH
+    | {{ [a-z]+ }} -&gt; IDENT
+    end
+
+    or:
+
+    ((:html) {{ &lt;div class=&quot;$x&quot;&gt; }})
+
+    (a lighter syntax with parentheses)
+
+-- Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000164.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+	<LI>Next message: <A HREF="000173.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#171">[ date ]</a>
+              <a href="thread.html#171">[ thread ]</a>
+              <a href="subject.html#171">[ subject ]</a>
+              <a href="author.html#171">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

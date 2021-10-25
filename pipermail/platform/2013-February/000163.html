@@ -1,0 +1,193 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBGiaNCetfbWeWWwnj_6cQatWX1dc9b%3Dy-%2BCGh-m%3D8BF%2Bw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000162.html">
+   <LINK REL="Next"  HREF="000164.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBGiaNCetfbWeWWwnj_6cQatWX1dc9b%3Dy-%2BCGh-m%3D8BF%2Bw%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Wed Feb 27 06:58:41 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000162.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000164.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#163">[ date ]</a>
+              <a href="thread.html#163">[ thread ]</a>
+              <a href="subject.html#163">[ subject ]</a>
+              <a href="author.html#163">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I don't like your lazy initialization scheme because it changes the
+observable semantics of the the OCaml language when modules have
+global side-effects. Currently, the effects are evaluated in the
+linking order of the modules, not the use order.
+
+Note that the main difficulty of your proposal is to track
+dependencies at a structure item level, rather than at a compilation
+unit level as is currently done. Lazyness is arguably bad and in any
+case not needed if you have this finer granularity -- but as I argued
+this would have large, and possibly unpleasant, implementation
+implications.
+
+On Tue, Feb 26, 2013 at 11:26 PM, Christophe TROESTLER
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Christophe.Troestler at umons.ac.be</A>&gt; wrote:
+&gt;<i> On Tue, 26 Feb 2013 12:30:15 +0000, Leo White wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Ignoring the implementation issues for now, consider the run-time
+</I>&gt;&gt;<i> semantics of the module system.
+</I>&gt;<i>
+</I>&gt;<i> Thanks for that explanation.  I have some questions though.
+</I>&gt;<i>
+</I>&gt;&gt;<i> At run-time a module is a record. Initialising a module involves
+</I>&gt;&gt;<i> initialising every component of the module and placing them in this
+</I>&gt;&gt;<i> record. Initialising these components can involve executing arbitrary
+</I>&gt;&gt;<i> code; in fact the execution of an OCaml program is simply the
+</I>&gt;&gt;<i> initialisation of all its modules.
+</I>&gt;<i>
+</I>&gt;<i> How about doing that initialization in a more lazy fashion?
+</I>&gt;<i> Initializing a module would only create the top level components:
+</I>&gt;<i> toplevel values and modules&#185;, the modules being only &quot;pointers to
+</I>&gt;<i> NULL&quot;.  when accessing a submodule, the compiler would take note to
+</I>&gt;<i> initialize that submodule (and link the corresponding cmo/cmx for
+</I>&gt;<i> packed modules&#178;).  If the modules is used in a functor or as a first
+</I>&gt;<i> class value, then all submodules present in the signature are
+</I>&gt;<i> initialized (this could be on the spot &#8212; especially for the toplevel &#8212;
+</I>&gt;<i> or moved to the place where the module is initialized if that makes a
+</I>&gt;<i> difference).  To avoid runtime checks, some static analysis is
+</I>&gt;<i> required to make sure that, when a value is used, the corresponding
+</I>&gt;<i> submodule has been properly initialized but that may not be too hard.
+</I>&gt;<i>
+</I>&gt;<i> There are two problems that I can see with this but I think namespaces
+</I>&gt;<i> have the same ones if they are to be convenient.  The first is about
+</I>&gt;<i> the initialization code in submodules.  As you say, loading a library
+</I>&gt;<i> should execute the &quot;toplevel code&quot; of each submodule.  Since this is
+</I>&gt;<i> rather infrequent, when building the module record, one may add all
+</I>&gt;<i> module paths containing submodules with initialization code.  That way
+</I>&gt;<i> the current semantics are preserved and for huge packed modules many
+</I>&gt;<i> components should still go away.  However, one could argue that if one
+</I>&gt;<i> does not reference the module at all, its initialization code should
+</I>&gt;<i> not be executed (alike the behavior one gets when adding cm[x]a on the
+</I>&gt;<i> command line).
+</I>&gt;<i>
+</I>&gt;<i> The second problem is that some toplevel value may need some sumodules
+</I>&gt;<i> to be initialized (because they use these submodules).  Some analysis
+</I>&gt;<i> is thus required to add these submodules during the record
+</I>&gt;<i> initialization.  The same is true when one initialize a submodule that
+</I>&gt;<i> was &quot;NULL&quot; before &#8212; other submodules may need to be initialized first.
+</I>&gt;<i> This analysis may not be too had to do &#8212; indeed it is already
+</I>&gt;<i> basically present in ocamldep.
+</I>&gt;<i>
+</I>&gt;<i> &#185; As an added bonus, one does not have to load the entire module
+</I>&gt;<i> signature (&#8776;4Mb for Core) &#8212; only keep pointers to the signatures of
+</I>&gt;<i> submodules &#8212; which should speed up compilation.  This is mostly an
+</I>&gt;<i> orthogonal issue but it could benefit from the same laziness framework.
+</I>&gt;<i>
+</I>&gt;<i> &#178; This could be done almost for free if packing would rename the
+</I>&gt;<i> modules to some internal names, gather them in a cm[x]a (and not a
+</I>&gt;<i> cmo/cmx as of now) and add a module aliasing these internal names to
+</I>&gt;<i> the desired names for the outside world.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Any attempt to overcome the problems with pack, whilst still
+</I>&gt;&gt;<i> maintaining the illusion that the &quot;pack&quot; is a normal module, would
+</I>&gt;&gt;<i> result (at the very least) in one of the following unhealthy
+</I>&gt;&gt;<i> situations:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - The module type of the &quot;pack&quot; module would depend on which of its
+</I>&gt;&gt;<i>   components were accessed by the program.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - Any use of the &quot;pack&quot; module other than as a simple container
+</I>&gt;&gt;<i>   (e.g. &quot;module CS = Core.Std&quot;) could have a dramatic effect on what was
+</I>&gt;&gt;<i>   linked into the program and potentially on the semantics of the
+</I>&gt;&gt;<i>   program.
+</I>&gt;<i>
+</I>&gt;<i> Maybe one of these problems occurs with the rough proposal described
+</I>&gt;<i> above but it is not immediately clear to me.  May you tell?
+</I>&gt;<i>
+</I>&gt;&gt;<i> Namespaces are basically modules that can only be used as a simple
+</I>&gt;&gt;<i> container. This means that they do not need a corresponding record at
+</I>&gt;&gt;<i> run-time (or any other run-time representation). This avoids the
+</I>&gt;&gt;<i> problems with pack as well as enabling other useful features
+</I>&gt;&gt;<i> (e.g. open definitions).
+</I>&gt;<i>
+</I>&gt;<i> I agree that openness may be a desired feature.  Gabriel however said
+</I>&gt;<i> that it is not essential.  Moreover, one could imagine that a module
+</I>&gt;<i> wanting to be added to a hierarchy (say &quot;Data&quot;) could be repacked at
+</I>&gt;<i> in the module Data at installation time.  Granted this is not very
+</I>&gt;<i> nice but this is just intended to show that there are short term
+</I>&gt;<i> possibilities.
+</I>&gt;<i>
+</I>&gt;<i> Best,
+</I>&gt;<i> C.
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000162.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000164.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#163">[ date ]</a>
+              <a href="thread.html#163">[ thread ]</a>
+              <a href="subject.html#163">[ subject ]</a>
+              <a href="author.html#163">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

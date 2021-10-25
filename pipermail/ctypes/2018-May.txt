@@ -1,0 +1,128 @@
+From thomas.braibant at gmail.com  Thu May 31 09:41:06 2018
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Thu, 31 May 2018 09:41:06 +0100
+Subject: [ocaml-ctypes] Passing ocaml strings to C functions
+Message-ID: <CAHR=VkzUbUpU1MNFVM+5ORx9gaB65SezcOUiqfGvRwaCkZi-mw@mail.gmail.com>
+
+Hi,
+
+I am trying to pass an OCaml string to a C function, in some specific
+scenario where I know that the C part will not keep a reference to the
+ OCaml string after the function returns. Without loss of generality,
+the binding would look like
+
+```
+module C (F : Cstubs.FOREIGN) = struct
+  open F
+  let foo = foreign "fooC" (ptr void @-> size_t @-> returning int);;
+end
+```
+
+After applying the bindings to the generated stubs, I can write something like
+
+```
+module M = C (C_generated)
+let foo_wrapped (s : Bigstring.t) =
+  C.foo
+    (Ctypes.to_voidp (Ctypes.bigarray_start Array1 s)
+    (Unsigned.Size_t.of_int (Bigstring.length str))
+;;
+```
+
+For some reason, I can't seem to find how to apply C.foo to an ocaml string.
+
+```
+let foo_wrapped' (s : String.t) =
+  C.foo
+    (Ctypes.to_voidp (Ctypes.ocaml_string_start s)
+    (Unsigned.Size_t.of_int (String.length str))
+;;
+```
+
+What's more surprising is the error message when trying to coerce the
+ptr char and ocaml strings together:
+```
+Ctypes.(coerce ocaml_string (ptr char) (Ctypes.ocaml_string_start ""))
+;;
+Exception: Coercion failure: char* is not coercible to char*.
+```
+
+What I think is that I could rewrite the binding, to have something like:
+```
+let foo' = foreign "fooC" (ocaml_string @-> size_t @-> returning int);;
+```
+but it seems like unnecessary code duplication (and would make my
+actual use case harder to write).
+
+Am I missing something here?
+Thanks in advance,
+Thomas Braibant
+
+From yallop at gmail.com  Thu May 31 21:26:28 2018
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 31 May 2018 21:26:28 +0100
+Subject: [ocaml-ctypes] Passing ocaml strings to C functions
+In-Reply-To: <CAHR=VkzUbUpU1MNFVM+5ORx9gaB65SezcOUiqfGvRwaCkZi-mw@mail.gmail.com>
+References: <CAHR=VkzUbUpU1MNFVM+5ORx9gaB65SezcOUiqfGvRwaCkZi-mw@mail.gmail.com>
+Message-ID: <CAAxsn=HtjTehjdzZRjiWx+e-375Ug0Tkjw-zZ_-4jP7vd6Se+Q@mail.gmail.com>
+
+Dear Thomas,
+
+On 31 May 2018 at 09:41, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> For some reason, I can't seem to find how to apply C.foo to an ocaml string.
+>
+> ```
+> let foo_wrapped' (s : String.t) =
+>   C.foo
+>     (Ctypes.to_voidp (Ctypes.ocaml_string_start s)
+>     (Unsigned.Size_t.of_int (String.length str))
+> ;;
+> ```
+
+Right: the circumstances under which C parts of a program can read
+directly from an OCaml string are deliberately very constrained.  Even
+something like this is unsafe:
+
+>     (Ctypes.to_voidp (Ctypes.ocaml_string_start s)
+
+because allocating the pointer in 'to_voidp' could cause the GC to
+run, changing the address of the string 's'.
+
+> What's more surprising is the error message when trying to coerce the
+> ptr char and ocaml strings together:
+> ```
+> Ctypes.(coerce ocaml_string (ptr char) (Ctypes.ocaml_string_start ""))
+> ;;
+> Exception: Coercion failure: char* is not coercible to char*.
+> ```
+
+This is indeed a surprising message, even to OCaml users, who might be
+somewhat used to messages of the form "type t is not equal to type t".
+Ctypes generally uses the underlying C type as the printed
+representation of a 'typ' value, and in this case both 'ptr char' and
+ocaml_string represent the same C type, albeit with different
+constraints on the behaviour, and so they have the same printed
+representation:
+
+   # ptr char;;
+   - : char ptr typ = char*
+   # ocaml_string;;
+   - : string ocaml typ = char*
+
+> What I think is that I could rewrite the binding, to have something like:
+> ```
+> let foo' = foreign "fooC" (ocaml_string @-> size_t @-> returning int);;
+> ```
+> but it seems like unnecessary code duplication (and would make my
+> actual use case harder to write).
+
+One way to avoid the duplication is parameterizing the storage by the
+'typ'.  David Sheets's ocaml-sodium library uses that approach in a
+single set of bindings that work with both bigarrays and bytes:
+
+    https://github.com/dsheets/ocaml-sodium/blob/c1ab5990/lib_gen/sodium_bindings.ml#L29-L32
+
+Kind regards,
+
+Jeremy
+

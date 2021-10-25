@@ -1,0 +1,126 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;Thank&nbsp;you,&nbsp;Jeremy.&nbsp; This&nbsp;is&nbsp;exactly&nbsp;what&nbsp;I&nbsp;needed.&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Thank&nbsp;you&nbsp;as&nbsp;well&nbsp;for&nbsp;Ctypes,&nbsp;from&nbsp;my&nbsp;brief&nbsp;use&nbsp;so&nbsp;far&nbsp;it&nbsp;seems&nbsp;great.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Travis&lt;/div&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;<br>
+&lt;br&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Tue,&nbsp;Dec&nbsp;17,&nbsp;2013&nbsp;at&nbsp;5:33&nbsp;PM,&nbsp;Jeremy&nbsp;Yallop&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:yallop@gmail.com&quot;&nbsp;target=&quot;_blank&quot;&gt;yallop@gmail.com&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+&lt;div&nbsp;class=&quot;im&quot;&gt;On&nbsp;17&nbsp;December&nbsp;2013&nbsp;04:46,&nbsp;Travis&nbsp;Brady&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:travis.brady@gmail.com&quot;&gt;travis.brady@gmail.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;I&#39;m&nbsp;wrapping&nbsp;a&nbsp;simple&nbsp;library&nbsp;that&nbsp;contains&nbsp;a&nbsp;few&nbsp;functions&nbsp;that&nbsp;call&nbsp;malloc&lt;br&gt;<br>
+&gt;&nbsp;or&nbsp;realloc&nbsp;internally&nbsp;to&nbsp;allocate&nbsp;a&nbsp;few&nbsp;struct&nbsp;members&nbsp;and&nbsp;I&#39;m&nbsp;wondering&nbsp;how&lt;br&gt;<br>
+&gt;&nbsp;to&nbsp;make&nbsp;those&nbsp;behave&nbsp;with&nbsp;Ctypes&nbsp;and&nbsp;the&nbsp;GC.&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;The&nbsp;library&nbsp;exposes&nbsp;structname_free&nbsp;functions&nbsp;where&nbsp;applicable,&nbsp;but&nbsp;I&#39;m&nbsp;not&lt;br&gt;<br>
+&gt;&nbsp;certain&nbsp;how&nbsp;to&nbsp;tell&nbsp;Ctypes&nbsp;how&nbsp;to&nbsp;use&nbsp;them&nbsp;or&nbsp;if&nbsp;I&nbsp;even&nbsp;need&nbsp;to&nbsp;at&nbsp;all.&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/div&gt;There&nbsp;are&nbsp;several&nbsp;possible&nbsp;approaches&nbsp;to&nbsp;consider.&nbsp; One&nbsp;approach&nbsp;is&nbsp;to&lt;br&gt;<br>
+simply&nbsp;write&nbsp;C-style&nbsp;code&nbsp;in&nbsp;OCaml,&nbsp;binding&nbsp;the&nbsp;structname_free&lt;br&gt;<br>
+functions&nbsp;and&nbsp;explicitly&nbsp;calling&nbsp;them&nbsp;when&nbsp;you&nbsp;know&nbsp;that&nbsp;it&#39;s&nbsp;safe&nbsp;to&lt;br&gt;<br>
+do&nbsp;so.&nbsp; This&nbsp;will&nbsp;probably&nbsp;work&nbsp;best&nbsp;if&nbsp;the&nbsp;lifetime&nbsp;of&nbsp;the&nbsp;struct&nbsp;is&lt;br&gt;<br>
+easy&nbsp;to&nbsp;predict&nbsp;--&nbsp;for&nbsp;example,&nbsp;if&nbsp;it&#39;s&nbsp;associated&nbsp;with&nbsp;a&nbsp;file&lt;br&gt;<br>
+descriptor&nbsp;or&nbsp;other&nbsp;resource&nbsp;that&nbsp;also&nbsp;needs&nbsp;to&nbsp;be&nbsp;explicitly&lt;br&gt;<br>
+released.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Another&nbsp;approach&nbsp;is&nbsp;to&nbsp;register&nbsp;the&nbsp;destructor&nbsp;functions&nbsp;with&nbsp;the&nbsp;GC&lt;br&gt;<br>
+so&nbsp;that&nbsp;they&#39;re&nbsp;called&nbsp;automatically&nbsp;when&nbsp;ctypes&nbsp;no&nbsp;longer&nbsp;has&nbsp;a&lt;br&gt;<br>
+reference&nbsp;to&nbsp;the&nbsp;memory.&nbsp; This&nbsp;approach&nbsp;should&nbsp;work&nbsp;well&nbsp;where&nbsp;you&#39;re&lt;br&gt;<br>
+allocating&nbsp;the&nbsp;memory&nbsp;from&nbsp;ctypes,&nbsp;since&nbsp;the&nbsp;hooks&nbsp;for&nbsp;registering&lt;br&gt;<br>
+destructor&nbsp;functions&nbsp;are&nbsp;currently&nbsp;associated&nbsp;with&nbsp;the&nbsp;ctypes&lt;br&gt;<br>
+allocation&nbsp;functions&nbsp;such&nbsp;as&nbsp;make&lt;br&gt;<br>
+(&lt;a&nbsp;href=&quot;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake&quot;&nbsp;target=&quot;_blank&quot;&gt;http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake&lt;/a&gt;).&lt;br&gt;<br>
+&lt;br&gt;<br>
+Here&#39;s&nbsp;a&nbsp;simple&nbsp;example&nbsp;with&nbsp;a&nbsp;struct&nbsp;whose&nbsp;fields&nbsp;point&nbsp;to&nbsp;memory&lt;br&gt;<br>
+dynamically&nbsp;allocated&nbsp;by&nbsp;C&nbsp;code.&nbsp; The&nbsp;unmanaged_person&nbsp;function&nbsp;shows&lt;br&gt;<br>
+the&nbsp;C-style&nbsp;approach,&nbsp;with&nbsp;explicit&nbsp;deallocation;&nbsp;the&nbsp;managed_person&lt;br&gt;<br>
+function&nbsp;shows&nbsp;the&nbsp;GC-based&nbsp;approach,&nbsp;using&nbsp;the&nbsp;finaliser&nbsp;argument&nbsp;to&lt;br&gt;<br>
+the&nbsp;make&nbsp;function&nbsp;to&nbsp;register&nbsp;the&nbsp;destructor:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; $&nbsp;cat&nbsp;example_stubs.c&lt;br&gt;<br>
+ &nbsp; #include&nbsp;&lt;stdlib.h&gt;&lt;br&gt;<br>
+ &nbsp; #include&nbsp;&lt;string.h&gt;&lt;br&gt;<br>
+ &nbsp; #include&nbsp;&lt;stdio.h&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; struct&nbsp;person&nbsp;{&nbsp;char&nbsp;*name;&nbsp;int&nbsp;age;&nbsp;};&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; void&nbsp;initialize_person(struct&nbsp;person&nbsp;*p,&nbsp;const&nbsp;char&nbsp;*name,&nbsp;int&nbsp;age)&lt;br&gt;<br>
+ &nbsp; {&lt;br&gt;<br>
+ &nbsp; &nbsp; p-&gt;name&nbsp;=&nbsp;malloc(strlen(name)&nbsp;+&nbsp;1);&lt;br&gt;<br>
+ &nbsp; &nbsp; strcpy(p-&gt;name,&nbsp;name);&lt;br&gt;<br>
+ &nbsp; &nbsp; p-&gt;age&nbsp;=&nbsp;age;&lt;br&gt;<br>
+ &nbsp; }&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; void&nbsp;destroy_person(struct&nbsp;person&nbsp;*p)&lt;br&gt;<br>
+ &nbsp; {&lt;br&gt;<br>
+ &nbsp; &nbsp; printf(&quot;goodbye&nbsp;%s&nbsp;(age&nbsp;%d)\n&quot;,&nbsp;p-&gt;name,&nbsp;p-&gt;age);&lt;br&gt;<br>
+ &nbsp; &nbsp; free(p-&gt;name);&lt;br&gt;<br>
+ &nbsp; }&lt;br&gt;<br>
+ &nbsp; $&nbsp;cat&nbsp;&lt;a&nbsp;href=&quot;http://example.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;example.ml&lt;/a&gt;&lt;br&gt;<br>
+ &nbsp; open&nbsp;Ctypes&lt;br&gt;<br>
+ &nbsp; open&nbsp;Foreign&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; type&nbsp;person&lt;br&gt;<br>
+ &nbsp; let&nbsp;person&nbsp;:&nbsp;person&nbsp;structure&nbsp;typ&nbsp;=&nbsp;structure&nbsp;&quot;person&quot;&lt;br&gt;<br>
+ &nbsp; let&nbsp;name&nbsp;=&nbsp;field&nbsp;person&nbsp;&quot;name&quot;&nbsp;string&lt;br&gt;<br>
+ &nbsp; let&nbsp;age&nbsp;=&nbsp;field&nbsp;person&nbsp;&quot;age&quot;&nbsp;int&lt;br&gt;<br>
+ &nbsp; let&nbsp;()&nbsp;=&nbsp;seal&nbsp;person&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; let&nbsp;initialize_person&nbsp;=&nbsp;foreign&nbsp;&quot;initialize_person&quot;&lt;br&gt;<br>
+ &nbsp; &nbsp; (ptr&nbsp;person&nbsp;@-&gt;&nbsp;string&nbsp;@-&gt;&nbsp;int&nbsp;@-&gt;&nbsp;returning&nbsp;void)&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; let&nbsp;destroy_person&nbsp;=&nbsp;foreign&nbsp;&quot;destroy_person&quot;&lt;br&gt;<br>
+ &nbsp; &nbsp; (ptr&nbsp;person&nbsp;@-&gt;&nbsp;returning&nbsp;void)&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; (*&nbsp;Allocate&nbsp;a&nbsp;`person&#39;&nbsp;value,&nbsp;registering&nbsp;the&nbsp;destructor&nbsp;function&lt;br&gt;<br>
+with&nbsp;the&nbsp;GC&nbsp;*)&lt;br&gt;<br>
+ &nbsp; let&nbsp;managed_person&nbsp;~name&nbsp;~age&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; let&nbsp;p&nbsp;=&nbsp;make&nbsp;~finalise:(fun&nbsp;p&nbsp;-&gt;&nbsp;destroy_person&nbsp;(addr&nbsp;p))&nbsp;person&nbsp;in&lt;br&gt;<br>
+ &nbsp; &nbsp; initialize_person&nbsp;(addr&nbsp;p)&nbsp;name&nbsp;age;&lt;br&gt;<br>
+ &nbsp; &nbsp; p&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; (*&nbsp;Allocate&nbsp;a&nbsp;`person&#39;&nbsp;value&nbsp;that&nbsp;must&nbsp;be&nbsp;explicitly&nbsp;deallocated&nbsp;*)&lt;br&gt;<br>
+ &nbsp; let&nbsp;unmanaged_person&nbsp;~name&nbsp;~age&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; let&nbsp;p&nbsp;=&nbsp;make&nbsp;person&nbsp;in&lt;br&gt;<br>
+ &nbsp; &nbsp; initialize_person&nbsp;(addr&nbsp;p)&nbsp;name&nbsp;age;&lt;br&gt;<br>
+ &nbsp; &nbsp; p&lt;br&gt;<br>
+ &nbsp; $&nbsp;ocamlfind&nbsp;ocamlc&nbsp;-c&nbsp;-package&nbsp;ctypes&nbsp;example_stubs.c&nbsp;&lt;a&nbsp;href=&quot;http://example.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;example.ml&lt;/a&gt;&lt;br&gt;<br>
+ &nbsp; $&nbsp;ocamlmklib&nbsp;-o&nbsp;example&nbsp;example_stubs.o&nbsp;example.cmo&lt;br&gt;<br>
+ &nbsp; $&nbsp;ocaml&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; OCaml&nbsp;version&nbsp;4.01.0&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; #&nbsp;#use&nbsp;&quot;topfind&quot;;;&lt;br&gt;<br>
+ &nbsp; [...]&lt;br&gt;<br>
+ &nbsp; #&nbsp;#require&nbsp;&quot;ctypes.foreign&quot;;;&lt;br&gt;<br>
+ &nbsp; [...]&lt;br&gt;<br>
+ &nbsp; #&nbsp;#load&nbsp;&quot;example.cma&quot;;;&lt;br&gt;<br>
+ &nbsp; #&nbsp;open&nbsp;Example;;&lt;br&gt;<br>
+ &nbsp; #&nbsp;let&nbsp;mcc&nbsp;=&nbsp;unmanaged_person&nbsp;&quot;Mrs&nbsp;McCave&quot;&nbsp;40;;&lt;br&gt;<br>
+ &nbsp; val&nbsp;mcc&nbsp;:&nbsp;(Example.person,&nbsp;[&nbsp;`Struct&nbsp;])&nbsp;Ctypes.structured&nbsp;=&nbsp;&lt;abstr&gt;&lt;br&gt;<br>
+ &nbsp; #&nbsp;let&nbsp;()&nbsp;=&nbsp;for&nbsp;i&nbsp;=&nbsp;1&nbsp;to&nbsp;23&nbsp;do&nbsp;ignore&nbsp;(managed_person&nbsp;~name:&quot;Dave&quot;&lt;br&gt;<br>
+~age:i)&nbsp;done;;&lt;br&gt;<br>
+ &nbsp; #&nbsp;Gc.full_major&nbsp;();;&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;23)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;22)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;21)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;20)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;19)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;18)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;17)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;16)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;15)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;14)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;13)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;12)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;11)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;10)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;9)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;8)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;7)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;6)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;5)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;4)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;3)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;2)&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Dave&nbsp;(age&nbsp;1)&lt;br&gt;<br>
+ &nbsp; -&nbsp;:&nbsp;unit&nbsp;=&nbsp;()&lt;br&gt;<br>
+ &nbsp; #&nbsp;destroy_person&nbsp;(Ctypes.addr&nbsp;mcc);;&lt;br&gt;<br>
+ &nbsp; goodbye&nbsp;Mrs&nbsp;McCave&nbsp;(age&nbsp;40)&lt;br&gt;<br>
+ &nbsp; -&nbsp;:&nbsp;unit&nbsp;=&nbsp;()&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

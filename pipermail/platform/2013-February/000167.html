@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302271057140.29276%40hermes-1.csi.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000173.html">
+   <LINK REL="Next"  HREF="000104.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302271057140.29276%40hermes-1.csi.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Feb 27 10:57:14 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000173.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000104.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#167">[ date ]</a>
+              <a href="thread.html#167">[ thread ]</a>
+              <a href="subject.html#167">[ subject ]</a>
+              <a href="author.html#167">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i>How about doing that initialization in a more lazy fashion?
+</I>&gt;<i>Initializing a module would only create the top level components:
+</I>&gt;<i>toplevel values and modules&#185;, the modules being only &quot;pointers to
+</I>&gt;<i>NULL&quot;.  when accessing a submodule, the compiler would take note to
+</I>&gt;<i>initialize that submodule (and link the corresponding cmo/cmx for
+</I>&gt;<i>packed modules&#178;).  If the modules is used in a functor or as a first
+</I>&gt;<i>class value, then all submodules present in the signature are
+</I>&gt;<i>initialized (this could be on the spot - especially for the toplevel -
+</I>&gt;<i>or moved to the place where the module is initialized if that makes a
+</I>&gt;<i>difference).  To avoid runtime checks, some static analysis is
+</I>&gt;<i>required to make sure that, when a value is used, the corresponding
+</I>&gt;<i>submodule has been properly initialized but that may not be too hard.
+</I>&gt;<i>
+</I>&gt;<i>There are two problems that I can see with this but I think namespaces
+</I>&gt;<i>have the same ones if they are to be convenient.  The first is about
+</I>&gt;<i>the initialization code in submodules.  As you say, loading a library
+</I>&gt;<i>should execute the &quot;toplevel code&quot; of each submodule.  Since this is
+</I>&gt;<i>rather infrequent, when building the module record, one may add all
+</I>&gt;<i>module paths containing submodules with initialization code.  That way
+</I>&gt;<i>the current semantics are preserved and for huge packed modules many
+</I>&gt;<i>components should still go away.  However, one could argue that if one
+</I>&gt;<i>does not reference the module at all, its initialization code should
+</I>&gt;<i>not be executed (alike the behavior one gets when adding cm[x]a on the
+</I>&gt;<i>command line).
+</I>&gt;<i>
+</I>&gt;<i>The second problem is that some toplevel value may need some sumodules
+</I>&gt;<i>to be initialized (because they use these submodules).  Some analysis
+</I>&gt;<i>is thus required to add these submodules during the record
+</I>&gt;<i>initialization.  The same is true when one initialize a submodule that
+</I>&gt;<i>was &quot;NULL&quot; before - other submodules may need to be initialized first.
+</I>&gt;<i>This analysis may not be too had to do - indeed it is already
+</I>&gt;<i>basically present in ocamldep.
+</I>
+Ignoring the fact that this is a dramatic and non-trivial change to the 
+language and its implementation, this proposal does not solve the problems 
+with pack since it still requires you to link all the modules in the pack 
+in case they need to be used (lazily) later on.
+
+It also suffers from a version of my second unhealthy situation: If you do 
+anything that requires the runtime representation of the module (e.g. 
+&quot;module CS = Core.Std&quot;) then you will initialise every sub-module and 
+potentially change the semantics of your program.
+
+&gt;<i>I agree that openness may be a desired feature.  Gabriel however said
+</I>&gt;<i>that it is not essential. 
+</I>
+I didn't entirely follow what Gabriel said, but I think that he was saying 
+a proposal that was locally closed (e.g. within a specific file or using a 
+specific namespace definition) could still be globally open. This is 
+similar to your suggestion that a &quot;Data&quot; pack could be recompiled/linked to 
+add new modules.
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000173.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000104.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#167">[ date ]</a>
+              <a href="thread.html#167">[ thread ]</a>
+              <a href="subject.html#167">[ subject ]</a>
+              <a href="author.html#167">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

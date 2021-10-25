@@ -1,0 +1,120 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structure/signature attributes suggestion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structure/signature%20attributes%20suggestion&In-Reply-To=%3C525864BB.6030409%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000465.html">
+   <LINK REL="Next"  HREF="000467.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structure/signature attributes suggestion</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structure/signature%20attributes%20suggestion&In-Reply-To=%3C525864BB.6030409%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Structure/signature attributes suggestion">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Oct 11 21:51:07 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000465.html">[wg-camlp4] Structure/signature attributes suggestion
+</A></li>
+        <LI>Next message: <A HREF="000467.html">[wg-camlp4] Structure/signature attributes suggestion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#466">[ date ]</a>
+              <a href="thread.html#466">[ thread ]</a>
+              <a href="subject.html#466">[ subject ]</a>
+              <a href="author.html#466">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 10/11/2013 7:26 PM, Gabriel Scherer wrote:
+&gt;<i> My understanding of Alain's &quot;;;[@..]&quot; was that he introduced a specific
+</I>&gt;<i> &quot;empty item&quot; in the AST of the current structure/signature.
+</I>
+Attributes attached to signature/structure items are actually attached, 
+in the Parsetree representation, to individual declarations, not items, 
+because a group of mutually recursive type declarations count as a 
+single item in the current definition of the Parsetree but one really 
+wants to be able to attach attributes to each of them.  Floating 
+attributes are just a new kind of structure/signature items in the 
+Parsetree.
+
+
+Concretely, we have today:
+
+
+and signature_item_desc =
+   | Psig_value of value_description
+   | Psig_type of type_declaration list
+   ...
+   | Psig_include of module_type * attributes
+   ...
+   | Psig_attribute of attribute
+
+
+and value_description =
+     {
+      ...
+      pval_attributes: attributes;
+     }
+
+and type_declaration =
+     {
+      ...
+      ptype_attributes: attributes;
+     }
+
+
+Another approach would be to split groups of declarations into 
+successive items, as in the Types representation:
+
+and signature_item =
+     Sig_value of Ident.t * value_description
+   | Sig_type of Ident.t * type_declaration * rec_status
+   ...
+
+(where rec_status indicates if the declaration is in the same group as 
+the previous one)
+
+
+This adds some invariants which are not represented in the data 
+structure (a Trec_next Sig_type must immediately follow another 
+Sig_type), but it allows for a more uniform representation of 
+attributes.  (That said, it's also very useful to have attributes 
+directly represented in the value_description/type_declaration/... 
+records, especially in the Typedtree representation.)
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000465.html">[wg-camlp4] Structure/signature attributes suggestion
+</A></li>
+	<LI>Next message: <A HREF="000467.html">[wg-camlp4] Structure/signature attributes suggestion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#466">[ date ]</a>
+              <a href="thread.html#466">[ thread ]</a>
+              <a href="subject.html#466">[ subject ]</a>
+              <a href="author.html#466">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-infra] TLS (https) for ocaml.org
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20TLS%20%28https%29%20for%20ocaml.org&In-Reply-To=%3C53F4A6DF.4060302%40cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000471.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-infra] TLS (https) for ocaml.org</H1>
+    <B>David Sheets</B> 
+    <A HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20TLS%20%28https%29%20for%20ocaml.org&In-Reply-To=%3C53F4A6DF.4060302%40cam.ac.uk%3E"
+       TITLE="[ocaml-infra] TLS (https) for ocaml.org">dwws2 at cam.ac.uk
+       </A><BR>
+    <I>Wed Aug 20 14:47:11 BST 2014</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000471.html">[ocaml-infra] TLS (https) for ocaml.org
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#469">[ date ]</a>
+              <a href="thread.html#469">[ thread ]</a>
+              <a href="subject.html#469">[ subject ]</a>
+              <a href="author.html#469">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello, world!
+
+I just turned on SSLv3 and TLS 1.0, 1.1, 1.2 for ocaml.org using 
+lighttpd's SSL engine. The ocaml.org server configuration does not 
+appear to be version-controlled.
+
+Here is what I did:
+
+- loaded the private certificate onto ocaml.org
+- symlinked private certificate into lighttpd's config
+- symlinked lighttpd's default SSL configuration into &quot;conf-enabled&quot;:
+
+$SERVER[&quot;socket&quot;] == &quot;0.0.0.0:443&quot; {
+	ssl.engine  = &quot;enable&quot;
+	ssl.pemfile = &quot;/etc/lighttpd/server.pem&quot;
+
+	ssl.cipher-list = 
+&quot;ECDHE-RSA-AES256-SHA384:AES256-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH:!AESGCM&quot;
+	ssl.honor-cipher-order = &quot;enable&quot;
+}
+
+- reloaded the lighttpd daemon's configuration with /etc/init.d script
+- tested that both the vanilla and encrypted HTTP ports work
+- ran the Qualys SSL Tests 
+&lt;<A HREF="https://www.ssllabs.com/ssltest/analyze.html?d=ocaml.org">https://www.ssllabs.com/ssltest/analyze.html?d=ocaml.org</A>&gt;
+
+Here's what the tests found:
+
+- Prefix handling 	Not valid for &quot;www.ocaml.org&quot;   CONFUSING
+   This causes a Big Scary Warning when accessing via www.ocaml.org
+- Chain issues 	Incomplete
+   This requires another download of the Gandi Standard SSL CA cert.
+   Maybe we should bundle this cert for all our TLS sites?
+- RC4 	Yes (with TLS 1.1 and newer)   WEAK
+   I don't know the severity of this issue. Maybe a simple cipher-list
+   modification? I'm not clear on the compatibility story.
+- Forward Secrecy 	With some browsers
+   This also looks like a configuration issue. Perhaps plain DHE would
+   help?
+
+I welcome any feedback here or on 
+&lt;<A HREF="https://github.com/ocaml/ocaml.org/issues/399">https://github.com/ocaml/ocaml.org/issues/399</A>&gt;. Please test the site, 
+recommend configuration changes, and look for mixed content issues on 
+all pages. The goal is to get the TLS-served version of the site ready 
+to be pointed at by the middle next week.
+
+Thanks,
+
+David
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000471.html">[ocaml-infra] TLS (https) for ocaml.org
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#469">[ date ]</a>
+              <a href="thread.html#469">[ thread ]</a>
+              <a href="subject.html#469">[ subject ]</a>
+              <a href="author.html#469">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/infrastructure">More information about the Infrastructure
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Pending issues
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Pending%20issues&In-Reply-To=%3C51190420.5080305%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000252.html">
+   <LINK REL="Next"  HREF="000244.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Pending issues</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Pending%20issues&In-Reply-To=%3C51190420.5080305%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Pending issues">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Mon Feb 11 14:45:52 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000252.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000244.html">[wg-camlp4] Pending issues
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#243">[ date ]</a>
+              <a href="thread.html#243">[ thread ]</a>
+              <a href="subject.html#243">[ subject ]</a>
+              <a href="author.html#243">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear all,
+
+I think we have made good progress in discussing extensions to the OCaml 
+grammar with generic extension points (which can be used as anchors for 
+-ppx rewriters), and how existing &quot;camlp4 extensions&quot; could be 
+re-implemented based on them.
+
+Here is a list of questions on which I'd like to hear the opinion of 
+participants.
+
+0. Scope of extensions covered by ppx + extension points
+
+Do people see useful camlp4 extensions which couldn't be covered in a 
+satisfactory way with the ppx + extension points approach?  The only 
+such cases I've seen mentioned on this list are pervasive changes to the 
+syntax, where the goal is precisely to customized the concrete syntax.
+
+
+1. Nature of extension points
+
+There seems to be a consensus that we should distinguish between 
+&quot;ignorable&quot; attributes and extension markers, to be expanded by 
+rewriters (the type-checker fails on them).  Concretely, this amounts to 
+extending the OCaml Parsetree with cases like:
+
+  | Ptyp_attribute of core_type * attribute
+  | Ptyp_extension of extension
+
+  | Ppat_attribute of pattern * attribute
+  | Ppat_extension of extension
+
+  | Pmod_attribute of module_expr * attribute
+  | Pmod_extension of extension
+
+  ...
+
+Leo suggests to take:
+
+type attribute = expression
+and extension = longident * expression option
+
+I'm now convinced that it's a good idea to make the &quot;extension name&quot; 
+explicit (and not encoded in the expression itself), if only to allow 
+nice error messages when the type-checker fails on such a node.  I'm 
+wondering if we shouldn't be more symmetric and do the same for 
+attributes. Opinions?  Also, I'm not sure that the expression should be 
+optional (if the idea is that the extension marker &quot;expands&quot; its 
+content, without touching its context &quot;too much&quot;, we need a non-trivial 
+content).  One can always have a syntax which support &quot;empty argument&quot; 
+represented as the &quot;()&quot; expression internally.
+
+
+2. Concrete syntax for extension points
+
+Proposals are welcome.  We must choose an unambiguous syntax, which 
+allows to add an attribute on a structure item, an expression, etc.
+Do we want both prefix and suffix syntaxes for attributes on all 
+syntactic categories?  Do we want a special (lighter) syntax to attach 
+attributes on specific constructions?
+
+
+3. Quotations
+
+The more I think about it, the more I believe this concept is orthogonal 
+to &quot;extensions&quot;.  Leo disagrees and would like to have a combined syntax 
+for the case where the argument of an extension is a quotation.  What do 
+other people think?  (For me, a quotation is only a way to introduce a 
+string literal without &quot;suffering&quot; from the lexical conventions of OCaml.)
+
+For the concrete syntax of quotations, it was suggested to use a form 
+where the closing delimiter would be defined by the opening one.  This 
+makes it possible to &quot;quote&quot; an arbitrary string without having to 
+define a way to escape a potential occurrence of the closing delimiter 
+(just pick a different one).   Example:  {xxx{blablabla}xxx}
+
+Do people familiar with implementation of editor modes believe it will 
+be easy to support such syntax in emacs or vim modes?
+
+
+4. What to do with attributes in the type-checker
+
+Attributes are designed in a way which make it trivial for the 
+type-checker to ignore them, which is a good property.  It is not much 
+more difficult to keep in the Typedtree so that they appear in 
+.cmt/.cmti files.  This could support interesting tools, like an 
+&quot;ocamldoc-like&quot; tool based on those files (instead of having to rarse 
+the source file again).  What do people think about it?  Of course, this 
+does not need to be implemented right away.
+
+A related question is related to the current work on runtime types. 
+Attributes on type declarations could be kept in the runtime 
+representation of the declarations, allowing libraries to interpret them 
+as they want.  (LexiFi's version of OCaml has been extended with 
+attributes on type declarations precisely to do that.)  Having 
+attributes defined as general expressions, however, means that those 
+libraries would need to link with compiler-libs, or at least be compiled 
+against some of its .cmi, in order to be able to analyze the Parsetree. 
+  I don't see it is as a big problem, and it would also be possible to 
+restrict which expressions are reflected in runtime types (e.g. to 
+structured constants).  Comments are welcome!
+
+
+5. Fork Parsetree or clean it up?
+
+Hongbo has proposed that we introduce a different representation of the 
+Parsetree on which -ppx rewriters would be applied.  Concretely, we 
+could fork parsetree.mli into parsetree.mli/ast.mli, clean up parsetree 
+(see below) and adapt parser.mly accordingly, and then implement a 
+translation pass from Parsetree to Ast before running the type-checker 
+on Ast.  The alternative is to clean up Parsetree directly and adapt the 
+type-checker to these changes.  This avoids an extra intermediate 
+language and the mapping, but this could add a little bit of extra 
+complexity to the type-checker (and it might be more difficult to 
+convince core developers).  What do people think?
+
+Changes (to be discussed):
+
+  - Avoid some desugaring currently done in the parsetree (interval 
+patterns, let open M in... = M.(...) ).
+  - Avoid some weird encodings (Pexp_when, mandatory Ptyp_poly at some 
+places, etc).
+  - Make the Parsetree more future proof and self-documented by using 
+records instead of tuples, sum types instead of booleans, etc.
+  - Remove prefixes on constructors/labels (although I've got some 
+negative feedback from other core developers on this point).
+
+
+
+Alain
+</PRE>
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000252.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000244.html">[wg-camlp4] Pending issues
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#243">[ date ]</a>
+              <a href="thread.html#243">[ thread ]</a>
+              <a href="subject.html#243">[ subject ]</a>
+              <a href="author.html#243">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

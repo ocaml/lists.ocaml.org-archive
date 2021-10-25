@@ -1,0 +1,163 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3Cm49y5e8stgx.fsf%40coffee.modeemi.fi%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000181.html">
+   <LINK REL="Next"  HREF="000187.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Erkki Seppala</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3Cm49y5e8stgx.fsf%40coffee.modeemi.fi%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">flux-ocaml-platform at inside.org
+       </A><BR>
+    <I>Thu Feb 28 09:01:01 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000181.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000187.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#184">[ date ]</a>
+              <a href="thread.html#184">[ thread ]</a>
+              <a href="subject.html#184">[ subject ]</a>
+              <a href="author.html#184">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>TLDR; I agree with the parts of proposal suggesting statement &quot;namespace
+X&quot; to be introduced to .ml and .mli files and then statements &quot;open
+namespace X&quot;, &quot;let namespace Y = X&quot; and their expression forms. And that
+this all should be controlled from the source code, not the build
+system.
+
+Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; writes:
+
+&gt;<i>   My biggest objection to having opens be at the build system level is
+</I>&gt;<i>   that it makes your code more ambiguous.  When you do namespace
+</I>&gt;<i>   manipulations, you very much want to see what's happening by
+</I>&gt;<i>   inspecting the source.  We have a vigorous code review system here,
+</I>&gt;<i>   and I don't want to start adding code review of the build rules to
+</I>&gt;<i>   it, and this change would require that.
+</I>
+I agree that namespaces should be defined and accessed through the
+source code. Not the least because it depends on the project's chosen
+build system on how I should go on changing those definitions. While
+currently the situation is the same regarding findlib package
+management, I think it is worth considering that perhaps this kind of
+namespace system could automatically lead into the build system
+(ocamldep?)  inferring which packages you need to use and eliminate that
+piece of configuration from the build system. Only special cases would
+need more configuration.
+
+While C++ might not be the golden standard to look upon on language
+development, perhaps it can serve as an inspiration. Its namespace
+system seems to work pretty nicely without complaints from the
+developers. It has the following constructs:
+
+namespace X {
+  /* introduce values for the namespace X */
+  int a = 42;
+  namespace Z {
+    /* introduce namespace X::Z */
+    int b = a;
+  }
+}
+
+namespace X {
+  /* introduce more values for the namespace X */
+  int z = 5;
+}
+
+namespace Y = X; /* alias a namespace */
+
+int b = X::a; /* access a value in a namespace */
+
+using namespace X; /* bring X to current scope (works in function scope
+                      as well */
+
+using X::a; /* bring one value from a namespace to current scope */
+
+In implementation side it works by simply relabeling symbols in the
+generated object files which makes the namespaces open.
+
+C++'s compilation system with include files is of course very different
+from OCaml, but a similar solution to OCaml would mean having a hidden
+internal name (such as namespace_modulename or possibly even something
+that like namespace#modulename) for the module created from that
+compilation unit. It would need to be limited to a single top-level
+namespace specification per compilation unit, so it would work sort of
+in reverse compared to C++. For example if x.ml contained statement
+&quot;namespace Foo&quot;, a module Foo#X would be generated instead of plain X.
+
+This solution would not allow the same module names from different
+namespaces to coexist in a single directory, but I don't see this as an
+essential feature. The source file names already would be the same, and
+OCaml compiler produces object files to the same directory as the
+source. If you have a build system copying files around, it could (and
+perhaps should!) preserve the directory hierarchy.
+
+&gt;<i> - NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+</I>&gt;<i>   namespace to also implicitly open some modules, this essentially
+</I>
+The previosuly described system would also eliminate the C++-like
+ability of introducing values to a namespace, unless special module
+names or other changes, such as an automatic opening of some modules,
+are implemented. It would be nice to be able to define such top-level
+values from multiple compilation units, but I'm uncertain how that would
+be implemented.
+
+This approach would need the compiler to find many similarly named .cmi
+files and decide the proper one to use based on their contents, as
+mentioned in a previous proposal.
+
+Everyone seems to agree that # is a good operator for accessing modules
+(or values) from namespaces. Or maybe we could go with \ ;-).
+
+&gt;<i>   But what Alain is proposing is to make opening a namespace silent at
+</I>&gt;<i>   the source level.  This strikes me as a grave error.
+</I>
+I agree. At worst this could mean that in large projects developers let
+the build system recompile their files so they can see what namespaces
+they are using. It seems much better to me to just read it from the
+source code, which is the same regardless of the project.
+
+-- 
+  _____________________________________________________________________
+     / __// /__ ____  __               <A HREF="http://www.modeemi.fi/~flux/\">http://www.modeemi.fi/~flux/\</A>   \
+    / /_ / // // /\ \/ /                                            \  /
+   /_/  /_/ \___/ /_/\_\@modeemi.fi                                  \/
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000181.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000187.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#184">[ date ]</a>
+              <a href="thread.html#184">[ thread ]</a>
+              <a href="subject.html#184">[ subject ]</a>
+              <a href="author.html#184">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

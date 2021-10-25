@@ -1,0 +1,285 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3C51137D59.7050308%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000217.html">
+   <LINK REL="Next"  HREF="000219.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3C51137D59.7050308%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Feb  7 10:09:29 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000217.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000219.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#218">[ date ]</a>
+              <a href="thread.html#218">[ thread ]</a>
+              <a href="subject.html#218">[ subject ]</a>
+              <a href="author.html#218">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 02/06/2013 07:48 PM, Hongbo Zhang wrote:
+&gt;<i>     Some arguments why Fan is a better candidate than ppx
+</I>&gt;<i>     1. Fan is much much faster than P4 (10~20 times)
+</I>
+This is great, in particular because it illustrates a vastly simplified 
+bootstrapping procedure of Fan compared to Camlp4.  But this does not 
+bring much to the comparison with ppx.
+
+&quot;-ppx&quot; on its own is even faster to build, since there is nothing to 
+build (it is just a command-line flag, in the same way as &quot;-pp&quot; on which 
+Fan relies, I guess).
+
+&gt;<i>     2. Fan does not require any compiler change, easy to distribute, on
+</I>&gt;<i> the contrary the pervasive change to compiler is close to kill P4, Fan
+</I>&gt;<i> or any other advanced external tools
+</I>
+ppx is already part of the development version and required minimal 
+changes.  We are also discussing the addition of a few syntactic 
+constructs which will only impact the definition of Parsetree and the 
+official parser.  This cannot really be considered as a &quot;pervasive 
+change&quot; to the compiler.
+
+Can you elaborate on why you think this would kill Camlp4 or Fan?  I 
+know from experience that Camlp4 is quite tedious to update when the 
+concrete syntax of OCaml changes, but I'm sure someone will manage to 
+update Camlp4/Fan definition of OCaml's AST and the associate parsers.
+
+-ppx is compatible with pre-processors implemented with -pp 
+(Camlp4/Fan), as long as those pre-processors can understand the new 
+syntactic constructs and pass them back to OCaml.
+
+ &gt; unlike P4, it will
+ &gt; not inhibit OCaml's compiler's progress.
+
+Your point above illustrates that it is not that simple: a simple 
+addition to the OCaml syntax, which would normally require to adapt only
+parser.mly, parsetree.mli, ast_mapper.ml/mli and a few other modules in 
+the compilers, also requires to port the same changes to Fan's 
+definition of the OCaml AST and to its parsers.
+
+&gt;<i>     3. It's easy to build in Fan
+</I>
+Again, this seems more like a comparison between Fan and Camlp4 than 
+between Fan and the ppx approach.
+
+ &gt; Fan can recognize its syntax on its
+ &gt; own, without external tool's help
+
+How does this argument apply to the comparison with the ppx approach?
+
+
+&gt;<i>     4. It's easy to port P4's code base to Fan, it only takes me 2 hours
+</I>&gt;<i> to port Alain's ulex to Fan
+</I>
+It did not take that much longer to port ulex from Camlp4 to -ppx, and 
+as an extra added bonus, it really gave me the feeling that I could 
+finally *breathe* and understand exactly what I'm writing. Frankly, I'm 
+more comfortable writing:
+
+   E.let_ Recursive states
+     (E.sequence
+        (appfun &quot;Sedlexing.start&quot; [eid lexbuf])
+        (E.match_ (appfun (state_fun 0) [eid lexbuf])
+           (cases @ [P.any (), error])
+        )
+     )
+
+than:
+
+   &lt;:expr&lt; fun lexbuf -&gt;
+     let rec $list:Array.to_list states$ in
+     do { Ulexing.start lexbuf;
+          match __ulex_state_0 lexbuf with
+          [ $list:Array.to_list cases$ | _ -&gt; raise Ulexing.Error ] } &gt;&gt;
+
+which requires me to learn two new &quot;sub-languages&quot; (the revised syntax 
+and the notion of quotation / antiquotation).  Imagine that the &quot;rec&quot; 
+flag above should be set only according to some condition to be checked; 
+I know directly how to write that in regular OCaml but I would need to 
+dig into Camlp4 documentation (or not) to see how to introduce an 
+&quot;anti-quotation on the rec flag&quot;.
+
+Is the code for the Fan version of ulex/sedlex available somewehere?
+
+
+ &gt; (I also make it available on the toplevel,
+ &gt; this feature is not available in sedlex or ulex)
+
+sedlex works fine in the toplevel:
+
+$ ocaml -ppx &quot;ocamlfind sedlex/sedlex.exe&quot;
+         OCaml version 4.01.0+dev10-2012-10-16
+
+# #use &quot;topfind&quot;;;
+- : unit = ()
+Findlib has been successfully loaded. Additional directives:
+...
+# #require &quot;sedlex&quot;;;
+/home/afrisch/.opam/4.01.0dev+trunk/lib/sedlex: added to search path
+/home/afrisch/.opam/4.01.0dev+trunk/lib/sedlex/sedlexing.cma: loaded
+# let rec token buf =
+   let ('a'..'z'|'A'..'Z') as letter = SEDLEX.regexp in
+   let '0'..'9' as digit = SEDLEX.regexp in
+   match SEDLEX buf with
+   | Plus letter -&gt; Printf.printf &quot;Word %s\n&quot; (Sedlexing.Latin1.lexeme 
+buf); token buf
+   | Plus digit -&gt; Printf.printf &quot;Number %s\n&quot; (Sedlexing.Latin1.lexeme 
+buf); token buf
+   | _ -&gt; failwith &quot;Error&quot;
+               ;;
+...
+val token : Sedlexing.lexbuf -&gt; 'a = &lt;fun&gt;
+#
+
+
+&gt;<i>     5. Global Ast Rewriter is available but discouraged
+</I>&gt;<i>     6. Local Ast Rewriter is provided(deriving and type_conv conflicts
+</I>&gt;<i> will never happen in Fan)
+</I>&gt;<i>         {:ocaml| type u = A of int |}
+</I>&gt;<i>         {:derive| (sexp,json) |}
+</I>
+Can you describe in more detail your position concerning the following 
+points?
+
+   - How do you deal with cases where the &quot;expander&quot; for such a local 
+annotation needs to access the context of the AST fragment on which it 
+applies, or where it needs to inject code non-locally?  For instance, 
+several ulex/sedlex lexers specified in the same file will share code 
+&quot;partition function&quot; (put at the beginning of the compilation unit in 
+this case).
+
+  - How would you support &quot;ignorable&quot; attributes, e.g. information 
+targeted to specific tools like bisect or a variant ocamldoc based on 
+structured comments?
+
+  - How would you support a simple macro system?  For instance, I can 
+imagine to use -ppx to do something like:
+
+    let(:macro) if_debug x =
+      if !debug_mode then (print_endline &quot;DEBUG:&quot;; x)
+
+    let debug_mode = ref false
+
+    ....
+
+    if_debug (print_endline &quot;XXX&quot;)
+
+    What would be the Fan equivalent of it?
+
+  - Imagine that two type-conv-like extensions need to be applied on the 
+same type declaration, and detect attributes put on type expressions in it:
+
+     type foo =
+           {
+             quantity: float (@xml ~digits:2) (@bin single);
+             code: string (@xml ~cdata) (@bin base64);
+           }
+          (@xml) (@bin)
+
+  (here we have two annotations &quot;xml&quot; and &quot;bin&quot; on the type declaration 
+&quot;foo&quot;, understood by two independent tools which generate marshaling 
+code based the declaration, and interpret annotations on inner type 
+expressions to customize the format)
+
+  How do you write that in Fan?  My understanding is that one the 
+expanders will be applied first and it will need to parse the type 
+declaration itself; but what will it do with attributes intended to be 
+used by the other extension?
+
+  - Can you confirm that the content .... of {:foo| .... |} is passed as 
+an unparsed string to the expander &quot;foo&quot;?  If this is the case, what is 
+your position concerning support from editor?  Should they treat .... 
+like OCaml code (e.g. applying lexing rules for coloring and grammar 
+rules for indentation)?  If so, this syntax will not work well with 
+fragments of code in a foreign syntax, and could potentially lead to 
+broken editor behavior.  If not, you loose all support from your editor 
+as soon as your are in the scope of an expander.  Or maybe do you 
+envision a much ambitious proposal where the editor would somehow need 
+to run the expander &quot;on the fly&quot; (I don't believe this is possible at a 
+reasonable cost).  Another question: how is the end marker |} detected? 
+  Can you write e.g.:
+
+    {:html|
+      &lt;p&gt;I &lt;em&gt;really&lt;/em&gt; like &lt;b&gt;Fan&lt;/b&gt; syntax, and especially
+      its terminator |}
+    |}
+
+&gt;<i>     7. Fan's notation is uniform
+</I>&gt;<i>         only {:| |} is introduced, I  am a bit headache when seeing so
+</I>&gt;<i> many notations
+</I>
+I claim that this single notation corresponds to three different 
+concepts which deserve to be understood separately:
+
+   - Extension marker around a parsed fragment, to be interpreted by an 
+expander (otherwise the type-checker fails).
+
+   - Attributes attached on AST fragments, to be (optionally) 
+interpreted by tools like Bisect, by expanders, or which can trigger 
+themselves local rewritings (in that case, one might want a specific 
+syntax to ensure they won't be silently ignored by the type-checker).
+
+   - Quotations: a way to write fragment of code in a foreign syntax, by 
+escaping from OCaml lexical conventions on string literals.  (I believe 
+this is rather orthogonal to -ppx and might be useful for regular 
+libraries, but I accept the idea of a combined notation: extension 
+marker + quotation.)
+
+&gt;<i>     8. Fan provides first class parser lexer(or in-line parser/lexer) as
+</I>&gt;<i> a library
+</I>
+I claim that most interesting uses of camlp4 extensions around can be 
+implemented in a way which does not require any extra lexing/parsing 
+technology in addition to what's included in the core compiler today 
+(based on ocamllex/ocamlyacc).  (The only exceptions seem to be these 
+extensions which need to parse foreign syntax, and I find it good that 
+they can rely on an arbitrary parsing technology.)
+
+
+
+
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000217.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000219.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#218">[ date ]</a>
+              <a href="thread.html#218">[ thread ]</a>
+              <a href="subject.html#218">[ subject ]</a>
+              <a href="author.html#218">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

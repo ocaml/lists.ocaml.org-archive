@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3C2744176.6h3nOvt1Sh%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001441.html">
+   <LINK REL="Next"  HREF="001443.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3C2744176.6h3nOvt1Sh%40maitake%3E"
+       TITLE="[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Thu Apr 14 09:04:57 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001441.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+        <LI>Next message: <A HREF="001443.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1442">[ date ]</a>
+              <a href="thread.html#1442">[ thread ]</a>
+              <a href="subject.html#1442">[ subject ]</a>
+              <a href="author.html#1442">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Let me gather some answers in a single response (including lots of spoilers on 
+opam 2.0~alpha)...
+
+&gt;<i> Daniel:
+</I>&gt;<i> (Louis, I really need these x- fields for playing with ideas&#8230;)
+</I>
+Yup, 2.0~alpha is getting rolled out. I'll be grateful if you are ready to 
+take the risk, as you have been most helpful with your reports on previous 
+releases.
+
+&gt;<i> Since OCaml packages may also get used outside OPAM itself (e.g. in an os
+</I>&gt;<i> package manager), this means that I need to install opam files so that they
+</I>&gt;<i> can be made available to hypothetical tools that consume them,
+</I>&gt;<i> independently from an OPAM install. The upcoming topkg packager overhaul
+</I>&gt;<i> will do this automatically, unless prevented.
+</I>
+The granularity of opam libs for manipulating these files has been much 
+improved, but it could probably still be improved. Feel free to suggest such 
+changes (OpamFile should probably be split; it would be better to do these 
+_before_ everyone migrates to the new APIs). Also, the data handling is done 
+through the new lens-like OpamFormat module (in lib opam-format).
+
+The work-in-progress APIs are now online here:
+    <A HREF="http://opam.ocaml.org/doc/2.0/api/">http://opam.ocaml.org/doc/2.0/api/</A>
+
+&gt;<i> 1. Where should those be installed in `lib:` (like METAs) or `etc:` (seems
+</I>&gt;<i> more logical) or &#8230; ?
+</I>
+Two things:
+- opam now puts all its metadata into a .opam-switch/ subdir below the switch 
+prefix. This is cleaner.
+- it now keeps a synchronised cache of the opam files of all installed 
+packages, in each switch. It's at `&lt;prefix&gt;/.opam-
+switch/packages/&lt;name&gt;.&lt;version&gt;/opam`, but could be moved somewhere else (a 
+directory structure is used to allow for a `files/` subdir, and for 
+consistence with the repository format)
+
+&gt;<i> 2. Has this any chance to confuse OPAM itself  ? My
+</I>&gt;<i> guess is no, it treats its install directories elements as sequence of
+</I>&gt;<i> bytes.
+</I>
+No, unless you write directly to the above-mentionned cache.
+
+&gt;<i> Anil:
+</I>&gt;<i> - I think it would be good to encourage the use of an `opam/` directory so
+</I>&gt;<i> that `descr` files can also be tracked with the development version.  We
+</I>&gt;<i> could even assemble useful information in there such as example code
+</I>&gt;<i> fragments that would appear in the OPAM homepage for that package when
+</I>&gt;<i> published.
+</I>
+Unless you use overlay files (`files/xxx` that get added to the archive), 
+which should really only be used for hot-patching in the repo and not on 
+development packages, you can now put everything within a single opam file:
+
+- For the description, use a `descr:` field, and a simple string. The new 
+`&quot;&quot;&quot;`-delimited syntax for strings makes this more convenient.
+- For the url, use the &quot;section&quot; format (implemented since opam 1.0 or before, 
+but never used):
+    url {
+      &lt;same format as the url file&gt;
+    }
+
+&gt;<i> Daniel:
+</I>&gt;<i> 1) There's no support at the moment for such directories in OPAM install
+</I>&gt;<i> file
+</I>
+This can easily be added if we get a consensus
+
+&gt;<i> Build tool link helpers, documentation indexer, finder and viewers, etc.
+</I>
+The repository maintainers will probably have to put some guidelines on what 
+should or should not be within these files, when they are part of the official 
+repository ?
+
+Hope this helps!
+Louis
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001441.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+	<LI>Next message: <A HREF="001443.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1442">[ date ]</a>
+              <a href="thread.html#1442">[ thread ]</a>
+              <a href="subject.html#1442">[ subject ]</a>
+              <a href="author.html#1442">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

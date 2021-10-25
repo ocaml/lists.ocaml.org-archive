@@ -1,0 +1,160 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] OPAM: signing the repository
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20OPAM%3A%20signing%20the%20repository&In-Reply-To=%3C557196AD.8070005%40mehnert.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000597.html">
+   <LINK REL="Next"  HREF="000603.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] OPAM: signing the repository</H1>
+    <B>Hannes Mehnert</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20OPAM%3A%20signing%20the%20repository&In-Reply-To=%3C557196AD.8070005%40mehnert.org%3E"
+       TITLE="[ocaml-platform] OPAM: signing the repository">hannes at mehnert.org
+       </A><BR>
+    <I>Fri Jun  5 13:31:41 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000597.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+        <LI>Next message: <A HREF="000603.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#599">[ date ]</a>
+              <a href="thread.html#599">[ thread ]</a>
+              <a href="subject.html#599">[ subject ]</a>
+              <a href="author.html#599">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA384
+
+David,
+
+On 06/05/2015 11:47, David Sheets wrote:
+&gt;&gt;<i> Wow! This is really nice work.
+</I>
+
+Thanks! And thanks for your questions!
+
+
+&gt;&gt;<i> 1. In your linearity invariants, you say that no key may be
+</I>&gt;&gt;<i> removed (1) which seems sensible even if inviting a lot of cruft
+</I>&gt;&gt;<i> eventually. Then, you say that keys can only be modified with a
+</I>&gt;&gt;<i> signature (5) and, as a special exception, removal of a developer
+</I>&gt;&gt;<i> key (exception 2) is allowed. What happens when these events
+</I>&gt;&gt;<i> occur? Do things get re-signed? Do clients have to traverse the
+</I>&gt;&gt;<i> repo history to extract old keys to verify signatures?
+</I>
+
+The first ones are the linearity invariants for each commit. Addition
+is pretty straightforward.
+
+A modification is still ok, since there can be signatures on the
+modified data. Deletion is the hard bit: there is nothing afterwards -
+thus the commit must contain an annotated tag storing signatures that
+the deletion was intentioned.
+
+Whenever a key is removed (on a compromise/steal event), all the
+signatures done with this key are considered to be invalid. No need to
+traverse history.
+
+
+&gt;&gt;<i> 2. Are the default opam root keys compiled into the binary or
+</I>&gt;&gt;<i> on-disk? I interpreted it both ways from a couple of mentions
+</I>&gt;&gt;<i> throughout the doc.
+</I>
+
+Shipped within the binary (for the main opam repository), and used to
+verify the signed root file in the repository.
+
+
+&gt;&gt;<i> 3. How will the uniqueness and time-limitedness of the
+</I>&gt;&gt;<i> initial-bootstrap key be enforced?
+</I>
+
+It will be generated once, all the things will be signed, and then
+purged from its existence.
+
+
+&gt;&gt;<i> 4. Where are RM keys stored in the repo? in keys/dev? keys/root
+</I>&gt;&gt;<i> seems to contain a list of the keyid/algo/key triples for RMs but
+</I>&gt;&gt;<i> there is a keyid uniqueness condition...? Could you clarify the
+</I>&gt;&gt;<i> distinction between a keyid and an author id (<A HREF="http://lists.ocaml.org/listinfo/platform">user at host</A>)?
+</I>
+
+RM keys are stored in the root file. A keyid and authorid are the
+same, authorids must be unique (across package and repository
+maintainers, although stored at different places). Since the amount of
+RMs is bounded, and their keys will be needed during most runs of opam
+anyways, they will reside in memory. Thus, a lookup for a specific
+keyid/authorid will first lookup in the set of RMs, then in the
+package maintainer directory (keys/).
+
+
+&gt;&gt;<i> 5. Can the dev (and RM) identities be designed for extensibility?
+</I>&gt;&gt;<i> It reads like the key files will just contain a list of key
+</I>&gt;&gt;<i> triples right now. Could these files contain a single field, e.g.
+</I>&gt;&gt;<i> &quot;keys&quot;, so that others could be added later? Specifically, I
+</I>&gt;&gt;<i> would like to attest to my GitHub user id so the signatures in
+</I>&gt;&gt;<i> the repo can be used by bots to authorize simple actions
+</I>&gt;&gt;<i> performed by my GitHub user (e.g. rebuild this PR).
+</I>
+
+Yes, we removed the not-yet-finished part about what is contained in
+keys/authorid (and how certain parts of it are verified). We want to
+couple them to GitHub user ids, and email addresses -- and have some
+form of automatic validation (similar to keybase.io).
+
+
+Hannes
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBCQAGBQJVcZatAAoJELyJZYjffCjuvGwQAKayQl+94d7oj2X5NOiMyDmz
+MhNbMZOxfHlWDB2HqtE+rBqv3c96bKB2j8/Pd22BEGbDin6JE1THno2ozBF1cKI1
+u/nOVY4A7Br2wwmd6qaDh3nP/VNglXCyP5mUnPhTaVZpGgSBHDAa/imGE59f6f/z
+PAUKseNmc0dume2Tz9GeTfYDeVNfEA2wqS+FoUbV/wpGKdVfVRTUwB6AHkWJqGsi
+7cb1ry4ceSh+FWemxd60icIGW9oU8cBjEdJka11sYYwOAEd4F9XO+8JNZVvY6qfo
+ZjJDK0YssQatxua7Lob0TSAL2cfcJGjlxvKr0T9ET26m+8EvuO8qYaMBzECTnB6r
+EXC6jWPQC72OY3W2aXLmUndYflLH6IBTppsKwsoU+oOtwPZj7C90FpW8+shShMm/
+3Ca22Qz+wEQ9/vUwT4yFqrc3tGNqZgpDPVv3Yyt8t8Pn7379THT4gsD5hSHAVZhf
+R7ARlp/Gks68rK9Ix/HfE44yKMZ4I8zyz8KygjzruDdUiugBji6mCLbZ9vxS0HEU
+E6b6u8GxrnOWenPyc9mAJ27Ez8SzELbnGpfffQb3eJESztU4dRNO9/CdqwuOcXyJ
+yaNkLdwuld3PJjoYJ+kHHst27QfvZ3UL4Luh3tfbDHLvlHSk2ccgFS0B34TbGt0K
+IeaePU2UXrd2jkBHCaXX
+=ZvVJ
+-----END PGP SIGNATURE-----
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000597.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+	<LI>Next message: <A HREF="000603.html">[ocaml-platform] OPAM: signing the repository
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#599">[ date ]</a>
+              <a href="thread.html#599">[ thread ]</a>
+              <a href="subject.html#599">[ subject ]</a>
+              <a href="author.html#599">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

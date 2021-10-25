@@ -1,0 +1,3986 @@
+From anil at recoil.org  Thu Dec  4 10:29:10 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 4 Dec 2014 10:29:10 +0000
+Subject: [opam-devel] passing through environment variables to builds
+Message-ID: <9C185D1B-5700-4E4A-B909-F33A1B36E14C@recoil.org>
+
+I'm having trouble compiling crypto-related libraries on MacOSX and OpenBSD, since it requires:
+
+CFLAGS="-I/usr/local/include" LDFLAGS="-I/usr/local/lib"
+
+to be passed in the environment.  Our "conf-gmp" package currently just does a "cc -c gmp.c" which is very unlikely to work portably.
+
+I was trying to modify the package description to use CFLAGS passed in externally to the `opam` command-line, and this diff works:
+
+diff --git a/packages/conf-gmp/conf-gmp.1/opam b/packages/conf-gmp/conf-gmp.1/opam
+index d0f0065..8b45586 100644
+--- a/packages/conf-gmp/conf-gmp.1/opam
++++ b/packages/conf-gmp/conf-gmp.1/opam
+@@ -2,7 +2,7 @@ opam-version: "1"
+ maintainer: "nbraud"
+ homepage: "http://gmplib.org/"
+ license: "GPL"
+-build: [["cc" "-c" "test.c"]]
++build: [["sh" "-c" "cc -c $CFLAGS test.c"]]
+ depexts: [
+   [["debian"] ["libgmp-dev"]]
+   [["ubuntu"] ["libgmp-dev"]]
+
+However, is there a better way to pass through environment variables to OPAM packages?  An %{env:CFLAGS}% macro would be cleaner than forcing evaluation through a subshell as my diff above does.
+
+-anil
+
+From whitequark at whitequark.org  Thu Dec  4 20:19:00 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Thu, 04 Dec 2014 23:19:00 +0300
+Subject: [opam-devel] passing through environment variables to builds
+In-Reply-To: <9C185D1B-5700-4E4A-B909-F33A1B36E14C@recoil.org>
+References: <9C185D1B-5700-4E4A-B909-F33A1B36E14C@recoil.org>
+Message-ID: <9b3d1a596b7313568dc02321d5fd0532@whitequark.org>
+
+On 2014-12-04 13:29, Anil Madhavapeddy wrote:
+> I'm having trouble compiling crypto-related libraries on MacOSX and
+> OpenBSD, since it requires:
+> 
+> CFLAGS="-I/usr/local/include" LDFLAGS="-I/usr/local/lib"
+> 
+> to be passed in the environment.  Our "conf-gmp" package currently
+> just does a "cc -c gmp.c" which is very unlikely to work portably.
+
+I believe this should be done at the compiler level. Requiring every
+native package to figure out what CFLAGS/LDFLAGS the current platform
+wants is unreasonable.
+
+-- 
+Peter Zotov
+
+From ygrek at autistici.org  Fri Dec  5 04:19:58 2014
+From: ygrek at autistici.org (ygrek)
+Date: Fri, 5 Dec 2014 12:19:58 +0800
+Subject: [opam-devel] passing through environment variables to builds
+In-Reply-To: <9b3d1a596b7313568dc02321d5fd0532@whitequark.org>
+References: <9C185D1B-5700-4E4A-B909-F33A1B36E14C@recoil.org>
+ <9b3d1a596b7313568dc02321d5fd0532@whitequark.org>
+Message-ID: <20141205121958.17ae989c@kiwi.local.tld>
+
+On Thu, 04 Dec 2014 23:19:00 +0300
+Peter Zotov <whitequark at whitequark.org> wrote:
+
+> I believe this should be done at the compiler level. Requiring every
+> native package to figure out what CFLAGS/LDFLAGS the current platform
+> wants is unreasonable.
+
+Agreed, and that's why (at least) gcc has C_INCLUDE_PATH and LIBRARY_PATH and those
+should be set by user in the environment (maybe permanently) if he wants to use packages
+installed in /usr/local or /opt or whatever, and this shouldn't be the deal of package manager
+to automatically make various paths available to the compiler without user's approval
+(because that can lead to conflicts if there are several versions of same library installed
+in different locations), IIUC.
+
+-- 
+
+From anil at recoil.org  Tue Dec  9 11:16:33 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 9 Dec 2014 11:16:33 +0000
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+Message-ID: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+
+It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+
+This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+
+Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+
+-anil
+
+From lukedunstan81 at gmail.com  Tue Dec  9 11:52:27 2014
+From: lukedunstan81 at gmail.com (Luke Dunstan)
+Date: Tue, 9 Dec 2014 19:52:27 +0800
+Subject: [opam-devel] [MirageOS-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+Message-ID: <CAEui0wWpWLXMSVMPcywOjpoELGrxmGWZoRoRB=1r-ahwC+Mrmg@mail.gmail.com>
+
+I haven't had to do it before, but I would try running "apport-bug opam" on
+the failing machine.
+
+Or one of these email addresses:
+
+$ apt-cache show opam
+...
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss at lists.ubuntu.com>
+Original-Maintainer: Debian OCaml Maintainers <
+debian-ocaml-maint at lists.debian.org>
+...
+
+$ apt-cache show aspcud
+...
+Maintainer: Ubuntu Developers <ubuntu-devel-discuss at lists.ubuntu.com>
+Original-Maintainer: Ralf Treinen <treinen at debian.org>
+...
+
+
+Luke
+
+
+On 9 December 2014 at 19:16, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> It looks like the latest Ubuntu has a completely broken OPAM out of the
+> box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2
+> due to a changed solver interface).
+>
+> This leads to issues such as this:
+> https://github.com/mirage/mirage-skeleton/issues/59
+>
+> Does anyone know how to get in touch with Ubuntu folk to request a
+> backport of OPAM 1.2 to Ubuntu 14.10?
+>
+> -anil
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141209/f5dfc224/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Wed Dec 10 01:15:37 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 10 Dec 2014 10:15:37 +0900
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+Message-ID: <5416267.uz7Mnlar5D@agaric>
+
+I've been trying to reproduce the issue, but things seem fine, sort of:
+
+>From what I could gather:
+* trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+* utopic (14.10, latest) has 1.1 and aspcud 1.9
+* vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+
+Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+
+There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+```
+===== ERROR while installing ocamlfind.1.5.5 =====
+Internal error:
+  "ocamlfind": command not found.
+```
+
+so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+
+Cheers,
+Louis
+
+
+[1] https://github.com/ocaml/opam/issues/1683
+[2] https://github.com/ocaml/opam/issues/1658
+
+- Anil Madhavapeddy, 09/12/2014 11:16 -
+> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> 
+> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> 
+> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From roberto at dicosmo.org  Wed Dec 10 07:16:31 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Wed, 10 Dec 2014 08:16:31 +0100
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <5416267.uz7Mnlar5D@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric>
+Message-ID: <20141210071631.GA4391@traveler>
+
+Thanks Louis for looking into this. 
+
+As for aspcud 1.9, I also have trouble understanding what the issue could be.
+The version in utopic [1] is exactly the same as the one I use in Debian [2],
+and it is backward compatible with 1.8: the old preference criteria are still
+there, just do
+
+  $ /usr/local/bin/cudf2lp --help
+
+and you will see this text among the rest
+
+  --criteria,-c <arg>  : Preprocess for specific optimization criteria
+      Default: none
+      Valid:   none, paranoid, trendy, -|+<crit>\(,-|+<crit>\)*
+        <crit>: count(<set>) | sum(<set>,<attr>) | unsat_recommends(<set>)
+              | aligned(<set>,<attr>,<attr>) | notuptodate(<set>)
+        <attr>: CUDF attribute name
+        <set> : solution | changed | new | removed | up | down
+              | installrequest | upgraderequest | request
+      For backwards compatibility: 
+        new              = count(new)
+        removed          = count(removed)
+        changed          = count(changed)
+        notuptodate      = notuptodate(solution)
+        unsat_recommends = unsat_recommends(solution)
+        sum(name)        = sum(name,solution)
+
+Anil, may you provide a more precise bug report?
+
+[1] http://packages.ubuntu.com/fr/utopic/aspcud
+[2] https://packages.debian.org/fr/jessie/aspcud
+
+On Wed, Dec 10, 2014 at 10:15:37AM +0900, Louis Gesbert wrote:
+> I've been trying to reproduce the issue, but things seem fine, sort of:
+> 
+> >From what I could gather:
+> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> 
+> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> 
+> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> ```
+> ===== ERROR while installing ocamlfind.1.5.5 =====
+> Internal error:
+>   "ocamlfind": command not found.
+> ```
+> 
+> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> 
+> Cheers,
+> Louis
+> 
+> 
+> [1] https://github.com/ocaml/opam/issues/1683
+> [2] https://github.com/ocaml/opam/issues/1658
+> 
+> - Anil Madhavapeddy, 09/12/2014 11:16 -
+> > It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> > 
+> > This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> > 
+> > Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> > 
+> > -anil
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From simon.cruanes.2007 at m4x.org  Wed Dec 10 13:16:22 2014
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Wed, 10 Dec 2014 14:16:22 +0100
+Subject: [opam-devel] global installation with opam
+Message-ID: <20141210131622.GE29376@emmental.inria.fr>
+
+Hello,
+
+Is there a blessed way to install packages system-wide using Opam? I
+suspect there isn't, so I attached a document [1] that describes my
+use-cases and what I'm thinking of (of course I know you opam
+developers are busy).
+
+Thanks!
+
+Best,
+
+-- 
+Simon
+
+[1] http://cedeela.fr/~simon/files/opam_system.html
+or joined file
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+# Global installation with Opam
+
+I have a few use cases in which I would like to use opam to install libraries
+or programs written in OCaml (with non-trivial dependencies) on a GNU/Linux
+system.
+
+- I share a machine with several colleagues, and
+  developed [a few tools](https://github.com/c-cube/frog-utils) to make it
+  easy to parallelize jobs without stepping on one another's toes. I would
+  like a "global" opam switch that would install the binaries and libraries
+  in `/usr/local/bin` and `/usr/local/lib` so that everyone can use the same
+  version easily (and make upgrade easier).
+- When developing a web application, CGI program, or other Unix daemon (a
+  server, basically), it's better to use the system's init program to
+  start/stop the daemon. It is possible (although, imho, ugly) to compile
+  and install the daemon in `~/.opam/<switch>/bin` and use this path from the
+  init script. However, the daemon should not fail if the user
+  were to suddenly "opam switch" to an experimental compiler just at the
+  wrong moment. A much cleaner solution is to install those kinds of binaries
+  to `/usr/local/bin/` or something similar.
+- for teaching, it would be nice to install (on a network filesystem?) the
+  libraries and tools required for a course (especially if they eat up
+  a lot of disk space quotas, or take time to compile. Example: Coq). The
+  students could then all use the same libraries, already installed,
+  in the same version as every other student. Headache--.
+
+I'm not aware of a clean way to do it currently, so here's how I would like
+things to work (please, Santa):
+
+There would be a special switch (maybe `system`, I'm not sure how it works
+currently), let's call it `global`. This switch assumes that OCaml **and**
+ocamlfind are already installed by whatever package manager the distribution
+provides. Everything installed with this switch would be installed in
+`/usr/local/bin/` and `/usr/local/lib/` (and `/usr/local/share/doc/` etc.) so
+that it can be used without opam. Other switches (`4.02.1`, `4.03-PR-123`, etc.)
+would behave exactly the same as they do currently.
+
+Security issues: to limit the potential impact of evil opam packages, here are
+a few possibilities when compiling/installing with the `global` switch:
+
+- compilation as a user, only installation as root (use `sudo`, or require
+  root rights, and fork+drop privilege to run the "build" target)
+- compilation within a chroot in `/tmp/` (no possibility for `make install`
+  to erase stuff as a root,
+  see [this fail](https://github.com/MrMEEE/bumblebee-Old-and-abbandoned/commit/a047be85247755cdbe0acce6f1dafc8beb84f2ac)),
+  then copy files to their right location. Also allows to track what files a
+  package has copied so that un-installation can get rid of them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141210/7defe94f/attachment.sig>
+
+From anil at recoil.org  Wed Dec 10 14:54:39 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 10 Dec 2014 14:54:39 +0000
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <5416267.uz7Mnlar5D@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric>
+Message-ID: <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+
+I just reproduced it by following the referenced bug report.
+
+From a fresh Ubuntu 14.10, if I do:
+
+$ sudo apt-get install opam camlp4-extra aspcud
+$ opam init -a
+$ opam install mirage -y
+$ eval `opam config env`
+
+At this point some packages have been installed and mirage is installed.
+
+Now however, if I use mirage it invokes opam install again and packages
+are reinstalled as a duplicate.  See below:
+
+opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+[NOTE] Package mirage-types is already installed (current version is 2.1.0).
+[NOTE] Package lwt is already installed (current version is 2.4.6).
+[NOTE] Package io-page is already installed (current version is 1.1.1).
+[NOTE] Package cstruct is already installed (current version is 1.4.0).
+[NOTE] Package crunch is already installed (current version is 1.3.0).
+[WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+The following actions will be performed:
+ - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+ - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install base-bigarray.base [required by cowabloga]
+ - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install xmlm.1.2.0 [required by cowabloga]
+ - install uutf.0.9.3 [required by cowabloga]
+ - install stringext.1.1.0 [required by cowabloga, mirage-http]
+ - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install re.1.2.2 [required by cowabloga, mirage-http]
+ - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install hex.0.1.0 [required by cowabloga]
+ - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+ - install base64.1.0.0 [required by cowabloga, mirage-http]
+ - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install ulex.1.1 [required by cowabloga]
+ - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install omd.1.2.3 [required by cowabloga]
+ - install jsonm.0.9.1 [required by cowabloga]
+ - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install crunch.1.3.0
+ - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+ - install dyntype.0.9.0 [required by cowabloga]
+ - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+ - install uri.1.7.2 [required by cowabloga, mirage-http]
+
+I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+
+Any inspiration from there from the CUDF interactions in the above gist?
+
+-anil
+
+> On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> I've been trying to reproduce the issue, but things seem fine, sort of:
+> 
+> From what I could gather:
+> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> 
+> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> 
+> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> ```
+> ===== ERROR while installing ocamlfind.1.5.5 =====
+> Internal error:
+>  "ocamlfind": command not found.
+> ```
+> 
+> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> 
+> Cheers,
+> Louis
+> 
+> 
+> [1] https://github.com/ocaml/opam/issues/1683
+> [2] https://github.com/ocaml/opam/issues/1658
+> 
+> - Anil Madhavapeddy, 09/12/2014 11:16 -
+>> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+>> 
+>> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+>> 
+>> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Wed Dec 10 15:00:43 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 10 Dec 2014 15:00:43 +0000
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <20141210071631.GA4391@traveler>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric> <20141210071631.GA4391@traveler>
+Message-ID: <EDC9DA9D-05F3-4665-BF84-379199C7C875@recoil.org>
+
+See my previous mail for more debug information -- hope that's useful.
+
+It may also be the version of Gringo or Clasp that is incompatible with Aspcud.
+This happened before on MacOS X when clasp was upgraded before Aspcud:
+https://github.com/Homebrew/homebrew/pull/27871
+
+I also note that Ubuntu's opam package only installs ocaml as a dependency
+and not ocaml-native-compilers and camlp4-extra, both of which are pretty
+much necessary for modern OCaml operation.  Any thoughts on making this a
+harder dependency in the opam package?
+
+-anil
+
+On 10 Dec 2014, at 07:16, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> 
+> Thanks Louis for looking into this. 
+> 
+> As for aspcud 1.9, I also have trouble understanding what the issue could be.
+> The version in utopic [1] is exactly the same as the one I use in Debian [2],
+> and it is backward compatible with 1.8: the old preference criteria are still
+> there, just do
+> 
+>  $ /usr/local/bin/cudf2lp --help
+> 
+> and you will see this text among the rest
+> 
+>  --criteria,-c <arg>  : Preprocess for specific optimization criteria
+>      Default: none
+>      Valid:   none, paranoid, trendy, -|+<crit>\(,-|+<crit>\)*
+>        <crit>: count(<set>) | sum(<set>,<attr>) | unsat_recommends(<set>)
+>              | aligned(<set>,<attr>,<attr>) | notuptodate(<set>)
+>        <attr>: CUDF attribute name
+>        <set> : solution | changed | new | removed | up | down
+>              | installrequest | upgraderequest | request
+>      For backwards compatibility: 
+>        new              = count(new)
+>        removed          = count(removed)
+>        changed          = count(changed)
+>        notuptodate      = notuptodate(solution)
+>        unsat_recommends = unsat_recommends(solution)
+>        sum(name)        = sum(name,solution)
+> 
+> Anil, may you provide a more precise bug report?
+> 
+> [1] http://packages.ubuntu.com/fr/utopic/aspcud
+> [2] https://packages.debian.org/fr/jessie/aspcud
+> 
+> On Wed, Dec 10, 2014 at 10:15:37AM +0900, Louis Gesbert wrote:
+>> I've been trying to reproduce the issue, but things seem fine, sort of:
+>> 
+>>> From what I could gather:
+>> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+>> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+>> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+>> 
+>> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+>> 
+>> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+>> ```
+>> ===== ERROR while installing ocamlfind.1.5.5 =====
+>> Internal error:
+>>  "ocamlfind": command not found.
+>> ```
+>> 
+>> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+>> 
+>> Cheers,
+>> Louis
+>> 
+>> 
+>> [1] https://github.com/ocaml/opam/issues/1683
+>> [2] https://github.com/ocaml/opam/issues/1658
+>> 
+>> - Anil Madhavapeddy, 09/12/2014 11:16 -
+>>> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+>>> 
+>>> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+>>> 
+>>> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+>>> 
+>>> -anil
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> -- 
+> Roberto Di Cosmo
+> 
+> ------------------------------------------------------------------
+> Professeur               En delegation a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann       
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>      http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+> 
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> Avenue de France
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Wed Dec 10 15:18:41 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 10 Dec 2014 15:18:41 +0000
+Subject: [opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+In-Reply-To: <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric> <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+Message-ID: <3EC5765F-4802-4BA6-B52F-83B32F6934E6@recoil.org>
+
+I wonder if this is due to the OPAM 1.1 repository redirect, which leads to
+lots of errors in the initial `opam init` and subsequently caused the base
+packages to not be installed...
+
+However, doing an `opam update -u` and letting the repository update didnt
+work, nor did `opam init https://opam.ocaml.org/1.1` make a difference.
+
+I'll stop trying random things now and let the CUDF experts speak :-)
+
+-anil
+
+> On 10 Dec 2014, at 14:54, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+> I just reproduced it by following the referenced bug report.
+> 
+> From a fresh Ubuntu 14.10, if I do:
+> 
+> $ sudo apt-get install opam camlp4-extra aspcud
+> $ opam init -a
+> $ opam install mirage -y
+> $ eval `opam config env`
+> 
+> At this point some packages have been installed and mirage is installed.
+> 
+> Now however, if I use mirage it invokes opam install again and packages
+> are reinstalled as a duplicate.  See below:
+> 
+> opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+> [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+> [NOTE] Package lwt is already installed (current version is 2.4.6).
+> [NOTE] Package io-page is already installed (current version is 1.1.1).
+> [NOTE] Package cstruct is already installed (current version is 1.4.0).
+> [NOTE] Package crunch is already installed (current version is 1.3.0).
+> [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+> The following actions will be performed:
+> - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+> - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install base-bigarray.base [required by cowabloga]
+> - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install xmlm.1.2.0 [required by cowabloga]
+> - install uutf.0.9.3 [required by cowabloga]
+> - install stringext.1.1.0 [required by cowabloga, mirage-http]
+> - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install re.1.2.2 [required by cowabloga, mirage-http]
+> - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install hex.0.1.0 [required by cowabloga]
+> - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+> - install base64.1.0.0 [required by cowabloga, mirage-http]
+> - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install ulex.1.1 [required by cowabloga]
+> - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install omd.1.2.3 [required by cowabloga]
+> - install jsonm.0.9.1 [required by cowabloga]
+> - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install crunch.1.3.0
+> - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+> - install dyntype.0.9.0 [required by cowabloga]
+> - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> - install uri.1.7.2 [required by cowabloga, mirage-http]
+> 
+> I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+> gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+> 
+> Any inspiration from there from the CUDF interactions in the above gist?
+> 
+> -anil
+> 
+>> On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+>> 
+>> I've been trying to reproduce the issue, but things seem fine, sort of:
+>> 
+>> From what I could gather:
+>> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+>> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+>> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+>> 
+>> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+>> 
+>> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+>> ```
+>> ===== ERROR while installing ocamlfind.1.5.5 =====
+>> Internal error:
+>> "ocamlfind": command not found.
+>> ```
+>> 
+>> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+>> 
+>> Cheers,
+>> Louis
+>> 
+>> 
+>> [1] https://github.com/ocaml/opam/issues/1683
+>> [2] https://github.com/ocaml/opam/issues/1658
+>> 
+>> - Anil Madhavapeddy, 09/12/2014 11:16 -
+>>> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+>>> 
+>>> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+>>> 
+>>> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+>>> 
+>>> -anil
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+> 
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+> 
+
+
+From thomas at gazagnaire.org  Wed Dec 10 23:12:29 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 10 Dec 2014 23:12:29 +0000
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <20141210131622.GE29376@emmental.inria.fr>
+References: <20141210131622.GE29376@emmental.inria.fr>
+Message-ID: <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+
+A (bad) solution is to set change OPAMROOT to an appropriate location.
+
+Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+
+Best,
+Thomas
+
+
+> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+> 
+> Hello,
+> 
+> Is there a blessed way to install packages system-wide using Opam? I
+> suspect there isn't, so I attached a document [1] that describes my
+> use-cases and what I'm thinking of (of course I know you opam
+> developers are busy).
+> 
+> Thanks!
+> 
+> Best,
+> 
+> -- 
+> Simon
+> 
+> [1] http://cedeela.fr/~simon/files/opam_system.html
+> or joined file
+> 
+> http://weusepgp.info/
+> key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+> <opam_system.md>_______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Wed Dec 10 23:18:25 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 10 Dec 2014 23:18:25 +0000
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+Message-ID: <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+
+Thanks for the great writeup Simon!
+
+I do wonder why Thomas thinks that OPAMROOT is a bad solution though.  It
+seems quite clean to me -- you can have an OPAM installation pointing to
+(e.g.) /usr/local/opam and either add that your global PATH or symlink binaries
+into /usr/local/bin.
+
+This could be scripted up with a fairly trivial shell script (caveat: that I
+haven't actually written).
+
+-anil
+
+> On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+> A (bad) solution is to set change OPAMROOT to an appropriate location.
+> 
+> Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+> 
+> Best,
+> Thomas
+> 
+> 
+>> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+>> 
+>> Hello,
+>> 
+>> Is there a blessed way to install packages system-wide using Opam? I
+>> suspect there isn't, so I attached a document [1] that describes my
+>> use-cases and what I'm thinking of (of course I know you opam
+>> developers are busy).
+>> 
+>> Thanks!
+>> 
+>> Best,
+>> 
+>> -- 
+>> Simon
+>> 
+>> [1] http://cedeela.fr/~simon/files/opam_system.html
+>> or joined file
+>> 
+>> http://weusepgp.info/
+>> key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+>> <opam_system.md>_______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From thomas at gazagnaire.org  Wed Dec 10 23:30:29 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 10 Dec 2014 23:30:29 +0000
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+Message-ID: <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+
+> I do wonder why Thomas thinks that OPAMROOT is a bad solution though.  It
+> seems quite clean to me -- you can have an OPAM installation pointing to
+> (e.g.) /usr/local/opam and either add that your global PATH or symlink binaries
+> into /usr/local/bin.
+
+you can indeed have things under /usr/local/opam, but what you might want is to have libs in /usr/local/lib, binaries in /usr/local/bin to integrate with your system better etc... homebrew solves this by taking ownership of /usrl/local, but we clearly don't want this for opam (I think) :-)
+
+I think having a special "global" switch could makes sense and could be implemented without too much hassle. Need to special case https://github.com/ocaml/opam/blob/master/src/core/opamPath.ml to use global paths. Requiring the user to install ocaml and ocamlfind only could help (so we need to implement a the detection of an "external" ocamlfind) as we don't need to support other external ocaml libs (which can become a pain when you want to upgrade ...).
+
+So I think that adding that kind of limited support for global packages could makes sense and is not too hard to do.
+
+Thomas
+
+
+> 
+> This could be scripted up with a fairly trivial shell script (caveat: that I
+> haven't actually written).
+> 
+> -anil
+> 
+>> On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>> 
+>> A (bad) solution is to set change OPAMROOT to an appropriate location.
+>> 
+>> Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+>> 
+>> Best,
+>> Thomas
+>> 
+>> 
+>>> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+>>> 
+>>> Hello,
+>>> 
+>>> Is there a blessed way to install packages system-wide using Opam? I
+>>> suspect there isn't, so I attached a document [1] that describes my
+>>> use-cases and what I'm thinking of (of course I know you opam
+>>> developers are busy).
+>>> 
+>>> Thanks!
+>>> 
+>>> Best,
+>>> 
+>>> -- 
+>>> Simon
+>>> 
+>>> [1] http://cedeela.fr/~simon/files/opam_system.html
+>>> or joined file
+>>> 
+>>> http://weusepgp.info/
+>>> key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+>>> <opam_system.md>_______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+
+
+From thomas at gazagnaire.org  Wed Dec 10 23:32:36 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 10 Dec 2014 23:32:36 +0000
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+ <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+Message-ID: <14A5B2E0-E41C-4202-9ADE-D0F30065A267@gazagnaire.org>
+
+> I think having a special "global" switch could makes sense and could be implemented without too much hassle. Need to special case https://github.com/ocaml/opam/blob/master/src/core/opamPath.ml to use global paths. Requiring the user to install ocaml and ocamlfind only could help (so we need to implement a the detection of an "external" ocamlfind) as we don't need to support other external ocaml libs (which can become a pain when you want to upgrade ...).
+> 
+> So I think that adding that kind of limited support for global packages could makes sense and is not too hard to do.
+
+to be more complete: this will make system compiler and ocamlfind updates more complicated, but I think that Louis is already looking at this for the "compiler-as-a-package" stuff.
+
+Thomas
+> 
+>> 
+>> This could be scripted up with a fairly trivial shell script (caveat: that I
+>> haven't actually written).
+>> 
+>> -anil
+>> 
+>>> On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>>> 
+>>> A (bad) solution is to set change OPAMROOT to an appropriate location.
+>>> 
+>>> Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+>>> 
+>>> Best,
+>>> Thomas
+>>> 
+>>> 
+>>>> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+>>>> 
+>>>> Hello,
+>>>> 
+>>>> Is there a blessed way to install packages system-wide using Opam? I
+>>>> suspect there isn't, so I attached a document [1] that describes my
+>>>> use-cases and what I'm thinking of (of course I know you opam
+>>>> developers are busy).
+>>>> 
+>>>> Thanks!
+>>>> 
+>>>> Best,
+>>>> 
+>>>> -- 
+>>>> Simon
+>>>> 
+>>>> [1] http://cedeela.fr/~simon/files/opam_system.html
+>>>> or joined file
+>>>> 
+>>>> http://weusepgp.info/
+>>>> key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+>>>> <opam_system.md>_______________________________________________
+>>>> opam-devel mailing list
+>>>> opam-devel at lists.ocaml.org
+>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>> 
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>>> 
+>> 
+> 
+
+
+From anil at recoil.org  Wed Dec 10 23:35:20 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 10 Dec 2014 23:35:20 +0000
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <14A5B2E0-E41C-4202-9ADE-D0F30065A267@gazagnaire.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+ <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+ <14A5B2E0-E41C-4202-9ADE-D0F30065A267@gazagnaire.org>
+Message-ID: <788E359F-1ED0-4CD8-88CD-2E2B6E983C0B@recoil.org>
+
+On 10 Dec 2014, at 23:32, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> I think having a special "global" switch could makes sense and could be implemented without too much hassle. Need to special case https://github.com/ocaml/opam/blob/master/src/core/opamPath.ml to use global paths. Requiring the user to install ocaml and ocamlfind only could help (so we need to implement a the detection of an "external" ocamlfind) as we don't need to support other external ocaml libs (which can become a pain when you want to upgrade ...).
+>> 
+>> So I think that adding that kind of limited support for global packages could makes sense and is not too hard to do.
+> 
+> to be more complete: this will make system compiler and ocamlfind updates more complicated, but I think that Louis is already looking at this for the "compiler-as-a-package" stuff.
+
+The proliferation of special switches makes me nervous as the testing matrix gets larger and larger.  We already run into this with system vs custom compiler regularly.  I agree that we should look into the compiler-as-a-package design and figure out if there's a general way to specify paths to OPAM endpoints like %{bindir} as part of that.
+
+-anil
+
+
+> 
+> Thomas
+>> 
+>>> 
+>>> This could be scripted up with a fairly trivial shell script (caveat: that I
+>>> haven't actually written).
+>>> 
+>>> -anil
+>>> 
+>>>> On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>>>> 
+>>>> A (bad) solution is to set change OPAMROOT to an appropriate location.
+>>>> 
+>>>> Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+>>>> 
+>>>> Best,
+>>>> Thomas
+>>>> 
+>>>> 
+>>>>> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+>>>>> 
+>>>>> Hello,
+>>>>> 
+>>>>> Is there a blessed way to install packages system-wide using Opam? I
+>>>>> suspect there isn't, so I attached a document [1] that describes my
+>>>>> use-cases and what I'm thinking of (of course I know you opam
+>>>>> developers are busy).
+>>>>> 
+>>>>> Thanks!
+>>>>> 
+>>>>> Best,
+>>>>> 
+>>>>> -- 
+>>>>> Simon
+>>>>> 
+>>>>> [1] http://cedeela.fr/~simon/files/opam_system.html
+>>>>> or joined file
+>>>>> 
+>>>>> http://weusepgp.info/
+>>>>> key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+>>>>> <opam_system.md>_______________________________________________
+>>>>> opam-devel mailing list
+>>>>> opam-devel at lists.ocaml.org
+>>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>>> 
+>>>> _______________________________________________
+>>>> opam-devel mailing list
+>>>> opam-devel at lists.ocaml.org
+>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>>> 
+>>> 
+>> 
+> 
+
+
+From daniel.buenzli at erratique.ch  Wed Dec 10 23:49:50 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 11 Dec 2014 00:49:50 +0100
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+ <52F79042-166E-40E6-9A5E-B17776773255@gazagnaire.org>
+Message-ID: <A25FD7861156440DA1DE4F35A931BD8E@erratique.ch>
+
+Le jeudi, 11 d?cembre 2014 ? 00:30, Thomas Gazagnaire a ?crit :
+> you can indeed have things under /usr/local/opam, but what you might want is to have libs in /usr/local/lib, binaries in /usr/local/bin to integrate with your system better etc... homebrew solves this by taking ownership of /usrl/local, but we clearly don't want this for opam (I think) :-)
+
+That's not exactly true. In homebrew each package installs in its own prefix and then, if you actually want (i.e. by default), will symlink into /usr/local prefixes.  
+
+So why not try to take the same approach ? opam packages live in their own prefix (that's already the case) and then just provide a way to symlink package contents into a given prefix.
+
+That would avoid having another special switch.  
+
+So maybe we just want `opam link`, no ?  
+
+(I'm sure I'm missing a lot of things, like relocatable compiler etc.).  
+
+Best,
+
+Daniel
+
+
+
+
+From louis.gesbert at ocamlpro.com  Thu Dec 11 01:03:57 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 11 Dec 2014 10:03:57 +0900
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+Message-ID: <1984064.0AnRkfAlgQ@agaric>
+
+OPAMROOT has a few drawbacks:
+* you want the switch root (eg ~/.opam/system) at /usr/local, not the global opamroot which would lead to /usr/local/system/lib. Unless you call your switch "local" and set OPAMROOT to /usr... (DON'T do that ;))
+* it contains a lot of files you don't actually want in /usr/local (repo caches, all switches, etc.)
+* even a single switch contains a few extra files we may not want in /usr/local (list of installed packages, pinned packages overlays, etc.)
+
+On the bright side, all paths are defined cleanly using module OpamPath, and relocating some parts of a switch to an external directory should'nt be too problematic, as Thomas pointed out. Of course in the meantime, you could use OPAMROOT set as e.g. /shared/opam/ and then
+```
+for dir in sbin bin doc etc lib man share; do
+  mv /shared/opam/system/$dir/* /usr/local/$dir
+  rmdir /shared/opam/system/$dir
+  ln -s /usr/local/$dir /shared/opam/system/$dir
+done
+```
+
+Which is kind of what Daniel suggested for `opam link`, if I understood him correctly.
+The relocation issue may cause some programs to look back to /shared, but that shouldn't be a problem.
+
+Cheers,
+Louis
+
+> - Anil Madhavapeddy, 10/12/2014 23:18 -
+> Thanks for the great writeup Simon!
+> 
+> I do wonder why Thomas thinks that OPAMROOT is a bad solution though.  It
+> seems quite clean to me -- you can have an OPAM installation pointing to
+> (e.g.) /usr/local/opam and either add that your global PATH or symlink binaries
+> into /usr/local/bin.
+> 
+> This could be scripted up with a fairly trivial shell script (caveat: that I
+> haven't actually written).
+> 
+> -anil
+> 
+> > On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> > 
+> > A (bad) solution is to set change OPAMROOT to an appropriate location.
+> > 
+> > Thanks for the write-up, this is very helpful to understand the use-cases. I've created https://github.com/ocaml/opam/issues/1895 to track that.
+> > 
+> > Best,
+> > Thomas
+> > 
+> > 
+> >> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org> wrote:
+> >> 
+> >> Hello,
+> >> 
+> >> Is there a blessed way to install packages system-wide using Opam? I
+> >> suspect there isn't, so I attached a document [1] that describes my
+> >> use-cases and what I'm thinking of (of course I know you opam
+> >> developers are busy).
+> >> 
+> >> Thanks!
+> >> 
+> >> Best,
+> >> 
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From louis.gesbert at ocamlpro.com  Thu Dec 11 01:40:57 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 11 Dec 2014 10:40:57 +0900
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric> <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+Message-ID: <5123334.al3TCFKHKs@agaric>
+
+It's indeed completely broken, that's bad news indeed.
+
+But I confirm my diagnostic: aspcud is not in cause, Dose is (well, or the dose interface in opam 1.1, not trying to put the blame on anyone). The problem happens even without aspcud installed.
+
+Here is the original report: https://github.com/ocaml/opam/issues/1683
+
+Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+
+I filed a bug at https://bugs.launchpad.net/ubuntu/+source/opam/+bug/1401346
+Hope they can act on it quickly...
+
+Thanks for notifying and helping trace this!
+Louis
+
+> - Anil Madhavapeddy, 10/12/2014 14:54 -
+> I just reproduced it by following the referenced bug report.
+> 
+> From a fresh Ubuntu 14.10, if I do:
+> 
+> $ sudo apt-get install opam camlp4-extra aspcud
+> $ opam init -a
+> $ opam install mirage -y
+> $ eval `opam config env`
+> 
+> At this point some packages have been installed and mirage is installed.
+> 
+> Now however, if I use mirage it invokes opam install again and packages
+> are reinstalled as a duplicate.  See below:
+> 
+> opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+> [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+> [NOTE] Package lwt is already installed (current version is 2.4.6).
+> [NOTE] Package io-page is already installed (current version is 1.1.1).
+> [NOTE] Package cstruct is already installed (current version is 1.4.0).
+> [NOTE] Package crunch is already installed (current version is 1.3.0).
+> [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+> The following actions will be performed:
+>  - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+>  - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install base-bigarray.base [required by cowabloga]
+>  - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install xmlm.1.2.0 [required by cowabloga]
+>  - install uutf.0.9.3 [required by cowabloga]
+>  - install stringext.1.1.0 [required by cowabloga, mirage-http]
+>  - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install re.1.2.2 [required by cowabloga, mirage-http]
+>  - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install hex.0.1.0 [required by cowabloga]
+>  - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+>  - install base64.1.0.0 [required by cowabloga, mirage-http]
+>  - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install ulex.1.1 [required by cowabloga]
+>  - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install omd.1.2.3 [required by cowabloga]
+>  - install jsonm.0.9.1 [required by cowabloga]
+>  - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install crunch.1.3.0
+>  - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+>  - install dyntype.0.9.0 [required by cowabloga]
+>  - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+>  - install uri.1.7.2 [required by cowabloga, mirage-http]
+> 
+> I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+> gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+> 
+> Any inspiration from there from the CUDF interactions in the above gist?
+> 
+> -anil
+> 
+> > On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> > 
+> > I've been trying to reproduce the issue, but things seem fine, sort of:
+> > 
+> > From what I could gather:
+> > * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> > * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> > * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> > 
+> > Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> > 
+> > There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> > ```
+> > ===== ERROR while installing ocamlfind.1.5.5 =====
+> > Internal error:
+> >  "ocamlfind": command not found.
+> > ```
+> > 
+> > so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> > 
+> > Cheers,
+> > Louis
+> > 
+> > 
+> > [1] https://github.com/ocaml/opam/issues/1683
+> > [2] https://github.com/ocaml/opam/issues/1658
+> > 
+> > - Anil Madhavapeddy, 09/12/2014 11:16 -
+> >> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> >> 
+> >> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> >> 
+> >> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> >> 
+> >> -anil
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From roberto at dicosmo.org  Thu Dec 11 08:57:31 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 11 Dec 2014 09:57:31 +0100
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <5123334.al3TCFKHKs@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric>
+ <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+ <5123334.al3TCFKHKs@agaric>
+Message-ID: <20141211085730.GA7087@traveler>
+
+Thanks Luis,
+       indeed, now I remember, this is the same issue we had with Debian Jessie,
+see the thread started here
+
+   https://sympa.inria.fr/sympa/arc/caml-list/2014-10/msg00095.html
+
+and then continued offline with Debian maintainers (I'm pointing them to
+this thread this very moment)
+
+Two issues I see:
+
+ - urgent: fix Jessie an Utopic ... we'll see what the maintainers may do, but
+   it might be too late
+
+ - important: update our workflow to prevent all this in the future... IMHO,
+   we need to get the dependencies right in the different distributions, and
+   update them as soon as an incompatibility arises. For example, opam 1.1.1
+   should depend on dose << 3.2.2 ... and this should be linked to the bugs
+   found by Torok back in October
+
+Thanks Anil for re-finding this
+
+On Thu, Dec 11, 2014 at 10:40:57AM +0900, Louis Gesbert wrote:
+> It's indeed completely broken, that's bad news indeed.
+> 
+> But I confirm my diagnostic: aspcud is not in cause, Dose is (well, or the dose interface in opam 1.1, not trying to put the blame on anyone). The problem happens even without aspcud installed.
+> 
+> Here is the original report: https://github.com/ocaml/opam/issues/1683
+> 
+> Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+> 
+> I filed a bug at https://bugs.launchpad.net/ubuntu/+source/opam/+bug/1401346
+> Hope they can act on it quickly...
+> 
+> Thanks for notifying and helping trace this!
+> Louis
+> 
+> > - Anil Madhavapeddy, 10/12/2014 14:54 -
+> > I just reproduced it by following the referenced bug report.
+> > 
+> > From a fresh Ubuntu 14.10, if I do:
+> > 
+> > $ sudo apt-get install opam camlp4-extra aspcud
+> > $ opam init -a
+> > $ opam install mirage -y
+> > $ eval `opam config env`
+> > 
+> > At this point some packages have been installed and mirage is installed.
+> > 
+> > Now however, if I use mirage it invokes opam install again and packages
+> > are reinstalled as a duplicate.  See below:
+> > 
+> > opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+> > [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+> > [NOTE] Package lwt is already installed (current version is 2.4.6).
+> > [NOTE] Package io-page is already installed (current version is 1.1.1).
+> > [NOTE] Package cstruct is already installed (current version is 1.4.0).
+> > [NOTE] Package crunch is already installed (current version is 1.3.0).
+> > [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+> > The following actions will be performed:
+> >  - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+> >  - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install base-bigarray.base [required by cowabloga]
+> >  - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install xmlm.1.2.0 [required by cowabloga]
+> >  - install uutf.0.9.3 [required by cowabloga]
+> >  - install stringext.1.1.0 [required by cowabloga, mirage-http]
+> >  - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install re.1.2.2 [required by cowabloga, mirage-http]
+> >  - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install hex.0.1.0 [required by cowabloga]
+> >  - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+> >  - install base64.1.0.0 [required by cowabloga, mirage-http]
+> >  - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install ulex.1.1 [required by cowabloga]
+> >  - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install omd.1.2.3 [required by cowabloga]
+> >  - install jsonm.0.9.1 [required by cowabloga]
+> >  - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install crunch.1.3.0
+> >  - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+> >  - install dyntype.0.9.0 [required by cowabloga]
+> >  - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install uri.1.7.2 [required by cowabloga, mirage-http]
+> > 
+> > I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+> > gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+> > 
+> > Any inspiration from there from the CUDF interactions in the above gist?
+> > 
+> > -anil
+> > 
+> > > On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> > > 
+> > > I've been trying to reproduce the issue, but things seem fine, sort of:
+> > > 
+> > > From what I could gather:
+> > > * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> > > * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> > > * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> > > 
+> > > Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> > > 
+> > > There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> > > ```
+> > > ===== ERROR while installing ocamlfind.1.5.5 =====
+> > > Internal error:
+> > >  "ocamlfind": command not found.
+> > > ```
+> > > 
+> > > so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> > > 
+> > > Cheers,
+> > > Louis
+> > > 
+> > > 
+> > > [1] https://github.com/ocaml/opam/issues/1683
+> > > [2] https://github.com/ocaml/opam/issues/1658
+> > > 
+> > > - Anil Madhavapeddy, 09/12/2014 11:16 -
+> > >> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> > >> 
+> > >> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> > >> 
+> > >> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> > >> 
+> > >> -anil
+> > >> _______________________________________________
+> > >> opam-devel mailing list
+> > >> opam-devel at lists.ocaml.org
+> > >> http://lists.ocaml.org/listinfo/opam-devel
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> > > 
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From david.allsopp at metastack.com  Thu Dec 11 09:17:17 2014
+From: david.allsopp at metastack.com (David Allsopp)
+Date: Thu, 11 Dec 2014 09:17:17 +0000
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <5123334.al3TCFKHKs@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric>
+ <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>, <5123334.al3TCFKHKs@agaric>
+Message-ID: <48D0749F-FD88-4FB0-A94A-E1EF4A0A4F15@metastack.com>
+
+
+> On 11 Dec 2014, at 01:41, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+
+It is indeed 'funny' the feeling of betrayal which a fully-typing yet broken functional program gives :)
+
+However, rather than introducing version constraints, wouldn't it be better to introduce a mandatory test step to the build process (one which could possibly be disabled when developing opam, but would definitely be enabled when it's being packaged or compiled by users)? Just a minimal program which fails with if Dose isn't behaving as expected (using this bug as the first test case)
+
+
+David
+
+From sylvain+ocaml at le-gall.net  Thu Dec 11 10:01:05 2014
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Thu, 11 Dec 2014 10:01:05 +0000
+Subject: [opam-devel] global installation with opam
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org> <1984064.0AnRkfAlgQ@agaric>
+Message-ID: <CAOCAUGOOq5=L0DwgRgbOSF_OjRTrk9=yx7xbyhrjZP_HFchmug@mail.gmail.com>
+
+IMHO, you can also consider /opt/$NAME because this is a standard place to
+install 3rd party application (e.g. Google Chrome). This is more a place
+for precompiled binaries, but I think it should be fine for system level
+opam as well. In opam2debian (https://github.com/gildor478/opam2debian a
+utility to precompiled a set of opam packages into a .deb archive), I
+install the precompiled binaries in /opt/opam2debian.
+
+Although /usr/local is fine as well. I think Daniel idea to install in
+/usr/local/$NAME is very good.
+
+Regards
+Sylvain
+
+
+
+
+Le Thu Dec 11 2014 at 2:03:57 AM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+a ?crit :
+
+> OPAMROOT has a few drawbacks:
+> * you want the switch root (eg ~/.opam/system) at /usr/local, not the
+> global opamroot which would lead to /usr/local/system/lib. Unless you call
+> your switch "local" and set OPAMROOT to /usr... (DON'T do that ;))
+> * it contains a lot of files you don't actually want in /usr/local (repo
+> caches, all switches, etc.)
+> * even a single switch contains a few extra files we may not want in
+> /usr/local (list of installed packages, pinned packages overlays, etc.)
+>
+> On the bright side, all paths are defined cleanly using module OpamPath,
+> and relocating some parts of a switch to an external directory should'nt be
+> too problematic, as Thomas pointed out. Of course in the meantime, you
+> could use OPAMROOT set as e.g. /shared/opam/ and then
+> ```
+> for dir in sbin bin doc etc lib man share; do
+>   mv /shared/opam/system/$dir/* /usr/local/$dir
+>   rmdir /shared/opam/system/$dir
+>   ln -s /usr/local/$dir /shared/opam/system/$dir
+> done
+> ```
+>
+> Which is kind of what Daniel suggested for `opam link`, if I understood
+> him correctly.
+> The relocation issue may cause some programs to look back to /shared, but
+> that shouldn't be a problem.
+>
+> Cheers,
+> Louis
+>
+> > - Anil Madhavapeddy, 10/12/2014 23:18 -
+> > Thanks for the great writeup Simon!
+> >
+> > I do wonder why Thomas thinks that OPAMROOT is a bad solution though.  It
+> > seems quite clean to me -- you can have an OPAM installation pointing to
+> > (e.g.) /usr/local/opam and either add that your global PATH or symlink
+> binaries
+> > into /usr/local/bin.
+> >
+> > This could be scripted up with a fairly trivial shell script (caveat:
+> that I
+> > haven't actually written).
+> >
+> > -anil
+> >
+> > > On 10 Dec 2014, at 23:12, Thomas Gazagnaire <thomas at gazagnaire.org>
+> wrote:
+> > >
+> > > A (bad) solution is to set change OPAMROOT to an appropriate location.
+> > >
+> > > Thanks for the write-up, this is very helpful to understand the
+> use-cases. I've created https://github.com/ocaml/opam/issues/1895 to
+> track that.
+> > >
+> > > Best,
+> > > Thomas
+> > >
+> > >
+> > >> On 10 Dec 2014, at 13:16, Simon Cruanes <simon.cruanes.2007 at m4x.org>
+> wrote:
+> > >>
+> > >> Hello,
+> > >>
+> > >> Is there a blessed way to install packages system-wide using Opam? I
+> > >> suspect there isn't, so I attached a document [1] that describes my
+> > >> use-cases and what I'm thinking of (of course I know you opam
+> > >> developers are busy).
+> > >>
+> > >> Thanks!
+> > >>
+> > >> Best,
+> > >>
+> > >
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> > >
+> >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141211/3bd07ecb/attachment-0001.html>
+
+From roberto at dicosmo.org  Thu Dec 11 13:56:00 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 11 Dec 2014 14:56:00 +0100
+Subject: [opam-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <5123334.al3TCFKHKs@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric>
+ <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+ <5123334.al3TCFKHKs@agaric>
+Message-ID: <20141211135600.GA30089@traveler>
+
+Just for completeness, here is the info I can confirm after checking with
+the Debian side:
+
+ - in Debian Jessie and Sid, opam 1.2 is now correctly packaged together with
+   aspcud 1.9 and dose 3.3
+
+ - unfortunately, the time-boxed development process of Ubuntu, with a release
+   in mid-October, ended in picking up an inconsistent set of versions of our
+   beloved packages from the Debian timeline; this is not something that only
+   happen to us, it is intrinsically related to these imperfectly aligned
+   processes, and I suppose the Ubuntu people will be quick to act on this,
+   as they are probably used to this kind of events
+
+--
+Roberto
+
+On Thu, Dec 11, 2014 at 10:40:57AM +0900, Louis Gesbert wrote:
+> It's indeed completely broken, that's bad news indeed.
+> 
+> But I confirm my diagnostic: aspcud is not in cause, Dose is (well, or the dose interface in opam 1.1, not trying to put the blame on anyone). The problem happens even without aspcud installed.
+> 
+> Here is the original report: https://github.com/ocaml/opam/issues/1683
+> 
+> Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+> 
+> I filed a bug at https://bugs.launchpad.net/ubuntu/+source/opam/+bug/1401346
+> Hope they can act on it quickly...
+> 
+> Thanks for notifying and helping trace this!
+> Louis
+> 
+> > - Anil Madhavapeddy, 10/12/2014 14:54 -
+> > I just reproduced it by following the referenced bug report.
+> > 
+> > From a fresh Ubuntu 14.10, if I do:
+> > 
+> > $ sudo apt-get install opam camlp4-extra aspcud
+> > $ opam init -a
+> > $ opam install mirage -y
+> > $ eval `opam config env`
+> > 
+> > At this point some packages have been installed and mirage is installed.
+> > 
+> > Now however, if I use mirage it invokes opam install again and packages
+> > are reinstalled as a duplicate.  See below:
+> > 
+> > opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+> > [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+> > [NOTE] Package lwt is already installed (current version is 2.4.6).
+> > [NOTE] Package io-page is already installed (current version is 1.1.1).
+> > [NOTE] Package cstruct is already installed (current version is 1.4.0).
+> > [NOTE] Package crunch is already installed (current version is 1.3.0).
+> > [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+> > The following actions will be performed:
+> >  - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+> >  - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install base-bigarray.base [required by cowabloga]
+> >  - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install xmlm.1.2.0 [required by cowabloga]
+> >  - install uutf.0.9.3 [required by cowabloga]
+> >  - install stringext.1.1.0 [required by cowabloga, mirage-http]
+> >  - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install re.1.2.2 [required by cowabloga, mirage-http]
+> >  - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install hex.0.1.0 [required by cowabloga]
+> >  - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+> >  - install base64.1.0.0 [required by cowabloga, mirage-http]
+> >  - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install ulex.1.1 [required by cowabloga]
+> >  - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install omd.1.2.3 [required by cowabloga]
+> >  - install jsonm.0.9.1 [required by cowabloga]
+> >  - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install crunch.1.3.0
+> >  - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+> >  - install dyntype.0.9.0 [required by cowabloga]
+> >  - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >  - install uri.1.7.2 [required by cowabloga, mirage-http]
+> > 
+> > I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+> > gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+> > 
+> > Any inspiration from there from the CUDF interactions in the above gist?
+> > 
+> > -anil
+> > 
+> > > On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> > > 
+> > > I've been trying to reproduce the issue, but things seem fine, sort of:
+> > > 
+> > > From what I could gather:
+> > > * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> > > * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> > > * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> > > 
+> > > Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> > > 
+> > > There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> > > ```
+> > > ===== ERROR while installing ocamlfind.1.5.5 =====
+> > > Internal error:
+> > >  "ocamlfind": command not found.
+> > > ```
+> > > 
+> > > so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> > > 
+> > > Cheers,
+> > > Louis
+> > > 
+> > > 
+> > > [1] https://github.com/ocaml/opam/issues/1683
+> > > [2] https://github.com/ocaml/opam/issues/1658
+> > > 
+> > > - Anil Madhavapeddy, 09/12/2014 11:16 -
+> > >> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> > >> 
+> > >> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> > >> 
+> > >> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> > >> 
+> > >> -anil
+> > >> _______________________________________________
+> > >> opam-devel mailing list
+> > >> opam-devel at lists.ocaml.org
+> > >> http://lists.ocaml.org/listinfo/opam-devel
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> > > 
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From daniel.buenzli at erratique.ch  Thu Dec 11 21:44:46 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 11 Dec 2014 22:44:46 +0100
+Subject: [opam-devel] global installation with opam
+In-Reply-To: <1984064.0AnRkfAlgQ@agaric>
+References: <20141210131622.GE29376@emmental.inria.fr>
+ <1B3FD5A8-D776-4B37-83AB-88C782CF395C@gazagnaire.org>
+ <485C71D3-1732-46FE-8BC2-CA18C33161FC@recoil.org>
+ <1984064.0AnRkfAlgQ@agaric>
+Message-ID: <DECF3AE99ECF4242A4D7E63E90C04ADF@erratique.ch>
+
+Le jeudi, 11 d?cembre 2014 ? 02:03, Louis Gesbert a ?crit :
+> Which is kind of what Daniel suggested for `opam link`, if I understood him correctly.
+
+To expand a little bit. I think that any switch should get the capability of having another prefix associated, e.g. `opam switch link SWITCH PATH`.
+
+Once this has been issued any `opam {un,re,}install` in that SWITCH will also add/remove/update symlinks of the packages installation files in PATH.  
+
+One of the main problem (w.r.t. to opam getting more ocaml agnostic) I guess would be the need to perform surgery on lib/findlib.conf and any kind of package relying on absolute install paths ? it would be interesting to know how homebrew or gnu stow handle these.  
+
+Best,
+
+Daniel
+
+
+
+
+From anil at recoil.org  Fri Dec 12 15:32:54 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 12 Dec 2014 15:32:54 +0000
+Subject: [opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+In-Reply-To: <20141211135600.GA30089@traveler>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <5416267.uz7Mnlar5D@agaric> <4CF6C0CD-9BF9-4976-ACE9-71110CE042DA@recoil.org>
+ <5123334.al3TCFKHKs@agaric> <20141211135600.GA30089@traveler>
+Message-ID: <E562EC10-4747-44D9-8672-B61CA2764FA4@recoil.org>
+
+Excellent detective work all around -- thanks for helping to pin this down,
+Louis and Roberto.  Ideally Ubuntu will just upgrade to OPAM 1.2 rather than
+just fix Dose
+
+Louis -- can we do anything in OPAM 1.2 to ensure that packagers don't get
+this mixed up in the future via a failing configure script, as David suggests?
+In OpenBSD, I elected to import the -full archive rather than piecemeal
+packaging of the libraries required to build OPAM.
+
+-anil
+
+
+> On 11 Dec 2014, at 13:56, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> 
+> Just for completeness, here is the info I can confirm after checking with
+> the Debian side:
+> 
+> - in Debian Jessie and Sid, opam 1.2 is now correctly packaged together with
+>   aspcud 1.9 and dose 3.3
+> 
+> - unfortunately, the time-boxed development process of Ubuntu, with a release
+>   in mid-October, ended in picking up an inconsistent set of versions of our
+>   beloved packages from the Debian timeline; this is not something that only
+>   happen to us, it is intrinsically related to these imperfectly aligned
+>   processes, and I suppose the Ubuntu people will be quick to act on this,
+>   as they are probably used to this kind of events
+> 
+> --
+> Roberto
+> 
+> On Thu, Dec 11, 2014 at 10:40:57AM +0900, Louis Gesbert wrote:
+>> It's indeed completely broken, that's bad news indeed.
+>> 
+>> But I confirm my diagnostic: aspcud is not in cause, Dose is (well, or the dose interface in opam 1.1, not trying to put the blame on anyone). The problem happens even without aspcud installed.
+>> 
+>> Here is the original report: https://github.com/ocaml/opam/issues/1683
+>> 
+>> Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+>> 
+>> I filed a bug at https://bugs.launchpad.net/ubuntu/+source/opam/+bug/1401346
+>> Hope they can act on it quickly...
+>> 
+>> Thanks for notifying and helping trace this!
+>> Louis
+>> 
+>>> - Anil Madhavapeddy, 10/12/2014 14:54 -
+>>> I just reproduced it by following the referenced bug report.
+>>> 
+>>> From a fresh Ubuntu 14.10, if I do:
+>>> 
+>>> $ sudo apt-get install opam camlp4-extra aspcud
+>>> $ opam init -a
+>>> $ opam install mirage -y
+>>> $ eval `opam config env`
+>>> 
+>>> At this point some packages have been installed and mirage is installed.
+>>> 
+>>> Now however, if I use mirage it invokes opam install again and packages
+>>> are reinstalled as a duplicate.  See below:
+>>> 
+>>> opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+>>> [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+>>> [NOTE] Package lwt is already installed (current version is 2.4.6).
+>>> [NOTE] Package io-page is already installed (current version is 1.1.1).
+>>> [NOTE] Package cstruct is already installed (current version is 1.4.0).
+>>> [NOTE] Package crunch is already installed (current version is 1.3.0).
+>>> [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+>>> The following actions will be performed:
+>>> - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+>>> - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install base-bigarray.base [required by cowabloga]
+>>> - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install xmlm.1.2.0 [required by cowabloga]
+>>> - install uutf.0.9.3 [required by cowabloga]
+>>> - install stringext.1.1.0 [required by cowabloga, mirage-http]
+>>> - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install re.1.2.2 [required by cowabloga, mirage-http]
+>>> - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install hex.0.1.0 [required by cowabloga]
+>>> - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+>>> - install base64.1.0.0 [required by cowabloga, mirage-http]
+>>> - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install ulex.1.1 [required by cowabloga]
+>>> - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install omd.1.2.3 [required by cowabloga]
+>>> - install jsonm.0.9.1 [required by cowabloga]
+>>> - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install crunch.1.3.0
+>>> - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+>>> - install dyntype.0.9.0 [required by cowabloga]
+>>> - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+>>> - install uri.1.7.2 [required by cowabloga, mirage-http]
+>>> 
+>>> I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+>>> gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+>>> 
+>>> Any inspiration from there from the CUDF interactions in the above gist?
+>>> 
+>>> -anil
+>>> 
+>>>> On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+>>>> 
+>>>> I've been trying to reproduce the issue, but things seem fine, sort of:
+>>>> 
+>>>> From what I could gather:
+>>>> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+>>>> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+>>>> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+>>>> 
+>>>> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+>>>> 
+>>>> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+>>>> ```
+>>>> ===== ERROR while installing ocamlfind.1.5.5 =====
+>>>> Internal error:
+>>>> "ocamlfind": command not found.
+>>>> ```
+>>>> 
+>>>> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+>>>> 
+>>>> Cheers,
+>>>> Louis
+>>>> 
+>>>> 
+>>>> [1] https://github.com/ocaml/opam/issues/1683
+>>>> [2] https://github.com/ocaml/opam/issues/1658
+>>>> 
+>>>> - Anil Madhavapeddy, 09/12/2014 11:16 -
+>>>>> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+>>>>> 
+>>>>> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+>>>>> 
+>>>>> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+>>>>> 
+>>>>> -anil
+>>>>> _______________________________________________
+>>>>> opam-devel mailing list
+>>>>> opam-devel at lists.ocaml.org
+>>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>>> _______________________________________________
+>>>> opam-devel mailing list
+>>>> opam-devel at lists.ocaml.org
+>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>>> 
+>>> 
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> -- 
+> Roberto Di Cosmo
+> 
+> ------------------------------------------------------------------
+> Professeur               En delegation a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann       
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>      http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+> 
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> Avenue de France
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> 
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+> 
+
+
+From louis.gesbert at ocamlpro.com  Sat Dec 13 01:24:45 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 13 Dec 2014 10:24:45 +0900
+Subject: [opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+In-Reply-To: <E562EC10-4747-44D9-8672-B61CA2764FA4@recoil.org>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <20141211135600.GA30089@traveler>
+ <E562EC10-4747-44D9-8672-B61CA2764FA4@recoil.org>
+Message-ID: <3900186.VCNjxAKEzz@agaric>
+
+For this specific bug,running "make tests" would have been enough (I just tested on my VM). For being defensive and having ./configure refuse newer version of dependencies, the m4 macros don't seem to provide version filtering (only API testing. Here the API was compatible, anyway that would have failed at build-time). Does ocamlfind even provide an easy way to get the version of a package?
+
+But my feeling is that what happened really shouldn't happen -- I mean, a small, but API compatible change, that would cause the older version to break _but not the newer version, just by chance_, so that it could get unnoticed ? What are the odds of this happening _again_ ? ;)
+
+On using the -full archive, that can be a good thing, but it probably won't go well with the Debian/Ubuntu policies. Really, packaging scripts should run "make tests"; not sure if it's worth preventing upgrades in ./configure -- although that at least gives the opportunity to fix ./configure (and hopefully check that nothing is broken) by hand.
+
+Cheers,
+Louis
+
+> - Anil Madhavapeddy, 12/12/2014 15:32 -
+> Excellent detective work all around -- thanks for helping to pin this down,
+> Louis and Roberto.  Ideally Ubuntu will just upgrade to OPAM 1.2 rather than
+> just fix Dose
+> 
+> Louis -- can we do anything in OPAM 1.2 to ensure that packagers don't get
+> this mixed up in the future via a failing configure script, as David suggests?
+> In OpenBSD, I elected to import the -full archive rather than piecemeal
+> packaging of the libraries required to build OPAM.
+> 
+> -anil
+> 
+> 
+> > On 11 Dec 2014, at 13:56, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> > 
+> > Just for completeness, here is the info I can confirm after checking with
+> > the Debian side:
+> > 
+> > - in Debian Jessie and Sid, opam 1.2 is now correctly packaged together with
+> >   aspcud 1.9 and dose 3.3
+> > 
+> > - unfortunately, the time-boxed development process of Ubuntu, with a release
+> >   in mid-October, ended in picking up an inconsistent set of versions of our
+> >   beloved packages from the Debian timeline; this is not something that only
+> >   happen to us, it is intrinsically related to these imperfectly aligned
+> >   processes, and I suppose the Ubuntu people will be quick to act on this,
+> >   as they are probably used to this kind of events
+> > 
+> > --
+> > Roberto
+> > 
+> > On Thu, Dec 11, 2014 at 10:40:57AM +0900, Louis Gesbert wrote:
+> >> It's indeed completely broken, that's bad news indeed.
+> >> 
+> >> But I confirm my diagnostic: aspcud is not in cause, Dose is (well, or the dose interface in opam 1.1, not trying to put the blame on anyone). The problem happens even without aspcud installed.
+> >> 
+> >> Here is the original report: https://github.com/ocaml/opam/issues/1683
+> >> 
+> >> Opam build got broken between 1.1.1-1 (trusty) and 1.1.1-1build3 (utopic) because the dose version was upgraded from 3.1.3-7build1 to 3.2.2-2build1. It's very painful when everything types and compiles after an upgrade, but gets subtly broken :(
+> >> 
+> >> I filed a bug at https://bugs.launchpad.net/ubuntu/+source/opam/+bug/1401346
+> >> Hope they can act on it quickly...
+> >> 
+> >> Thanks for notifying and helping trace this!
+> >> Louis
+> >> 
+> >>> - Anil Madhavapeddy, 10/12/2014 14:54 -
+> >>> I just reproduced it by following the referenced bug report.
+> >>> 
+> >>> From a fresh Ubuntu 14.10, if I do:
+> >>> 
+> >>> $ sudo apt-get install opam camlp4-extra aspcud
+> >>> $ opam init -a
+> >>> $ opam install mirage -y
+> >>> $ eval `opam config env`
+> >>> 
+> >>> At this point some packages have been installed and mirage is installed.
+> >>> 
+> >>> Now however, if I use mirage it invokes opam install again and packages
+> >>> are reinstalled as a duplicate.  See below:
+> >>> 
+> >>> opam install --yes conduit cow cowabloga crunch cstruct io-page lwt mirage-clock-unix mirage-conduit mirage-console mirage-fs-unix mirage-http mirage-net-unix mirage-types mirage-unix tcpip vchan
+> >>> [NOTE] Package mirage-types is already installed (current version is 2.1.0).
+> >>> [NOTE] Package lwt is already installed (current version is 2.4.6).
+> >>> [NOTE] Package io-page is already installed (current version is 1.1.1).
+> >>> [NOTE] Package cstruct is already installed (current version is 1.4.0).
+> >>> [NOTE] Package crunch is already installed (current version is 1.3.0).
+> >>> [WARNING] mirage-unix.2.1.0 references unknown package mirage-profile
+> >>> The following actions will be performed:
+> >>> - install ocamlfind.1.5.5 [required by cowabloga, crunch, mirage-fs-unix, mirage-http]
+> >>> - install base-no-ppx.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install camlp4.4.01.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install base-threads.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install base-bigarray.base [required by cowabloga]
+> >>> - install base-unix.base [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install xmlm.1.2.0 [required by cowabloga]
+> >>> - install uutf.0.9.3 [required by cowabloga]
+> >>> - install stringext.1.1.0 [required by cowabloga, mirage-http]
+> >>> - install ssl.0.4.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install re.1.2.2 [required by cowabloga, mirage-http]
+> >>> - install ounit.2.0.0 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install hex.0.1.0 [required by cowabloga]
+> >>> - install cmdliner.0.9.5 [required by cowabloga, crunch, mirage-http]
+> >>> - install base64.1.0.0 [required by cowabloga, mirage-http]
+> >>> - install base-bytes.legacy [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install ulex.1.1 [required by cowabloga]
+> >>> - install type_conv.111.13.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install optcomp.1.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install omd.1.2.3 [required by cowabloga]
+> >>> - install jsonm.0.9.1 [required by cowabloga]
+> >>> - install lwt.2.4.6 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install crunch.1.3.0
+> >>> - install sexplib.111.25.00 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install fieldslib.109.20.03 [required by cowabloga, mirage-http]
+> >>> - install dyntype.0.9.0 [required by cowabloga]
+> >>> - install ocplib-endian.0.7 [required by cowabloga, mirage-fs-unix, mirage-http]
+> >>> - install uri.1.7.2 [required by cowabloga, mirage-http]
+> >>> 
+> >>> I've not managed to narrow it down further to a smaller test case, but the OPAMDEBUG
+> >>> gist is up at: https://gist.github.com/avsm/62e28b05e2b282ed5fbe
+> >>> 
+> >>> Any inspiration from there from the CUDF interactions in the above gist?
+> >>> 
+> >>> -anil
+> >>> 
+> >>>> On 10 Dec 2014, at 01:15, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> >>>> 
+> >>>> I've been trying to reproduce the issue, but things seem fine, sort of:
+> >>>> 
+> >>>> From what I could gather:
+> >>>> * trusty (14.04LTS) has 1.1 and aspcud 1.8, it works fine
+> >>>> * utopic (14.10, latest) has 1.1 and aspcud 1.9
+> >>>> * vivid (15.04, unreleased) has OPAM 1.2, so it's ok. Recommends aspcud, too
+> >>>> 
+> >>>> Note that there should be no conflict that I know of between OPAM 1.1 and aspcud 1.9 -- it's just that newer OPAM will benefit from the more advanced criteria offered. Where we have been hitting problems on Debian was by compiling with a different version of *Dose* [1] (which has a much less standardised interface).
+> >>>> 
+> >>>> There is still a known issue, though, the missing dependency on m4 that will bite you as soon as you try to install ocamlfind [2] and which is very badly reported with
+> >>>> ```
+> >>>> ===== ERROR while installing ocamlfind.1.5.5 =====
+> >>>> Internal error:
+> >>>> "ocamlfind": command not found.
+> >>>> ```
+> >>>> 
+> >>>> so it would still be nice if they could backport (so that there is a better error) or recommend m4.
+> >>>> 
+> >>>> Cheers,
+> >>>> Louis
+> >>>> 
+> >>>> 
+> >>>> [1] https://github.com/ocaml/opam/issues/1683
+> >>>> [2] https://github.com/ocaml/opam/issues/1658
+> >>>> 
+> >>>> - Anil Madhavapeddy, 09/12/2014 11:16 -
+> >>>>> It looks like the latest Ubuntu has a completely broken OPAM out of the box since it ships with OPAM 1.1.1 and Aspcud 1.9 (which requires OPAM 1.2 due to a changed solver interface).
+> >>>>> 
+> >>>>> This leads to issues such as this: https://github.com/mirage/mirage-skeleton/issues/59
+> >>>>> 
+> >>>>> Does anyone know how to get in touch with Ubuntu folk to request a backport of OPAM 1.2 to Ubuntu 14.10? 
+> >>>>> 
+> >>>>> -anil
+> >>>>> _______________________________________________
+> >>>>> opam-devel mailing list
+> >>>>> opam-devel at lists.ocaml.org
+> >>>>> http://lists.ocaml.org/listinfo/opam-devel
+> >>>> _______________________________________________
+> >>>> opam-devel mailing list
+> >>>> opam-devel at lists.ocaml.org
+> >>>> http://lists.ocaml.org/listinfo/opam-devel
+> >>>> 
+> >>> 
+> >>> _______________________________________________
+> >>> opam-devel mailing list
+> >>> opam-devel at lists.ocaml.org
+> >>> http://lists.ocaml.org/listinfo/opam-devel
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141213/1f6d5639/attachment-0001.html>
+
+From Christophe.Troestler at umons.ac.be  Sat Dec 13 12:27:20 2014
+From: Christophe.Troestler at umons.ac.be (Christophe Troestler)
+Date: Sat, 13 Dec 2014 13:27:20 +0100
+Subject: [opam-devel] [MirageOS-devel] opam 1.1.1 and aspcud 1.9
+In-Reply-To: <3900186.VCNjxAKEzz@agaric>
+References: <20141211135600.GA30089@traveler>
+ <E562EC10-4747-44D9-8672-B61CA2764FA4@recoil.org>	<3900186.VCNjxAKEzz@agaric>
+Message-ID: <20141213.132720.1360309041060667382.Christophe.Troestler@umons.ac.be>
+
+On Sat, 13 Dec 2014 10:24:45 +0900, Louis Gesbert wrote:
+> 
+> For this specific bug,running "make tests" would have been enough (I
+> just tested on my VM). For being defensive and having ./configure
+> refuse newer version of dependencies, the m4 macros don't seem to
+> provide version filtering (only API testing. Here the API was
+> compatible, anyway that would have failed at build-time). Does
+> ocamlfind even provide an easy way to get the version of a package?
+
+$ ocamlfind query -format "%v" lacaml
+7.1.5
+
+From anil at recoil.org  Sat Dec 13 20:35:46 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 13 Dec 2014 20:35:46 +0000
+Subject: [opam-devel] passing through environment variables to builds
+In-Reply-To: <20141205121958.17ae989c@kiwi.local.tld>
+References: <9C185D1B-5700-4E4A-B909-F33A1B36E14C@recoil.org>
+ <9b3d1a596b7313568dc02321d5fd0532@whitequark.org>
+ <20141205121958.17ae989c@kiwi.local.tld>
+Message-ID: <4D606297-76BF-4002-B4C2-7C80E9C2CEBE@recoil.org>
+
+On 5 Dec 2014, at 04:19, ygrek <ygrek at autistici.org> wrote:
+> 
+> On Thu, 04 Dec 2014 23:19:00 +0300
+> Peter Zotov <whitequark at whitequark.org> wrote:
+> 
+>> I believe this should be done at the compiler level. Requiring every
+>> native package to figure out what CFLAGS/LDFLAGS the current platform
+>> wants is unreasonable.
+> 
+> Agreed, and that's why (at least) gcc has C_INCLUDE_PATH and LIBRARY_PATH and those
+> should be set by user in the environment (maybe permanently) if he wants to use packages
+> installed in /usr/local or /opt or whatever, and this shouldn't be the deal of package manager
+> to automatically make various paths available to the compiler without user's approval
+> (because that can lead to conflicts if there are several versions of same library installed
+> in different locations), IIUC.
+
+Doing it at the compiler level is orthogonal to the question I
+asked.  It's still very important for a source-level package 
+manager to support flexible passthrough of CFLAGS for other reasons.
+(for instance, to crank up warnings, pass cross-compilation targets,
+ preface CC with static analysis tools, etc...)
+
+Note that I'm not asking for every package to support these.  I'm
+asking how OPAM passes through the variables so that *my* packages
+can support them.
+
+-anil
+
+From david.allsopp at metastack.com  Tue Dec 16 09:53:45 2014
+From: david.allsopp at metastack.com (David Allsopp)
+Date: Tue, 16 Dec 2014 09:53:45 +0000
+Subject: [opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+In-Reply-To: <3900186.VCNjxAKEzz@agaric>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <20141211135600.GA30089@traveler>
+ <E562EC10-4747-44D9-8672-B61CA2764FA4@recoil.org> <3900186.VCNjxAKEzz@agaric>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9785DFE@Remus.metastack.local>
+
+Louis Gesbert wrote:
+> For this specific bug,running "make tests" would have been enough
+> (I just tested on my VM). For being defensive and having ./configure
+> refuse newer version of dependencies, the m4 macros don't seem to
+> provide version filtering (only API testing. Here the API was
+> compatible, anyway that would have failed at build-time). Does
+> ocamlfind even provide an easy way to get the version of a package?
+
+Version filtering isn't what I meant, though - I meant semantic filtering, i.e. a relevant test case which fails for this "broken" version but works in the older versions (or corrected newer versions). IMO, version filtering is something packagers do with package meta-data; developers should use version filtering only because of API changes which isn't applicable here.
+
+> But my feeling is that what happened really shouldn't happen -- I
+> mean, a small, but API compatible change, that would cause the older
+> version to break _but not the newer version, just by chance_, so 
+> that it could get unnoticed ? What are the odds of this happening 
+> _again_ ? ;)
+
+Again, in my opinion, "once bitten, twice shy". My own personal experience is that if something like this has happened it is *very* likely it will happen again (and that's in no way a negative comment on any developers concerned!)
+
+There are plenty of other instances in configure scripts where semantics are tested rather than a version compatibility matrix (usually when probing the C compiler) so I don't think it's too unusual a thing to want to do?
+
+
+David 
+
+From louis.gesbert at ocamlpro.com  Wed Dec 17 01:13:05 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 17 Dec 2014 10:13:05 +0900
+Subject: [opam-devel] [MirageOS-devel]  opam 1.1.1 and aspcud 1.9
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9785DFE@Remus.metastack.local>
+References: <8014D6E0-3AA1-4391-A278-A9D630FB77F2@recoil.org>
+ <3900186.VCNjxAKEzz@agaric>
+ <E51C5B015DBD1348A1D85763337FB6D9E9785DFE@Remus.metastack.local>
+Message-ID: <3966385.O0j2Ln9Ulu@agaric>
+
+ 
+> Again, in my opinion, "once bitten, twice shy". My own personal experience is that if something like this has happened it is *very* likely it will happen again (and that's in no way a negative comment on any developers concerned!)
+> 
+> There are plenty of other instances in configure scripts where semantics are tested rather than a version compatibility matrix (usually when probing the C compiler) so I don't think it's too unusual a thing to want to do?
+
+Yup, I was half-joking... In this case though I have really no idea of what precise aspects of the semantics we may want to check (to be honest, I didn't even dig enough to see what change caused that bug -- because by the time it was done Opam was already fixed ; it's most likely a change in the Debian module, and what I can tell is that we _were_ assuming a consistent cudf-version numbering scheme among slightly different package universes, which wasn't specified. Also, that could well have had that kind of consequences ; but I'm still speculating).
+
+My point was that if we stick to specified APIs, we _shouldn't_ run into that ; as for the semantics, really, I don't see better than running `make tests` for testing them, and shouldn't that sound obvious before shipping a package ?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141217/aa0d13e8/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Wed Dec 17 10:07:40 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 17 Dec 2014 19:07:40 +0900
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+Message-ID: <1986707.pbMrazmXN0@agaric>
+
+Hi all,
+
+with some lag after the 1.2 release, I'd like to open some space for a collective discussion of the priorities for where the energies should go next. We have mainly 3 directions for improvements: first, portability, with the main goal of a Windows version. Second, agnosticity, with the goal to make OPAM more generic, and try and open it to users outside of the OCaml community (wouldn't OPAM for Haskell be fun ?). Third, there are always lots of features and improvements that have been asked for, and would improve the experience of current users.
+
+So here is a summary of what I've gathered. Feel free to add your own.
+
+
+
+## Portability
+
+- **Rewrite parallel command engine.** / done.
+
+- **Native system manipulation (cp, rm, curl...).**
+  These are mostly done through calls to the shell or external programs. It's
+  not very pretty but quite pragmatic actually... until we want to run on
+  Windows without Cygwin. Anyway, this wouldn't be the end of portability
+  issues.
+
+- **Windows support.**
+  for OPAM itself to begin with. This should be pretty close.
+
+- **Packages on Windows.**
+  Locate common issues and attempt to find generic fixes.
+
+- Allow **direct use of more solvers** or solver servers.
+
+- **Support cross-compilation**
+  This is quite an open issue at the moment.
+
+## Agnosticity
+
+- **Isolate OCaml-specific stuff.**
+  E.g. specific opam-file variables. See ocaml-specific.md
+
+- **Separate as plugins**
+  To open the gate to OPAM without these plugins, or with other ones
+
+- **Compilers as packages.**
+  This should mostly work now, but needs some tests and strengthening. The main
+  thing still to do is to handle the system compiler changes properly ; that
+  part should be made more generic anyway (see discussion on hooks)
+
+## Features
+
+- A **provides** field. Generally useful, but particulary so with
+  compilers-as-packages
+
+- Releasing the **"features" field** for easier package configuration
+
+- **Track installed files**
+
+- **Improve security**: just checking md5s is quite light ; package scripts can
+  write anywhere
+
+- **OS-specific handling of dependencies** (eg dependencies on packages from the
+  OS) with plugins (#1519)
+
+- Specify and implement **hooks**
+
+- Find a nicer way to **share dev repos** / undoable "pinning sources"
+
+- **Per-switch remotes**
+
+- **Multi-switch packages**
+
+- Support for (automatic generation of) **binary packages**
+
+- Nicer **ocamlfind interaction**
+
+
+
+Cheers,
+Louis Gesbert
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141217/8b436370/attachment.html>
+
+From simon.cruanes.2007 at m4x.org  Wed Dec 17 10:29:25 2014
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Wed, 17 Dec 2014 11:29:25 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <1986707.pbMrazmXN0@agaric>
+References: <1986707.pbMrazmXN0@agaric>
+Message-ID: <20141217102925.GH4679@emmental.inria.fr>
+
+Hi!
+
+Nice list you have :)
+
+I'll just add my own selfish wish to the "features" list, although it's
+linked to several of your points: having a switch that installes
+system-wide, in /usr/local/, for non-opam users to see.
+
+My two cents on the current list:
+- agnosticity seems mostly useful for porting opam to coq - most other
+  languages have their own package manager. Fine, but is the coq team
+  willing to work on that?
+- the list of features seems the most useful to me (of course, I don't
+  use windows), in particular tracking installed files and improving
+  security, binary packages, and hooks.
+
+Good luck!
+
+Le Wed, 17 Dec 2014, Louis Gesbert a ?crit :
+> Hi all,
+> 
+> with some lag after the 1.2 release, I'd like to open some space for a collective discussion of the priorities for where the energies should go next. We have mainly 3 directions for improvements: first, portability, with the main goal of a Windows version. Second, agnosticity, with the goal to make OPAM more generic, and try and open it to users outside of the OCaml community (wouldn't OPAM for Haskell be fun ?). Third, there are always lots of features and improvements that have been asked for, and would improve the experience of current users.
+> 
+> So here is a summary of what I've gathered. Feel free to add your own.
+> 
+> 
+> 
+> ## Portability
+> 
+> - **Rewrite parallel command engine.** / done.
+> 
+> - **Native system manipulation (cp, rm, curl...).**
+>   These are mostly done through calls to the shell or external programs. It's
+>   not very pretty but quite pragmatic actually... until we want to run on
+>   Windows without Cygwin. Anyway, this wouldn't be the end of portability
+>   issues.
+> 
+> - **Windows support.**
+>   for OPAM itself to begin with. This should be pretty close.
+> 
+> - **Packages on Windows.**
+>   Locate common issues and attempt to find generic fixes.
+> 
+> - Allow **direct use of more solvers** or solver servers.
+> 
+> - **Support cross-compilation**
+>   This is quite an open issue at the moment.
+> 
+> ## Agnosticity
+> 
+> - **Isolate OCaml-specific stuff.**
+>   E.g. specific opam-file variables. See ocaml-specific.md
+> 
+> - **Separate as plugins**
+>   To open the gate to OPAM without these plugins, or with other ones
+> 
+> - **Compilers as packages.**
+>   This should mostly work now, but needs some tests and strengthening. The main
+>   thing still to do is to handle the system compiler changes properly ; that
+>   part should be made more generic anyway (see discussion on hooks)
+> 
+> ## Features
+> 
+> - A **provides** field. Generally useful, but particulary so with
+>   compilers-as-packages
+> 
+> - Releasing the **"features" field** for easier package configuration
+> 
+> - **Track installed files**
+> 
+> - **Improve security**: just checking md5s is quite light ; package scripts can
+>   write anywhere
+> 
+> - **OS-specific handling of dependencies** (eg dependencies on packages from the
+>   OS) with plugins (#1519)
+> 
+> - Specify and implement **hooks**
+> 
+> - Find a nicer way to **share dev repos** / undoable "pinning sources"
+> 
+> - **Per-switch remotes**
+> 
+> - **Multi-switch packages**
+> 
+> - Support for (automatic generation of) **binary packages**
+> 
+> - Nicer **ocamlfind interaction**
+> 
+> 
+> 
+> Cheers,
+> Louis Gesbert
+
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+
+-- 
+Simon
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141217/b1f778c7/attachment-0001.sig>
+
+From david.allsopp at metastack.com  Wed Dec 17 10:42:45 2014
+From: david.allsopp at metastack.com (David Allsopp)
+Date: Wed, 17 Dec 2014 10:42:45 +0000
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <1986707.pbMrazmXN0@agaric>
+References: <1986707.pbMrazmXN0@agaric>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E97A49DD@Remus.metastack.local>
+
+My feeling is that full Windows support touches enough files that, whether it's part of opam 1.3 or something later, OS agnosticism in general is probably worth an entire release on its own, just to stop the carpet from moving under you? It'll be very boring for most opam users (well, except for a few hopefully happy Windows users!), but possibly easier to manage?
+
+I haven't had a chance in the last few weeks to work on 'my' Windows port (I was doing some work to detect the build tools environment correctly for opam switch to allow switching between the 4 windows ports within the same opam installation) - hoping to squeeze a day or two in over the Christmas break and then publish.
+
+I'm not very good at extracting git metrics, but my branch (at present from 954d29f, but I'll rebase before publishing) contains 32 commits touching/adding 45 or so source files and changing/adding 2000 lines.
+
+
+David
+
+From: opam-devel [mailto:opam-devel-bounces at lists.ocaml.org] On Behalf Of Louis Gesbert
+Sent: 17 December 2014 10:08
+To: opam-devel at lists.ocaml.org
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+
+
+Hi all,
+
+
+
+with some lag after the 1.2 release, I'd like to open some space for a collective discussion of the priorities for where the energies should go next. We have mainly 3 directions for improvements: first, portability, with the main goal of a Windows version. Second, agnosticity, with the goal to make OPAM more generic, and try and open it to users outside of the OCaml community (wouldn't OPAM for Haskell be fun ?). Third, there are always lots of features and improvements that have been asked for, and would improve the experience of current users.
+
+
+
+So here is a summary of what I've gathered. Feel free to add your own.
+
+
+
+
+
+
+
+## Portability
+
+
+
+- **Rewrite parallel command engine.** / done.
+
+
+
+- **Native system manipulation (cp, rm, curl...).**
+
+These are mostly done through calls to the shell or external programs. It's
+
+not very pretty but quite pragmatic actually... until we want to run on
+
+Windows without Cygwin. Anyway, this wouldn't be the end of portability
+
+issues.
+
+
+
+- **Windows support.**
+
+for OPAM itself to begin with. This should be pretty close.
+
+
+
+- **Packages on Windows.**
+
+Locate common issues and attempt to find generic fixes.
+
+
+
+- Allow **direct use of more solvers** or solver servers.
+
+
+
+- **Support cross-compilation**
+
+This is quite an open issue at the moment.
+
+
+
+## Agnosticity
+
+
+
+- **Isolate OCaml-specific stuff.**
+
+E.g. specific opam-file variables. See ocaml-specific.md
+
+
+
+- **Separate as plugins**
+
+To open the gate to OPAM without these plugins, or with other ones
+
+
+
+- **Compilers as packages.**
+
+This should mostly work now, but needs some tests and strengthening. The main
+
+thing still to do is to handle the system compiler changes properly ; that
+
+part should be made more generic anyway (see discussion on hooks)
+
+
+
+## Features
+
+
+
+- A **provides** field. Generally useful, but particulary so with
+
+compilers-as-packages
+
+
+
+- Releasing the **"features" field** for easier package configuration
+
+
+
+- **Track installed files**
+
+
+
+- **Improve security**: just checking md5s is quite light ; package scripts can
+
+write anywhere
+
+
+
+- **OS-specific handling of dependencies** (eg dependencies on packages from the
+
+OS) with plugins (#1519)
+
+
+
+- Specify and implement **hooks**
+
+
+
+- Find a nicer way to **share dev repos** / undoable "pinning sources"
+
+
+
+- **Per-switch remotes**
+
+
+
+- **Multi-switch packages**
+
+
+
+- Support for (automatic generation of) **binary packages**
+
+
+
+- Nicer **ocamlfind interaction**
+
+
+
+
+
+
+
+Cheers,
+
+Louis Gesbert
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141217/44129206/attachment.html>
+
+From daniel.buenzli at erratique.ch  Wed Dec 17 10:54:31 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 17 Dec 2014 11:54:31 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <20141217102925.GH4679@emmental.inria.fr>
+References: <1986707.pbMrazmXN0@agaric>
+ <20141217102925.GH4679@emmental.inria.fr>
+Message-ID: <7E4DF02D00B846BAABB8EF307BE442B8@erratique.ch>
+
+Le mercredi, 17 d?cembre 2014 ? 11:29, Simon Cruanes a ?crit :
+> - agnosticity seems mostly useful for porting opam to coq - most other
+> languages have their own package manager.
+
+I think it's also useful as a sanity check to ensure you don't specialize for things that are specific to the current state of affairs but could improve in the future (see e.g. PR #1902).  
+
+Best,
+
+Daniel
+
+
+
+From louis.gesbert at ocamlpro.com  Thu Dec 18 09:34:04 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 18 Dec 2014 18:34:04 +0900
+Subject: [opam-devel] installext
+Message-ID: <2206600.btPkzVIT1g@agaric>
+
+Just created https://github.com/AltGr/opam-installext to replace another bunch of shell-scripts. It's an OCaml script supposed to detect the correct flags for "installext", call OPAM to get the system dependencies of the packages supplied on the command-line, and use the system specific command for installing these packages.
+
+This is a rough prototype intended to replace shell-scripts, but hopefully will pave the way to proper handling directly by OPAM, with a plugin architecture [1].
+
+The idea is to have an instance of opam-in-a-box be generated by just
+
+```
+<package-manager> install <stuff> <editors> opam
+opam init
+opam install installext
+opam installext <packages>
+opam install <packages>
+```
+
+with the system stuff done in OCaml and split between opam-installext and opam-user-setup (which should be included in <packages>).
+
+Be aware that the current prototype will call your package manager in non-interactive mode and run shell-scripts from the web.
+
+
+Cheers,
+Louis
+
+
+[1] https://github.com/ocaml/opam/blob/master/doc/design/depexts-plugins
+
+From thomas at gazagnaire.org  Sun Dec 21 11:28:53 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Sun, 21 Dec 2014 11:28:53 +0000
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <1986707.pbMrazmXN0@agaric>
+References: <1986707.pbMrazmXN0@agaric>
+Message-ID: <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+
+Hi,
+
+> - Allow **direct use of more solvers** or solver servers.
+
+If we go this route I really would like to have a proper `opam solver` command (similar to `opam repo` or `opam pin`).
+ 
+> - **Support cross-compilation**
+> This is quite an open issue at the moment.
+
+This needs support on the build system side, so I'm not sure it's a high priority for now on (although it would be *very* nice to have at one point).
+
+Something which would be a bit simpler but very still very useful is to share things between switches: ie. you want to use install things in one switch while using things installed in other ones. Could be used to cross-compile (host / target) but also to have a base ocaml installation with "layers" of different packages (so need to recompile the compiler every-time). Don't have a clear spec of that yet, though.
+
+An other idea related to that: better support for global installation where it would be cool to have some (OCaml) packages installed on the system which are "external" i.e. not managed by opam (so a fixed package version which is not removable). Think mixing both `apt-get install` and `opam install foo`. I guess that's also related to the 'compiler-as-a-package" stuff ...
+ 
+> ## Agnosticity
+
+This bit will not really benefits OCaml users, so it's not a high-priority for now on. But it is good designs principles to keep in mind when adding new features (as Daniel mentioned). It is also interesting if we want more people using opam outside of the OCaml world, but that's an indirect/longer-term target I'd say.
+
+> ## Features
+>  
+> - A **provides** field. Generally useful, but particulary so with
+> compilers-as-packages
+>  
+> - Releasing the **"features" field** for easier package configuration
+
+We need new features to help managing the grow of the number of packages. I think both of these features could help, but as they are interacting with the solver we need to check that we are not doing things too crazy with the solver experts. Having a way to have multiple versions of the same library installed in the same switch could be very cool as well, although again it requires support in ocamlfind/build systems and it will break quite a few assumptions in opam so it won't be very easy to add properly.
+
+> - Specify and implement **hooks**
+
+Would be nice to have (with clear indications to the users than something fancy is happening) but that's not a blocker for opam-doc. 
+>  
+> - Find a nicer way to **share dev repos** / undoable "pinning sources"
+
+What do you mean?
+ 
+> - **Per-switch remotes**
+
+yea! dual is global pinned package which is less useful.
+ 
+> - **Multi-switch packages**
+
+What do you mean?
+
+> - Support for (automatic generation of) **binary packages**
+
+That would be *extremely* useful.
+
+> - Nicer **ocamlfind interaction**
+
+What do you mean?
+
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141221/e217d5f6/attachment.html>
+
+From whitequark at whitequark.org  Sun Dec 21 11:39:00 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 21 Dec 2014 14:39:00 +0300
+Subject: [opam-devel] =?utf-8?q?OPAM_Roadmap_--_what_next_=3F?=
+In-Reply-To: <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+Message-ID: <7820742feb9a45c1d141ca2125ed4508@whitequark.org>
+
+On 2014-12-21 14:28, Thomas Gazagnaire wrote:
+> Hi,
+> 
+>> - Allow **direct use of more solvers** or solver servers.
+> 
+> If we go this route I really would like to have a proper `opam solver`
+> command (similar to `opam repo` or `opam pin`).
+> 
+>> - **Support cross-compilation**
+>> This is quite an open issue at the moment.
+> 
+> This needs support on the build system side, so I'm not sure it's a
+> high priority for now on (although it would be *very* nice to have at
+> one point).
+> 
+> Something which would be a bit simpler but very still very useful is
+> to share things between switches: ie. you want to use install things
+> in one switch while using things installed in other ones. Could be
+> used to cross-compile (host / target) but also to have a base ocaml
+> installation with "layers" of different packages (so need to recompile
+> the compiler every-time). Don't have a clear spec of that yet, though.
+
+I completely agree; this is how opam-android essentially works now.
+https://github.com/whitequark/opam-android/
+
+It still needs per-package tweaks, so I'm not sure it could be 
+automated.
+
+> 
+> An other idea related to that: better support for global installation
+> where it would be cool to have some (OCaml) packages installed on the
+> system which are "external" i.e. not managed by opam (so a fixed
+> package version which is not removable). Think mixing both `apt-get
+> install` and `opam install foo`. I guess that's also related to the
+> 'compiler-as-a-package" stuff ...
+
+That would only work for binaries. I'm not sure how useful would it be.
+
+> Having a way to have
+> multiple versions of the same library installed in the same switch
+> could be very cool as well, although again it requires support in
+> ocamlfind/build systems and it will break quite a few assumptions in
+> opam so it won't be very easy to add properly.
+
+This is an extremely bad idea. It has been tried in RubyGems;
+the conclusion of both users and maintainers is that it should have
+never been added. The main problem is what happens when there are
+many disjoint ranges of possible versions for some package:
+the behavior gets very unexpected.
+
+-- 
+Peter Zotov
+
+From daniel.buenzli at erratique.ch  Sun Dec 21 12:25:26 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 21 Dec 2014 13:25:26 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+Message-ID: <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+
+
+
+Le dimanche, 21 d?cembre 2014 ? 12:28, Thomas Gazagnaire a ?crit :
+
+> Having a way to have multiple versions of the same library installed in the same switch could be very cool as well, although again it requires support in ocamlfind/build systems
+
+I'm not so sure you need anything ocamlfind and/or in the build systems. Wouldn't it be sufficient to install each package in PKG.VERSION directories with PKG symlinked on the latest version ? If your root package name is not specified in the META file then you will be able to name the versioned packages in ocamlfind.
+
+Daniel
+
+
+
+From whitequark at whitequark.org  Sun Dec 21 12:43:39 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 21 Dec 2014 15:43:39 +0300
+Subject: [opam-devel] =?utf-8?q?OPAM_Roadmap_--_what_next_=3F?=
+In-Reply-To: <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+Message-ID: <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+
+On 2014-12-21 15:25, Daniel B?nzli wrote:
+> Le dimanche, 21 d?cembre 2014 ? 12:28, Thomas Gazagnaire a ?crit :
+> 
+>> Having a way to have multiple versions of the same library installed 
+>> in the same switch could be very cool as well, although again it 
+>> requires support in ocamlfind/build systems
+> 
+> I'm not so sure you need anything ocamlfind and/or in the build
+> systems. Wouldn't it be sufficient to install each package in
+> PKG.VERSION directories with PKG symlinked on the latest version ? If
+> your root package name is not specified in the META file then you will
+> be able to name the versioned packages in ocamlfind.
+
+Imagine four packages installed:
+   * B.1
+   * B.2
+   * A.1 depends: B<2
+   * A.2 depends B>=2
+
+Now if you request A.1, the wrong version of B will get pulled in.
+
+> 
+> Daniel
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Peter Zotov
+
+From daniel.buenzli at erratique.ch  Sun Dec 21 13:19:25 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 21 Dec 2014 14:19:25 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+Message-ID: <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+
+
+
+Le dimanche, 21 d?cembre 2014 ? 13:43, Peter Zotov a ?crit :
+
+> Imagine four packages installed:
+> * B.1
+> * B.2
+> * A.1 depends: B<2
+> * A.2 depends B>=2
+>  
+> Now if you request A.1, the wrong version of B will get pulled in.
+Request through what ? I think your scenario is underspecified. If A.1's META file specifies that it requires B.1 then B.1 will be pulled in.
+
+Daniel
+
+
+
+From whitequark at whitequark.org  Sun Dec 21 13:26:49 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 21 Dec 2014 16:26:49 +0300
+Subject: [opam-devel] =?utf-8?q?OPAM_Roadmap_--_what_next_=3F?=
+In-Reply-To: <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+Message-ID: <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+
+On 2014-12-21 16:19, Daniel B?nzli wrote:
+> Le dimanche, 21 d?cembre 2014 ? 13:43, Peter Zotov a ?crit :
+> 
+>> Imagine four packages installed:
+>> * B.1
+>> * B.2
+>> * A.1 depends: B<2
+>> * A.2 depends B>=2
+>> 
+>> Now if you request A.1, the wrong version of B will get pulled in.
+> 
+> Request through what ? I think your scenario is underspecified. If
+> A.1's META file specifies that it requires B.1 then B.1 will be pulled
+> in.
+
+Through ocamlfind, of course, there's nothing else now.
+
+Sure. But note that ocamlfind explicitly refuses to deal with versioning
+constraints; it's even in the manual. So the dependencies of neither
+A.1 nor A.2 are not expressible in META.
+
+Additionally, this requires more work from package maintainers, and
+I can't imagine how to convince them to do it. (I do not think
+it is possible to automatically infer those from opam fields.)
+
+-- 
+Peter Zotov
+
+From talex5 at gmail.com  Sun Dec 21 13:37:34 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Sun, 21 Dec 2014 13:37:34 +0000
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+Message-ID: <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+
+On 21 December 2014 at 13:26, Peter Zotov <whitequark at whitequark.org> wrote:
+> On 2014-12-21 16:19, Daniel B?nzli wrote:
+>>
+>> Le dimanche, 21 d?cembre 2014 ? 13:43, Peter Zotov a ?crit :
+>>
+>>> Imagine four packages installed:
+>>> * B.1
+>>> * B.2
+>>> * A.1 depends: B<2
+>>> * A.2 depends B>=2
+>>>
+>>> Now if you request A.1, the wrong version of B will get pulled in.
+>>
+>>
+>> Request through what ? I think your scenario is underspecified. If
+>> A.1's META file specifies that it requires B.1 then B.1 will be pulled
+>> in.
+>
+>
+> Through ocamlfind, of course, there's nothing else now.
+>
+> Sure. But note that ocamlfind explicitly refuses to deal with versioning
+> constraints; it's even in the manual. So the dependencies of neither
+> A.1 nor A.2 are not expressible in META.
+>
+> Additionally, this requires more work from package maintainers, and
+> I can't imagine how to convince them to do it. (I do not think
+> it is possible to automatically infer those from opam fields.)
+
+If the information can't be inferred from opam fields, then how can
+things even work now? Somehow, there must be valid and invalid
+combinations, and it must be possible to know what they are. e.g. a
+valid (per-build) combination in a world of parallel installs is any
+combination that could be installed now.
+
+FWIW, 0install has always done parallel installs and it hasn't been a
+problem, except that you always have to start your build from a
+0install-aware tool (or an environment created by one). The problem is
+mainly that people want to continue with their current habbits (e.g.
+unpack source archive and run make). Some change in tools or habits is
+needed.
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From daniel.buenzli at erratique.ch  Sun Dec 21 13:51:50 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 21 Dec 2014 14:51:50 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+Message-ID: <8B1D1FFE300E401AB407E8CBF98B67A3@erratique.ch>
+
+
+
+Le dimanche, 21 d?cembre 2014 ? 14:26, Peter Zotov a ?crit :
+
+> Through ocamlfind, of course, there's nothing else now.
+>  
+> Sure. But note that ocamlfind explicitly refuses to deal with versioning
+> constraints; it's even in the manual. So the dependencies of neither
+> A.1 nor A.2 are not expressible in META.
+
+That's the point, I'm not asking ocamlfind to resolve any versioning constraints. It's all based on the name of the package (if . is not allowed in the name then substitute by another character). With this packages are able to specify a dependency on a particular version.  
+
+I don't see that as a long term solution; I hope we can eventually get rid of that hideous naming resolution hydra and menagerie of meta files we have now (which basically means ocamlfind should go). However I suspect that the underlying mecanism (install each package in PKG.VERSION directory) will be similar for whatever replaces the current mess, so there's no harm in having it now.  
+
+Daniel
+
+
+
+From agarwal1975 at gmail.com  Sun Dec 21 15:22:30 2014
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Sun, 21 Dec 2014 10:22:30 -0500
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <8B1D1FFE300E401AB407E8CBF98B67A3@erratique.ch>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <8B1D1FFE300E401AB407E8CBF98B67A3@erratique.ch>
+Message-ID: <CAMu2m2K-3_AFP_x8oDnVjZq7DxMkHeX5s2rOBz24Qmwg0rfRuA@mail.gmail.com>
+
+> Having a way to have multiple versions of the same library installed in
+the same switch could be very cool as well
+
+For websites, I need to pull in various Javascript libraries and CSS
+frameworks, which I can copy into my repo manually or manage with something
+like Bower. However, I'd rather have everything via opam, so I started a
+repo for this [1]. The files of these packages are simply copied at build
+time, and thus there's no reason I couldn't have multiple versions of
+jquery installed at the same time. (I appreciate this is not a priority use
+case.)
+
+[1] https://github.com/solvuu/opam-repo-web
+
+
+
+
+
+On Sun, Dec 21, 2014 at 8:51 AM, Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+>
+>
+>
+> Le dimanche, 21 d?cembre 2014 ? 14:26, Peter Zotov a ?crit :
+>
+> > Through ocamlfind, of course, there's nothing else now.
+> >
+> > Sure. But note that ocamlfind explicitly refuses to deal with versioning
+> > constraints; it's even in the manual. So the dependencies of neither
+> > A.1 nor A.2 are not expressible in META.
+>
+> That's the point, I'm not asking ocamlfind to resolve any versioning
+> constraints. It's all based on the name of the package (if . is not allowed
+> in the name then substitute by another character). With this packages are
+> able to specify a dependency on a particular version.
+>
+> I don't see that as a long term solution; I hope we can eventually get rid
+> of that hideous naming resolution hydra and menagerie of meta files we have
+> now (which basically means ocamlfind should go). However I suspect that the
+> underlying mecanism (install each package in PKG.VERSION directory) will be
+> similar for whatever replaces the current mess, so there's no harm in
+> having it now.
+>
+> Daniel
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141221/ba0ebd3f/attachment.html>
+
+From whitequark at whitequark.org  Sun Dec 21 15:57:17 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 21 Dec 2014 18:57:17 +0300
+Subject: [opam-devel] =?utf-8?q?OPAM_Roadmap_--_what_next_=3F?=
+In-Reply-To: <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+Message-ID: <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+
+On 2014-12-21 16:37, Thomas Leonard wrote:
+> On 21 December 2014 at 13:26, Peter Zotov <whitequark at whitequark.org> 
+> wrote:
+>> On 2014-12-21 16:19, Daniel B?nzli wrote:
+>>> 
+>>> Le dimanche, 21 d?cembre 2014 ? 13:43, Peter Zotov a ?crit :
+>>> 
+>>>> Imagine four packages installed:
+>>>> * B.1
+>>>> * B.2
+>>>> * A.1 depends: B<2
+>>>> * A.2 depends B>=2
+>>>> 
+>>>> Now if you request A.1, the wrong version of B will get pulled in.
+>>> 
+>>> 
+>>> Request through what ? I think your scenario is underspecified. If
+>>> A.1's META file specifies that it requires B.1 then B.1 will be 
+>>> pulled
+>>> in.
+>> 
+>> 
+>> Through ocamlfind, of course, there's nothing else now.
+>> 
+>> Sure. But note that ocamlfind explicitly refuses to deal with 
+>> versioning
+>> constraints; it's even in the manual. So the dependencies of neither
+>> A.1 nor A.2 are not expressible in META.
+>> 
+>> Additionally, this requires more work from package maintainers, and
+>> I can't imagine how to convince them to do it. (I do not think
+>> it is possible to automatically infer those from opam fields.)
+> 
+> If the information can't be inferred from opam fields, then how can
+> things even work now? Somehow, there must be valid and invalid
+> combinations, and it must be possible to know what they are. e.g. a
+> valid (per-build) combination in a world of parallel installs is any
+> combination that could be installed now.
+
+Actually you're right. It will be possible to use the `findlib` files
+in opam repository to infer the mapping.
+
+> 
+> FWIW, 0install has always done parallel installs and it hasn't been a
+> problem, except that you always have to start your build from a
+> 0install-aware tool (or an environment created by one). The problem is
+> mainly that people want to continue with their current habbits (e.g.
+> unpack source archive and run make). Some change in tools or habits is
+> needed.
+
+I still don't see a reason to have multiple versions installed at once
+that would justify the migration cost.
+
+The use case with JS/CSS libraries can easily be handled by mangling
+the name of the package and/or using the "provides" feature.
+
+-- 
+Peter Zotov
+
+From daniel.buenzli at erratique.ch  Sun Dec 21 16:16:45 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 21 Dec 2014 17:16:45 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+ <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+Message-ID: <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+
+
+
+Le dimanche, 21 d?cembre 2014 ? 16:57, Peter Zotov a ?crit :
+
+> I still don't see a reason to have multiple versions installed at once
+> that would justify the migration cost.
+
+You may be working on different projects whose recursive dependencies includes two different versions of a library or you are a library author working on an incompatible release of a library. Both already happened to me and it's painful. Using a switch just for that as it was once suggested to me is painful and error prone, one time out of two you end up starting your build in the wrong switch.  
+
+Daniel
+
+
+
+From whitequark at whitequark.org  Sun Dec 21 16:20:05 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 21 Dec 2014 19:20:05 +0300
+Subject: [opam-devel] =?utf-8?q?OPAM_Roadmap_--_what_next_=3F?=
+In-Reply-To: <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+ <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+ <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+Message-ID: <aa863e116e99077bff4af0e648156450@whitequark.org>
+
+On 2014-12-21 19:16, Daniel B?nzli wrote:
+> Le dimanche, 21 d?cembre 2014 ? 16:57, Peter Zotov a ?crit :
+> 
+>> I still don't see a reason to have multiple versions installed at once
+>> that would justify the migration cost.
+> 
+> You may be working on different projects whose recursive dependencies
+> includes two different versions of a library or you are a library
+> author working on an incompatible release of a library. Both already
+> happened to me and it's painful. Using a switch just for that as it
+> was once suggested to me is painful and error prone, one time out of
+> two you end up starting your build in the wrong switch.
+
+How about having your shell change the switch based on e.g. 
+`.opamswitch`
+file in the project root? I actually want this supported regardless, it
+would be very convenient.
+
+-- 
+Peter Zotov
+
+From daniel.buenzli at erratique.ch  Sun Dec 21 16:58:51 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 21 Dec 2014 17:58:51 +0100
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <aa863e116e99077bff4af0e648156450@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+ <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+ <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+ <aa863e116e99077bff4af0e648156450@whitequark.org>
+Message-ID: <63CE3EFD21734A42AB6309415E658126@erratique.ch>
+
+
+
+Le dimanche, 21 d?cembre 2014 ? 17:20, Peter Zotov a ?crit :
+
+> How about having your shell change the switch based on e.g.
+> `.opamswitch`
+> file in the project root? I actually want this supported regardless, it
+> would be very convenient.
+
+Could be an idea, though it's one more of these implicit things that can bite you when trying to diagnose problems and I don't really look forward in having `opam update` doing different things according to which cwd I'm in ? I wouldn't mind if the switch was really local to the cwd like a git repo is, i.e. the directory really represents the object you want to operate upon, but that's not the really the case here.  
+
+Besides switches are not a lightweight construct from a disk-size, conceptual and UI perspective and I'm not sure that it is the place to solve these problems which are (or will be) quite widespread.  
+
+That being said it would be interesting to have a clear definition of what a switch is (or will be) in opam, especially in the light of compilers as packages, per switch opam repositories, multi-switch packages, globally pinned packages, and what not.  
+
+Daniel
+
+From amc79 at cam.ac.uk  Sun Dec 21 17:35:21 2014
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Sun, 21 Dec 2014 17:35:21 +0000
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <63CE3EFD21734A42AB6309415E658126@erratique.ch>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+ <C03FB00FCD204DFBB7C8EF9C88DB1C49@erratique.ch>
+ <30d16ed15fb13892185e76ca3156286f@whitequark.org>
+ <418E76F4412E401DBDFCB9C2577CA3C9@erratique.ch>
+ <6a39f47b89bf7f310b4ac3e690122cbe@whitequark.org>
+ <CAG4opy_+tOEU4L5_2ZqSEG1tYJot=OB4jrcrVEynKHYbGKnnDA@mail.gmail.com>
+ <f26e0b6a7b0426164532f80be331838b@whitequark.org>
+ <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+ <aa863e116e99077bff4af0e648156450@whitequark.org>
+ <63CE3EFD21734A42AB6309415E658126@erratique.ch>
+Message-ID: <B95BBDFC-B109-4291-B6BE-49E556CECCF8@cam.ac.uk>
+
+
+On 21 Dec 2014, at 16:58, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> That being said it would be interesting to have a clear definition of what a switch is (or will be) in opam, especially in the light of compilers as packages, per switch opam repositories, multi-switch packages, globally pinned packages, and what not.  
+
+I agree and I think it would be useful to draft something as features get developed (i.e. before or as we go, rather than after the fact).  It might help guide the decisions and will help people understand the direction being taken.
+
+From louis.gesbert at ocamlpro.com  Mon Dec 22 02:02:24 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 22 Dec 2014 11:02:24 +0900
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <CAMu2m2K-3_AFP_x8oDnVjZq7DxMkHeX5s2rOBz24Qmwg0rfRuA@mail.gmail.com>
+References: <1986707.pbMrazmXN0@agaric>
+ <8B1D1FFE300E401AB407E8CBF98B67A3@erratique.ch>
+ <CAMu2m2K-3_AFP_x8oDnVjZq7DxMkHeX5s2rOBz24Qmwg0rfRuA@mail.gmail.com>
+Message-ID: <5126995.rFRQb6Jh17@agaric>
+
+Wow! So non-OCaml OPAM is already a reality ! :) (not counting Coq here, which sits on top of OCaml)
+One point for "agnosticity" !
+
+> - Ashish Agarwal, 21/12/2014 10:22 -
+> > Having a way to have multiple versions of the same library installed in
+> the same switch could be very cool as well
+> 
+> For websites, I need to pull in various Javascript libraries and CSS
+> frameworks, which I can copy into my repo manually or manage with something
+> like Bower. However, I'd rather have everything via opam, so I started a
+> repo for this [1]. The files of these packages are simply copied at build
+> time, and thus there's no reason I couldn't have multiple versions of
+> jquery installed at the same time. (I appreciate this is not a priority use
+> case.)
+> 
+> [1] https://github.com/solvuu/opam-repo-web
+> 
+> 
+> 
+> 
+> 
+> On Sun, Dec 21, 2014 at 8:51 AM, Daniel B?nzli <daniel.buenzli at erratique.ch>
+> wrote:
+> >
+> >
+> >
+> > Le dimanche, 21 d?cembre 2014 ? 14:26, Peter Zotov a ?crit :
+> >
+> > > Through ocamlfind, of course, there's nothing else now.
+> > >
+> > > Sure. But note that ocamlfind explicitly refuses to deal with versioning
+> > > constraints; it's even in the manual. So the dependencies of neither
+> > > A.1 nor A.2 are not expressible in META.
+> >
+> > That's the point, I'm not asking ocamlfind to resolve any versioning
+> > constraints. It's all based on the name of the package (if . is not allowed
+> > in the name then substitute by another character). With this packages are
+> > able to specify a dependency on a particular version.
+> >
+> > I don't see that as a long term solution; I hope we can eventually get rid
+> > of that hideous naming resolution hydra and menagerie of meta files we have
+> > now (which basically means ocamlfind should go). However I suspect that the
+> > underlying mecanism (install each package in PKG.VERSION directory) will be
+> > similar for whatever replaces the current mess, so there's no harm in
+> > having it now.
+> >
+> > Daniel
+> >
+> >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> >
+
+From louis.gesbert at ocamlpro.com  Mon Dec 22 02:32:57 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 22 Dec 2014 11:32:57 +0900
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <aa863e116e99077bff4af0e648156450@whitequark.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D7B48122280410FA2CAAC2E15BD9D8B@erratique.ch>
+ <aa863e116e99077bff4af0e648156450@whitequark.org>
+Message-ID: <2353174.W6hsqpCeid@agaric>
+
+> - Peter Zotov, 21/12/2014 19:20 -
+> On 2014-12-21 19:16, Daniel B?nzli wrote:
+> > Le dimanche, 21 d?cembre 2014 ? 16:57, Peter Zotov a ?crit :
+> > 
+> >> I still don't see a reason to have multiple versions installed at once
+> >> that would justify the migration cost.
+> > 
+> > You may be working on different projects whose recursive dependencies
+> > includes two different versions of a library or you are a library
+> > author working on an incompatible release of a library. Both already
+> > happened to me and it's painful. Using a switch just for that as it
+> > was once suggested to me is painful and error prone, one time out of
+> > two you end up starting your build in the wrong switch.
+> 
+> How about having your shell change the switch based on e.g. 
+> `.opamswitch`
+> file in the project root? I actually want this supported regardless, it
+> would be very convenient.
+> 
+
+That's exactly what 'opam-manager' [1] provides ; also, still error-prone, but you can always set a switch in a given shell instance using `eval $(opam config env --switch <switch>)` as mentionned in the FAQ [2] ; I recenlty improved `opam switch` to be much more helpful when you are not in the standard situation.
+
+I agree with Daniel that switches may not be the best solution -- but I am afraid that opening this door is a very bad idea until build and link tools more widely support it.
+
+> - Daniel B?nzli, 21/12/2014 17:58 -
+> That being said it would be interesting to have a clear definition of what a
+> switch is (or will be) in opam, especially in the light of compilers as
+> packages, per switch opam repositories, multi-switch packages, globally
+> pinned packages, and what not.
+
+As I understand it at the moment, a switch is defined by a `.comp` file: this is basically just a set of "base" (e.g. immovable) packages that get installed at creation (we can now count the compiler as one of them). 
+Then, as for the `opam switch` command, a switch is
+- a prefix, and the associated set of environment variables
+- a set of installed packages
+- a set of pinned packages and their definitions
+
+Now, we have built on this quite strong basis for a while with success, so I agree with Daniel that we must be very careful and specify precisely what will be going on before we start breaking the wall between switches -- or even moving more stuff inside them, as with per-switch remotes.
+
+
+[1] https://github.com/hnrgrgr/opam-manager/
+[2] http://opam.ocaml.org/doc/FAQ.html#CanIworkondifferentswitchesatthesametimeindifferentshells
+
+From louis.gesbert at ocamlpro.com  Mon Dec 22 03:28:41 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 22 Dec 2014 12:28:41 +0900
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+References: <1986707.pbMrazmXN0@agaric>
+ <5D1922C8-3A8B-47E9-A159-4008A03D0D59@gazagnaire.org>
+Message-ID: <2227961.WkJkM3pxEo@agaric>
+
+> > - Allow **direct use of more solvers** or solver servers.
+> 
+> If we go this route I really would like to have a proper `opam solver` command (similar to `opam repo` or `opam pin`).
+
+Why not, there is already something that can be stored in ~/.opam/config but without front-end
+
+> > - **Support cross-compilation**
+> > This is quite an open issue at the moment.
+> 
+> This needs support on the build system side, so I'm not sure it's a high priority for now on (although it would be *very* nice to have at one point).
+
+I'm still quite confused on how to get there to be honest. I'd gladly take the time to discuss it with an expert!
+
+> Something which would be a bit simpler but very still very useful is to share things between switches: ie. you want to use install things in one switch while using things installed in other ones. Could be used to cross-compile (host / target) but also to have a base ocaml installation with "layers" of different packages (so need to recompile the compiler every-time). Don't have a clear spec of that yet, though.
+
+Two things here:
+* just using stuff installed in another switch can be done by (manually, at the moment) tweaking your environment. If that's successful, there is a clear workflow, it doesn't add too much complexity (to the user), and we can build a clear interface for that, then we can go. If the problem is that, at the moment, OPAM restricts the environment of the commands it runs too much, we can see how to get through that to get it tested.
+* layering switches: the compilers-as-packages introduces immovable packages, and these can be used for stuff external to the switch as well as the initial installation. So you could well generate a .comp and associated base (immovable) packages that refer to an other existing switch. Remains the problem of upgrade (of the parent switch), but that already needs to be solved to make compilers-as-packages usable with a system compiler.
+
+> An other idea related to that: better support for global installation where it would be cool to have some (OCaml) packages installed on the system which are "external" i.e. not managed by opam (so a fixed package version which is not removable). Think mixing both `apt-get install` and `opam install foo`. I guess that's also related to the 'compiler-as-a-package" stuff ...
+
+Partly solved by the above ; maintaining a parity between system and OPAM packages sounds very tedious though.
+
+> > ## Agnosticity
+> 
+> This bit will not really benefits OCaml users, so it's not a high-priority for now on. But it is good designs principles to keep in mind when adding new features (as Daniel mentioned). It is also interesting if we want more people using opam outside of the OCaml world, but that's an indirect/longer-term target I'd say.
+
+It's indeed something that I always keep in mind -- but note that, the sooner we separate the OCaml stuff in a plugin, the sooner this will be enforced.
+
+> > ## Features
+> >  
+> > - A **provides** field. Generally useful, but particulary so with
+> > compilers-as-packages
+> >  
+> > - Releasing the **"features" field** for easier package configuration
+> 
+> We need new features to help managing the grow of the number of packages. I think both of these features could help, but as they are interacting with the solver we need to check that we are not doing things too crazy with the solver experts. Having a way to have multiple versions of the same library installed in the same switch could be very cool as well, although again it requires support in ocamlfind/build systems and it will break quite a few assumptions in opam so it won't be very easy to add properly.
+
+`provides` is well handled by Cudf and thoroughly used in Debian, so I am not too worried on the solver side (more on the handling of our metadata: it'll break a few assumptions).
+
+`features` on the other hand, as currently designed, doesn't actually interact with the solver, alike depopts. They can be used as variables, but only at package installation time and for user information, not for resolution (don't want to go Turing-complete !).
+
+> > - Specify and implement **hooks**
+> 
+> Would be nice to have (with clear indications to the users than something fancy is happening) but that's not a blocker for opam-doc. 
+
+The discussion at https://github.com/ocaml/opam/issues/1431 is still open, we'd need to get to some consensus on the specification. Now that the main use-case, opam-doc, has taken another road, what is the priority, and remaining use-cases ?
+
+> > - Find a nicer way to **share dev repos** / undoable "pinning sources"
+> 
+> What do you mean?
+
+A dev environment is often made of a bunch of pinned packages, which has many advantages over a custom opam repository. But it's much more difficult to share.
+
+See https://github.com/ocaml/opam/issues/1734
+
+> > - **Per-switch remotes**
+> 
+> yea! dual is global pinned package which is less useful.
+>  
+> > - **Multi-switch packages**
+> 
+> What do you mean?
+
+Being able to install a (binary, I assume) package across switches. Mainly useful for editor tools I guess.
+
+See https://github.com/ocaml/opam/issues/1058
+
+> > - Support for (automatic generation of) **binary packages**
+> 
+> That would be *extremely* useful.
+
+There have been several approaches on this already -- my current idea is a map function on a repository: it would compile every package and generate a corresponding binary archive, at the same time as it generates a corresponding repository (links to the binary archives, no depopts, rewritten deps, etc.)
+Of course you'd need to know with what depopts packages should be built, and there are quite a few related issues.
+
+> > - Nicer **ocamlfind interaction**
+> 
+> What do you mean?
+
+Not sure, but the current duality between OPAM and ocamlfind packages isn't really satisfying.
+
+
+I didn't mention in this list, obviously, ongoing fixes, optimisation, etc. But there is no end to that :)
+
+Best,
+Louis
+
+From sebastien.mondet at gmail.com  Mon Dec 22 14:51:49 2014
+From: sebastien.mondet at gmail.com (Sebastien Mondet)
+Date: Mon, 22 Dec 2014 09:51:49 -0500
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <5126995.rFRQb6Jh17@agaric>
+References: <1986707.pbMrazmXN0@agaric>
+ <8B1D1FFE300E401AB407E8CBF98B67A3@erratique.ch>
+ <CAMu2m2K-3_AFP_x8oDnVjZq7DxMkHeX5s2rOBz24Qmwg0rfRuA@mail.gmail.com>
+ <5126995.rFRQb6Jh17@agaric>
+Message-ID: <CALScVYmYSwTRQU2uCGbV_oxjrQnMSyCq6wUuQBd_wvro9TTzPQ@mail.gmail.com>
+
+On Sun, Dec 21, 2014 at 9:02 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+wrote:
+>
+> Wow! So non-OCaml OPAM is already a reality ! :) (not counting Coq here,
+> which sits on top of OCaml)
+> One point for "agnosticity" !
+>
+>
+
+Just noting, I also experimented with non-OCaml opam repos, for C/C++
+crappy software:
+
+https://github.com/smondet/bfx-opam-repo
+
+- for exectuables to ?see? libraries, I needed the LD_LIBRARY_PATH hack in
+the README
+- to avoid compiling OCaml, I had to create that ?fake? compiler
+
+
+
+
+
+> > - Ashish Agarwal, 21/12/2014 10:22 -
+> > > Having a way to have multiple versions of the same library installed in
+> > the same switch could be very cool as well
+> >
+> > For websites, I need to pull in various Javascript libraries and CSS
+> > frameworks, which I can copy into my repo manually or manage with
+> something
+> > like Bower. However, I'd rather have everything via opam, so I started a
+> > repo for this [1]. The files of these packages are simply copied at build
+> > time, and thus there's no reason I couldn't have multiple versions of
+> > jquery installed at the same time. (I appreciate this is not a priority
+> use
+> > case.)
+> >
+> > [1] https://github.com/solvuu/opam-repo-web
+> >
+> >
+> >
+> >
+> >
+> > On Sun, Dec 21, 2014 at 8:51 AM, Daniel B?nzli <
+> daniel.buenzli at erratique.ch>
+> > wrote:
+> > >
+> > >
+> > >
+> > > Le dimanche, 21 d?cembre 2014 ? 14:26, Peter Zotov a ?crit :
+> > >
+> > > > Through ocamlfind, of course, there's nothing else now.
+> > > >
+> > > > Sure. But note that ocamlfind explicitly refuses to deal with
+> versioning
+> > > > constraints; it's even in the manual. So the dependencies of neither
+> > > > A.1 nor A.2 are not expressible in META.
+> > >
+> > > That's the point, I'm not asking ocamlfind to resolve any versioning
+> > > constraints. It's all based on the name of the package (if . is not
+> allowed
+> > > in the name then substitute by another character). With this packages
+> are
+> > > able to specify a dependency on a particular version.
+> > >
+> > > I don't see that as a long term solution; I hope we can eventually get
+> rid
+> > > of that hideous naming resolution hydra and menagerie of meta files we
+> have
+> > > now (which basically means ocamlfind should go). However I suspect
+> that the
+> > > underlying mecanism (install each package in PKG.VERSION directory)
+> will be
+> > > similar for whatever replaces the current mess, so there's no harm in
+> > > having it now.
+> > >
+> > > Daniel
+> > >
+> > >
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> > >
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20141222/ffa3b728/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Fri Dec 26 01:32:40 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 26 Dec 2014 10:32:40 +0900
+Subject: [opam-devel] OPAM Roadmap -- what next ?
+In-Reply-To: <CALScVYmYSwTRQU2uCGbV_oxjrQnMSyCq6wUuQBd_wvro9TTzPQ@mail.gmail.com>
+References: <1986707.pbMrazmXN0@agaric> <5126995.rFRQb6Jh17@agaric>
+ <CALScVYmYSwTRQU2uCGbV_oxjrQnMSyCq6wUuQBd_wvro9TTzPQ@mail.gmail.com>
+Message-ID: <4454151.uA6izx9jhd@agaric>
+
+Cool!
+On the "fake" compiler, with latest OPAM you should be able to switch "preinstalled" to "false", which should avoid some complications (recompilation if system OCaml is changed...) ;
+and, still in the ".comp" file, you should be able to add:
+
+env: [ "LD_LIBRARY_PATH" += "%{lib}%" ]
+
+to avoid the manual hack.
+
+Best,
+Louis
+
+> - Sebastien Mondet, 22/12/2014 09:51 -
+> On Sun, Dec 21, 2014 at 9:02 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> wrote:
+> >
+> > Wow! So non-OCaml OPAM is already a reality ! :) (not counting Coq here,
+> > which sits on top of OCaml)
+> > One point for "agnosticity" !
+> >
+> >
+> 
+> Just noting, I also experimented with non-OCaml opam repos, for C/C++
+> crappy software:
+> 
+> https://github.com/smondet/bfx-opam-repo
+> 
+> - for exectuables to ?see? libraries, I needed the LD_LIBRARY_PATH hack in
+> the README
+> - to avoid compiling OCaml, I had to create that ?fake? compiler
+> 
+> 
+> 
+> 
+> 
+> > > - Ashish Agarwal, 21/12/2014 10:22 -
+> > > > Having a way to have multiple versions of the same library installed in
+> > > the same switch could be very cool as well
+> > >
+> > > For websites, I need to pull in various Javascript libraries and CSS
+> > > frameworks, which I can copy into my repo manually or manage with
+> > something
+> > > like Bower. However, I'd rather have everything via opam, so I started a
+> > > repo for this [1]. The files of these packages are simply copied at build
+> > > time, and thus there's no reason I couldn't have multiple versions of
+> > > jquery installed at the same time. (I appreciate this is not a priority
+> > use
+> > > case.)
+> > >
+> > > [1] https://github.com/solvuu/opam-repo-web
+> > >
+> > >
+> > >
+> > >
+> > >
+> > > On Sun, Dec 21, 2014 at 8:51 AM, Daniel B?nzli <
+> > daniel.buenzli at erratique.ch>
+> > > wrote:
+> > > >
+> > > >
+> > > >
+> > > > Le dimanche, 21 d?cembre 2014 ? 14:26, Peter Zotov a ?crit :
+> > > >
+> > > > > Through ocamlfind, of course, there's nothing else now.
+> > > > >
+> > > > > Sure. But note that ocamlfind explicitly refuses to deal with
+> > versioning
+> > > > > constraints; it's even in the manual. So the dependencies of neither
+> > > > > A.1 nor A.2 are not expressible in META.
+> > > >
+> > > > That's the point, I'm not asking ocamlfind to resolve any versioning
+> > > > constraints. It's all based on the name of the package (if . is not
+> > allowed
+> > > > in the name then substitute by another character). With this packages
+> > are
+> > > > able to specify a dependency on a particular version.
+> > > >
+> > > > I don't see that as a long term solution; I hope we can eventually get
+> > rid
+> > > > of that hideous naming resolution hydra and menagerie of meta files we
+> > have
+> > > > now (which basically means ocamlfind should go). However I suspect
+> > that the
+> > > > underlying mecanism (install each package in PKG.VERSION directory)
+> > will be
+> > > > similar for whatever replaces the current mess, so there's no harm in
+> > > > having it now.
+> > > >
+> > > > Daniel
+> > > >
+> > > >
+> > > > _______________________________________________
+> > > > opam-devel mailing list
+> > > > opam-devel at lists.ocaml.org
+> > > > http://lists.ocaml.org/listinfo/opam-devel
+> > > >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> >
+
+From anil at recoil.org  Sat Dec 27 19:20:38 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 27 Dec 2014 19:20:38 +0000
+Subject: [opam-devel] opam installext packaged up
+Message-ID: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+
+Hi,
+
+I've been cleaning up some of the bulk building infrastructure, and so have packaged up opam-installext into an OPAM package as Thomas Gazagnaire suggested a while back:
+
+https://github.com/ocaml/opam-repository/pull/3296
+
+Testing and support for more OS distributions would be much appreciated.  When the pull request is merged, you just need to:
+
+    opam update
+    opam install opam-installext
+    opam installext ssl
+
+The configure script is pretty straightforward to edit in the source:
+
+    https://github.com/avsm/opam-installext
+
+If there are no objections, I will transfer this repository to the `ocaml` organisation on GitHub soon for a permanent home.
+
+cheers,
+Anil
+
+From whitequark at whitequark.org  Sat Dec 27 19:36:29 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sat, 27 Dec 2014 22:36:29 +0300
+Subject: [opam-devel] opam installext packaged up
+In-Reply-To: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+References: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+Message-ID: <12bd36a5834798f320a765f5e939eb48@whitequark.org>
+
+On 2014-12-27 22:20, Anil Madhavapeddy wrote:
+> Hi,
+> 
+> I've been cleaning up some of the bulk building infrastructure, and so
+> have packaged up opam-installext into an OPAM package as Thomas
+> Gazagnaire suggested a while back:
+> 
+> https://github.com/ocaml/opam-repository/pull/3296
+
+Nice! The next step is tighter integration with OPAM...
+
+-- 
+Peter Zotov
+
+From anil at recoil.org  Sat Dec 27 21:01:47 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 27 Dec 2014 21:01:47 +0000
+Subject: [opam-devel] opam installext packaged up
+In-Reply-To: <12bd36a5834798f320a765f5e939eb48@whitequark.org>
+References: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+ <12bd36a5834798f320a765f5e939eb48@whitequark.org>
+Message-ID: <DBC4EABA-2B89-4048-8D06-279536CDAAF6@recoil.org>
+
+On 27 Dec 2014, at 19:36, Peter Zotov <whitequark at whitequark.org> wrote:
+> 
+> On 2014-12-27 22:20, Anil Madhavapeddy wrote:
+>> Hi,
+>> I've been cleaning up some of the bulk building infrastructure, and so
+>> have packaged up opam-installext into an OPAM package as Thomas
+>> Gazagnaire suggested a while back:
+>> https://github.com/ocaml/opam-repository/pull/3296
+> 
+> Nice! The next step is tighter integration with OPAM...
+
+Yep -- I just wanted to get all the hacky shell script and OS distro
+detection stuff into a package first, since that will really benefit
+from a wider contribution base.  I couldn't find anything out there
+for doing distro detection from shell scripts -- does anyone know of
+an existing tool to replace the `configure` script in opam-installext?
+
+-a
+
+From whitequark at whitequark.org  Sat Dec 27 21:06:50 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Sun, 28 Dec 2014 00:06:50 +0300
+Subject: [opam-devel] opam installext packaged up
+In-Reply-To: <DBC4EABA-2B89-4048-8D06-279536CDAAF6@recoil.org>
+References: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+ <12bd36a5834798f320a765f5e939eb48@whitequark.org>
+ <DBC4EABA-2B89-4048-8D06-279536CDAAF6@recoil.org>
+Message-ID: <6c4ccd733a1df4c819228a4f6fcc852c@whitequark.org>
+
+On 2014-12-28 00:01, Anil Madhavapeddy wrote:
+> On 27 Dec 2014, at 19:36, Peter Zotov <whitequark at whitequark.org> 
+> wrote:
+>> 
+>> On 2014-12-27 22:20, Anil Madhavapeddy wrote:
+>>> Hi,
+>>> I've been cleaning up some of the bulk building infrastructure, and 
+>>> so
+>>> have packaged up opam-installext into an OPAM package as Thomas
+>>> Gazagnaire suggested a while back:
+>>> https://github.com/ocaml/opam-repository/pull/3296
+>> 
+>> Nice! The next step is tighter integration with OPAM...
+> 
+> Yep -- I just wanted to get all the hacky shell script and OS distro
+> detection stuff into a package first, since that will really benefit
+> from a wider contribution base.  I couldn't find anything out there
+> for doing distro detection from shell scripts -- does anyone know of
+> an existing tool to replace the `configure` script in opam-installext?
+
+To my knowledge, the mechanism you're using is about the best you can 
+do.
+
+-- 
+Peter Zotov
+
+From louis.gesbert at ocamlpro.com  Sun Dec 28 03:10:43 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sun, 28 Dec 2014 12:10:43 +0900
+Subject: [opam-devel] opam installext packaged up
+In-Reply-To: <6c4ccd733a1df4c819228a4f6fcc852c@whitequark.org>
+References: <B7505806-AA3B-4699-BFF2-4900C650825C@recoil.org>
+ <12bd36a5834798f320a765f5e939eb48@whitequark.org>
+ <DBC4EABA-2B89-4048-8D06-279536CDAAF6@recoil.org>
+ <6c4ccd733a1df4c819228a4f6fcc852c@whitequark.org>
+Message-ID: <6074971C-4BD4-4537-A5E6-4E07354E5B95@ocamlpro.com>
+
+Let's synchronize our efforts! I've been doing the same but in OCaml recently; not handling as many archs though.
+
+https://github.com/AltGr/opam-installext
+
+Le 28 d?cembre 2014 06:06:50 UTC+09:00, Peter Zotov <whitequark at whitequark.org> a ?crit :
+>On 2014-12-28 00:01, Anil Madhavapeddy wrote:
+>> On 27 Dec 2014, at 19:36, Peter Zotov <whitequark at whitequark.org> 
+>> wrote:
+>>> 
+>>> On 2014-12-27 22:20, Anil Madhavapeddy wrote:
+>>>> Hi,
+>>>> I've been cleaning up some of the bulk building infrastructure, and
+>
+>>>> so
+>>>> have packaged up opam-installext into an OPAM package as Thomas
+>>>> Gazagnaire suggested a while back:
+>>>> https://github.com/ocaml/opam-repository/pull/3296
+>>> 
+>>> Nice! The next step is tighter integration with OPAM...
+>> 
+>> Yep -- I just wanted to get all the hacky shell script and OS distro
+>> detection stuff into a package first, since that will really benefit
+>> from a wider contribution base.  I couldn't find anything out there
+>> for doing distro detection from shell scripts -- does anyone know of
+>> an existing tool to replace the `configure` script in
+>opam-installext?
+>
+>To my knowledge, the mechanism you're using is about the best you can 
+>do.
+

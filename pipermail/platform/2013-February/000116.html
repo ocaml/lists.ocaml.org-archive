@@ -1,0 +1,274 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBHHBWoqkb3Ctq4k35mhY%3DK3WqGa07tsStffEUPqNUK4Bg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000114.html">
+   <LINK REL="Next"  HREF="000106.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBHHBWoqkb3Ctq4k35mhY%3DK3WqGa07tsStffEUPqNUK4Bg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Feb 26 10:12:04 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000114.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000106.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#116">[ date ]</a>
+              <a href="thread.html#116">[ thread ]</a>
+              <a href="subject.html#116">[ subject ]</a>
+              <a href="author.html#116">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Christophe TROESTLER &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Christophe.Troestler at umons.ac.be</A>&gt; wrote:
+&gt;<i> It seems to me that the openness of namespaces is the only feature I
+</I>&gt;<i> have seen mentioned that modules do not have.  But is the openness of
+</I>&gt;<i> namespaces something considered useful?  What problem does this solves?
+</I>
+If you have a haskell-ish view of module hierarchies as functional
+classification rather than provenance, eg.
+  Data.List
+  Data.Array
+  Data.Array.Mutable
+  Foreign.ForeignPtr
+  Control.Concurrent.IO
+  ...
+
+then having a &quot;merge {Data.{List,Array.Mutable}} with
+{Data.{Array,String}}&quot; is important. This is something open structures
+naturally have, and that is not a good fit for closed structures. The
+discussion for namespaces (before it landed on this list) insisted on
+openness as a distinctive aspect for a while, but then we realized
+that, at the moment of compilation of a single module, all the
+information about the compilation environment in known, so you can
+have a closed view of the world -- even if the world may change
+between compilations. This idea that &quot;once everything is decided you
+are in a closed world again&quot; allows to present (open) namespaces as
+(closed) modules at the source code level if deemed desirable -- see
+<A HREF="http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html">http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html</A>
+
+Summary: &quot;open&quot; is not essential, but &quot;open merge&quot; is an useful
+primitive to have (even in a closed world). You can always locally
+assume that the world is closed, and (locally) close structures are
+simpler to deal with.
+
+&gt;<i> With no doubt, I understand even less about the compiler internals
+</I>&gt;<i> than you do.  Nonetheless, shouldn't these questions receive a
+</I>&gt;<i> definitive answer before we speak about namespaces?  I have heard
+</I>&gt;<i> neither that these things are hard to do.  And, if they are, it would
+</I>&gt;<i> be interesting to understand what features of modules hamper their
+</I>&gt;<i> efficiency as simple containers.  That way, it seems to me, either the
+</I>&gt;<i> technical problems will get solved or what kind of &quot;stripped modules&quot;
+</I>&gt;<i> namespaces must be will emerge naturally.
+</I>
+The reason why this isn't done more is that the people that know well
+about the compiler internals don't want to be bothered with the
+namespace discussion (except Alain, that knows very well about these
+issues and is active, if maybe a bit conservatively so, in the
+discussions), and these questions are full of tedious implementation
+details that even the implementors don't keep all in mind at the same
+time. Some partial answers:
+
+- The reason why packing everything in a single .cmo (compilation
+unit) bloats linking results is that dependencies are handled at a
+granularity of the compilation unit. Relying (dynamically) on the
+module Foo in your source unit will result in a mention of Foo's
+internal name in your compilation unit, and Foo will need to be linked
+as a whole. To reduce the granularity in a principled way, one could
+decide to track dependencies at the definition/structure-item level
+rather than the whole-unit level, but that would be a fairly invasive
+implementation change that has so far been resisted, with unclear (and
+potentially scary) implications of compilation time changes for
+example.
+
+- One should keep in mind that while bytecode compiled files (.cmo and
+.cmi) are easy to deal with, native objects (.cmx and friends) are a
+pain because of portability issues. The reason why we have this
+two-step &quot;-for-pack&quot; then &quot;-pack&quot; process for packing is that
+implementors found that (at the time) MacOS systems couldn't be relied
+on to manipulate and change .cmx files. That's the reason why you need
+to prepare for packing in advance (-for-pack) instead of simply
+packing regularly compiled module. These are the kind of limitation
+you have to work with in linker-related settings.
+
+On Mon, Feb 25, 2013 at 11:37 PM, Christophe TROESTLER
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Christophe.Troestler at umons.ac.be</A>&gt; wrote:
+&gt;<i> On Mon, 25 Feb 2013 16:50:33 -0500, Yaron Minsky wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Feb 25, 2013 at 3:43 PM, Christophe TROESTLER
+</I>&gt;&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Christophe.Troestler at umons.ac.be</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; On Mon, 25 Feb 2013 14:16:03 -0500, Yaron Minsky wrote:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; On Mon, Feb 25, 2013 at 1:04 PM, Daniel B&#252;nzli
+</I>&gt;&gt;<i> &gt;&gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">daniel.buenzli at erratique.ch</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; Le vendredi, 22 f&#233;vrier 2013 &#224; 22:51, Xavier Clerc a &#233;crit :
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; So, as of today, we have :
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; - &quot;archives&quot; (cma / cmxa) allowing to gather modules but without
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; naming (at the language level) the gathering ;
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; - &quot;packs&quot; allowing to gather modules into a module.
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; I regard namespaces are gathering modules into a named entity but
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; without creating a module. Hence, it is a new beast, different from
+</I>&gt;&gt;<i> &gt;&gt; &gt;&gt; archives and packs.
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; So basically a new concept is introduced because &quot;pack&quot; is not
+</I>&gt;&gt;<i> &gt;&gt; &gt; technically satisfying. That's not the way I would like the language
+</I>&gt;&gt;<i> &gt;&gt; &gt; I program in to be designed. I'd rather see the problems pack has
+</I>&gt;&gt;<i> &gt;&gt; &gt; fixed which I'm sure could be done by allowing archives to be named
+</I>&gt;&gt;<i> &gt;&gt; &gt; at the language level as a module.
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; You might be right, but I think there's a deep issue here that
+</I>&gt;&gt;<i> &gt;&gt; shouldn't be dismissed so lightly.  The argument is that modules are
+</I>&gt;&gt;<i> &gt;&gt; simply too powerful to be used as the complete solution to namespace
+</I>&gt;&gt;<i> &gt;&gt; management.  Deciding that the only principled approach is to always
+</I>&gt;&gt;<i> &gt;&gt; pick the most powerful, most general purpose primitive is attractive,
+</I>&gt;&gt;<i> &gt;&gt; but not always sane...
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; That's an interesting take on this.  Would you care to elaborate on
+</I>&gt;&gt;<i> &gt; why a module approach may not be sane?  Is it from a semantic or an
+</I>&gt;&gt;<i> &gt; implementation point of view?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> To be clear: I'm not an expert on the internals of the compiler, and
+</I>&gt;&gt;<i> am mostly repeating claims made by others who are.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> But my understanding is roughly this: we want namespaces to behave
+</I>&gt;&gt;<i> differently than modules currently do: in particular, we need to be
+</I>&gt;&gt;<i> able to depend on only a subset of a namespace, and to track
+</I>&gt;&gt;<i> dependencies within the different components of a namespace.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> One could imagine building these features into modules directly, but
+</I>&gt;&gt;<i> this is hampered by the fact there is a rich set of operators on
+</I>&gt;&gt;<i> modules, for example, you can apply a functor to a module.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> It's of course possible that either (a) one could naturally add these
+</I>&gt;&gt;<i> features to modules directly and thus neatly avoid the need for
+</I>&gt;&gt;<i> another language feature; or (b) that one could have two classes of
+</I>&gt;&gt;<i> modules whose implementations differ under the skin but that present
+</I>&gt;&gt;<i> themselves almost identically to users.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> But I am unaware of anyone who understand the compiler internals who
+</I>&gt;&gt;<i> believes either (a) or (b) is reasonably easy to do.
+</I>&gt;<i>
+</I>&gt;<i> With no doubt, I understand even less about the compiler internals
+</I>&gt;<i> than you do.  Nonetheless, shouldn't these questions receive a
+</I>&gt;<i> definitive answer before we speak about namespaces?  I have heard
+</I>&gt;<i> neither that these things are hard to do.  And, if they are, it would
+</I>&gt;<i> be interesting to understand what features of modules hamper their
+</I>&gt;<i> efficiency as simple containers.  That way, it seems to me, either the
+</I>&gt;<i> technical problems will get solved or what kind of &quot;stripped modules&quot;
+</I>&gt;<i> namespaces must be will emerge naturally.
+</I>&gt;<i>
+</I>&gt;<i> Best,
+</I>&gt;<i> C.
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000114.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000106.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#116">[ date ]</a>
+              <a href="thread.html#116">[ thread ]</a>
+              <a href="subject.html#116">[ subject ]</a>
+              <a href="author.html#116">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

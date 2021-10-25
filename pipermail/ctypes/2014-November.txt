@@ -1,0 +1,234 @@
+From yallop at gmail.com  Mon Nov  3 15:45:59 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 3 Nov 2014 15:45:59 +0000
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt8bARJ7_dNr9qhinnzMMC6ER6YCkAmdCWwoBD4JMZp7tA@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+ <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+ <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+ <CAG-KTt8bARJ7_dNr9qhinnzMMC6ER6YCkAmdCWwoBD4JMZp7tA@mail.gmail.com>
+Message-ID: <CAAxsn=EdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU+CUbRHw@mail.gmail.com>
+
+On 30 October 2014 12:34, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> Thanks for this work! I just got a chance this morning to take a look. This
+> work should save me a ton of time.
+>
+> I'm having problems referencing a cstub'd struct within another cstub'd
+> struct. Looking at the types it doesn't seem that this would work  - the
+> cstubs typ is different than the Ctypes.typ. I reproduced a tiny example in
+> the cstubs test files (diff below).
+
+Right: this is a difficulty with the current approach.  You can work
+round it, of course, by generating each struct via a separate functor,
+but that's terribly clunky, especially where there are self references
+involved.
+
+We really need to embrace the fact that the stub generation approach
+involves staging, and make that explicit in the interface somehow.
+David Sheets and I have considered adding an 'applicative' for staging
+in the past, but I've been reluctant because it makes the interface
+more complicated.
+
+An interface with staging might work as follows: values, and
+specifically values that represent types, are classified as either
+'present' or 'future' according to whether we know about them now or
+whether we have to generate some code to learn about them.  For
+example, 'int' is present, since we know its size etc. now, but
+'struct uv_loop_s' is future: we have to generate some C code to
+determine its properties.  Present values can be used to build either
+present or future values, but future values can only be used to build
+future values: we don't get access to the future in advance.
+
+The interface looks like this:
+
+    https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli
+
+There are a couple of extra functions !^ and <*> for lifting present
+values into the future and for future application, and the structure,
+union, etc. functions now create future typ values rather than values
+of an abstract type.  In practice it looks much the same as before,
+except for a little extra syntactic noise when you use a present value
+in a future definition -- for example, when you build a future struct
+definition with an int field:
+
+   https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli#L16-L17
+
+Is this approach intelligible?  Overly complex?  Thoughts welcome.
+
+From daniel.buenzli at erratique.ch  Mon Nov  3 16:09:42 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 3 Nov 2014 17:09:42 +0100
+Subject: [ocaml-ctypes] Defines,
+ and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=EdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU+CUbRHw@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+ <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+ <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+ <CAG-KTt8bARJ7_dNr9qhinnzMMC6ER6YCkAmdCWwoBD4JMZp7tA@mail.gmail.com>
+ <CAAxsn=EdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU+CUbRHw@mail.gmail.com>
+Message-ID: <D7E3406B113240F0866BA7FA46B2FD99@erratique.ch>
+
+Le lundi, 3 novembre 2014 ? 16:45, Jeremy Yallop a ?crit :
+> Is this approach intelligible? Overly complex? Thoughts welcome.
+
+
+I think the litmus test for these kind of things is whether you get intelligible type error messages.  Understanding those depends both on having good documentation strings for the types and not overly nested types and/or huge polyvars which seems to look ok here.  
+
+But please don't use too many operators, I'd rather have `future` than `^!`, so when I *read* code like:
+
+future f <*> field "bla"   
+
+then well, I know I'm dealing with the future. Having ^! is one other operator to mix-up with the couple of ones ctypes provides.
+
+Best,
+
+Daniel  
+
+
+
+From trevorsummerssmith at gmail.com  Mon Nov  3 21:02:33 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Mon, 3 Nov 2014 16:02:33 -0500
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=EdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU+CUbRHw@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+ <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+ <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+ <CAG-KTt8bARJ7_dNr9qhinnzMMC6ER6YCkAmdCWwoBD4JMZp7tA@mail.gmail.com>
+ <CAAxsn=EdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU+CUbRHw@mail.gmail.com>
+Message-ID: <CAG-KTt_D6JUniMmURLFMfRjyRVT8rvtBgQKu6k0+ZEU0g+1kLA@mail.gmail.com>
+
+Jeremy,
+
+Your interface is kind of cool! There's something kind of fun about your
+futures. However, I do think it adds complexity that perhaps is not needed.
+
+I actually like the approach you suggested (earlier on this thread) of
+using an abstract type and hand-creating accessors to the needed fields. I
+like this approach because it does not add new ideas to the client's head.
+Specifically, it would reuse the notion of an abstract type (which they
+already are familiar with). Then the user needs to 1) ferry the size of the
+type into Ocaml (my example does not currently do this, but this is
+straightforward) and 2) generate the accessor functions (accessor generation
+<https://github.com/trevorsummerssmith/ocaml-libuv/blob/test-lifecycle/lib_gen/libuv_accessor_gen.ml>
+, ml accessors
+<https://github.com/trevorsummerssmith/ocaml-libuv/blob/test-lifecycle/lib_gen/libuv_bindings.ml#L267>).
+The code I wrote is a straightforward proof of concept that repeats a lot
+of information.
+
+However, *hand wave*, I think cstubs could be extended in a relatively
+straightforward manor to generate this staged information, without
+introducing new paradigms into the cstubs interface.
+
+Thoughts? Thanks.
+
+Trevor
+
+On Mon, Nov 3, 2014 at 10:45 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 30 October 2014 12:34, Trevor Smith <trevorsummerssmith at gmail.com>
+> wrote:
+> > Thanks for this work! I just got a chance this morning to take a look.
+> This
+> > work should save me a ton of time.
+> >
+> > I'm having problems referencing a cstub'd struct within another cstub'd
+> > struct. Looking at the types it doesn't seem that this would work  - the
+> > cstubs typ is different than the Ctypes.typ. I reproduced a tiny example
+> in
+> > the cstubs test files (diff below).
+>
+> Right: this is a difficulty with the current approach.  You can work
+> round it, of course, by generating each struct via a separate functor,
+> but that's terribly clunky, especially where there are self references
+> involved.
+>
+> We really need to embrace the fact that the stub generation approach
+> involves staging, and make that explicit in the interface somehow.
+> David Sheets and I have considered adding an 'applicative' for staging
+> in the past, but I've been reluctant because it makes the interface
+> more complicated.
+>
+> An interface with staging might work as follows: values, and
+> specifically values that represent types, are classified as either
+> 'present' or 'future' according to whether we know about them now or
+> whether we have to generate some code to learn about them.  For
+> example, 'int' is present, since we know its size etc. now, but
+> 'struct uv_loop_s' is future: we have to generate some C code to
+> determine its properties.  Present values can be used to build either
+> present or future values, but future values can only be used to build
+> future values: we don't get access to the future in advance.
+>
+> The interface looks like this:
+>
+>
+> https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli
+>
+> There are a couple of extra functions !^ and <*> for lifting present
+> values into the future and for future application, and the structure,
+> union, etc. functions now create future typ values rather than values
+> of an abstract type.  In practice it looks much the same as before,
+> except for a little extra syntactic noise when you use a present value
+> in a future definition -- for example, when you build a future struct
+> definition with an int field:
+>
+>
+> https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli#L16-L17
+>
+> Is this approach intelligible?  Overly complex?  Thoughts welcome.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141103/fc38f9a4/attachment.html>
+
+From trevorsummerssmith at gmail.com  Fri Nov 28 17:09:53 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Fri, 28 Nov 2014 12:09:53 -0500
+Subject: [ocaml-ctypes] Runtime Lock
+Message-ID: <CAG-KTt_iuHwhasWS4t-ZvqkBE=+8A1mSYjnBtOtLjHkdfxAH6g@mail.gmail.com>
+
+Hello,
+
+Following up from a thread "Lifecycle of a callback?" discussed on this
+list: I want to double check my thinking.
+
+The C functions I am calling in libuv mostly do one thing: put a struct
+representing the system call to call, and the callback to run once the
+system call is called, on a queue that another thread will work on. If my
+understanding is correct, the runtime lock would need to be re-acquired
+when the OCaml callback is ran. However, it's not clear to me how to do
+this.
+
+Thoughts? Thanks.
+
+Trevor
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141128/f9c88b11/attachment.html>
+

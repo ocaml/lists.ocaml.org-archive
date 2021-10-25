@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] Improving the state of OCaml on Windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3C5568B746.4050607%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000002.html">
+   <LINK REL="Next"  HREF="000005.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] Improving the state of OCaml on Windows</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3C5568B746.4050607%40etorok.net%3E"
+       TITLE="[wg-windows] Improving the state of OCaml on Windows">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Fri May 29 20:00:22 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000002.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+        <LI>Next message: <A HREF="000005.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#3">[ date ]</a>
+              <a href="thread.html#3">[ thread ]</a>
+              <a href="subject.html#3">[ subject ]</a>
+              <a href="author.html#3">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 05/29/2015 06:10 PM, Thomas Braibant wrote:
+&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> Thanks for joining this working group. Its goal is to find out how to
+</I>&gt;<i> improve the state of OCaml and its ecosystem on Windows.
+</I>&gt;<i> 
+</I>&gt;<i> Some of the tasks that we might address (this list is by no mean
+</I>&gt;<i> meant to be exhaustive nor normative):
+</I>&gt;<i> 
+</I>&gt;<i> - Gather information from the community  about the use of the various
+</I>&gt;<i> versions of OCaml available on Windows, and understand what kind of
+</I>&gt;<i> environment people are working with. (BTW, I think a good way to get
+</I>&gt;<i> the discussion rolling might be to describe each other's setup to use
+</I>&gt;<i> OCaml on Windows.)
+</I>
+I don't use Windows myself at all, but I've been recently asked how to build an OCaml application on windows.
+Here is my very short experience with OCaml on Windows:
+ - I used WODI with Cygwin64/Cygwin32 and OCaml 4.02.1 due to the large number of OCaml and C libraries available (notably Lwt and OpenSSL)
+ - I tried to build my application however it failed due to path errors (more on this below)
+ - I tried building opam from git, and it succeeded, although almost any package I tried to opam install failed to build
+ - for some reason Cygwin64 executables keep crashing
+ - I gave up after WODI was shutdown, waiting until opam has official Windows support 
+
+Path errors
+-----------
+
+The errors looked like this, and it took me a while to figure out that this is because the build system is Cygwin but ocamlfind is a Win32 application
+and has no knowledge of what /cygdrive is:
+ocamlfind: Bad configuration: Cannot mkdir /cygdrive/c/libre/source/_build/lib/ocaml/site-lib\re because a path component does not exist or is not a directory
+File &quot;dynlink_wrapper.ml&quot;, line 1, characters 13-14: Illegal character (\000)
+
+I worked this around by using `cygpath -m` in my build system in a few places, normalizing all paths to use / and replacing symlinks with cp.
+
+The path separators are also mixed (/ vs \, because build system uses / in queries like `pwd`, and Filename.concat uses \),  but IIRC this actually worked.
+I think native Win32 apps might support a path made all of / these days, not sure why we have to go through all the trouble of trying to use \, but as a Unix person I probably miss some details here.
+
+Cygwin64 unreliability
+----------------------
+
+I don't know if the bug is in Windows, Cygwin64 or my VM configuration but the build system itself crashes a lot and randomly
+(there seems to be plenty of RAM available).
+Even things like make.exe or rm.exe crash with: segfault, fork: resource unavailable, exit code -1073741819.
+Restarting the cygwin shell helps sometimes but the errors are soon back, even when using just make -j1.
+The situation was bad enough that I had to repeat the build  4-5 times until it finally succeeded as it kept crashing in different places.
+Someone else tried WODI32 and didn't see such errors there, so that seems like a more reliable build system.
+Was about to report this as a bug in Cygwin64, but next week WODI was shutdown so that ended my Windows testing as well.
+
+Functions not implemented in Unix module
+----------------------------------------
+
+Although the build system was cygwin I got a native Win32 executable apparently, as it failed at runtime as various functions from the Unix module are not implemented.
+Luckily this is all well documented, so after adding some conditional code I was able to make some progress. Would be better if I could override these functions
+with a dummy implementation to make sure I don't get runtime errors.
+
+&gt;<i> 
+</I>&gt;<i> - Finalize OPAM support for Windows (this is listed on the OPAM 1.3
+</I>&gt;<i> roadmap). When this support is in place, many OCaml packages should
+</I>&gt;<i> work out of the box (with the proviso that many packages assume a
+</I>&gt;<i> unix-ish environment for their build system).
+</I>
+Is there a way to have the build system and ocamlfind/ocamlopt/ocamlc agree on the format of paths?
+(i.e. either both of them are Cygwin or both of them native Win32 apps but not a mix)
+
+&gt;<i> 
+</I>&gt;<i> - Discuss how to help package developers improve Windows support. One
+</I>&gt;<i> way to do that could be to provide know-how about how to setup
+</I>&gt;<i> continuous integration on services like Appveyor to check that
+</I>&gt;<i> packages build on typical Windows setups.
+</I>&gt;<i> 
+</I>&gt;<i> - Find a solution for users of WODI, the GODI based OCaml
+</I>&gt;<i> distribution for Windows, which has been shutdown. WODI was able to
+</I>&gt;<i> compile OCaml related software (using Cygwin as an environment), but
+</I>&gt;<i> was also able to install binary packages. (In some cases, some
+</I>&gt;<i> non-trivial patches  were applied to make package usable on Windows.)
+</I>&gt;<i> Some of the sources needed to use WODI are still available, but the
+</I>&gt;<i> system does not work out of the box now that the server has gone
+</I>&gt;<i> offline. With a little work, we might be able to bring it back, to
+</I>&gt;<i> smooth the transition.
+</I>&gt;<i> 
+</I>&gt;<i> - Discuss the state of cross compilation to Windows.
+</I>
+This seems similar to the Android cross-compilation repository:
+<A HREF="https://github.com/vouillon/opam-windows-repository">https://github.com/vouillon/opam-windows-repository</A>
+
+Best regards,
+--Edwin
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000002.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+	<LI>Next message: <A HREF="000005.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#3">[ date ]</a>
+              <a href="thread.html#3">[ thread ]</a>
+              <a href="subject.html#3">[ subject ]</a>
+              <a href="author.html#3">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

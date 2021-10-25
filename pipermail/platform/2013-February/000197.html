@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512FD793.30208%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000195.html">
+   <LINK REL="Next"  HREF="000196.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512FD793.30208%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Thu Feb 28 22:17:55 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000195.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000196.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#197">[ date ]</a>
+              <a href="thread.html#197">[ thread ]</a>
+              <a href="subject.html#197">[ subject ]</a>
+              <a href="author.html#197">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> I agree with your point about settilng deep semantic issues ahead of
+</I>&gt;<i> syntactic one.  I would however submit that the question of whether
+</I>&gt;<i> you should:
+</I>&gt;<i>
+</I>&gt;<i> - Have opens in the language proper, including local opens
+</I>&gt;<i> - Have renames for namespaces in the language proper
+</I>
+Yes, this is  the minimal, and probably agreed on.
+
+The main question whether namespaces are hierarchical or flat is still not
+answered, Flat namespaces are not much of an extension to OCaml and do not
+raise many questions about their semantics.  This is the benefit of Alain's
+proposal---but also its weakness to be limited in expressiveness.
+
+If namespaces are hierarchical, the simplest model is that of a graph where
+inner nodes are namespaces, leave nodes are module objects, edges are
+names (and directed).
+
+One question raised is whether edges should also carry auto-open flags, so
+that whenever a node is opened all other nodes reachable by auto-open edges
+are also opened.  This feature is strongly desired by Yaron, but it raises
+further issues...
+
+There is no reason for having just one such edge. Indeed, the idea is to
+break big modules into smaller ones so that only actually used modules need
+to be linked. The same should hold for auto-open modules.
+
+However, since opening modules is not commutative, auto-open edges must be
+ordered.  This means that the mental model to give to the user is not just
+a directed graph with label edges whose leaves are module objects, as
+described above, but whose edges (at least those flagged auto-opened) are
+also ordered.  I think this is a bit more complicated and not so nice that
+edges need to be both ordered and named...
+
+The problem comes from module leaves.  For inner nodes one could check the
+absence of conflicting names at the end of auto-open edges when building
+namespaces so that the order of opens would not matter.  But one cannot do
+so for leaves, because modules should remain opaque to namespaces (I think),
+hence conflicts cannot be detected when building the namespace,
+
+Yet another question raised by auto-open flags, which Gabriel and I
+discussed  today is how auto-open behaves on access paths.  Assume,
+for instance, a namespace containing:
+
+         ROOT . --Core--&gt; C --Pervasives*--&gt; M
+                           \
+                             --Std*--&gt; S
+
+and that the module M contains a submodule List.  Should the user always
+write Core#Pervasives#List or could he simply write Core#List, since given
+that Pervasives is auto-open it could have just written
+
+            open Core
+            List
+
+to designate module M.List. Indeed, one could expect that both
+
+         let open path in Name
+and
+         path#Name
+
+return the same object.  This way, the ordinary user would not need to know
+about the Pervasives module.  Only the expert user who wishes to open just
+the Pervasives module and not its parent will have to know its existence and
+write
+
+         open Core#Pervasive
+
+Unfortunately, this choice of semantics implies that paths must be
+interpreted in a much more complex way: path#name need not only look at the
+node at path for an edge labeled Name but also at all nodes (recursively)
+reachable by auto-open edges!
+
+With these (small) complications in mind, do we still wish to have
+auto-open edges? It this the good model?
+
+----------------
+
+In their absence, one would have to perform the auto-opens manually, and
+the order of opens would therefore be given by the user.
+
+The reason for auto-opens is to allow the user to just write
+
+         open Core
+
+instead of
+
+         open Core
+         open Pervasive
+         open Std
+
+Perhaps, an alternative to auto-open would be to allow one to write open
+directives in .ns files as well. Then, a file myenv.ns could both build a
+namespace and pre-open some of the nodes, including some of its leaves.  The
+user could then just put something as concise as
+
+         use myenv.ns
+
+at the top of his *.ml files. And if he opens myenv.ns he will have a very
+clear idea of what names should be visible.
+
+Just an idea, which I don't like so much either.  But is shows that there
+are still important details to be thought of and choices to be made.
+
+----------------
+
+Notice that the problem comes from the fact that leaves of namespaces are
+opaque modules (and I think modules should remain opaque to namespaces), and
+as a result conflicting interfaces of modules cannot be detected when
+building a namespace, combined with the fact that the open construct of the
+module language is not itself strict (i.e. it may override bindings) and
+thus does not commute.
+
+         Didier
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000195.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000196.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#197">[ date ]</a>
+              <a href="thread.html#197">[ thread ]</a>
+              <a href="subject.html#197">[ subject ]</a>
+              <a href="author.html#197">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

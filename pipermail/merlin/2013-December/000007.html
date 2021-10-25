@@ -1,0 +1,193 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Merlin-discuss] Merlin's configuration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:merlin%40lists.ocaml.org?Subject=Re%3A%20%5BMerlin-discuss%5D%20Merlin%27s%20configuration&In-Reply-To=%3CCAJ_epFOLVWo%2BLdKJgZ3fmD%3DUffhC7xZN3DGrWs_tVUcKMVohNg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Merlin-discuss] Merlin's configuration</H1>
+    <B>Thomas Refis</B> 
+    <A HREF="mailto:merlin%40lists.ocaml.org?Subject=Re%3A%20%5BMerlin-discuss%5D%20Merlin%27s%20configuration&In-Reply-To=%3CCAJ_epFOLVWo%2BLdKJgZ3fmD%3DUffhC7xZN3DGrWs_tVUcKMVohNg%40mail.gmail.com%3E"
+       TITLE="[Merlin-discuss] Merlin's configuration">thomas.refis
+       </A><BR>
+    <I>Mon Dec  2 18:43:43 GMT 2013</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+Thank you everyone for the quick answer, and sorry for the delay of ours.
+
+  * * *
+
+Gabriel said:
+&gt;<i> I think trying to reimplement the build system's
+</I>&gt;<i> job in Merlin is a dead end. You must defer to the existing build
+</I>&gt;<i> system(s) to provide you this information.'
+</I>
+Yes, we think so too. We wanted to make sure others would agree.
+
+  * * *
+
+Sylvain said:
+&gt;<i> I will be more than happy to help you on the second point to
+</I>&gt;<i> integrate an external process that can ask directly oasis to
+</I>&gt;<i> generate a configuration. I can help you on this project and
+</I>&gt;<i> even help you write the extension.
+</I>
+Thank you!
+We will contact you when we start working on that.
+
+  * * *
+
+Roshan said:
+&gt;<i> A. There should be a way to state this information per file.
+</I>&gt;<i> B. The merlin command should use the same syntax as an ocamlopt
+</I>&gt;<i>    call for expressing the information.
+</I>&gt;<i> C. The information from the command-line in B also be used to
+</I>&gt;<i>    determine other aspects of type checking, e.g. warnings.
+</I>&gt;<i> D. An auxiliary file (.merlin) be used for expressing only things
+</I>&gt;<i>    that the ocamlopt call doesn't express, e.g. (3).
+</I>&gt;<i> E. A running merlin process should accept a command that updates
+</I>&gt;<i>    this information.
+</I>&gt;<i> F. A running merlin process should accept a command that tells it
+</I>&gt;<i>    when a .cmt or .cmi changes, and should update its internal
+</I>&gt;<i>    cache.
+</I>
+A. Yes, that's what we want too, hence this thread.
+
+B. Well, the command does use the same syntax as an ocamlopt call, for
+   example you can call merlin like that :
+
+      ocamlmerlin -I&lt;some dir&gt; -I&lt;some other dir&gt; -w +w32
+
+   Except that's not the way you do it, because you (as an user) never
+   call merlin, your editor does. And your editor just call merlin and
+   then tell him the absolute path of the file currently under
+   edition, and it's then to merlin to find the relevant configuration
+   for this file (at the moment in the associated .merlin).
+   It works that way because you don't want your editor to know the
+   logic of your project.
+
+C. You can already do that.
+
+D. Right.
+
+E. It's already the case.
+
+F. It's already the case.
+
+Roshan said:
+&gt;<i> The thinking behind using an ocamlopt call as the mechanism of
+</I>&gt;<i> expression is that it is already present in all build systems,
+</I>&gt;<i> and is thus very likely to reflect what the build system is
+</I>&gt;<i> actually doing.
+</I>&gt;<i> [...]
+</I>&gt;<i> How should the compilation command be communicated to merlin?
+</I>&gt;<i> There are at least three approaches that one can think of, of
+</I>&gt;<i> which we think the third has several advantages:
+</I>&gt;<i> (i) Write things into files: As you proposed, ...
+</I>&gt;<i> (ii) Have merlin ask the build system: ...
+</I>&gt;<i> (iii) Have the build system notify merlin: ...
+</I>
+Ok so, I'll pass on the first part since (I think) we're more
+interested by the global mechanisms than the concrete syntax.
+
+So, one clarification, I think what we propose is closer to (ii) than
+to (i) : what we want to store in a (unique) file is the information
+merlin needs to retrieve informations from the build system (i.e.
+&quot;call 'oasis setup merlin'&quot; or &quot;send this query to jenga on this
+port&quot;).
+
+I'll comment a bit on (iii), so let me quote it in full :
+
+&gt;<i> Have the build system notify merlin: Merlin can provide a
+</I>&gt;<i> command that the build system calls to communicate the ocamlopt
+</I>&gt;<i> compilation command to the current running instance of
+</I>&gt;<i> merlin. This has the advantage that merlin gets updates whenever
+</I>&gt;<i> the build system needs to recompile files. Further, merlin can be
+</I>&gt;<i> notified of successful build completion of each .ml file.
+</I>
+That could be an option, we could have merlin &quot;listening&quot; for new
+information about the &quot;project state&quot;.
+But I think there are several drawbacks to this:
+
+1/ what if there are several instance of merlin running?
+   You have emacs so you probably have only one instance of emacs
+   running, which in turn has only one merlin subprocessed launched.
+   Which is fine. But I use vim, I have several vim process launched,
+   and with that several instances of merlin.
+   It's gonna be a bit of a pain to tell your build system which
+   instance of merlin it should be talking too.
+
+2/ The build system has no way to know which file merlin is currently
+   handling (except if you provide a way for the build system to ask
+   that information to merlin, but then you need a real protocol and
+   need to seriously extend the existing build systems), so it would
+   feed merlin information about the entire project.
+   Which is what we do at the moment, except this information are
+   &quot;global&quot;, &quot;unprecise&quot; if you want. But we are discussing having
+   information on a &quot;per file&quot; basis, so that's gonna be a bit bigger.
+   Which is fine for the project I write in my cellar. But that's
+   gonna be a whole lot bigger at janestreet for example.
+   How much memory does jenga need to stay in polling mode on your
+   tree?
+
+3/ OMake and/or jenga can be run in polling mode, which is fine for
+   that kind of usage, they can discuss with merlin without user
+   interraction. But people using oasis, ocamlbuild, make would need
+   to call their build system everytime they launch merlin, and
+   everytime the project configuration changes; it's annoying.
+   I'd rather have merlin ask the build system by itself.
+
+As for notifying merlin when a successful build completed, there
+already is a way to do that.
+
+   * * *
+
+There was one last point to Roshan's mail (the &quot;best effort&quot; behavior)
+but that is off-topic. There are certainly things to say on that
+topic, but I think it should be on a thread of its own.
+
+Cheers.
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#7">[ date ]</a>
+              <a href="thread.html#7">[ thread ]</a>
+              <a href="subject.html#7">[ subject ]</a>
+              <a href="author.html#7">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/merlin">More information about the Merlin
+mailing list</a><br>
+</body></html>

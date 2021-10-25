@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Preparing the path for 1.2
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Preparing%20the%20path%20for%201.2&In-Reply-To=%3C10229387.JhaiCQeLLi%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000652.html">
+   <LINK REL="Next"  HREF="000654.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Preparing the path for 1.2</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Preparing%20the%20path%20for%201.2&In-Reply-To=%3C10229387.JhaiCQeLLi%40agaric%3E"
+       TITLE="[opam-devel] Preparing the path for 1.2">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Fri Sep 19 16:19:12 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000652.html">[opam-devel] Preparing the path for 1.2
+</A></li>
+        <LI>Next message: <A HREF="000654.html">[opam-devel] ows reports
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#653">[ date ]</a>
+              <a href="thread.html#653">[ thread ]</a>
+              <a href="subject.html#653">[ subject ]</a>
+              <a href="author.html#653">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le vendredi 19 septembre 2014, 16:09:34 Anil Madhavapeddy a &#233;crit :
+&gt;<i> One thing that worries me is that some people did not see the repo redirection for OPAM 1.1, and this might happen again for 1.2 until we figure out why (I think it might be just that they did a Git init instead of the default).
+</I>
+Probably. I also added the 'repo' file to the 'index.tar.gz' file, which may help even for 1.1.
+
+&gt;<i> Would it make sense to activate the repo redirect to the new branch ahead of the release?
+</I>
+Exactly what I was suggesting :)
+The branch was just for tests, normally what I advised won't need any branching on the git side, only rewrite on the http server side
+
+&gt;<i> The only way we will know if people have moved over is via the HTTP remote (since the Git remote is hosted on GitHub without direct logs).  Which leads on to my next question -- will there be a separate HTTP URL space for 1.1 and 1.2 for the HTTP remote?
+</I>&gt;<i> 
+</I>&gt;<i> cheers,
+</I>&gt;<i> Anil
+</I>&gt;<i> 
+</I>&gt;<i> On 19 Sep 2014, at 16:02, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> &gt; Hi all,
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; As you may know, the 1.2.0 RC2 has just been tagged [1]. However, as discussed at [2], planning the migration of the repository is quite a delicate matter ; this doesn't have to be done at the same time as the release itself, but some confusion may arise if we advertise a new workflow that leads to packages that get refused from the main repo because they're not 1.1 compatible.
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; We tried to improve compatibility for the next release, but for 1.2 there are just too many changes and opam 1.1 _won't_ nicely handle them. So here is how I have been preparing:
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - a batch conversion of the existing repo [7]: not required but useful for 1.2 (adding dev repos for archives held on github, setting ocamlfind deps as build-only, turning depopts constraints to conflicts [3]...). This is useful as a starting point for repo extension and example, and done using scripts in `admin-scripts/` [4]
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - a `admin-scripts/to_1_1.ml` script in opam [5] that can convert a package back to 1.1 format. I successfully tested it on the above repo and with opam 1.1 ; there may be corner cases on new 1.2 opam files that this didn't get into, but these can be caught by Travis before they break.
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - updated admin scripts on the 11-bridge branch of opam.ocaml.org [6]. The new scripts create a duplicate of the repo at opam.ocaml.org/1.1/, branch version-triggered redirects between the two, and apply the above script to the 1.1 repo mirror at every update. This should make it transparent whichever opam version is used.
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - tested the opam.ocaml.org scripts on a local mirror I set up, and they seem to work fine (after _a lot_ of tweaking) ; note that these can be pushed live beforehand, they'll set up the redirects but the translation script doesn't change opam files with `opam-version` &lt; &quot;1.2&quot; so it won't cause any user-visible changes until we actually accept 1.2 opam files in the repo (except for the &quot;permanently redirected&quot; message)
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; What remains to do:
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - setup the opam-repository travis scripts to apply the 1.1 rewrite before testing, for opam versions &lt; 1.2. Only tricky part is to get hold of a recent enough opam-lib to run the script (maybe we could cheat and put a standalone bytecode exe on opam-repository for that ; well one for 4.01 and one for 4.02 since the format changed...). This way PRs to opam-repo containing 1.2 opam files will be correctly tested, as well as the rewrite.
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; - release !
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; Finally, note that I'll be moving across the globe next week, and won't be available for two weeks or so. Everything should be ready to release as soon as I get back.
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; Cheers,
+</I>&gt;<i> &gt; Louis
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; [1] <A HREF="https://github.com/ocaml/opam/releases/tag/1.2.0-rc2">https://github.com/ocaml/opam/releases/tag/1.2.0-rc2</A>
+</I>&gt;<i> &gt; [2] <A HREF="https://github.com/ocaml/opam/issues/1662">https://github.com/ocaml/opam/issues/1662</A>
+</I>&gt;<i> &gt; [3] <A HREF="https://github.com/ocaml/opam/pull/1325">https://github.com/ocaml/opam/pull/1325</A>
+</I>&gt;<i> &gt; [4] <A HREF="https://github.com/ocaml/opam/tree/master/admin-scripts">https://github.com/ocaml/opam/tree/master/admin-scripts</A>
+</I>&gt;<i> &gt; [5] <A HREF="https://github.com/ocaml/opam/pull/1743">https://github.com/ocaml/opam/pull/1743</A>
+</I>&gt;<i> &gt; [6] <A HREF="https://github.com/ocaml/opam.ocaml.org/tree/11-bridge">https://github.com/ocaml/opam.ocaml.org/tree/11-bridge</A>
+</I>&gt;<i> &gt; [7] <A HREF="https://github.com/ocaml/opam-repository/tree/1.2-test">https://github.com/ocaml/opam-repository/tree/1.2-test</A>
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt;  
+</I>&gt;<i> &gt; PS: during the course of these tests, I sadly found out that repo redirect handling in 1.1 wasn't that good: it works at update but not straight-away at init. See comment at <A HREF="https://github.com/ocaml/opam/pull/1744">https://github.com/ocaml/opam/pull/1744</A>
+</I>&gt;<i> &gt; _______________________________________________
+</I>&gt;<i> &gt; opam-devel mailing list
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i> 
+</I>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20140919/7938e8fa/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20140919/7938e8fa/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000652.html">[opam-devel] Preparing the path for 1.2
+</A></li>
+	<LI>Next message: <A HREF="000654.html">[opam-devel] ows reports
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#653">[ date ]</a>
+              <a href="thread.html#653">[ thread ]</a>
+              <a href="subject.html#653">[ subject ]</a>
+              <a href="author.html#653">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

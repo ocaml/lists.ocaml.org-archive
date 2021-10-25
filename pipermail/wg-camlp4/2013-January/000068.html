@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My uses of syntax extension
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C510790C5.8000705%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000063.html">
+   <LINK REL="Next"  HREF="000036.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My uses of syntax extension</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C510790C5.8000705%40frisch.fr%3E"
+       TITLE="[wg-camlp4] My uses of syntax extension">alain at frisch.fr
+       </A><BR>
+    <I>Tue Jan 29 09:05:09 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000063.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+        <LI>Next message: <A HREF="000036.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#68">[ date ]</a>
+              <a href="thread.html#68">[ thread ]</a>
+              <a href="subject.html#68">[ subject ]</a>
+              <a href="author.html#68">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I've given it some thought, but I'm not convinced that it really make 
+sense to introduce an extra intermediate representation of source code, 
+between the parser and the input of the type-checker.  Let's look at 
+where the Parsetree representation is actually used:
+
+- Producers:
+
+    the official parser
+    ast_mapper and ppx rewriters
+    camlp4
+    untypeast
+
+- Consumers:
+
+    the type checker
+    ast_mapper and ppx rewriters
+    depend (could be rewritten to use ast_mapper)
+    ocamlprof (could be rewritten to use ast_mapper)
+
+(I've omitted more exotic consumers: pprintast, eqparsetree, addlabels)
+
+The only important producer is the official parser and the only 
+important consumer is the type checker, so I don't see clearly the 
+benefits of introducing an extra representation in between.  The 
+Parsetree could be improved, in particular to do less desugaring in the 
+parser itself, but I don't see why we could not do it.  It would not 
+increase the complexity of the type checker significantly.
+
+Do you see &quot;big&quot; issues with the Parsetree, which could not be solved 
+without the introduction of a different representation?
+
+Alain
+
+
+
+On 01/28/2013 10:23 PM, Hongbo Zhang wrote:
+&gt;<i>
+</I>&gt;<i> After you doing all those stuff,  I am worried that you may find you
+</I>&gt;<i> just re-implemented a new P4.
+</I>&gt;<i>
+</I>&gt;<i> *I agree that the complexity of extensible parser should be removed,
+</I>&gt;<i>   there's a compromise here.*
+</I>&gt;<i>
+</I>&gt;<i> The ppx*shares the same Intermediate Ast*(It could be improved with more
+</I>&gt;<i> meaningful tags names)  with camlp4 but uses the built in parser.
+</I>&gt;<i>
+</I>&gt;<i> The benefit lies in two aspects:
+</I>&gt;<i>      1. You get the automatically meta filter, quasi-quotation is for free
+</I>&gt;<i>      2. The camlp4 can works well with ppx, the change is incremental,
+</I>&gt;<i> most existing library still works under both cases
+</I>&gt;<i>
+</I>&gt;<i> Introducing an Intermediate Ast also gives you some freedom, the
+</I>&gt;<i> parsetree does a lot of syntax desguaring(to name a few, range patterns,
+</I>&gt;<i> bigarray, string access, array access), you may change
+</I>&gt;<i> the representation of parsetree, but that introduces complexity in other
+</I>&gt;<i> cases, so my suggestion is that we can separate extensible parser part
+</I>&gt;<i> from camlp4, that's absolutely doable, then we share the same
+</I>&gt;<i> intermediate Ast
+</I>&gt;<i>
+</I>&gt;<i> On Mon, Jan 28, 2013 at 4:01 PM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>
+</I>&gt;<i> &lt;mailto:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt;&gt; wrote:
+</I>&gt;<i>
+</I>&gt;<i>         3 parsers actually.
+</I>&gt;<i>         The original parser, the parser to patt, the parser to expr.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>     The original parser isn't necessary for the quotation, and of course
+</I>&gt;<i>     the other two parsers are only both needed if you want the quotation
+</I>&gt;<i>     to work as both a pattern and an expression.
+</I>&gt;<i>
+</I>&gt;<i>     Anyway, my point is that you do not *need* to implement quotations
+</I>&gt;<i>     by parsing to a value and then converting to an AST fragment, in
+</I>&gt;<i>     fact it is often easier not to.
+</I>&gt;<i>
+</I>&gt;<i>     That is not to say that some people might not want to implement
+</I>&gt;<i>     their quotations by parsing to a value and then converting to an AST
+</I>&gt;<i>     fragment. In fact, if they want to use an external parser (over
+</I>&gt;<i>     which they have little control) to parse their quotations then they
+</I>&gt;<i>     may have to do it that way.
+</I>&gt;<i>
+</I>&gt;<i>     For these cases I think there are three options:
+</I>&gt;<i>
+</I>&gt;<i>     1. They can implement conversion functions by hand.
+</I>&gt;<i>
+</I>&gt;<i>     2. They could use some kind of type-conv style extension to
+</I>&gt;<i>     automatically produce the conversion functions. I'm sure such an
+</I>&gt;<i>     extension would be welcomed by other extension authors.
+</I>&gt;<i>
+</I>&gt;<i>     3. If/when some kind of run-time type representation is added to the
+</I>&gt;<i>     language, it could be used to create a generic conversion function.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> -- Regards, Hongbo
+</I>
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000063.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+	<LI>Next message: <A HREF="000036.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#68">[ date ]</a>
+              <a href="thread.html#68">[ thread ]</a>
+              <a href="subject.html#68">[ subject ]</a>
+              <a href="author.html#68">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

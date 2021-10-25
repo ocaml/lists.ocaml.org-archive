@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Making Async play better with others
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Making%20Async%20play%20better%20with%20others&In-Reply-To=%3CCAKYjr2ApDOzFU5Lwmqv1d%3D3zqn7SydpwXM4oGuShhZYNsKcaTQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000943.html">
+   <LINK REL="Next"  HREF="000058.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Making Async play better with others</H1>
+    <B>Alex Feinberg</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Making%20Async%20play%20better%20with%20others&In-Reply-To=%3CCAKYjr2ApDOzFU5Lwmqv1d%3D3zqn7SydpwXM4oGuShhZYNsKcaTQ%40mail.gmail.com%3E"
+       TITLE="Making Async play better with others">feinberg at gmail.com
+       </A><BR>
+    <I>Wed Nov  2 22:13:23 GMT 2011</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000943.html">Making Async play better with others
+</A></li>
+        <LI>Next message: <A HREF="000058.html">Making Async play better with others
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#945">[ date ]</a>
+              <a href="thread.html#945">[ thread ]</a>
+              <a href="subject.html#945">[ subject ]</a>
+              <a href="author.html#945">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+libevent2 is also worth investigating. The &quot;libevent book&quot; explains it
+very well:
+
+<A HREF="http://www.wangafu.net/~nickm/libevent-book/">http://www.wangafu.net/~nickm/libevent-book/</A>
+
+It adds thread safety and, as a result of additional work on the
+Windows/IOCP port, a great deal of bugfixes as compared to libevent1.
+
+Thanks,
+- Alex
+
+On Tue, Nov 1, 2011 at 3:32 AM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at gmail.com</A>&gt; wrote:
+&gt;<i> Poking around a bit more, it looks like libuv uses libev (rather than
+</I>&gt;<i> forking/reimplementing), which makes libuv sound more interesting...
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i> On Tue, Nov 1, 2011 at 6:30 AM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I agree that you want to use one of those libraries if you're programming
+</I>&gt;&gt;<i> against epoll and kqueue. &#160;I'm less sure that you should use them in
+</I>&gt;&gt;<i> preference to select (which, from both some experiments I think Markus Mottl
+</I>&gt;&gt;<i> ran, and other things I've heard is faster for moderate numbers of file
+</I>&gt;&gt;<i> descriptors) is less clear.
+</I>&gt;&gt;<i> But even once you agree you need one of these libraries, it's till not
+</I>&gt;&gt;<i> clear to me how to pick amongst libev, libuv and libevent. &#160;libevent seems
+</I>&gt;&gt;<i> like the most mature, libev is claimed (by the author anyway) to be more
+</I>&gt;&gt;<i> efficient, and libuv seems to treat Windows as a first-class citizen. &#160;This
+</I>&gt;&gt;<i> is to some degree why I like the idea of a pluggable engine, which would
+</I>&gt;&gt;<i> prevent us from needing to commit to a single answer.
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue, Nov 1, 2011 at 6:24 AM, Dmitry Astapov &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dastapov at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I read quite a lot about libev, which seems to be an ancestor of libuv
+</I>&gt;&gt;&gt;<i> while I hunted for bugs in the code which had direct bindings for
+</I>&gt;&gt;&gt;<i> epoll and kqueue. And in my experience, libev handles so many bugs and
+</I>&gt;&gt;&gt;<i> quirky situations in underlying polling mechanisms that one must be
+</I>&gt;&gt;&gt;<i> really, really condfident that he is rejecting libev (or any other
+</I>&gt;&gt;&gt;<i> wrapper) for a good reason (that is, that he would do the same job
+</I>&gt;&gt;&gt;<i> better).
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Just search for EVBACKEND_EPOLL and EVBACKEND_KQUEUE here
+</I>&gt;&gt;&gt;<i> <A HREF="http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod">http://pod.tst.eu/http://cvs.schmorp.de/libev/ev.pod</A> and then look at
+</I>&gt;&gt;&gt;<i> the relevant parts of ev_epoll.c or ev_kqueue.c and think if you want
+</I>&gt;&gt;&gt;<i> to have a walk through this particular minefield :)
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Oct 31, 3:06&#160;pm, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">ymin... at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> &gt; On 31/10/11 14:29, Anil Madhavapeddy wrote:
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; You could combine most of these by basing Async on top of libuv,
+</I>&gt;&gt;&gt;<i> &gt; &gt; which is a superset of libev (the event library that Lwt uses to
+</I>&gt;&gt;&gt;<i> &gt; &gt; abstract network I/O).
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt;<A HREF="https://github.com/joyent/libuv">https://github.com/joyent/libuv</A>
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; Crucially, libuv has good support for the Windows AIO model, and is
+</I>&gt;&gt;&gt;<i> &gt; &gt; also what node.js uses to drive its event loop (so has widespread
+</I>&gt;&gt;&gt;<i> &gt; &gt; usage).
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; At first glance at Core, it looks like many of the Linux-specific
+</I>&gt;&gt;&gt;<i> &gt; &gt; bits like high-res timers and thread scheduling are also covered by
+</I>&gt;&gt;&gt;<i> &gt; &gt; it.
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; How much do you know about the performance and quality of libuv? &#160;I'm
+</I>&gt;&gt;&gt;<i> &gt; always nervous about shimming yet another layer between us and the
+</I>&gt;&gt;&gt;<i> &gt; bare metal.
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; y
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; Anil
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; On 31 Oct 2011, at 14:25, Yaron Minsky wrote:
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; I'm wondering if anyone has opinions on what we should do to make
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; Async more widely applicable. &#160;Here are some issues that jump to
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; mind.
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; - Porting to windows. &#160;People have proposed using libuv to do that.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; - Porting to non-Linux UNIX's: Right now, we depend on Core's
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;Linux_ext module. &#160;I think the dependency is not deep, so
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;conditional compilation might be a way to fix that.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; - Support for other polling mechanisms: like epoll and friends.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;Right
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;now, it's all select. &#160;A pluggable engine mechanism like the one
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; Lwt
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;has could make sense here.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; - Interoperability with Lwt: &#160;It would be nice to make Async and
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; Lwt
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;libraries play together. &#160;Jeremie Dimino suggested that the best
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;thing here might be to build a library for Lwt on top of Async.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;That seems plausible enough, but an engine in the other direction
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; &#160;might be good too.
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; I'm curious if people have opinions as to how to best handle these.
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; I'm in particular wondering about conditional compilation as a
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; solution. &#160;It seems messy, but I'm not sure what would be a better
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; approach. &#160;One thing you could imagine is using first-class
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; modules,
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; where you stored a system-dependent module that provided the
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; OS-specific functionality. &#160;But there's some performance compromise
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; there (probably too small to matter compared to a system-call,
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; though), and I'm not sure it comes out cleaner.
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; y
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; --
+</I>&gt;&gt;&gt;<i> &gt; &gt; &gt; Yaron Minsky
+</I>&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;<i> &gt; --
+</I>&gt;&gt;&gt;<i> &gt; Yaron Minsky
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000943.html">Making Async play better with others
+</A></li>
+	<LI>Next message: <A HREF="000058.html">Making Async play better with others
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#945">[ date ]</a>
+              <a href="thread.html#945">[ thread ]</a>
+              <a href="subject.html#945">[ subject ]</a>
+              <a href="author.html#945">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,1016 @@
+From robert.muller2 at gmail.com  Thu Jan  8 03:41:38 2015
+From: robert.muller2 at gmail.com (Robert Muller)
+Date: Wed, 7 Jan 2015 22:41:38 -0500
+Subject: [ocaml-platform] opam-in-a-box
+Message-ID: <CAKmYin=nZ-w+1jR+OSRjnU=-eMEcvtJqL8JApzvTHEdedH6NpQ@mail.gmail.com>
+
+Greetings. I'm not quite sure where to post this question. I have been
+porting Kenichi Asai's OSX-based Universe library to ubuntu and have run
+into an opam error. Trolling around the internet has not led to a
+solution.  Kenichi's installation instructions were expressed in terms of
+macports + opam:
+
+   -
+
+   sudo port install cairo +x11
+   sudo port install gtk2 +x11
+   sudo port install libgnomecanvas
+   sudo port install pkgconfig
+   opam install ocamlfind
+   opam install conf-gnomecanvas
+   opam install lablgtk
+
+   - Install OCamlMakefile.
+
+   opam install ocaml-makefile
+
+
+I have followed these on ubuntu using apt-get, I believe successfully,
+until I get to the following. Any hints greatly appreciated. - Bob Muller
+--------------------------------
+vagrant at vagrant-ubuntu-trusty-32:/usr/bin$ sudo opam install
+conf-gnomecanvas --verbose
+The following actions will be performed:
+ - install   conf-gnomecanvas.2
+=== 1 to install ===
+
+=-=- Synchronizing package archives
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+=-=- Installing packages
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Building conf-gnomecanvas.2:
+  pkg-config libgnomecanvas-2.0
+[ERROR] The compilation of conf-gnomecanvas.2 failed.
+Removing conf-gnomecanvas.2.
+  Nothing to do.
+
+
+#=== ERROR while installing conf-gnomecanvas.2
+================================#
+# opam-version 1.2.0
+# os           linux
+# command      pkg-config libgnomecanvas-2.0
+# path         /home/vagrant/.opam/4.01.0/build/conf-gnomecanvas.2
+# compiler     4.01.0
+# exit-code    1
+# env-file
+/home/vagrant/.opam/4.01.0/build/conf-gnomecanvas.2/conf-gnomecanvas-23548-58c514.env
+# stdout-file
+ /home/vagrant/.opam/4.01.0/build/conf-gnomecanvas.2/conf-gnomecanvas-23548-58c514.out
+# stderr-file
+ /home/vagrant/.opam/4.01.0/build/conf-gnomecanvas.2/conf-gnomecanvas-23548-58c514.err
+
+'opam install conf-gnomecanvas --verbose' failed.
+vagrant at vagrant-ubuntu-trusty-32:/usr/bin$
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150107/5f1b5242/attachment.html>
+
+From yallop at gmail.com  Thu Jan  8 10:36:01 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 8 Jan 2015 10:36:01 +0000
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <CAKmYin=nZ-w+1jR+OSRjnU=-eMEcvtJqL8JApzvTHEdedH6NpQ@mail.gmail.com>
+References: <CAKmYin=nZ-w+1jR+OSRjnU=-eMEcvtJqL8JApzvTHEdedH6NpQ@mail.gmail.com>
+Message-ID: <CAAxsn=H4WLAQGztX_xVqDeATfrPQoht5S0XJxaqA87rsG4Yr-Q@mail.gmail.com>
+
+On 8 January 2015 at 03:41, Robert Muller <robert.muller2 at gmail.com> wrote:
+> [ERROR] The compilation of conf-gnomecanvas.2 failed.
+
+The purpose of the conf-gnomecanvas package is to check that you have
+the appropriate system package for the libgnomecanvas library
+installed.  The description (which you can see with 'opam show
+conf-gnomecanvas') says:
+
+    This package can only install if libgnomecanvs2.0-dev is installed
+on the system.
+
+OPAM can also list the system package dependencies for you:
+
+   opam list conf-gnomecanvas --external
+
+So the following should help:
+
+    sudo apt-get install libgnomecanvas2.0-dev
+
+You might also be interested to know that the Universe Library now has
+OPAM support, so the following will install the OPAM dependencies and
+build and install the package:
+
+    opam pin add universe https://github.com/kenichi-asai/Universe
+
+Finally:it's best not to run OPAM using 'sudo'.  It's designed to run
+with normal user permissions and install files under your home
+directory.
+
+From robert.muller2 at gmail.com  Thu Jan  8 10:52:52 2015
+From: robert.muller2 at gmail.com (Robert Muller)
+Date: Thu, 8 Jan 2015 05:52:52 -0500
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <CAAxsn=H4WLAQGztX_xVqDeATfrPQoht5S0XJxaqA87rsG4Yr-Q@mail.gmail.com>
+References: <CAKmYin=nZ-w+1jR+OSRjnU=-eMEcvtJqL8JApzvTHEdedH6NpQ@mail.gmail.com>
+ <CAAxsn=H4WLAQGztX_xVqDeATfrPQoht5S0XJxaqA87rsG4Yr-Q@mail.gmail.com>
+Message-ID: <CAKmYinmmfnCJY7dVsXnHbcyGv2KeBOgQiqvTTbp2737jEy8Ljg@mail.gmail.com>
+
+Ah, thank you. I'm new to this, but I'm under the impression that this
+package name isn't correct. I had already tried:
+
+sudo apt-get install libgnomecanvas2.0-dev
+
+but OPAM reported that there was no such package. So I tried a few other
+things, I think I installed:
+
+sudo apt-get install libgonecanvas2-0
+
+which seemed to work, and I mistakenly assumed would get the -dev package
+as well. So I just now did
+
+sudo apt-get install libgnomecanvas2-dev
+
+NB: there is no ".0". This worked and Kenichi's Universe package is now
+working fine on ubuntu.
+
+Many thanks,
+Bob Muller
+
+
+
+
+On Thu, Jan 8, 2015 at 5:36 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 8 January 2015 at 03:41, Robert Muller <robert.muller2 at gmail.com>
+> wrote:
+> > [ERROR] The compilation of conf-gnomecanvas.2 failed.
+>
+> The purpose of the conf-gnomecanvas package is to check that you have
+> the appropriate system package for the libgnomecanvas library
+> installed.  The description (which you can see with 'opam show
+> conf-gnomecanvas') says:
+>
+>     This package can only install if libgnomecanvs2.0-dev is installed
+> on the system.
+>
+> OPAM can also list the system package dependencies for you:
+>
+>    opam list conf-gnomecanvas --external
+>
+> So the following should help:
+>
+>     sudo apt-get install libgnomecanvas2.0-dev
+>
+> You might also be interested to know that the Universe Library now has
+> OPAM support, so the following will install the OPAM dependencies and
+> build and install the package:
+>
+>     opam pin add universe https://github.com/kenichi-asai/Universe
+>
+> Finally:it's best not to run OPAM using 'sudo'.  It's designed to run
+> with normal user permissions and install files under your home
+> directory.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150108/a650cd0f/attachment.html>
+
+From robert.muller2 at gmail.com  Thu Jan  8 11:09:16 2015
+From: robert.muller2 at gmail.com (Robert Muller)
+Date: Thu, 8 Jan 2015 06:09:16 -0500
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <CAKmYinmmfnCJY7dVsXnHbcyGv2KeBOgQiqvTTbp2737jEy8Ljg@mail.gmail.com>
+References: <CAKmYin=nZ-w+1jR+OSRjnU=-eMEcvtJqL8JApzvTHEdedH6NpQ@mail.gmail.com>
+ <CAAxsn=H4WLAQGztX_xVqDeATfrPQoht5S0XJxaqA87rsG4Yr-Q@mail.gmail.com>
+ <CAKmYinmmfnCJY7dVsXnHbcyGv2KeBOgQiqvTTbp2737jEy8Ljg@mail.gmail.com>
+Message-ID: <CAKmYin=xccj75oWjqFx=7QYcQEYUW1T8=fY5vh3Q8cvcc8r9aw@mail.gmail.com>
+
+On Thu, Jan 8, 2015 at 5:52 AM, Robert Muller <robert.muller2 at gmail.com>
+wrote:
+
+> Ah, thank you. I'm new to this, but I'm under the impression that this
+> package name isn't correct. I had already tried:
+>
+> sudo apt-get install libgnomecanvas2.0-dev
+>
+> but OPAM reported that there was no such package.
+>
+
+Ack. I meant that apt-get reported that there was no such package. It seems
+that there are inconsistencies in apt package names with respect to version
+numbers.
+
+Bob
+
+
+
+> So I tried a few other things, I think I installed:
+>
+> sudo apt-get install libgonecanvas2-0
+>
+> which seemed to work, and I mistakenly assumed would get the -dev package
+> as well. So I just now did
+>
+> sudo apt-get install libgnomecanvas2-dev
+>
+> NB: there is no ".0". This worked and Kenichi's Universe package is now
+> working fine on ubuntu.
+>
+> Many thanks,
+> Bob Muller
+>
+>
+>
+>
+> On Thu, Jan 8, 2015 at 5:36 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+>
+>> On 8 January 2015 at 03:41, Robert Muller <robert.muller2 at gmail.com>
+>> wrote:
+>> > [ERROR] The compilation of conf-gnomecanvas.2 failed.
+>>
+>> The purpose of the conf-gnomecanvas package is to check that you have
+>> the appropriate system package for the libgnomecanvas library
+>> installed.  The description (which you can see with 'opam show
+>> conf-gnomecanvas') says:
+>>
+>>     This package can only install if libgnomecanvs2.0-dev is installed
+>> on the system.
+>>
+>> OPAM can also list the system package dependencies for you:
+>>
+>>    opam list conf-gnomecanvas --external
+>>
+>> So the following should help:
+>>
+>>     sudo apt-get install libgnomecanvas2.0-dev
+>>
+>> You might also be interested to know that the Universe Library now has
+>> OPAM support, so the following will install the OPAM dependencies and
+>> build and install the package:
+>>
+>>     opam pin add universe https://github.com/kenichi-asai/Universe
+>>
+>> Finally:it's best not to run OPAM using 'sudo'.  It's designed to run
+>> with normal user permissions and install files under your home
+>> directory.
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150108/74aae8ee/attachment-0001.html>
+
+From agarwal1975 at gmail.com  Fri Jan  9 18:00:10 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Fri, 9 Jan 2015 13:00:10 -0500
+Subject: [ocaml-platform] OCaml 4.02.1 PPA
+Message-ID: <CAMu2m2LF4_-Ad5uud1wFGoxsnsL-EWuev=g9tgiVzanr8jRt=A@mail.gmail.com>
+
+Anil, any chance we can get a PPA for OCaml 4.02.1. I don't see one here:
+https://launchpad.net/~avsm
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150109/5ead3de7/attachment.html>
+
+From anil at recoil.org  Sun Jan 11 14:53:28 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 11 Jan 2015 14:53:28 +0000
+Subject: [ocaml-platform] OCaml 4.02.1 PPA
+In-Reply-To: <CAMu2m2LF4_-Ad5uud1wFGoxsnsL-EWuev=g9tgiVzanr8jRt=A@mail.gmail.com>
+References: <CAMu2m2LF4_-Ad5uud1wFGoxsnsL-EWuev=g9tgiVzanr8jRt=A@mail.gmail.com>
+Message-ID: <407500AA-9CF4-4893-A8F3-3AB2F09774B8@recoil.org>
+
+On 9 Jan 2015, at 18:00, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> 
+> Anil, any chance we can get a PPA for OCaml 4.02.1. I don't see one here:
+> https://launchpad.net/~avsm <https://launchpad.net/~avsm>
+
+It's actually already a 4.02.1 PPA -- I just hadn't updated the Launchpad titles to reflect that.  The name of the PPA (e.g. ocaml42+opam12) is independent of the point release, which I keep to the latest versions possible.
+
+Let me know if you find any of the above to not be true!
+
+Anil
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150111/d0b46bcc/attachment.html>
+
+From agarwal1975 at gmail.com  Mon Jan 12 17:23:16 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 12 Jan 2015 12:23:16 -0500
+Subject: [ocaml-platform] OCaml 4.02.1 PPA
+In-Reply-To: <407500AA-9CF4-4893-A8F3-3AB2F09774B8@recoil.org>
+References: <CAMu2m2LF4_-Ad5uud1wFGoxsnsL-EWuev=g9tgiVzanr8jRt=A@mail.gmail.com>
+ <407500AA-9CF4-4893-A8F3-3AB2F09774B8@recoil.org>
+Message-ID: <CAMu2m2+quqfdKrBsjiNpXN_NDVMY8XN1MeJEzN0n6ALEjkvJRw@mail.gmail.com>
+
+Got it. Thanks.
+
+On Sun, Jan 11, 2015 at 9:53 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> On 9 Jan 2015, at 18:00, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+>
+>
+> Anil, any chance we can get a PPA for OCaml 4.02.1. I don't see one here:
+> https://launchpad.net/~avsm
+>
+>
+> It's actually already a 4.02.1 PPA -- I just hadn't updated the Launchpad
+> titles to reflect that.  The name of the PPA (e.g. ocaml42+opam12) is
+> independent of the point release, which I keep to the latest versions
+> possible.
+>
+> Let me know if you find any of the above to not be true!
+>
+> Anil
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20150112/67d6bf2f/attachment.html>
+
+From christoph.hoeger at tu-berlin.de  Wed Jan 14 13:12:47 2015
+From: christoph.hoeger at tu-berlin.de (=?UTF-8?B?Q2hyaXN0b3BoIEjDtmdlcg==?=)
+Date: Wed, 14 Jan 2015 14:12:47 +0100
+Subject: [ocaml-platform] Opam pull request with failed build
+Message-ID: <54B66B4F.6000409@tu-berlin.de>
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+Dear all,
+
+I did not find an explicit opam maintainers list, so please let me
+know it this is off-topic.
+
+I made a pull request for my package since I wanted to publish it via
+opam:
+
+https://github.com/ocaml/opam-repository/pull/3359
+
+Unfortunately, it seems that the build failed for opam version 1.1 -
+but I do not know why:
+
+https://travis-ci.org/ocaml/opam-repository/jobs/46740237
+
+- From the logs it seems to be some kind of problem with ppx_deriving.
+
+Obviously, I do not want to downgrade my local opam to 1.1 to try and
+fix what seems like a bug in ppx_deriving. But without being able to
+reproduce it, I feel uncomfortable to just report it as an issue there.
+
+Can anyone of you guide me on how to handle this matter? Plus: How do
+I get my package accepted in opam?
+
+regards,
+
+Christoph
+- -- 
+Christoph H?ger
+
+Technische Universit?t Berlin
+Fakult?t IV - Elektrotechnik und Informatik
+?bersetzerbau und Programmiersprachen
+
+Sekr. TEL12-2, Ernst-Reuter-Platz 7, 10587 Berlin
+
+Tel.: +49 (30) 314-24890
+E-Mail: christoph.hoeger at tu-berlin.de
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iEYEARECAAYFAlS2a08ACgkQhMBO4cVSGS8MwgCeOtVEpiPR5k0oRz7oWPZ8m0/h
+q4sAnRNio0X0x5wt3ThQ6VCupFzu9pF6
+=mWpj
+-----END PGP SIGNATURE-----
+
+From gabriel.scherer at gmail.com  Sat Jan 17 15:19:46 2015
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Sat, 17 Jan 2015 16:19:46 +0100
+Subject: [ocaml-platform] Secure OPAM?
+Message-ID: <CAPFanBHVJvKwGOsy8zzrJc6QySiXqvQTwKoZurvOYkKJP5sBmg@mail.gmail.com>
+
+There is an excellent piece at LWN.net (do consider subscribing to
+this source of quality technical news) about a recent discussion in
+the Python community on how to "secure" their package manager
+  http://lwn.net/SubscriberLink/629426/bf933f7acea8466c/
+
+The article discusses in particular a library called TUF (The Update
+Framework) that aims to help solve the problem in a
+package-manager-agnostic way.
+  http://theupdateframework.com/
+(this page has some other interesting links, eg. to a similar
+discussion in the Ruby community about RubyGems)
+
+Is there a reference point to a discussion of the security aspects of
+the OPAM package manager? What I found so far is this 2013 issue by
+Edwin T?r?k on signing packages:
+  https://github.com/ocaml/opam/issues/423
+
+As far as I know, the current status is that OPAM checks downloaded
+packages against the checksum in opam-repository, so it protects
+against an attacker changing upstream releases, assuming the
+opam-repository remains trusted and there is no man-in-the-middle
+(MITM) attack when the user downloads the metadata -- afaik it uses
+only HTTP currently.
+
+From anil at recoil.org  Sun Jan 18 21:11:23 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 18 Jan 2015 21:11:23 +0000
+Subject: [ocaml-platform] Secure OPAM?
+In-Reply-To: <CAPFanBHVJvKwGOsy8zzrJc6QySiXqvQTwKoZurvOYkKJP5sBmg@mail.gmail.com>
+References: <CAPFanBHVJvKwGOsy8zzrJc6QySiXqvQTwKoZurvOYkKJP5sBmg@mail.gmail.com>
+Message-ID: <8E4BC1E0-8354-439D-A17B-93F3EB81D7D2@recoil.org>
+
+[+opam-devel to CC]
+
+On 17 Jan 2015, at 15:19, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> 
+> There is an excellent piece at LWN.net (do consider subscribing to
+> this source of quality technical news) about a recent discussion in
+> the Python community on how to "secure" their package manager
+>  http://lwn.net/SubscriberLink/629426/bf933f7acea8466c/
+> 
+> The article discusses in particular a library called TUF (The Update
+> Framework) that aims to help solve the problem in a
+> package-manager-agnostic way.
+>  http://theupdateframework.com/
+> (this page has some other interesting links, eg. to a similar
+> discussion in the Ruby community about RubyGems)
+> 
+> Is there a reference point to a discussion of the security aspects of
+> the OPAM package manager? What I found so far is this 2013 issue by
+> Edwin T?r?k on signing packages:
+>  https://github.com/ocaml/opam/issues/423
+> 
+> As far as I know, the current status is that OPAM checks downloaded
+> packages against the checksum in opam-repository, so it protects
+> against an attacker changing upstream releases, assuming the
+> opam-repository remains trusted and there is no man-in-the-middle
+> (MITM) attack when the user downloads the metadata -- afaik it uses
+> only HTTP currently.
+
+This is certainly something that needs to go on the roadmap sooner
+rather than later, and issue #423 is still the place to record
+your opinions.
+
+Having a signify-like model to let an OPAM mirroring script sign
+distfiles would be a good first step, since the complexities of
+managing a per-contributor signing infrastructure would be quite
+significantly more work.
+
+Note that the OPAM remote is HTTPS by default since OPAM 1.1.
+
+-anil
+
+
+From louis.gesbert at ocamlpro.com  Mon Jan 19 02:07:05 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 19 Jan 2015 11:07:05 +0900
+Subject: [ocaml-platform] Secure OPAM?
+In-Reply-To: <8E4BC1E0-8354-439D-A17B-93F3EB81D7D2@recoil.org>
+References: <CAPFanBHVJvKwGOsy8zzrJc6QySiXqvQTwKoZurvOYkKJP5sBmg@mail.gmail.com>
+ <8E4BC1E0-8354-439D-A17B-93F3EB81D7D2@recoil.org>
+Message-ID: <67700007.i8AoPAFe9Q@agaric>
+
+Indeed, we'd better get some security concerns before it becomes an issue ;
+
+Let me point what feels like weak areas at the moment:
+* No restriction on what the package scripts can do (other than running as user). Not writing outside of the switch prefix would be a good start, but that's more a concern of preventing mistakes than real security since you install executable code there anyway.
+* No repo or package signing. What we have at the moment is only:
+  - metadata downloaded through HTTPS (no specific certificate constraint)
+  - checksums on client-downloaded metadata (MD5, generated on the server by opam-admin)
+  - (non-mandatory) MD5 checksums on downloaded archives (verified by the client, OR by the mirroring server, which will then happily put a valid MD5 on the repackaged archive -- to be checked)
+  - no extra checks done on the other available repository or package upstream kinds (rsync, git, etc.)
+This was originally designed as a way to check the integrity of downloads and detect changes, not as a security mesure.
+* Handling of external dependencies: a bit out of the scope here, but we need to push on the discussion on the design of this, it's at the moment underspecified ; of concern here, there is a feature that allows to specify a URL in the "depexts" field that will be downloaded and executed by opam-depext (mine or Anil's) without any check. Not sure what to do with that.
+
+So yes, signing of packages would be a good start, but there are many possibilities ; assuming the Github repo is trusted (as well as the link between that and opam.ocaml.org), having opam-admin add some signatures and the OPAM client check those would certainly go in the right direction while remaining somewhat light. Asking contributors to sign their pull-requests, as mentionned in the LWN article forwarded by Gabriel, is another story (we could be using 'git tag --sign' and integrating that into opam-publish, for example).
+
+Cheers,
+Louis
+
+> - Anil Madhavapeddy, 18/01/2015 21:11 -
+> [+opam-devel to CC]
+> 
+> On 17 Jan 2015, at 15:19, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> > 
+> > There is an excellent piece at LWN.net (do consider subscribing to
+> > this source of quality technical news) about a recent discussion in
+> > the Python community on how to "secure" their package manager
+> >  http://lwn.net/SubscriberLink/629426/bf933f7acea8466c/
+> > 
+> > The article discusses in particular a library called TUF (The Update
+> > Framework) that aims to help solve the problem in a
+> > package-manager-agnostic way.
+> >  http://theupdateframework.com/
+> > (this page has some other interesting links, eg. to a similar
+> > discussion in the Ruby community about RubyGems)
+> > 
+> > Is there a reference point to a discussion of the security aspects of
+> > the OPAM package manager? What I found so far is this 2013 issue by
+> > Edwin T?r?k on signing packages:
+> >  https://github.com/ocaml/opam/issues/423
+> > 
+> > As far as I know, the current status is that OPAM checks downloaded
+> > packages against the checksum in opam-repository, so it protects
+> > against an attacker changing upstream releases, assuming the
+> > opam-repository remains trusted and there is no man-in-the-middle
+> > (MITM) attack when the user downloads the metadata -- afaik it uses
+> > only HTTP currently.
+> 
+> This is certainly something that needs to go on the roadmap sooner
+> rather than later, and issue #423 is still the place to record
+> your opinions.
+> 
+> Having a signify-like model to let an OPAM mirroring script sign
+> distfiles would be a good first step, since the complexities of
+> managing a per-contributor signing infrastructure would be quite
+> significantly more work.
+> 
+> Note that the OPAM remote is HTTPS by default since OPAM 1.1.
+> 
+> -anil
+> 
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+> 
+
+From yminsky at janestreet.com  Sat Jan 24 03:02:38 2015
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 23 Jan 2015 22:02:38 -0500
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <6066206.3BL9uuaWXL@agaric>
+References: <1429799.1gO6qO1K3u@agaric>
+ <FB1FF43D-F674-407B-B2C8-301EC0BA5F72@recoil.org>
+ <6066206.3BL9uuaWXL@agaric>
+Message-ID: <CACLX4jSh2rLHaM6usCFjOYmCiJR4RisUe0YT89n2YaZQzTFT-Q@mail.gmail.com>
+
+I was thinking now would be a good time to return to this thread, now
+that we have some experience trying out the current user-setup
+package.
+
+ http://lists.ocaml.org/pipermail/teaching/2015-January/thread.html
+
+A few random thoughts.
+
+- I have some concerns with the way the scripts are kicked off.  Right
+  now, the way it works is you install the user-setup config, and it
+  automatically modifies your dot files.  I wonder if it would be
+  better to have a tool that you could run that would set up your
+  dot-files, asking you along the way for permission to edit each file
+  it edited.
+
+- I wonder if more development work needs to go into the
+  editor-customization files themselves.  For example, I think the
+  current user-setup script tries to incrementally add support for the
+  different needed tools, including the major hits: utop, merlin,
+  ocp-indent, etc.  I wonder if instead we should write some elisp
+  code that detects what tools are available by searching through the
+  opam install, and conditionally sets up the emacs support when it's
+  there.  That seems simpler and easier to think about, since there's
+  one set of configurations that can be read and understood as a
+  whole.
+
+- I wonder how we should get opam -switch support to work effectively.
+  user-setup hard-codes paths into the .emacs, which is awkward when
+  you switch to a different compiler.
+
+  One might just want to inherit the opam paths from the shell, but
+  this doesn't work well on the mac. My .emacs setup has some code
+  that tries to figure out what the relevant opam paths are by
+  executing the shell, and that, though a terrible hack, seems to
+  work.  Maybe we should include something like this, rather than
+  hardcoding paths.
+
+    ;; -- Tweaks for OS X -------------------------------------
+    ;; Tweak for problem on OS X where Emacs.app doesn't run the right
+    ;; init scripts when invoking a sub-shell
+    (defun set-exec-path-from-shell-PATH ()
+      "Set up Emacs' `exec-path' and PATH environment variable to
+      match that used by the user's shell.
+
+    This is particularly useful under Mac OSX, where GUI apps are not
+    started from a shell."
+      (interactive)
+      (let ((path-from-shell
+    (replace-regexp-in-string
+     "[ \t\n]*$" ""
+     (shell-command-to-string "$SHELL --login -i -c 'echo $PATH'"))
+    ))
+(setenv "PATH" path-from-shell)
+(setq exec-path (split-string path-from-shell path-separator)))
+      )
+    (cond
+     ((eq window-system 'ns) ; macosx
+      (set-exec-path-from-shell-PATH)))
+
+Anyway, curious what others think on all this.
+
+y
+
+From yminsky at janestreet.com  Sat Jan 24 03:16:01 2015
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Fri, 23 Jan 2015 22:16:01 -0500
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <CACLX4jSh2rLHaM6usCFjOYmCiJR4RisUe0YT89n2YaZQzTFT-Q@mail.gmail.com>
+References: <1429799.1gO6qO1K3u@agaric>
+ <FB1FF43D-F674-407B-B2C8-301EC0BA5F72@recoil.org>
+ <6066206.3BL9uuaWXL@agaric>
+ <CACLX4jSh2rLHaM6usCFjOYmCiJR4RisUe0YT89n2YaZQzTFT-Q@mail.gmail.com>
+Message-ID: <CACLX4jSwbXOAW2zVUL-OKQmmzh=qzokTm0U_PG26h_zxVFUGmA@mail.gmail.com>
+
+Replying to Louis' response on the teaching list.  If no one objects,
+let's keep the conversation here rather than on the teaching list,
+since I think we're now into design discussions about user-setup.
+
+On Fri, Jan 23, 2015 at 10:02 PM, Louis Gesbert
+<louis.gesbert at ocamlpro.com> wrote:
+> user-setup doesn't handle yet the Mac-specific issue of Emacs
+> load-paths, so that's probably what is bitting you here; I'll port
+> the related code from your .emacs; getting a means to test on these
+> ASAP.
+
+Excellent.  Maybe the code I sent in the other email will be useful.
+I got it from Jeremie Dimino, so it's better than the dreck I would
+put together.
+
+> On hardcoding the paths, I'm still not certain it is the best
+> option, but I had a few reasons for doing so (open for discussion,
+> obviously, this is still a prototype):
+>
+> * user-setup configures editors depending on what is installed in
+>   the current switch ; it may not make sense in other switches.
+
+I'm tempted to think that this is a mistake, as I said in my previous
+email.  I think we'd probably get a more readable and robust set of
+emacs configs if they just auto-detected what was there, and
+conditionally enabled those bits of editor automation.
+
+> * some tools are generally useful (tuareg, ocp-indent) and
+>   installing them in one switch should be enough. There is a clear
+>   distinction though for compiler-version dependent tools (merlin,
+>   ocp-index).
+
+Yeah, that's a good point.  I think I'd personally prefer to just
+install tuareg and ocp-indent and the like in all my switches, and
+have merlin and ocp-index work properly as I switch.
+
+> * this is not focused on advanced users with multiple switches,
+>   etc. and it makes the configuration simpler to understand and
+>   edit.
+
+Fair, although it would be a lot better if this created dot files that
+were suitable for people who wanted to extend to more advanced use
+later.  Setting up emacs files and the like is quite painful, even for
+sophisticated users, and I think a lot of them would appreciate the
+help.
+
+As a general matter, an approach of building infrastructure for "less
+sophisticated users" that you wouldn't want to use yourself is a
+treacherous one, since it means it's harder to test that it really is
+good, since you won't use it yourself!
+
+> * this approach is guaranteed to be available for all editors.
+
+Perhaps we should do something more custom for individual editors.  We
+could just have different packages for different editors, vim-support,
+sublime-text-support, emacs-support, etc, which had some useful
+dot-files and a setup script for them.  I'm not sure a one-size-fits-all
+-editors approach is going to really be possible here.
+
+> The alternatives would be (i) using packages supplied within the
+> editor's ecosystems, when available (see the detailed discussion at
+> [1]), which should clearly handle locations dynamically -- I think
+> that best serves advanced users but has a purpose distinct enough to
+> justify both approaches ; and (ii) dynamically generating
+> configuration at editor run time (like ocp-edit does for emacs: it
+> reads its own configuration and outputs elisp code that is evaluated
+> at run time)
+>
+> Note that we still hit a consistency issue with this approach if
+> installing user-setup in multiple switches. This also raises the
+> question of handling "global" or "multi-switch" packages in OPAM.
+
+If we get user-setup to install a robust set of emacs (or vim, or
+sublime text...) macros, there isn't really a switch problem.  After
+all, my current emacs configs work fine when I flip between different
+switches.  If all user-setup is a set of configs to install such
+robust scripts, we're in a pretty good place.
+
+In other words, maybe we should focus on building highly robust
+scripts first, and then just have an easy delivery mechanism for those
+scripts in opam.
+
+> On the feature of dynamically adapting to the latest `opam switch`
+> in emacs, it could be achieved by running all external commands
+> through `opam config exec -- <command>`. It doesn't extend to
+> running different elisp files depending on the switch though, and
+> you'd still need to manually update PATH etc. if you're running
+> builds within emacs, similar to `eval $(opam config env)`. I do this
+> using:
+>
+>     (defun opam-env ()
+>       (interactive nil)
+>       (dolist (var (car (read-from-string (shell-command-to-string "opam config env --sexp"))))
+>         (setenv (car var) (cadr var))))
+>
+> opam-user-setup will set this statically, locally on caml/tuareg buffers, which may indeed not be the best idea.
+>
+> Thanks for the feedback, it'll help make this usable quick
+> Louis
+>
+>> - Yaron Minsky, 23/01/2015 20:48 -
+>> Hmm.  I'm still not able to get user-setup to work cleanly on my mac,
+>> though depext does install now, and I think correctly determines that
+>> there are no packages it needs to install.
+>>
+>> But here are the messages I get from emacs:
+>>
+>> Loading paren...done
+>> Loading tuareg-site-file...done
+>> For information about GNU Emacs and the GNU system, type C-h C-a.
+>> Making completion list...
+>> Starting merlin instance: default (binary=ocamlmerlin).
+>> File mode specification error: (file-error "Searching for program" "no
+>> such file or directory" "ocamlmerlin")
+>>
+>> So it can't seem to find merlin.
+>>
+>> I'm also a little troubled by the hard-coding of paths in the .emacs.
+>> Once nice thing about the dot-emacs file I shared with Greg is that it
+>> auto-updates where it points on every opam switch, without even
+>> needing to restart emacs, I believe.  It would be nice to have this
+>> for merlin, though I admit perhaps not with tuareg.
+>>
+>> I tend to think that until we get this sorted, teachers should use
+>> manually put together dot-emacs files like the ones I emailed out.
+>>
+>> y
+>>
+>> On Fri, Jan 23, 2015 at 12:39 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> > Fixed; there was a minor typo in the `opam` file for the package;
+>> > https://github.com/ocaml/opam-repository/pull/3441
+>> >
+>> > -a
+>> >
+>> >> On 23 Jan 2015, at 04:33, Yaron Minsky <yminsky at janestreet.com> wrote:
+>> >>
+>> >> Also, I can't seem to install depext, but the reason doesn't make sense:
+>> >>
+>> >> Kalessin:~ yminsky2$ opam install depext
+>> >> [ERROR] depext is not available because your system doesn't comply
+>> >> with opam-version >= "4.02".
+>> >> Kalessin:~ yminsky2$ opam --version
+>> >> 1.2.0
+>> >>
+>> >> I'm running the latest opam available from homebrew.
+>> >>
+>> >> y
+>> >>
+>> >> On Thu, Jan 22, 2015 at 10:21 PM, Yaron Minsky <yminsky at janestreet.com> wrote:
+>> >>> Does depext do anything on a mac?  On redhat? Or is it Debian only?
+>> >>>
+>> >>> On Jan 22, 2015 10:03 PM, "Louis Gesbert" <louis.gesbert at ocamlpro.com>
+>> >>> wrote:
+>> >>>>
+>> >>>> Just released 0.2 which should fix both issues (opam tuareg mode and
+>> >>>> stalling with vim)
+>> >>>>
+>> >>>>> It would be good to know what we have there now.  It seems like a
+>> >>>>> minimum should be:
+>> >>>>>
+>> >>>>> - tuareg
+>> >>>>> - merlin
+>> >>>>> - ocp-indent
+>> >>>>> - utop
+>> >>>>>
+>> >>>>> all read to go in emacs.  Getting vim and sublime text support would
+>> >>>>> be lovely too, but I think less critical.  What does user-setup
+>> >>>>> already support?
+>> >>>>
+>> >>>> Needs more testing, but we do have those ; vim support also, but it's more
+>> >>>> lightly tested.
+>> >>>> I didn't figure how to configure Sublime yet.
+>> >>>>
+>> >>>>> Interesting. Concretely, what would would depext do in this context?
+>> >>>>> I did a fresh install of a number of packages on my mac, and I didn't
+>> >>>>> need much else, but I may have already had the dependencies in place
+>> >>>>> via brew.
+>> >>>>
+>> >>>> Not sure, but you can use `opam depext -l` to simply show the currently
+>> >>>> required external packages.
+>> >>>>
+>> >>>> The one that bites most often on .deb distributions is the lack of m4,
+>> >>>> which is required by ocamlfind. It gets much more complicated as soon as you
+>> >>>> want to install e.g. gtk stuff, of course (ocaml-top...).
+>> >>>>
+>> >>>> Best,
+>> >>>> Louis
+>> >>
+>> >
+
+From louis.gesbert at ocamlpro.com  Sat Jan 24 06:05:38 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 24 Jan 2015 15:05:38 +0900
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <CACLX4jSwbXOAW2zVUL-OKQmmzh=qzokTm0U_PG26h_zxVFUGmA@mail.gmail.com>
+References: <1429799.1gO6qO1K3u@agaric>
+ <CACLX4jSh2rLHaM6usCFjOYmCiJR4RisUe0YT89n2YaZQzTFT-Q@mail.gmail.com>
+ <CACLX4jSwbXOAW2zVUL-OKQmmzh=qzokTm0U_PG26h_zxVFUGmA@mail.gmail.com>
+Message-ID: <12814709.8e8OqCoY0h@agaric>
+
+You're making important points; this is an area where pragmatism is way above consistency or simplicity of design, just because the one direction it'll have to scale is users.
+
+> > * this is not focused on advanced users with multiple switches,
+> >   etc. and it makes the configuration simpler to understand and
+> >   edit.
+> 
+> Fair, although it would be a lot better if this created dot files that
+> were suitable for people who wanted to extend to more advanced use
+> later.  Setting up emacs files and the like is quite painful, even for
+> sophisticated users, and I think a lot of them would appreciate the
+> help.
+
+Agreed: best if it can be scaled to the needs of more advanced users without having to restart configuring from scratch, let's not add more steps than needed.
+
+> > * user-setup configures editors depending on what is installed in
+> >   the current switch ; it may not make sense in other switches.
+> 
+> I'm tempted to think that this is a mistake, as I said in my previous
+> email.  I think we'd probably get a more readable and robust set of
+> emacs configs if they just auto-detected what was there, and
+> conditionally enabled those bits of editor automation.
+
+Hmm, I was afraid of writing something that could get inconsistent, but indeed, if possible, there is no good reason not to add the detection code in the editor itself. Tool-configuration snippets may still be useful in some cases (less versatile editors), but it's best to put as much as possible in the base snippet for the editor.
+
+> > * some tools are generally useful (tuareg, ocp-indent) and
+> >   installing them in one switch should be enough. There is a clear
+> >   distinction though for compiler-version dependent tools (merlin,
+> >   ocp-index).
+> 
+> Yeah, that's a good point.  I think I'd personally prefer to just
+> install tuareg and ocp-indent and the like in all my switches, and
+> have merlin and ocp-index work properly as I switch.https://github.com/AltGr/opam-user-setup
+
+Nothing is actually preventing us from being static for the first class of tools (tuareg, indent), and dynamic for the second class (compiler-specific ones), except maybe complexity and readability. I'd like to have similar (dynamic) code for all, but then set a static path for first-class tools so that it'll still work if you don't install them everywhere.
+
+> > * this approach is guaranteed to be available for all editors.
+> 
+> Perhaps we should do something more custom for individual editors.  We
+> could just have different packages for different editors, vim-support,
+> sublime-text-support, emacs-support, etc, which had some useful
+> dot-files and a setup script for them.  I'm not sure a one-size-fits-all
+> -editors approach is going to really be possible here.
+
+I'd still like to try: there is an (editor x tool) matrix that can quickly gain in size, and gathering everything at a single place will really help maintaining various combinations, or at least knowing were to search. If it explodes in size, we can still start referring to other packages.
+
+> If we get user-setup to install a robust set of emacs (or vim, or
+> sublime text...) macros, there isn't really a switch problem.  After
+> all, my current emacs configs work fine when I flip between different
+> switches.  If all user-setup is a set of configs to install such
+> robust scripts, we're in a pretty good place.
+> 
+> In other words, maybe we should focus on building highly robust
+> scripts first, and then just have an easy delivery mechanism for those
+> scripts in opam.
+
+That's indeed my goal, maybe I over-engineered the tool. But I am also concerned with the convergence for such scripts: everyone typically tends to have his or her own tailored version of the editor configuration, and is generally reluctant to swap it for one in n integrated solutions, so it's really important to manage and focus the effort somewhere for establishing and testing these files.
+
+I just updated the README at https://github.com/AltGr/opam-user-setup to reflect these thoughts in one place (it's by no means the end of discussion)
+
+Best,
+Louis
+
+From yminsky at janestreet.com  Sat Jan 24 11:33:28 2015
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Sat, 24 Jan 2015 06:33:28 -0500
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <12814709.8e8OqCoY0h@agaric>
+References: <1429799.1gO6qO1K3u@agaric>
+ <CACLX4jSh2rLHaM6usCFjOYmCiJR4RisUe0YT89n2YaZQzTFT-Q@mail.gmail.com>
+ <CACLX4jSwbXOAW2zVUL-OKQmmzh=qzokTm0U_PG26h_zxVFUGmA@mail.gmail.com>
+ <12814709.8e8OqCoY0h@agaric>
+Message-ID: <CACLX4jS5kvKSYOafsnMsfnyFLuRDXbztuwM6i_+C+qC1UsRZAQ@mail.gmail.com>
+
+On Sat, Jan 24, 2015 at 1:05 AM, Louis Gesbert
+<louis.gesbert at ocamlpro.com> wrote:
+> You're making important points; this is an area where pragmatism is way above consistency or simplicity of design, just because the one direction it'll have to scale is users.
+>
+>> > * this is not focused on advanced users with multiple switches,
+>> >   etc. and it makes the configuration simpler to understand and
+>> >   edit.
+>>
+>> Fair, although it would be a lot better if this created dot files that
+>> were suitable for people who wanted to extend to more advanced use
+>> later.  Setting up emacs files and the like is quite painful, even for
+>> sophisticated users, and I think a lot of them would appreciate the
+>> help.
+>
+> Agreed: best if it can be scaled to the needs of more advanced users without having to restart configuring from scratch, let's not add more steps than needed.
+>
+>> > * user-setup configures editors depending on what is installed in
+>> >   the current switch ; it may not make sense in other switches.
+>>
+>> I'm tempted to think that this is a mistake, as I said in my previous
+>> email.  I think we'd probably get a more readable and robust set of
+>> emacs configs if they just auto-detected what was there, and
+>> conditionally enabled those bits of editor automation.
+>
+> Hmm, I was afraid of writing something that could get inconsistent, but indeed, if possible, there is no good reason not to add the detection code in the editor itself. Tool-configuration snippets may still be useful in some cases (less versatile editors), but it's best to put as much as possible in the base snippet for the editor.
+>
+>> > * some tools are generally useful (tuareg, ocp-indent) and
+>> >   installing them in one switch should be enough. There is a clear
+>> >   distinction though for compiler-version dependent tools (merlin,
+>> >   ocp-index).
+>>
+>> Yeah, that's a good point.  I think I'd personally prefer to just
+>> install tuareg and ocp-indent and the like in all my switches, and
+>> have merlin and ocp-index work properly as I switch.https://github.com/AltGr/opam-user-setup
+>
+> Nothing is actually preventing us from being static for the first class of tools (tuareg, indent), and dynamic for the second class (compiler-specific ones), except maybe complexity and readability. I'd like to have similar (dynamic) code for all, but then set a static path for first-class tools so that it'll still work if you don't install them everywhere.
+
+That sounds good.
+
+>> > * this approach is guaranteed to be available for all editors.
+>>
+>> Perhaps we should do something more custom for individual editors.  We
+>> could just have different packages for different editors, vim-support,
+>> sublime-text-support, emacs-support, etc, which had some useful
+>> dot-files and a setup script for them.  I'm not sure a one-size-fits-all
+>> -editors approach is going to really be possible here.
+>
+> I'd still like to try: there is an (editor x tool) matrix that can quickly gain in size, and gathering everything at a single place will really help maintaining various combinations, or at least knowing were to search. If it explodes in size, we can still start referring to other packages.
+
+That seems totally fine.
+
+>> If we get user-setup to install a robust set of emacs (or vim, or
+>> sublime text...) macros, there isn't really a switch problem.  After
+>> all, my current emacs configs work fine when I flip between different
+>> switches.  If all user-setup is a set of configs to install such
+>> robust scripts, we're in a pretty good place.
+>>
+>> In other words, maybe we should focus on building highly robust
+>> scripts first, and then just have an easy delivery mechanism for those
+>> scripts in opam.
+>
+> That's indeed my goal, maybe I over-engineered the tool. But I am also concerned with the convergence for such scripts: everyone typically tends to have his or her own tailored version of the editor configuration, and is generally reluctant to swap it for one in n integrated solutions, so it's really important to manage and focus the effort somewhere for establishing and testing these files.
+>
+> I just updated the README at https://github.com/AltGr/opam-user-setup to reflect these thoughts in one place (it's by no means the end of discussion)
+
+Excellent.  I'll take a look.
+
+y
+
+From anil at recoil.org  Mon Jan 26 11:06:04 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 26 Jan 2015 11:06:04 +0000
+Subject: [ocaml-platform] Fwd: [Haskell] ANN: Halcyon and Haskell on Heroku
+References: <CA87FCB5-4217-4B53-97FA-A544FAF6248F@bak.io>
+Message-ID: <442CBAED-2543-4034-A0C4-99D27FF12913@recoil.org>
+
+This looks like a really nicely polished tool from Mietek.  A similar tool built on top of OPAM to handle deployments would be interesting (particularly in light of the Coq community starting to use OPAM more).
+
+> Begin forwarded message:
+> 
+> From: Mi?tek Bak <mietek at bak.io>
+> Date: 26 January 2015 01:25:05 GMT
+> To: haskell at haskell.org
+> Subject: [Haskell] ANN: Halcyon and Haskell on Heroku
+> 
+> I?m happy to announce the initial public release of Halcyon, a system for installing Haskell apps and development tools.
+> https://halcyon.sh/
+> 
+> Halcyon stands on the shoulders of Cabal, and isn?t intended to replace it.  Instead, consider Halcyon a proof-of-concept implementation of one possible future version of Cabal.
+> 
+> - See the Halcyon examples for a demonstration of advanced Halcyon features.
+>  https://halcyon.sh/examples/
+> 
+> - Take a look at the Halcyon shootout for a comparison of build times and sizes across most Haskell web frameworks.
+>  https://halcyon.sh/shootout/
+> 
+> - Read the Halcyon tutorial to learn how to develop a simple Haskell web app using Halcyon.
+>  https://halcyon.sh/tutorial/
+> 
+> 
+> While Halcyon isn?t a deployment system, it?s intended to be used for constructing deployment systems.
+> 
+> I?m doubly happy to also announce Haskell on Heroku, a buildpack for deploying Haskell apps.
+> https://haskellonheroku.com/
+> 
+> - Read the Haskell on Heroku tutorial to learn how to deploy Haskell web apps to Heroku.
+>  https://haskellonheroku.com/tutorial/
+> 
+> 
+> Enjoy,
+> 
+> -- 
+> Mi?tek Bak
+> https://mietek.io/
+> 
+> _______________________________________________
+> Haskell mailing list
+> Haskell at haskell.org
+> http://www.haskell.org/mailman/listinfo/haskell
+
+

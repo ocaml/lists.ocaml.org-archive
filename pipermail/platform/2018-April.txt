@@ -1,0 +1,203 @@
+From zhenya1007 at gmail.com  Thu Apr 12 23:16:48 2018
+From: zhenya1007 at gmail.com (Evgeny Roubinchtein)
+Date: Thu, 12 Apr 2018 15:16:48 -0700
+Subject: [ocaml-platform] How to inform OPAM's "system" switch about OCaml
+ libraries installed by RPMs?
+Message-ID: <CAGYXaSZdOVCEQb1PyK-e6iezMnSxmYRKL=CBN-_dGiJe-oKTCA@mail.gmail.com>
+
+Dear OCaml platform users and developers,
+
+I am working in an environment where OCaml (but not OPAM) is installed
+system-wide via RPMs, along with a few OCaml libraries.  All of the
+libraries have corresponding OPAM packages.   I would like to create an
+OPAM  switch that is an alias of the "system" switch, but to also inform
+OPAM about the packages already installed system-wide.  Simply creating a
+switch a as an alias of "system" seems to "not notice" any of the libraries
+installed via RPMs.  Do you have any suggestions?
+
+The set of RPMs installed on the system changes at glacial speeds, so
+having a dumb script into which I hard-code some information about the
+packages installed by system-wide RPMs is perfectly acceptable in my case,
+if a more elegant solution does not exist (yet): I just would like to know
+what information I would need to hard-code, and I am hoping that asking
+here can save me a few hours of hunting through the OPAM source code.
+
+In case it matters, this is OPAM 2.0 pre-release.
+
+Thank you in advance!
+
+-- 
+Best,
+Evgeny ("Zhenya")
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20180412/5a84c16c/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Fri Apr 13 10:26:27 2018
+From: louis.gesbert at ocamlpro.com (louis.gesbert at ocamlpro.com)
+Date: Fri, 13 Apr 2018 11:26:27 +0200
+Subject: [ocaml-platform] How to inform OPAM's "system" switch about
+ OCaml libraries installed by RPMs?
+In-Reply-To: <CAGYXaSZdOVCEQb1PyK-e6iezMnSxmYRKL=CBN-_dGiJe-oKTCA@mail.gmail.com>
+References: <CAGYXaSZdOVCEQb1PyK-e6iezMnSxmYRKL=CBN-_dGiJe-oKTCA@mail.gmail.com>
+Message-ID: <3604243.qhfdeTcYmI@maitake>
+
+On jeudi 12 avril 2018 15:16:48 CEST Evgeny Roubinchtein wrote:
+> Dear OCaml platform users and developers,
+> 
+> I am working in an environment where OCaml (but not OPAM) is installed
+> system-wide via RPMs, along with a few OCaml libraries.  All of the
+> libraries have corresponding OPAM packages.   I would like to create an
+> OPAM  switch that is an alias of the "system" switch, but to also inform
+> OPAM about the packages already installed system-wide.  Simply creating a
+> switch a as an alias of "system" seems to "not notice" any of the libraries
+> installed via RPMs.  Do you have any suggestions?
+> 
+> The set of RPMs installed on the system changes at glacial speeds, so
+> having a dumb script into which I hard-code some information about the
+> packages installed by system-wide RPMs is perfectly acceptable in my case,
+> if a more elegant solution does not exist (yet): I just would like to know
+> what information I would need to hard-code, and I am hoping that asking
+> here can save me a few hours of hunting through the OPAM source code.
+> 
+> In case it matters, this is OPAM 2.0 pre-release.
+> 
+> Thank you in advance!
+
+Hi
+
+This is unfortunately not supported at the moment, as it would be quite 
+difficult in general to map system packages (from all the OSes and ditributions 
+out there) to opam packages, including version numbers, fixes, etc.
+
+If you really want to avoid recompilations, you could try a few workarounds, 
+though:
+
+- find the corresponding opam packages and their versions, pin them (with `-n`) 
+and pretend to install them with `--fake`. This will register them as 
+installed, but without any processing. It is pretty brittle, though, and be 
+careful that all fake-installed packages really are on the system.
+
+- or, much cleaner, but also more work, define your own package repository 
+(it's pretty simple), get the definitions of the packages you are interested in 
+from the official opam-repository, and remove their `url` definitions, as well as 
+build, install and remove instructions to make them dummy packages. Then the 
+clients should use this repository on top on the official repository (`opam repo 
+add`) to get the dummy packages. Then, on the client side, make sure to use 
+`opam pin` to remain on the provided versions of the packages.
+
+There may still be issues with `ocamlfind`, which needs to find the system 
+packages besides the opam ones (and here, we can't filter between what is 
+installed opam-wise or not). Using `setenv:` in the concerned packages might 
+help.
+
+Overall, I wouldn't recommend it: this requires quite some work, and there is 
+no guarantee that it will work reliably (package mapping is never 1-1). This 
+is the reason why the approach taken by opam is to rebuild all packages from 
+their source, using its own package definitions. We are experimenting with ways 
+to have binary caches of packages built by opam, though.
+
+Best,
+Louis Gesbert - OCamlPro
+
+From zhenya1007 at gmail.com  Fri Apr 13 18:48:27 2018
+From: zhenya1007 at gmail.com (Evgeny Roubinchtein)
+Date: Fri, 13 Apr 2018 10:48:27 -0700
+Subject: [ocaml-platform] How to inform OPAM's "system" switch about
+ OCaml libraries installed by RPMs?
+In-Reply-To: <3604243.qhfdeTcYmI@maitake>
+References: <CAGYXaSZdOVCEQb1PyK-e6iezMnSxmYRKL=CBN-_dGiJe-oKTCA@mail.gmail.com>
+ <3604243.qhfdeTcYmI@maitake>
+Message-ID: <CAGYXaSbrcuHYSg4=7EGt7Xevw6n8qtGHkQwuxFaug6pRf8-koA@mail.gmail.com>
+
+This is very helpful.  Thank you for a detailed reply.
+
+-- 
+Best,
+Evgeny ("Zhenya")
+
+On Fri, Apr 13, 2018 at 2:26 AM, <louis.gesbert at ocamlpro.com> wrote:
+
+> On jeudi 12 avril 2018 15:16:48 CEST Evgeny Roubinchtein wrote:
+> > Dear OCaml platform users and developers,
+> >
+> > I am working in an environment where OCaml (but not OPAM) is installed
+> > system-wide via RPMs, along with a few OCaml libraries.  All of the
+> > libraries have corresponding OPAM packages.   I would like to create an
+> > OPAM  switch that is an alias of the "system" switch, but to also inform
+> > OPAM about the packages already installed system-wide.  Simply creating a
+> > switch a as an alias of "system" seems to "not notice" any of the
+> libraries
+> > installed via RPMs.  Do you have any suggestions?
+> >
+> > The set of RPMs installed on the system changes at glacial speeds, so
+> > having a dumb script into which I hard-code some information about the
+> > packages installed by system-wide RPMs is perfectly acceptable in my
+> case,
+> > if a more elegant solution does not exist (yet): I just would like to
+> know
+> > what information I would need to hard-code, and I am hoping that asking
+> > here can save me a few hours of hunting through the OPAM source code.
+> >
+> > In case it matters, this is OPAM 2.0 pre-release.
+> >
+> > Thank you in advance!
+>
+> Hi
+>
+> This is unfortunately not supported at the moment, as it would be quite
+> difficult in general to map system packages (from all the OSes and
+> ditributions
+> out there) to opam packages, including version numbers, fixes, etc.
+>
+> If you really want to avoid recompilations, you could try a few
+> workarounds,
+> though:
+>
+> - find the corresponding opam packages and their versions, pin them (with
+> `-n`)
+> and pretend to install them with `--fake`. This will register them as
+> installed, but without any processing. It is pretty brittle, though, and
+> be
+> careful that all fake-installed packages really are on the system.
+>
+> - or, much cleaner, but also more work, define your own package repository
+> (it's pretty simple), get the definitions of the packages you are
+> interested in
+> from the official opam-repository, and remove their `url` definitions, as
+> well as
+> build, install and remove instructions to make them dummy packages. Then
+> the
+> clients should use this repository on top on the official repository
+> (`opam repo
+> add`) to get the dummy packages. Then, on the client side, make sure to
+> use
+> `opam pin` to remain on the provided versions of the packages.
+>
+> There may still be issues with `ocamlfind`, which needs to find the system
+> packages besides the opam ones (and here, we can't filter between what is
+> installed opam-wise or not). Using `setenv:` in the concerned packages
+> might
+> help.
+>
+> Overall, I wouldn't recommend it: this requires quite some work, and there
+> is
+> no guarantee that it will work reliably (package mapping is never 1-1).
+> This
+> is the reason why the approach taken by opam is to rebuild all packages
+> from
+> their source, using its own package definitions. We are experimenting with
+> ways
+> to have binary caches of packages built by opam, though.
+>
+> Best,
+> Louis Gesbert - OCamlPro
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20180413/1b472eff/attachment.html>
+

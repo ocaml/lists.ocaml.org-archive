@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 1.3 roadmap
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%201.3%20roadmap&In-Reply-To=%3C2524731.qnNM7Xpy0S%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000941.html">
+   <LINK REL="Next"  HREF="000950.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 1.3 roadmap</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%201.3%20roadmap&In-Reply-To=%3C2524731.qnNM7Xpy0S%40agaric%3E"
+       TITLE="[opam-devel] OPAM 1.3 roadmap">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon Feb 23 01:07:58 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000941.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+        <LI>Next message: <A HREF="000950.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#949">[ date ]</a>
+              <a href="thread.html#949">[ thread ]</a>
+              <a href="subject.html#949">[ subject ]</a>
+              <a href="author.html#949">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>That's starting to sound fairly consistent:
+
+# Secure OPAM itself a bit:
+
+  * Sandbox the build step: not sure how to do it, but it should be without network access, and only allowed to write to its build dir.
+  * Diff the prefix before and after the install step to track installed/changed files. That could use git ; for most packages, automatically generating a .install file would be possible. Installation should be sandboxed so that it can't write outside of the prefix, and is without network, too.
+  * Cleanup the usage of external commands (curl, POSIX, etc.)
+
+
+# Secure the repository and updates:
+
+Integrate some implementation of TUF to have signed packages, signed metadata and signed timestamps, and allow OPAM to detect anything suspicious. This implies:
+  * defining a signing and repository update workflow, adding as little burden as possible
+  * update opam-admin to apply the signing rules
+  * obviously, update opam to check all that
+  * update opam-publish (?) to help contribute signed packages, depending on the chosen workflow
+
+I'm still getting through the literature.
+
+
+# Improve Windows support
+
+Should be much helped by the cleanup of external commands above. This may include several tracks and I am not sure if we should define a clear release goal (or what that would be):
+  * write a tutorial on how to get an OPAM setup on Windows (what works, eg. purely Cygwin to start with, then we can improve on that)
+  * add dedicated automated tests
+  * have the core of OPAM build and run natively (mingw or vc, no cygwin)
+  * have a way to build packages with it ?
+
+
+That would be more than enough to justify a 1.3 release !
+
+
+Some more precise answers:
+
+&gt;<i> - Registering the files that are installed is going to be quite a large undertaking within the repository, but also makes eventual binary distributions much easier. This is traditionally done by having a 'fakeroot' into which packages are installed, but this requires changing every package
+</I>
+Yes, that's the approach taken by `ocp-bin`: you add wrappers to your packages descriptions, and they register the installed files, which can then be packed and used as a cache to reinstall on the same or an identical system (same depopts installed, same versions, etc.)
+
+&gt;<i> One interesting option is that we could turn ~/.opam/&lt;switch&gt; into a .git root, and simply version control it using ocaml-git.  This way anything can write into the checkout, and we simply do a `git add` after each installation to figure what changed in the staging area.  It also makes it significantly easier to revert back to an older snapshot.  If filesystem space is a concern, this feature can be deactivated and no git tracking done.
+</I>
+`opam cherry-pick core_kernel` :)
+Easier, I don't know, but certainly more reliable ! My ~/.opam is 11G already, so I probably don't care much about filesystem space. Wouldn't Darcs allow us to encode the package dependencies into the VC graph ? :D
+
+
+&gt;<i> - The `source linux` tags have to go.  Not sure how though...
+</I>
+Oh yes, implementing them in `opam-depext` gave me the chills.
+
+&gt;<i> The only other branch I don't have much view on is the compilers-as-a-package branch.  While that's a feature that could help out other communities like Coq, I'm not sure how it fits in.  It's going to be very difficult to do more than one major repository migration at a time, and security+Windows is already a lot to take on...
+</I>
+There are two parts in this:
+* Support from OPAM: removing the source from compiler definitions and moving that to packages is supported already in 1.2.1. Generating a custom package for the &quot;system compiler&quot; -- like we currently generate a custom compiler definition -- isn't yet, though, but shouldn't raise any problems (I just hoped to integrate it into something more general).
+* Rewriting the repository to migrate to that format: there are scripts that do it ; I wouldn't advise it currently, though, for the following reasons:
+  - there isn't a huge immediate benefit
+  - we would need the `provides` field for it to be really useful
+  - migrating from one to the other may be a little awkward
+  - repository backwards compatibility
+  - currently, compiler definitions may download huge patches ; OPAM packages don't support downloading multiple sources at the moment.
+
+On the other hand, it can already be used for e.g. a Coq or experimental repo (for people changing OCaml version all the time ?) without trouble; maybe it would be worth writing more documentation on it ?
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000941.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+	<LI>Next message: <A HREF="000950.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#949">[ date ]</a>
+              <a href="thread.html#949">[ thread ]</a>
+              <a href="subject.html#949">[ subject ]</a>
+              <a href="author.html#949">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

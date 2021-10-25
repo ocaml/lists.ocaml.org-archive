@@ -1,0 +1,207 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> type_conv/ocaml4 release
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20type_conv/ocaml4%20release&In-Reply-To=%3CCADKNfh%2B%2B8af17hCoZyUbwVKazVOD%2BaSxETTRFrWnOmF%3DxYc%3Dng%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>type_conv/ocaml4 release</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20type_conv/ocaml4%20release&In-Reply-To=%3CCADKNfh%2B%2B8af17hCoZyUbwVKazVOD%2BaSxETTRFrWnOmF%3DxYc%3Dng%40mail.gmail.com%3E"
+       TITLE="type_conv/ocaml4 release">yminsky at gmail.com
+       </A><BR>
+    <I>Sat Sep  8 19:55:42 BST 2012</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1429">[ date ]</a>
+              <a href="thread.html#1429">[ thread ]</a>
+              <a href="subject.html#1429">[ subject ]</a>
+              <a href="author.html#1429">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On Fri, Sep 7, 2012 at 9:19 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">avsm2 at cl.cam.ac.uk</A>&gt; wrote:
+&gt;<i> Stream of notes here:
+</I>&gt;<i>
+</I>&gt;<i> - Compiles on the Mac, hurrah!  Compiling my little HTTP library against it,
+</I>&gt;<i>   and I notice:
+</I>
+Great.
+
+&gt;<i> Async_core:
+</I>&gt;<i> (** [write_when_ready writer ~f] waits until there is space available in the
+</I>&gt;<i>     pipe, and then calls [f write], where [write] can be used by [f]
+</I>&gt;<i>     to write a single value into the pipe at a time.  [with_write]
+</I>&gt;<i>     guarantees that the pipe is open when it calls [f], and hence
+</I>&gt;<i>     that the writes will succeed, unless [f] itself closes the
+</I>&gt;<i>     pipe. *)
+</I>&gt;<i>
+</I>&gt;<i> - Pipe.with_writer is now gone, but there is still a reference to it
+</I>&gt;<i>   in the ocamldoc above in the renamed function.
+</I>
+Thanks.  Will fix!
+
+&gt;<i> - Similarly, Deferred.whenever is now gone, but there is a reference that
+</I>&gt;<i>   should be renamed to Deferred.dont_wait_for:
+</I>&gt;<i>   async_core/async_stream.mli:(** [iter t ~f] = [whenever (iter' t ~f:(fun a
+</I>&gt;<i>                                    -&gt; f a; Deferred.unit))] *)
+</I>
+Will fix!
+
+&gt;<i> - The new name Deferred.don't_wait_for seems really awkward with the
+</I>&gt;<i>   apostrophe in it.  Why not just call it 'do_not_wait_for' or
+</I>&gt;<i>   'dont_wait_for' ?  Its quite rare to have function names with
+</I>&gt;<i>   special characters, and the apostrophe is easy to mistake for a
+</I>&gt;<i>   type variable when scanning through code.  It may be too much
+</I>&gt;<i>   hassle to change it now though...
+</I>
+Yeah, we had a bunch of unsatisfactory names to choose between, and
+I'm somewhat regret changing it, but it's far too much pain to change
+it again now.  I agree the apostrophe is not ideal, but I was for it
+before I was against it...
+
+&gt;<i> - The unconditional use of GADTs in async_extra answers my earlier
+</I>&gt;<i>   question about ocaml-4 being a requirement. I'll add a constraint
+</I>&gt;<i>   to the OPAM packages.
+</I>
+Where specifically?  As I said, our internal tree doesn't use GADTs,
+since everything must compile against 3.12.1 to get through our
+compile daemon.
+
+&gt;<i> - I like the new TCP.Where_to_listen use of GADTs. It's a much more
+</I>&gt;<i>   self-documenting interface than before!
+</I>
+The version I'm looking at doesn't require GADTs, so again, I'm
+confused.
+
+&gt;<i> Cohttp only requires a small diff to compile with the new
+</I>&gt;<i> version. I'll test it over the weekend as I write tutorial notes.
+</I>&gt;<i>
+</I>&gt;<i> -anil
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On 7 Sep 2012, at 17:43, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;<i> Trying it now. I've pushed updates to the avsm/opam-core-pre0 and am
+</I>&gt;<i> compiling them now.
+</I>&gt;<i>
+</I>&gt;<i> Is there a hard requirement on ocaml-4.00.0 now? bin_prot's myocamlbuild:
+</I>&gt;<i>
+</I>&gt;<i> + + /usr/bin/ocamlopt.opt -I /usr/lib/ocaml/ocamlbuild unix.cmxa
+</I>&gt;<i> /usr/lib/ocaml/ocamlbuild/ocamlbuildlib.cmxa myocamlbuild.ml
+</I>&gt;<i> /usr/lib/ocaml/ocamlbuild/ocamlbuild.cmx -o myocamlbuild
+</I>&gt;<i> + File &quot;myocamlbuild.ml&quot;, line 506, characters 24-50:
+</I>&gt;<i> + Error: Unbound value Filename.get_temp_dir_name
+</I>&gt;<i>
+</I>&gt;<i> ...which only appeared in ocaml-4.00.0, so 3.12.1 compilation fails
+</I>&gt;<i> (Debian/wheezy).
+</I>&gt;<i>
+</I>&gt;<i> -anil
+</I>&gt;<i>
+</I>&gt;<i> On 7 Sep 2012, at 17:13, Yury Sulsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yury.sulsky at gmail.com</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;<i> Hi Anil,
+</I>&gt;<i>
+</I>&gt;<i> I've just uploaded new packages to
+</I>&gt;<i> <A HREF="https://ocaml.janestreet.com/ocaml-core/108.07.00-pre1/.">https://ocaml.janestreet.com/ocaml-core/108.07.00-pre1/.</A> I've moved the
+</I>&gt;<i> async hack down into base/async/setup.ml, so it should work when building
+</I>&gt;<i> async individually.
+</I>&gt;<i>
+</I>&gt;<i> Could you take a look and see if they work for you?
+</I>&gt;<i>
+</I>&gt;<i> Thanks,
+</I>&gt;<i> Yury
+</I>&gt;<i>
+</I>&gt;<i> On Thu, Sep 6, 2012 at 7:12 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Spot on... looks like OPAM might be leaking an environment variable that
+</I>&gt;&gt;<i> is pointing to the wrong DLL stubs directory after a compiler switch.
+</I>&gt;&gt;<i> Should be easy to fix.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Sorry about that; I'll clean up the 25 different OCaml installations I
+</I>&gt;&gt;<i> have and do a more fresh build as soon as I get a chance!
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> -anil
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On 6 Sep 2012, at 16:09, Yury Sulsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yury.sulsky at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Ah, okay. Anil, it looks like there might be some mixup in your install.
+</I>&gt;&gt;<i> The string &quot;caml_hash_mix_double&quot; only appears ocaml-4.00, but nowhere in
+</I>&gt;&gt;<i> ocaml-3.12.
+</I>&gt;&gt;<i> Also, I was confused. It turned out I was testing with 3.12.1 on Mac OS
+</I>&gt;&gt;<i> after all, which is why I didn't catch that unused value warning. I'll
+</I>&gt;&gt;<i> install and test with 4.00 on a Mac tomorrow.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Thu, Sep 6, 2012 at 6:55 PM, Yury Sulsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yury.sulsky at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Hi Markus,
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> A few of your sexplib changes didn't make it into this release, and I'll
+</I>&gt;&gt;&gt;<i> take a look at your patch queue to see what else we're missing. But I've
+</I>&gt;&gt;&gt;<i> been building and testing on Mac OS X. I'll see if I can recreate Anil's
+</I>&gt;&gt;&gt;<i> missing symbol problem (I haven't been testing with 3.12.1)
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Thu, Sep 6, 2012 at 6:42 PM, Markus Mottl &lt;<A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>&gt;
+</I>&gt;&gt;&gt;<i> wrote:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> On Thursday, September 6, 2012, Anil Madhavapeddy wrote:
+</I>&gt;&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;&gt;<i> The warnings are due to unused variables,
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> You might also want to apply my Bitbucket patch queue for ocaml-core.
+</I>&gt;&gt;&gt;&gt;<i> The resulting tree should build fine on Mac OS X, fixes a couple of bugs,
+</I>&gt;&gt;&gt;&gt;<i> and adds some useful features.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Regards,
+</I>&gt;&gt;&gt;&gt;<i> Markus
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> --
+</I>&gt;&gt;&gt;&gt;<i> Markus Mottl        <A HREF="http://www.ocaml.info">http://www.ocaml.info</A>        <A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1429">[ date ]</a>
+              <a href="thread.html#1429">[ thread ]</a>
+              <a href="subject.html#1429">[ subject ]</a>
+              <a href="author.html#1429">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

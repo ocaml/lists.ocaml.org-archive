@@ -1,0 +1,1040 @@
+From hannes at mehnert.org  Fri Mar  4 11:46:17 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Fri, 4 Mar 2016 11:46:17 +0000
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <3345875.3vZbcWxVr6@maitake>
+References: <3345875.3vZbcWxVr6@maitake>
+Message-ID: <56D97589.2030902@mehnert.org>
+
+Hello,
+
+
+what I miss from this mail is sandboxing - while "tracking installed
+files" is included - but what about containing the build process in a
+chroot-like environment (there was somewhere a long discussion what is
+suitable and what not on which platforms).  Is anyone putting effort
+into this?
+
+
+Since signing won't make it into 1.3 (or 2.0, however you name it), I'd
+like to propose to remove the "--insecure" and "--no-check-certificate"
+arguments from the download program [curl/wget] (in
+src/repository/opamDownload.ml).
+
+The history of this starts in https://github.com/ocaml/opam/issues/55 -
+some sites had invalid/untrusted certificates.  A followup is in
+https://github.com/ocaml/opam/issues/2006 .
+
+My reasoning: certificates which are trusted with the OS shipped trust
+anchors are nowadays easy to get (let's encrypt hands those out for
+free, startssl and others also provide free certificates).  In order to
+improve this Internet, it is better to be picky (so that people will
+actually fix their https infrastructure).  Also given that some work has
+been done to transparently mirror packages, there'll be a (secure!?)
+fallback in case package authors mess sth up.
+
+People who don't bother can still manually setup their download tool to
+sth which does not check any certificates.  Secure should be the default
+(also for downloading the opam repository, which is done via https, but
+no certificates are checked).
+
+I'm sure someone (either opam weather status or dockerized scripts, or
+the mirror) will be easily able to setup infrastructure to report
+archive download failures immediately and report them upstream.
+
+
+Thanks for working on this, Louis (and others), and I'm looking forward
+to a new release really soon now,
+
+hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160304/2f3d9835/attachment.sig>
+
+From louis.gesbert at ocamlpro.com  Sat Mar  5 00:56:53 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 05 Mar 2016 09:56:53 +0900
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <56D97589.2030902@mehnert.org>
+References: <3345875.3vZbcWxVr6@maitake> <56D97589.2030902@mehnert.org>
+Message-ID: <1710384.3tdE6ThiEa@maitake>
+
+Removing `--insecure`: absolutely, I would be glad to if I get agreement from 
+the repository team.
+
+Sandboxing: we've actually been studying this recently with Gr?goire, and it 
+seems it's not that difficult to do on Linux, using the namespaces. The related 
+features are actually available with just some calls to `unshare` and `mount`, 
+and we wrote a quick script that makes ~ read-only, while keeping only the 
+build dir read-write, and disabling network. That's for build, for install, 
+only the switch prefix should be rw, and the build dir ro. It's absolutely not 
+secure for now, but it's a good start.
+
+With that, my idea for 2.0 was to provide a generic way to configure wrappers 
+for package commands in the different scopes, document how to put the namespace 
+control in place, and do it on our automated tests on Linux: this would allow 
+to test the feature well, and provide a good sanity check, if nothing more 
+except for opt-in users. This would also allow to try implementations on other 
+OSes (I am sure the Docker guys would be glad to help, this is their stuff 
+after all ? ;)). If successful, the next release could include it built-in.
+
+How does this sound ?
+
+Le vendredi 4 mars 2016, 11:46:17 Hannes Mehnert a ?crit :
+> Hello,
+> 
+> 
+> what I miss from this mail is sandboxing - while "tracking installed
+> files" is included - but what about containing the build process in a
+> chroot-like environment (there was somewhere a long discussion what is
+> suitable and what not on which platforms).  Is anyone putting effort
+> into this?
+> 
+> 
+> Since signing won't make it into 1.3 (or 2.0, however you name it), I'd
+> like to propose to remove the "--insecure" and "--no-check-certificate"
+> arguments from the download program [curl/wget] (in
+> src/repository/opamDownload.ml).
+> 
+> The history of this starts in https://github.com/ocaml/opam/issues/55 -
+> some sites had invalid/untrusted certificates.  A followup is in
+> https://github.com/ocaml/opam/issues/2006 .
+> 
+> My reasoning: certificates which are trusted with the OS shipped trust
+> anchors are nowadays easy to get (let's encrypt hands those out for
+> free, startssl and others also provide free certificates).  In order to
+> improve this Internet, it is better to be picky (so that people will
+> actually fix their https infrastructure).  Also given that some work has
+> been done to transparently mirror packages, there'll be a (secure!?)
+> fallback in case package authors mess sth up.
+> 
+> People who don't bother can still manually setup their download tool to
+> sth which does not check any certificates.  Secure should be the default
+> (also for downloading the opam repository, which is done via https, but
+> no certificates are checked).
+> 
+> I'm sure someone (either opam weather status or dockerized scripts, or
+> the mirror) will be easily able to setup infrastructure to report
+> archive download failures immediately and report them upstream.
+> 
+> 
+> Thanks for working on this, Louis (and others), and I'm looking forward
+> to a new release really soon now,
+> 
+> hannes
+
+From hannes at mehnert.org  Sat Mar  5 12:49:37 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Sat, 5 Mar 2016 12:49:37 +0000
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <1710384.3tdE6ThiEa@maitake>
+References: <3345875.3vZbcWxVr6@maitake> <56D97589.2030902@mehnert.org>
+ <1710384.3tdE6ThiEa@maitake>
+Message-ID: <56DAD5E1.8030403@mehnert.org>
+
+On 05/03/2016 00:56, Louis Gesbert wrote:
+> Removing `--insecure`: absolutely, I would be glad to if I get agreement from 
+> the repository team.
+
+I see that you merged https://github.com/ocaml/opam/pull/2460 (which
+removes --insecure/--no-check-certificates ; in which I also reported
+statistics about https hosts in opam-repository).
+
+> Sandboxing: we've actually been studying this recently with Gr?goire, and it 
+> seems it's not that difficult to do on Linux, using the namespaces. The related 
+> features are actually available with just some calls to `unshare` and `mount`, 
+> and we wrote a quick script that makes ~ read-only, while keeping only the 
+> build dir read-write, and disabling network. That's for build, for install, 
+> only the switch prefix should be rw, and the build dir ro. It's absolutely not 
+> secure for now, but it's a good start.
+> 
+> With that, my idea for 2.0 was to provide a generic way to configure wrappers 
+> for package commands in the different scopes, document how to put the namespace 
+> control in place, and do it on our automated tests on Linux: this would allow 
+> to test the feature well, and provide a good sanity check, if nothing more 
+> except for opt-in users. This would also allow to try implementations on other 
+> OSes (I am sure the Docker guys would be glad to help, this is their stuff 
+> after all ? ;)). If successful, the next release could include it built-in.
+> 
+> How does this sound ?
+
+that sounds great.  Thanks for describing the current state!
+
+hannes
+
+
+From Fabrice.Le_fessant at inria.fr  Mon Mar 21 12:43:06 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Mon, 21 Mar 2016 12:43:06 +0000
+Subject: [opam-devel] build bot monitoring the opam-repository
+Message-ID: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+
+Hi,
+
+   In the last weeks, I have been working on a bot that monitors the
+opam-repository and displays issues when linting and building the packages.
+
+  Currently, the bot runs on a 4-core server with Debian 8, and prints
+results for 3.12.1, 4.00.1, 4.01.0, 4.02.3 and 4.03.0+beta1:
+
+http://opam.ocamlpro.com/builder/html/report-last.html
+
+  It tries to keep up with the opam-repository, in a best effort way.
+Compiling the full repository on one OCaml version can take one or two
+days, but next compilations are incremental (only impacted packages are
+recompiled, and binary archives are used to re-use previous compilations),
+so a report for every commit should be available after only a few
+minutes/hours, depending on the number of packages that need to be
+recompiled.
+
+  The sources are available here, if you want to start it on a different
+hardware/OS:
+
+https://github.com/OCamlPro/opam-builder
+
+Feedback and PRs are welcome !
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160321/5bc775c8/attachment.html>
+
+From yotambarnoy at gmail.com  Mon Mar 21 14:50:47 2016
+From: yotambarnoy at gmail.com (Yotam Barnoy)
+Date: Mon, 21 Mar 2016 10:50:47 -0400
+Subject: [opam-devel] build bot monitoring the opam-repository
+In-Reply-To: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+References: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+Message-ID: <CAN6ygOkEsMc_qpSLvCQ=JS-rD9gUeek0tToqmRK82AnPJGUj9w@mail.gmail.com>
+
+This is great!
+
+If a port has a blank box for a specific compiler version, is that because
+the constraints don't match?
+
+-Yotam
+
+On Mon, Mar 21, 2016 at 8:43 AM, Fabrice Le Fessant <
+Fabrice.Le_fessant at inria.fr> wrote:
+
+> Hi,
+>
+>    In the last weeks, I have been working on a bot that monitors the
+> opam-repository and displays issues when linting and building the packages.
+>
+>   Currently, the bot runs on a 4-core server with Debian 8, and prints
+> results for 3.12.1, 4.00.1, 4.01.0, 4.02.3 and 4.03.0+beta1:
+>
+> http://opam.ocamlpro.com/builder/html/report-last.html
+>
+>   It tries to keep up with the opam-repository, in a best effort way.
+> Compiling the full repository on one OCaml version can take one or two
+> days, but next compilations are incremental (only impacted packages are
+> recompiled, and binary archives are used to re-use previous compilations),
+> so a report for every commit should be available after only a few
+> minutes/hours, depending on the number of packages that need to be
+> recompiled.
+>
+>   The sources are available here, if you want to start it on a different
+> hardware/OS:
+>
+> https://github.com/OCamlPro/opam-builder
+>
+> Feedback and PRs are welcome !
+> --Fabrice
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160321/800982bf/attachment.html>
+
+From Fabrice.Le_fessant at inria.fr  Mon Mar 21 15:40:03 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Mon, 21 Mar 2016 15:40:03 +0000
+Subject: [opam-devel] build bot monitoring the opam-repository
+In-Reply-To: <CAN6ygOkEsMc_qpSLvCQ=JS-rD9gUeek0tToqmRK82AnPJGUj9w@mail.gmail.com>
+References: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+ <CAN6ygOkEsMc_qpSLvCQ=JS-rD9gUeek0tToqmRK82AnPJGUj9w@mail.gmail.com>
+Message-ID: <CAHvkLrOXcVK8rw-LooGg6BbEYxWCeygjuAOvQvkj1H-F713eGQ@mail.gmail.com>
+
+The white/blank box means that the package/version is not available for
+that version of OCaml, i.e. there is a constraint "available" that prevents
+compilation on that version.
+
+--Fabrice
+
+On Mon, Mar 21, 2016 at 3:51 PM Yotam Barnoy <yotambarnoy at gmail.com> wrote:
+
+> This is great!
+>
+> If a port has a blank box for a specific compiler version, is that because
+> the constraints don't match?
+>
+> -Yotam
+> On Mon, Mar 21, 2016 at 8:43 AM, Fabrice Le Fessant <
+> Fabrice.Le_fessant at inria.fr> wrote:
+>
+>> Hi,
+>>
+>>    In the last weeks, I have been working on a bot that monitors the
+>> opam-repository and displays issues when linting and building the packages.
+>>
+>>   Currently, the bot runs on a 4-core server with Debian 8, and prints
+>> results for 3.12.1, 4.00.1, 4.01.0, 4.02.3 and 4.03.0+beta1:
+>>
+>> http://opam.ocamlpro.com/builder/html/report-last.html
+>>
+>>   It tries to keep up with the opam-repository, in a best effort way.
+>> Compiling the full repository on one OCaml version can take one or two
+>> days, but next compilations are incremental (only impacted packages are
+>> recompiled, and binary archives are used to re-use previous compilations),
+>> so a report for every commit should be available after only a few
+>> minutes/hours, depending on the number of packages that need to be
+>> recompiled.
+>>
+>>   The sources are available here, if you want to start it on a different
+>> hardware/OS:
+>>
+>> https://github.com/OCamlPro/opam-builder
+>>
+>> Feedback and PRs are welcome !
+>> --Fabrice
+>>
+>>
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>>
+>>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160321/c5a2473f/attachment.html>
+
+From anil at recoil.org  Wed Mar 23 10:52:58 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 23 Mar 2016 10:52:58 +0000
+Subject: [opam-devel] build bot monitoring the opam-repository
+In-Reply-To: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+References: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+Message-ID: <6A755032-6526-48FA-A919-5E4AF9D31C71@recoil.org>
+
+Hi Fabrice,
+
+Thanks for releasing this; it looks very useful!  The build bot looks like it could also benefit from the container infrastructure, since that takes care of depexts for a number of distributions.
+
+Before I look further at this, I just wanted to confirm that the licensing of the buildbot is intended to be fully AGPLv3.  It looks like there's a fork of opamLib here: https://github.com/OCamlPro/opam-builder/tree/master/libs/copam <https://github.com/OCamlPro/opam-builder/tree/master/libs/copam> renamed under the copam namespace.
+
+regards,
+Anil
+
+> On 21 Mar 2016, at 12:43, Fabrice Le Fessant <Fabrice.Le_fessant at inria.fr> wrote:
+> 
+> Hi,
+> 
+>    In the last weeks, I have been working on a bot that monitors the opam-repository and displays issues when linting and building the packages.
+> 
+>   Currently, the bot runs on a 4-core server with Debian 8, and prints results for 3.12.1, 4.00.1, 4.01.0, 4.02.3 and 4.03.0+beta1:
+> 
+> http://opam.ocamlpro.com/builder/html/report-last.html <http://opam.ocamlpro.com/builder/html/report-last.html>
+> 
+>   It tries to keep up with the opam-repository, in a best effort way. Compiling the full repository on one OCaml version can take one or two days, but next compilations are incremental (only impacted packages are recompiled, and binary archives are used to re-use previous compilations), so a report for every commit should be available after only a few minutes/hours, depending on the number of packages that need to be recompiled.
+> 
+>   The sources are available here, if you want to start it on a different hardware/OS:
+> 
+> https://github.com/OCamlPro/opam-builder <https://github.com/OCamlPro/opam-builder>
+> 
+> Feedback and PRs are welcome !
+> --Fabrice
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160323/7810696e/attachment.html>
+
+From Fabrice.Le_fessant at inria.fr  Wed Mar 23 11:06:02 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Wed, 23 Mar 2016 11:06:02 +0000
+Subject: [opam-devel] build bot monitoring the opam-repository
+In-Reply-To: <6A755032-6526-48FA-A919-5E4AF9D31C71@recoil.org>
+References: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+ <6A755032-6526-48FA-A919-5E4AF9D31C71@recoil.org>
+Message-ID: <CAHvkLrM7h7b1tAR1X=S1NjW=T-fdKg66C1wcPFQa_C54CqXh1w@mail.gmail.com>
+
+Hi Anil,
+
+On Wed, Mar 23, 2016 at 11:53 AM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> The build bot looks like it could also benefit from the container
+> infrastructure, since that takes care of depexts for a number of
+> distributions.
+>
+
+Currently, we use the same computer for all compilations (my personal
+server at OVH), which means we have only one configuration of external
+packages. It's both a good thing (we can re-use binaries from previous
+compilations) but also a limitation (we cannot compile two packages that
+would have conflicting external dependencies). Indeed, running the bot on a
+large number of distributions would solve that later issue.
+
+Before I look further at this, I just wanted to confirm that the licensing
+> of the buildbot is intended to be fully AGPLv3.  It looks like there's a
+> fork of opamLib here:
+> https://github.com/OCamlPro/opam-builder/tree/master/libs/copam renamed
+> under the copam namespace.
+>
+
+Yes, everything should be AGPLv3 with an attribution exception, except some
+LGPL files that should have kept their original license. Copam itself is
+not a copy of opamLib, but a wrapper around the opam command. There are
+maybe a few files which were taken from OPAM (the Debian versioning, the
+lexer and parser for OPAM files), they should be under LGPLv3. I will check
+that the original headers for these files were kept, indeed.
+
+Regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160323/2d5faf24/attachment.html>
+
+From anil at recoil.org  Wed Mar 23 11:10:17 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 23 Mar 2016 11:10:17 +0000
+Subject: [opam-devel] build bot monitoring the opam-repository
+In-Reply-To: <CAHvkLrM7h7b1tAR1X=S1NjW=T-fdKg66C1wcPFQa_C54CqXh1w@mail.gmail.com>
+References: <CAHvkLrM9LgFUm33eb+5WBNZicWwG+wUB9B92Z3YFaQ4xL-Txcg@mail.gmail.com>
+ <6A755032-6526-48FA-A919-5E4AF9D31C71@recoil.org>
+ <CAHvkLrM7h7b1tAR1X=S1NjW=T-fdKg66C1wcPFQa_C54CqXh1w@mail.gmail.com>
+Message-ID: <2D9C22FF-5E9F-4BCE-84FB-31FCA7809B53@recoil.org>
+
+On 23 Mar 2016, at 11:06, Fabrice Le Fessant <Fabrice.Le_fessant at inria.fr> wrote:
+> 
+> Hi Anil,
+> 
+> On Wed, Mar 23, 2016 at 11:53 AM Anil Madhavapeddy <anil at recoil.org <mailto:anil at recoil.org>> wrote:
+> The build bot looks like it could also benefit from the container infrastructure, since that takes care of depexts for a number of distributions.
+> 
+> Currently, we use the same computer for all compilations (my personal server at OVH), which means we have only one configuration of external packages. It's both a good thing (we can re-use binaries from previous compilations) but also a limitation (we cannot compile two packages that would have conflicting external dependencies). Indeed, running the bot on a large number of distributions would solve that later issue.
+
+Makes sense.  If your server is running Linux, then you should be able to wrap the entire opam-builder in a Docker container.  That will give you an environment in which you can install external dependencies without contaminating the host, and also run different Linux distributions.  There are details of all the distribution images with OCaml and OPAM up at https://hub.docker.com/u/ocaml <https://hub.docker.com/u/ocaml>
+
+
+> Before I look further at this, I just wanted to confirm that the licensing of the buildbot is intended to be fully AGPLv3.  It looks like there's a fork of opamLib here: https://github.com/OCamlPro/opam-builder/tree/master/libs/copam <https://github.com/OCamlPro/opam-builder/tree/master/libs/copam> renamed under the copam namespace.
+> 
+> Yes, everything should be AGPLv3 with an attribution exception, except some LGPL files that should have kept their original license. Copam itself is not a copy of opamLib, but a wrapper around the opam command. There are maybe a few files which were taken from OPAM (the Debian versioning, the lexer and parser for OPAM files), they should be under LGPLv3. I will check that the original headers for these files were kept, indeed.
+
+Thanks for clarifying.  I'm unable to contribute to AGPLv3 code myself, so I won't be able to look at opam-builder directly.  Others may be able to -- please let me know if you need ocaml.org <http://ocaml.org/> infrastructure provisioned for it.
+
+regards,
+Anil
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160323/e8d9df5b/attachment.html>
+
+From anil at recoil.org  Mon Mar 28 14:46:36 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 28 Mar 2016 14:46:36 +0100
+Subject: [opam-devel] Fwd: [MirageOS-devel] ounit dependency failing for
+	mirage-xen package
+References: <56F92CBB.7090806@dornerworks.com>
+Message-ID: <7D853155-DD8A-4C8A-8112-4F1A96A673ED@recoil.org>
+
+Does anyone have time to check the forge distfiles to see if they've been altered maliciously?
+
+I see this in some builds:
+
+        /home/opam/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+          - 2e0a24648c55005978d4923eb4925b28 [expected result]
+          - 0f4f7cf8741d98cb419e45cc69962600 [actual result]
+        This may be fixed by running `opam update`.
+
+and the below spyware warning is very concerning indeed.
+
+-a
+
+
+> Begin forwarded message:
+> 
+> From: Aaron Cornelius <aaron.cornelius at dornerworks.com>
+> Subject: Re: [MirageOS-devel] ounit dependency failing for mirage-xen package
+> Date: 28 March 2016 at 14:08:11 BST
+> To: <talex5 at gmail.com>
+> Cc: mirageos-devel at lists.xenproject.org
+> 
+> On 3/26/2016 7:05 AM, Thomas Leonard wrote:
+>> On 23 March 2016 at 16:25, Aaron Cornelius
+>> <aaron.cornelius at dornerworks.com> wrote:
+>>> I am setting up a new cubieboard today with mirage, but when attempting to
+>>> install the necessary opam packages I get the following md5sum error on the
+>>> downloaded package:
+>>> 
+>>> [ERROR] Bad checksum for
+>>> /home/mirage/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+>>>          - 2e0a24648c55005978d4923eb4925b28 [expected result]
+>>>          - db53f6fe7559ddf572f672cbe2983f13 [actual result]
+>>>        This may be fixed by running `opam update`.
+>>> 
+>>> I have tried 4 times and received 4 different md5sums for the downloaded package.
+>>> 
+>>> Anyone have an idea what might be going on here?  I don't remember having this
+>>> much trouble in the past.
+>> 
+>> It works for me. Try downloading the archive manually and checking to
+>> see what's inside it (I'm guessing some kind of server error message).
+>> 
+>>  http://forge.ocamlcore.org/frs/download.php/1258/ounit-2.0.0.tar.gz
+> 
+> I discovered the problem, it appears that forge.ocamlcore.org is now on some
+> sort of spam/virus/spyware list and where I work is blocking access to it.  When
+> I try to download the file directly in chrome I get a google warning as well.
+> 
+> For the moment I created my own development opam repo and patched the ounit
+> requirement out of the xen-evtchn/xen-gnt/xenstore packages.
+> 
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+
+
+From gabriel.scherer at gmail.com  Mon Mar 28 15:12:15 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 28 Mar 2016 16:12:15 +0200
+Subject: [opam-devel] Fwd: [MirageOS-devel] ounit dependency failing for
+ mirage-xen package
+In-Reply-To: <7D853155-DD8A-4C8A-8112-4F1A96A673ED@recoil.org>
+References: <56F92CBB.7090806@dornerworks.com>
+ <7D853155-DD8A-4C8A-8112-4F1A96A673ED@recoil.org>
+Message-ID: <CAPFanBH_3cOiPb8Yg0Q4qcqhh5ALFG18sQ-pRECV7ZNiLrfDrQ@mail.gmail.com>
+
+There was news from malicious uploads on the forge from Sylvain yesterday:
+  https://forge.ocamlcore.org/forum/forum.php?forum_id=930
+
+On Mon, Mar 28, 2016 at 3:46 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> Does anyone have time to check the forge distfiles to see if they've been
+> altered maliciously?
+>
+> I see this in some builds:
+>
+>         /home/opam/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+>           - 2e0a24648c55005978d4923eb4925b28 [expected result]
+>           - 0f4f7cf8741d98cb419e45cc69962600 [actual result]
+>         This may be fixed by running `opam update`.
+>
+> and the below spyware warning is very concerning indeed.
+>
+> -a
+>
+>
+> > Begin forwarded message:
+> >
+> > From: Aaron Cornelius <aaron.cornelius at dornerworks.com>
+> > Subject: Re: [MirageOS-devel] ounit dependency failing for mirage-xen
+> package
+> > Date: 28 March 2016 at 14:08:11 BST
+> > To: <talex5 at gmail.com>
+> > Cc: mirageos-devel at lists.xenproject.org
+> >
+> > On 3/26/2016 7:05 AM, Thomas Leonard wrote:
+> >> On 23 March 2016 at 16:25, Aaron Cornelius
+> >> <aaron.cornelius at dornerworks.com> wrote:
+> >>> I am setting up a new cubieboard today with mirage, but when
+> attempting to
+> >>> install the necessary opam packages I get the following md5sum error
+> on the
+> >>> downloaded package:
+> >>>
+> >>> [ERROR] Bad checksum for
+> >>> /home/mirage/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+> >>>          - 2e0a24648c55005978d4923eb4925b28 [expected result]
+> >>>          - db53f6fe7559ddf572f672cbe2983f13 [actual result]
+> >>>        This may be fixed by running `opam update`.
+> >>>
+> >>> I have tried 4 times and received 4 different md5sums for the
+> downloaded package.
+> >>>
+> >>> Anyone have an idea what might be going on here?  I don't remember
+> having this
+> >>> much trouble in the past.
+> >>
+> >> It works for me. Try downloading the archive manually and checking to
+> >> see what's inside it (I'm guessing some kind of server error message).
+> >>
+> >>  http://forge.ocamlcore.org/frs/download.php/1258/ounit-2.0.0.tar.gz
+> >
+> > I discovered the problem, it appears that forge.ocamlcore.org is now on
+> some
+> > sort of spam/virus/spyware list and where I work is blocking access to
+> it.  When
+> > I try to download the file directly in chrome I get a google warning as
+> well.
+> >
+> > For the moment I created my own development opam repo and patched the
+> ounit
+> > requirement out of the xen-evtchn/xen-gnt/xenstore packages.
+> >
+> > _______________________________________________
+> > MirageOS-devel mailing list
+> > MirageOS-devel at lists.xenproject.org
+> > http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160328/088cbafa/attachment.html>
+
+From gildor478 at gmail.com  Tue Mar 29 07:04:43 2016
+From: gildor478 at gmail.com (Sylvain Le Gall)
+Date: Tue, 29 Mar 2016 06:04:43 +0000
+Subject: [opam-devel] Fwd: [MirageOS-devel] ounit dependency failing for
+ mirage-xen package
+In-Reply-To: <CAPFanBH_3cOiPb8Yg0Q4qcqhh5ALFG18sQ-pRECV7ZNiLrfDrQ@mail.gmail.com>
+References: <56F92CBB.7090806@dornerworks.com>
+ <7D853155-DD8A-4C8A-8112-4F1A96A673ED@recoil.org>
+ <CAPFanBH_3cOiPb8Yg0Q4qcqhh5ALFG18sQ-pRECV7ZNiLrfDrQ@mail.gmail.com>
+Message-ID: <CAOCAUGN72iZW6iYHU7UCSnXxB2pGj2FNDO1pahsJraHzz46zsg@mail.gmail.com>
+
+Hi,
+
+I have checked the file on the server and they haven't been altered (you
+can check by yourself, most of the time I add a .asc file to sign the
+tarball).
+
+Although, given that the warning about suspicious file is in Chrome, I
+don't see how it ends up into OPAM.
+
+FYI, thanks to T?rok investigation and Google Webmaster Tools, we found the
+error:
+https://www.virustotal.com/en/file/abc78143f1a4c5e4626e31654f9d0efdc328a05c346ce4fa696cd31baa691962/analysis/
+
+The problem is that gdk_pixbuf_mlsources is considered as a virus (same for
+labgladecc2). They actually don't contain any viruses, this is just a false
+positive on OCaml compiled bytecode program.
+
+Regards
+Sylvain
+
+Le lun. 28 mars 2016 ? 16:12, Gabriel Scherer <gabriel.scherer at gmail.com> a
+?crit :
+
+> There was news from malicious uploads on the forge from Sylvain yesterday:
+>   https://forge.ocamlcore.org/forum/forum.php?forum_id=930
+>
+> On Mon, Mar 28, 2016 at 3:46 PM, Anil Madhavapeddy <anil at recoil.org>
+> wrote:
+>
+>> Does anyone have time to check the forge distfiles to see if they've been
+>> altered maliciously?
+>>
+>> I see this in some builds:
+>>
+>>         /home/opam/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+>>           - 2e0a24648c55005978d4923eb4925b28 [expected result]
+>>           - 0f4f7cf8741d98cb419e45cc69962600 [actual result]
+>>         This may be fixed by running `opam update`.
+>>
+>> and the below spyware warning is very concerning indeed.
+>>
+>> -a
+>>
+>>
+>> > Begin forwarded message:
+>> >
+>> > From: Aaron Cornelius <aaron.cornelius at dornerworks.com>
+>> > Subject: Re: [MirageOS-devel] ounit dependency failing for mirage-xen
+>> package
+>> > Date: 28 March 2016 at 14:08:11 BST
+>> > To: <talex5 at gmail.com>
+>> > Cc: mirageos-devel at lists.xenproject.org
+>> >
+>> > On 3/26/2016 7:05 AM, Thomas Leonard wrote:
+>> >> On 23 March 2016 at 16:25, Aaron Cornelius
+>> >> <aaron.cornelius at dornerworks.com> wrote:
+>> >>> I am setting up a new cubieboard today with mirage, but when
+>> attempting to
+>> >>> install the necessary opam packages I get the following md5sum error
+>> on the
+>> >>> downloaded package:
+>> >>>
+>> >>> [ERROR] Bad checksum for
+>> >>> /home/mirage/.opam/packages.dev/ounit.2.0.0/ounit-2.0.0.tar.gz:
+>> >>>          - 2e0a24648c55005978d4923eb4925b28 [expected result]
+>> >>>          - db53f6fe7559ddf572f672cbe2983f13 [actual result]
+>> >>>        This may be fixed by running `opam update`.
+>> >>>
+>> >>> I have tried 4 times and received 4 different md5sums for the
+>> downloaded package.
+>> >>>
+>> >>> Anyone have an idea what might be going on here?  I don't remember
+>> having this
+>> >>> much trouble in the past.
+>> >>
+>> >> It works for me. Try downloading the archive manually and checking to
+>> >> see what's inside it (I'm guessing some kind of server error message).
+>> >>
+>> >>  http://forge.ocamlcore.org/frs/download.php/1258/ounit-2.0.0.tar.gz
+>> >
+>> > I discovered the problem, it appears that forge.ocamlcore.org is now
+>> on some
+>> > sort of spam/virus/spyware list and where I work is blocking access to
+>> it.  When
+>> > I try to download the file directly in chrome I get a google warning as
+>> well.
+>> >
+>> > For the moment I created my own development opam repo and patched the
+>> ounit
+>> > requirement out of the xen-evtchn/xen-gnt/xenstore packages.
+>> >
+>> > _______________________________________________
+>> > MirageOS-devel mailing list
+>> > MirageOS-devel at lists.xenproject.org
+>> > http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+>>
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160329/551640c5/attachment.html>
+
+From anil at recoil.org  Wed Mar 30 11:28:10 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 30 Mar 2016 11:28:10 +0100
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <94cf0c42-0c41-496d-a051-5d2617ccd7fc@googlegroups.com>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <94cf0c42-0c41-496d-a051-5d2617ccd7fc@googlegroups.com>
+Message-ID: <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+
+Hi Cheng,
+
+The OPAM tool indeed supports this model, but the automation infrastructure isn't fully written and deployed yet.  There are various tools in-flight that do portions of this, but none exist that poll the --dev repository (e.g. for a new GitHub release) and autocreate a PR.
+
+I think that's an interesting idea, as instead of the repository maintainer pushing a release and OPAM package, we could take the burden off the creator and poll for releases on the upstream GitHub repositories instead.
+
+One advantage of this "pull" model is that it ensures that the upstream `opam` metadata is sane, since that would form the basis for the PR. Right now they can diverge due to manual intervention.
+
+Anil
+
+> On 22 Feb 2016, at 22:14, Cheng Lou <chenglou92 at gmail.com> wrote:
+> 
+> Sorry for hijacking the discussion. I'm new to OPAM, but is there a reason why PRs for package upgrades can't be managed automatically? E.g. asking for a git URL and either periodically check for new release tags, or check on the fly when installing a library.
+> 
+> On Wednesday, February 17, 2016 at 7:27:49 AM UTC-5, Fabrice Le Fessant wrote:
+> Hi,
+> 
+>    If there is some need to help managing PRs to the opam-repository, Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github) are volunteers to spend some time doing it.
+> 
+> Best regards,
+> --Fabrice
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160330/eed7ba32/attachment.html>
+
+From thomas at gazagnaire.org  Wed Mar 30 11:38:39 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 30 Mar 2016 11:38:39 +0100
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <94cf0c42-0c41-496d-a051-5d2617ccd7fc@googlegroups.com>
+ <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+Message-ID: <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+
+> The OPAM tool indeed supports this model, but the automation infrastructure isn't fully written and deployed yet.  There are various tools in-flight that do portions of this, but none exist that poll the --dev repository (e.g. for a new GitHub release) and autocreate a PR.
+
+yes, that's a very good idea! (and not difficult to do actually)
+
+> I think that's an interesting idea, as instead of the repository maintainer pushing a release and OPAM package, we could take the burden off the creator and poll for releases on the upstream GitHub repositories instead.
+> 
+> One advantage of this "pull" model is that it ensures that the upstream `opam` metadata is sane, since that would form the basis for the PR. Right now they can diverge due to manual intervention.
+> 
+> Anil
+> 
+>> On 22 Feb 2016, at 22:14, Cheng Lou <chenglou92 at gmail.com <mailto:chenglou92 at gmail.com>> wrote:
+>> 
+>> Sorry for hijacking the discussion. I'm new to OPAM, but is there a reason why PRs for package upgrades can't be managed automatically? E.g. asking for a git URL and either periodically check for new release tags, or check on the fly when installing a library.
+>> 
+>> On Wednesday, February 17, 2016 at 7:27:49 AM UTC-5, Fabrice Le Fessant wrote:
+>> Hi,
+>> 
+>>    If there is some need to help managing PRs to the opam-repository, Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github) are volunteers to spend some time doing it.
+>> 
+>> Best regards,
+>> --Fabrice
+>> 
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org <mailto:opam-devel at lists.ocaml.org>
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160330/5fa5bd46/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Wed Mar 30 12:02:11 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 30 Mar 2016 20:02:11 +0900
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+ <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+Message-ID: <4656398.NSadKomMu3@maitake>
+
+Note that it would become more complicated with our upcoming signed 
+repository, since the package maintainer needs to sign for each new release.
+Maybe we could find a way to re-use git signed commits as releases, but that 
+sounds complicated and could be an attack vector.
+
+More simply, the mechanism could do all the work, and poll the package 
+maintainer for a signature (assuming he wouldn't sign without actually 
+checking ?) . Something like a mail with instructions and archive + cryptohash 
+to verify, then a command to run and it's done.
+
+Le mercredi 30 mars 2016, 11:38:39 Thomas Gazagnaire a ?crit :
+> > The OPAM tool indeed supports this model, but the automation
+> > infrastructure isn't fully written and deployed yet.  There are various
+> > tools in-flight that do portions of this, but none exist that poll the
+> > --dev repository (e.g. for a new GitHub release) and autocreate a PR.
+> yes, that's a very good idea! (and not difficult to do actually)
+> 
+> > I think that's an interesting idea, as instead of the repository
+> > maintainer pushing a release and OPAM package, we could take the burden
+> > off the creator and poll for releases on the upstream GitHub repositories
+> > instead.
+> > 
+> > One advantage of this "pull" model is that it ensures that the upstream
+> > `opam` metadata is sane, since that would form the basis for the PR.
+> > Right now they can diverge due to manual intervention.
+> > 
+> > Anil
+> > 
+> >> On 22 Feb 2016, at 22:14, Cheng Lou <chenglou92 at gmail.com
+> >> <mailto:chenglou92 at gmail.com>> wrote:
+> >> 
+> >> Sorry for hijacking the discussion. I'm new to OPAM, but is there a
+> >> reason why PRs for package upgrades can't be managed automatically? E.g.
+> >> asking for a git URL and either periodically check for new release tags,
+> >> or check on the fly when installing a library.
+> >> 
+> >> On Wednesday, February 17, 2016 at 7:27:49 AM UTC-5, Fabrice Le Fessant
+> >> wrote: Hi,
+> >> 
+> >>    If there is some need to help managing PRs to the opam-repository,
+> >>    Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on
+> >>    Github) are volunteers to spend some time doing it.>> 
+> >> Best regards,
+> >> --Fabrice
+> >> 
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org <mailto:opam-devel at lists.ocaml.org>
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+
+From anil at recoil.org  Wed Mar 30 12:03:39 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 30 Mar 2016 12:03:39 +0100
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <4656398.NSadKomMu3@maitake>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+ <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+ <4656398.NSadKomMu3@maitake>
+Message-ID: <01EFFE15-6C7D-4110-9866-BDF4D0AF358D@recoil.org>
+
+That actually sounds like the perfect workflow for signing... if there was some way to sign it (perhaps keybase.io via JavaScript) without a CLI, it would be much more widely adopted.
+
+-anil
+
+> On 30 Mar 2016, at 12:02, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> Note that it would become more complicated with our upcoming signed 
+> repository, since the package maintainer needs to sign for each new release.
+> Maybe we could find a way to re-use git signed commits as releases, but that 
+> sounds complicated and could be an attack vector.
+> 
+> More simply, the mechanism could do all the work, and poll the package 
+> maintainer for a signature (assuming he wouldn't sign without actually 
+> checking ?) . Something like a mail with instructions and archive + cryptohash 
+> to verify, then a command to run and it's done.
+> 
+> Le mercredi 30 mars 2016, 11:38:39 Thomas Gazagnaire a ?crit :
+>>> The OPAM tool indeed supports this model, but the automation
+>>> infrastructure isn't fully written and deployed yet.  There are various
+>>> tools in-flight that do portions of this, but none exist that poll the
+>>> --dev repository (e.g. for a new GitHub release) and autocreate a PR.
+>> yes, that's a very good idea! (and not difficult to do actually)
+>> 
+>>> I think that's an interesting idea, as instead of the repository
+>>> maintainer pushing a release and OPAM package, we could take the burden
+>>> off the creator and poll for releases on the upstream GitHub repositories
+>>> instead.
+>>> 
+>>> One advantage of this "pull" model is that it ensures that the upstream
+>>> `opam` metadata is sane, since that would form the basis for the PR.
+>>> Right now they can diverge due to manual intervention.
+>>> 
+>>> Anil
+>>> 
+>>>> On 22 Feb 2016, at 22:14, Cheng Lou <chenglou92 at gmail.com
+>>>> <mailto:chenglou92 at gmail.com>> wrote:
+>>>> 
+>>>> Sorry for hijacking the discussion. I'm new to OPAM, but is there a
+>>>> reason why PRs for package upgrades can't be managed automatically? E.g.
+>>>> asking for a git URL and either periodically check for new release tags,
+>>>> or check on the fly when installing a library.
+>>>> 
+>>>> On Wednesday, February 17, 2016 at 7:27:49 AM UTC-5, Fabrice Le Fessant
+>>>> wrote: Hi,
+>>>> 
+>>>>   If there is some need to help managing PRs to the opam-repository,
+>>>>   Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on
+>>>>   Github) are volunteers to spend some time doing it.>> 
+>>>> Best regards,
+>>>> --Fabrice
+>>>> 
+>>>> _______________________________________________
+>>>> opam-devel mailing list
+>>>> opam-devel at lists.ocaml.org <mailto:opam-devel at lists.ocaml.org>
+>>>> http://lists.ocaml.org/listinfo/opam-devel
+>>> 
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From hannes at mehnert.org  Wed Mar 30 12:15:34 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Wed, 30 Mar 2016 13:15:34 +0200
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <01EFFE15-6C7D-4110-9866-BDF4D0AF358D@recoil.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+ <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+ <4656398.NSadKomMu3@maitake>
+ <01EFFE15-6C7D-4110-9866-BDF4D0AF358D@recoil.org>
+Message-ID: <56FBB556.7000102@mehnert.org>
+
+uhm, this is very much into dreamland right now (since the first step,
+of signing integration isn't done yet)...
+
+On 30/03/2016 13:03, Anil Madhavapeddy wrote:
+> That actually sounds like the perfect workflow for signing... if there was some way to sign it (perhaps keybase.io via JavaScript) without a CLI, it would be much more widely adopted.
+
+does this propose that you want people to store their private keys
+online on the internet (certainly password-protected)?  I'm uneasy with
+that (and would prefer to store the private keys on the people's
+laptops, rather than online).
+
+>> On 30 Mar 2016, at 12:02, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+>> More simply, the mechanism could do all the work, and poll the package 
+>> maintainer for a signature (assuming he wouldn't sign without actually 
+>> checking ?) . Something like a mail with instructions and archive + cryptohash 
+>> to verify, then a command to run and it's done.
+
+this sounds good to me, a mail where the developer has to invoke some
+command-line utility locally to generate a signature, and resubmit this
+via mail (well, or git as a first step).
+
+
+
+hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160330/892ad845/attachment-0001.sig>
+
+From anil at recoil.org  Wed Mar 30 12:21:36 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 30 Mar 2016 12:21:36 +0100
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <56FBB556.7000102@mehnert.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <EC9682EF-50C8-473D-9592-2BAF5551CF88@recoil.org>
+ <DF436450-E02E-4DE0-A529-8CF7FF2F20D3@gazagnaire.org>
+ <4656398.NSadKomMu3@maitake>
+ <01EFFE15-6C7D-4110-9866-BDF4D0AF358D@recoil.org>
+ <56FBB556.7000102@mehnert.org>
+Message-ID: <10CE61E4-B972-4E54-ABA9-678650D52DF3@recoil.org>
+
+On 30 Mar 2016, at 12:15, Hannes Mehnert <hannes at mehnert.org> wrote:
+> 
+> uhm, this is very much into dreamland right now (since the first step,
+> of signing integration isn't done yet)...
+
+it's useful to figure out the workflow for people such that it'll actually get adoption...
+
+> 
+> On 30/03/2016 13:03, Anil Madhavapeddy wrote:
+>> That actually sounds like the perfect workflow for signing... if there was some way to sign it (perhaps keybase.io via JavaScript) without a CLI, it would be much more widely adopted.
+> 
+> does this propose that you want people to store their private keys
+> online on the internet (certainly password-protected)?  I'm uneasy with
+> that (and would prefer to store the private keys on the people's
+> laptops, rather than online).
+
+not necessarily; the keybase model seems to support a pure JS workflow where the private keys are never "on the cloud" but on the local machine.  In practise, having a mode that lets people do a single-click-or-two sign will make the difference between having to whip out out a CLI (much like the "merge" button in GitHub greatly accelerates the common case of pull request handling). 
+
+> 
+>>> On 30 Mar 2016, at 12:02, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+>>> More simply, the mechanism could do all the work, and poll the package 
+>>> maintainer for a signature (assuming he wouldn't sign without actually 
+>>> checking ?) . Something like a mail with instructions and archive + cryptohash 
+>>> to verify, then a command to run and it's done.
+> 
+> this sounds good to me, a mail where the developer has to invoke some
+> command-line utility locally to generate a signature, and resubmit this
+> via mail (well, or git as a first step).
+
+A CLI utility to sign is fine, but submitting it via yet another communication mechanism seems unnecessary.
+
+
+-a
+
+

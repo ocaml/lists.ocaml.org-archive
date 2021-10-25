@@ -1,0 +1,82 @@
+From simon.cruanes.2007 at m4x.org  Thu Jun 16 14:10:23 2016
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Thu, 16 Jun 2016 15:10:23 +0200
+Subject: [containers-users] hashing
+Message-ID: <20160616131023.GS3637@nunchakus.loria.fr>
+
+Hello,
+
+I released 0.18 a few days ago, a small release. There are a few
+deprecated functions around containers right now, but I'm considering a
+possibly more breaking change.
+
+The module CCHash (in core) is one of the modules I dislike the most, as
+I had to write a custom hash function, and the type of hasher:
+
+type 'a hash_fun = state -> 'a -> state
+
+is pretty annoying to work with in practice. Hashtbl.Make, for instance,
+requires `val hash : 'a -> int`. I am considering replacing this module
+with a new one, that would be based on `'a hash_fun = 'a -> int` (only
+positive ints), and combine hashes using variants of `Hashtbl.seeded_hash`.
+Something like
+
+```
+type 'a hash_fun = 'a -> int
+
+val hash : 'a hash_fun  (* hashtbl.hash *)
+val int : int hash_fun
+val string : string hash_fun
+(* ... *)
+
+val combine : int -> int -> int (* hashtbl.seeded_hash *)
+
+val hash_list : 'a hash_fun -> 'a list hash_fun
+(* relies on combine *)
+
+val pair : 'a hash_fun -> 'b hash_fun -> ('a * 'b) hash_fun
+(* relies on combine *)
+```
+
+Opinions on this? Would this break anyone's code except mine?
+
+-- 
+Simon Cruanes
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/containers-users/attachments/20160616/01ff6067/attachment.sig>
+
+From simon.cruanes.2007 at m4x.org  Mon Jun 20 15:12:36 2016
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Mon, 20 Jun 2016 16:12:36 +0200
+Subject: [containers-users] bug in FlatHashtbl
+Message-ID: <20160620141236.GE3637@nunchakus.loria.fr>
+
+Hello,
+
+Just a notice that I found a bug in CCFlatHashtbl (in containers.data);
+I fixed it (and added some direly needed tests), but if you happen to
+use it you might want to take a look (or discuss with me about it!).
+
+Cheers!
+
+-- 
+Simon Cruanes
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/containers-users/attachments/20160620/e81c0dfd/attachment.sig>
+

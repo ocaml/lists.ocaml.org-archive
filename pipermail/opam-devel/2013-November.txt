@@ -1,0 +1,2675 @@
+From anil at recoil.org  Fri Nov  1 08:26:10 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 1 Nov 2013 08:26:10 +0000
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <CAHvkLrN1iEimXUEpM1O8rc8aM0EAd0BkbCMMZ_KyNq8KsvRTSQ@mail.gmail.com>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <CAHvkLrN1iEimXUEpM1O8rc8aM0EAd0BkbCMMZ_KyNq8KsvRTSQ@mail.gmail.com>
+Message-ID: <D07C7A8E-4206-4632-B834-BA00E6BC3356@recoil.org>
+
+This is a good question -- I think there's a lot of utility in a
+simple binary package mechanism for OPAM.  The problem is that this
+is ultimately a deadend for any project that eventually wants to
+open-source (such as the Xen work) -- a lot of the work will be
+replayed when building Debs and RPMs for upstreaming anyway.
+
+The other thing to remember is how much system-specific policy is
+encoded in various upstream OS package managers. That wouldn't be
+fun to recreate generally in OPAM, although it could work for
+specific distros.  I wonder if your binary package system is really
+the right answer for a commercially supported Windows port of OPAM,
+rather than the UNIX ports...
+
+-anil
+
+On 31 Oct 2013, at 14:01, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+
+> Is it important to target RPMs and DEBs, or would it be enough to have
+> binary packages _inside_ opam ? i.e. "opam install MYPACKAGE" would
+> install binary versions instead of source versions of MYPACKAGE and
+> all its dependencies ?
+> 
+> At OCamlPro, we have already been experimenting with this idea, so if
+> it is what you are looking for, and we can gather a set of sponsors to
+> fund turning the prototype into stable software, it would be a nice
+> addition to OPAM...
+> --Fabrice
+> 
+> 
+> On Thu, Oct 31, 2013 at 1:40 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> On 15 Oct 2013, at 00:36, Mika Illouz <mika at illouz.net> wrote:
+>> 
+>>> Our current system involves packaging up OCaml stuff as
+>>> debian packages, and distributing them to ubuntu clients in binary
+>>> form via a internal debian repo.  This gets the ocaml dependencies
+>>> necessary to build stuff, even to those don't develop in ocaml, with
+>>> minimal cognitive overload.
+>>> 
+>>> Some of my colleagues think that distributing ocaml dependencies in
+>>> binary form is ultimately more stable.  I am wondering whether I can
+>>> satisfy them, with a solution that somehow exports as binary snapshot
+>>> of everything under ~/.opam/4.01/  .  One idea is to define a debian
+>>> package for a blessed ~/.opam/4.01/ , and export it via our internal
+>>> debian repo.  Another idea is just export it to clients via rsync, or
+>>> some other shared global storage.
+>> 
+>> [Ccing opam-devel and also Citrix/Rackspace folk, as this came up
+>> last week in XenSummit).
+>> 
+>> In general, I'd like to figure out how to use OPAM to build RPMs and
+>> Debs just as easily as it can currently do ocamlfind installations.
+>> In the short-term, I suspect that if you use a system compiler and
+>> have enough external dependency information in the OPAM repository,
+>> we could get away with quite a lot by tarring up the .opam directory.
+>> 
+>> This has also been a frequent request for teaching purposes, so I'd
+>> like to experiment with version controlling .opam -- this would just
+>> require hooks when adding/creating files in the subdirectory hierarchy,
+>> although it would probably be too slow to shell out every time
+>> (Thomas' cagit OCaml library may come in useful here).
+>> 
+>> Dave/Jon/John, any thoughts on this?
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> 
+> 
+> -- 
+> Fabrice LE FESSANT
+> Scientific Advisor, OCamlPro SAS
+> 
+
+
+From anil at recoil.org  Fri Nov  1 08:27:51 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 1 Nov 2013 08:27:51 +0000
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <CAOCAUGMdE3fKhJahjmEcReh674MyvWUmuC1OxBZVPMjffgfLdw@mail.gmail.com>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <52725A12.4010202@eu.citrix.com>
+ <CAOCAUGMdE3fKhJahjmEcReh674MyvWUmuC1OxBZVPMjffgfLdw@mail.gmail.com>
+Message-ID: <74DE4ED5-3906-45BE-BB91-6AA1BCB01D92@recoil.org>
+
+On 31 Oct 2013, at 15:35, Sylvain Le Gall <sylvain+ocaml at le-gall.net> wrote:
+
+>> RPMs/debs would definitely be nice. There would be a problem doing this
+>> right now as you'd have to do some sort of two pass thing to get the
+>> list of files installed by the package, which is required for both RPMs
+>> and debs.
+>> 
+> 
+> You don't need the list of files for a Debian package.... You don't
+> even need the dependencies, since it is auto-computed (except for
+> depending on executable, but this is a minor annoyance, lib deps are
+> computed).
+> 
+> Maybe you are talking about directly generating a binary .deb ? (like
+> directly an ar archive, but that is super tricky to do)
+
+I think Jon's point is that this work needs to happen for RPMs, and they
+need to generate both Debs and RPMs.  This implies that OPAM needs to
+support the lowest common denominator.  More generally, tracking file
+manifests is useful for direct uninstallation support in OPAM, and also
+for other packaging systems such as BSD ports.
+
+-anil
+
+
+From anil at recoil.org  Fri Nov  1 08:29:11 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 1 Nov 2013 08:29:11 +0000
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <52725A12.4010202@eu.citrix.com>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <52725A12.4010202@eu.citrix.com>
+Message-ID: <0F5BE089-EA12-4884-B072-54FF8FA86E9B@recoil.org>
+
+On 31 Oct 2013, at 13:24, Jon Ludlam <Jonathan.ludlam at eu.citrix.com> wrote:
+
+> One slightly odd thing about tarring up the .opam directory is that it's
+> usually something that lives in a user's home directory. I wonder if any
+> of the packages might have hard-coded paths in there which would mean
+> having to install it into exactly the same place - so requiring the same
+> user. I guess a quick grep through the .opam dir would tell you this.
+
+The main culprit for this is the OCaml compiler itself, which is not directly
+relocatable due to the standard library path being hardcoded (`ocamlc -where`).
+
+However, the system switch might get pretty far...we would just need to check
+if ocamlfind has hardcoded paths or if it can be keyed off some environment
+variable (which can be set in a custom OPAM switch).
+
+-anil
+
+From anil at recoil.org  Fri Nov  1 08:30:45 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 1 Nov 2013 08:30:45 +0000
+Subject: [opam-devel] OPAM 1.1.0 RC2 PPAs available
+Message-ID: <616BB192-8871-49F5-8FB9-E85B78A475DC@recoil.org>
+
+In this round of refreshes, I've also added Ubuntu Saucy to the PPA pool.   They been built in avsm/ppa-unstable and are migrating to all the other PPAs shortly.
+
+-anil
+
+From mika at illouz.net  Mon Nov  4 20:57:44 2013
+From: mika at illouz.net (Mika Illouz)
+Date: Mon, 4 Nov 2013 12:57:44 -0800
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <0F5BE089-EA12-4884-B072-54FF8FA86E9B@recoil.org>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <52725A12.4010202@eu.citrix.com>
+ <0F5BE089-EA12-4884-B072-54FF8FA86E9B@recoil.org>
+Message-ID: <CANvDa5ixtzFYhXrw9Vf7SvZ3G1fkUhWw0xikG6=P2hGqpdVfSA@mail.gmail.com>
+
+Hi Everyone,
+
+Thanks for the discussion. A tool which publishes an existing OPAM
+installation as one or more deb's would match our internal needs
+rather nicely.  Since my knowlege of OPAM's and Debian's package
+systems is superficial, I don't understand two technical questions:
+First, how would the tool infer the dependencies to non-opam packages
+managed by debian?  (Sylvain says this is easy).  Second, how would it
+expose individual OPAM packages as debian packages?  On one extreme,
+the entire OPAM installation is packaged as one deb; on the other, a
+debian package is created from each corresponding OPAM package.
+
+While this approach calls for a tool separate from OPAM itself, it
+preserves OPAM's OS/distribution-neutrality.
+
+On Oct 31 2013, Fabrice Le Fessant wrote:
+> Is it important to target RPMs and DEBs, or would it be enough to
+> have binary packages _inside_ opam ? i.e. "opam install MYPACKAGE"
+> would install binary versions instead of source versions of
+> MYPACKAGE and all its dependencies ?
+
+Fabrice: I'm not sure I understand what your are proposing.  One of my
+goals is to be able to distribute deb's derived from OPAM, but without
+requiring OPAM.
+
+On Oct 31 2013, Sylvain le Gall wrote:
+> Maybe you are talking about directly generating a binary .deb ? (like
+> directly an ar archive, but that is super tricky to do)
+
+Sylvain:  I think that's what I want ...
+
+> I could not resist the temptation to start the project:
+> https://github.com/gildor478/opam2debian
+
+Cool!
+
+thanks
+mika illouz
+
+From sylvain+ocaml at le-gall.net  Mon Nov  4 21:36:44 2013
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Mon, 4 Nov 2013 22:36:44 +0100
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <CANvDa5ixtzFYhXrw9Vf7SvZ3G1fkUhWw0xikG6=P2hGqpdVfSA@mail.gmail.com>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <52725A12.4010202@eu.citrix.com>
+ <0F5BE089-EA12-4884-B072-54FF8FA86E9B@recoil.org>
+ <CANvDa5ixtzFYhXrw9Vf7SvZ3G1fkUhWw0xikG6=P2hGqpdVfSA@mail.gmail.com>
+Message-ID: <CAOCAUGNNJreXhAAGJ_ovHKgkH_-sPD+933CwFsyyxF7Tuhcvqw@mail.gmail.com>
+
+2013/11/4 Mika Illouz <mika at illouz.net>:
+> Hi Everyone,
+>
+> Thanks for the discussion. A tool which publishes an existing OPAM
+> installation as one or more deb's would match our internal needs
+> rather nicely.  Since my knowlege of OPAM's and Debian's package
+> systems is superficial, I don't understand two technical questions:
+> First, how would the tool infer the dependencies to non-opam packages
+> managed by debian?  (Sylvain says this is easy).
+
+For runtime dependencies (once the package is built), this is rather
+easy. Debian maintainer script detect exec and library and compute
+dependencies from there. I.e:
+
+$ ldd /usr/bin/man
+        linux-vdso.so.1 =>  (0x00007fff7a9ff000)
+        libmandb-2.6.2.so => /usr/lib/man-db/libmandb-2.6.2.so
+        libman-2.6.2.so => /usr/lib/man-db/libman-2.6.2.so
+        libgdbm.so.3 => /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+        libpipeline.so.1 => /usr/lib/x86_64-linux-gnu/libpipeline.so.1
+        libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
+        libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1
+        /lib64/ld-linux-x86-64.so.2
+
+Then you just have to ask the packaging system which package provide
+the given libraries:
+$  dpkg -S /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+libgdbm3:amd64: /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+
+Et voila ! You know that /usr/bin/man depends on the package libgdbm3.
+
+For OCaml binary:
+- native: works just as a normal binary:
+$ ldd /usr/bin/unison-gtk
+        linux-vdso.so.1 =>  (0x00007fff8efa6000)
+        libgtk-x11-2.0.so.0 =>  ...
+
+- bytecode: the binary itself doesn't have dependencies, but if it has
+a non-OCaml dependencies, there will be a .so somewhere (stub
+libraries) that will create the link.
+
+All above is what is needed to compute runtime dependencies. We have
+additional tools to compute dependencies of .cmo/.cmx/.cmxa/.cma but
+this doesn't apply to what I want to do sine the generated package
+should be self-contained (except in the case of compiler=system, but I
+have injected a the usual Debian OCaml Maintainer trick for that by
+depending on ocaml-nox-${F:OCamlABI}).
+
+Now there are remaining problem:
+- build dependencies cannot be guessed
+- runtime dependencies on executable cannot be guessed (e.g. if you
+use Sys.command "patch" it is hard to guess that you depend on patch)
+
+I plan to solve this through a small DB, should be enough to start.
+
+>  Second, how would it
+> expose individual OPAM packages as debian packages?  On one extreme,
+> the entire OPAM installation is packaged as one deb; on the other, a
+> debian package is created from each corresponding OPAM package.
+
+I plan to create on big source package containing a checkout of the
+repository and a script that allow to build the package on specific
+architecture. Basically you get:
+opam2debian-le-gall.net-4.01_20131104.tar.gz
+opam2debian-le-gall.net-4.01_20131104.dsc
+
+This is the bare minimum to have a source package, then on each arch
+(i386, amd64, armhf) you extract the source package and build it. This
+will generate:
+opam2debian-le-gall.net_20131104_amd64.deb (or _i386 or _armhf).
+opam2debian-le-gall.net_20131104_amd64.changes (or _i386 or _armhf).
+
+You just have to sign the changes file before uploading.
+
+Note that given the way I built it, you ALSO get a snapshot of the
+OPAM repository inside the archive! Which means that if you want to
+build additional packages, you will use the snapshot from inside the
+debian package you are building!
+
+I am trying to see how I will translate the copyright to be nice to
+upstream contributor (this is a pretty big issue, trying to figure a
+solution).
+
+>
+> While this approach calls for a tool separate from OPAM itself, it
+> preserves OPAM's OS/distribution-neutrality.
+>
+> On Oct 31 2013, Fabrice Le Fessant wrote:
+>> Is it important to target RPMs and DEBs, or would it be enough to
+>> have binary packages _inside_ opam ? i.e. "opam install MYPACKAGE"
+>> would install binary versions instead of source versions of
+>> MYPACKAGE and all its dependencies ?
+>
+> Fabrice: I'm not sure I understand what your are proposing.  One of my
+> goals is to be able to distribute deb's derived from OPAM, but without
+> requiring OPAM.
+>
+> On Oct 31 2013, Sylvain le Gall wrote:
+>> Maybe you are talking about directly generating a binary .deb ? (like
+>> directly an ar archive, but that is super tricky to do)
+>
+> Sylvain:  I think that's what I want ...
+>
+>> I could not resist the temptation to start the project:
+>> https://github.com/gildor478/opam2debian
+>
+> Cool!
+>
+> thanks
+> mika illouz
+
+From sylvain+ocaml at le-gall.net  Tue Nov  5 01:34:39 2013
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Tue, 5 Nov 2013 02:34:39 +0100
+Subject: [opam-devel] opam binary snapshot
+In-Reply-To: <CAOCAUGNNJreXhAAGJ_ovHKgkH_-sPD+933CwFsyyxF7Tuhcvqw@mail.gmail.com>
+References: <CANvDa5h6BVGGjRPyQHjG92pW_tf+TNkt9PxTQ2=JRD7JmgnuGQ@mail.gmail.com>
+ <63CD3615-20DC-4109-BBFD-4CBE2259C4AD@recoil.org>
+ <52725A12.4010202@eu.citrix.com>
+ <0F5BE089-EA12-4884-B072-54FF8FA86E9B@recoil.org>
+ <CANvDa5ixtzFYhXrw9Vf7SvZ3G1fkUhWw0xikG6=P2hGqpdVfSA@mail.gmail.com>
+ <CAOCAUGNNJreXhAAGJ_ovHKgkH_-sPD+933CwFsyyxF7Tuhcvqw@mail.gmail.com>
+Message-ID: <CAOCAUGNQxfkmTVgBP-ZbUbF5iq4vJ8fwXn-kMRe3us6vZZAi0A@mail.gmail.com>
+
+Made some progress on opam2debian: I can generate an installable
+package, but ocamlfind need some tuning.
+
+You can checkout the github repository:
+https://github.com/gildor478/opam2debian
+
+You will need to install jingoo as well:
+https://forge.ocamlcore.org/projects/jingoo/
+
+Build opam2debian (and install if you want).
+
+$ ../opam2debian.byte create --name opam2debian-test --verbose --build ounit
+... [do a lot of thing, including building the binary package]
+
+$ sudo dpkg -i opam2debian-test_20131105_amd64.deb
+# The package is 3.1MB but uses system compiler...
+
+$ env OPAMROOT=/opt/opam2debian/opam2debian-test/ opam list -i
+base-bigarray   base  Bigarray library distributed with the OCaml compiler
+base-threads    base  Threads library distributed with the OCaml compiler
+base-unix       base  Unix library distributed with the OCaml compiler
+ocamlfind      1.4.0  A library manager for OCaml
+ounit          2.0.0  Unit testing framework ...
+
+# and to prove that I am not cheating.
+$ opam list -i
+Please run 'opam init' first to initialize the state of OPAM.
+'opam list -i' failed.
+
+However I have still this issue:
+$ /opt/opam2debian/opam2debian-test/system/bin/ocamlfind list
+ocamlfind: Config file not found - neither
+/opt/opam/home/gildor/programmation/opam2debian/tmp/opam2debian-test/system/lib/findlib.conf
+nor the directory
+/opt/opam/home/gildor/programmation/opam2debian/tmp/opam2debian-test/system/lib/findlib.conf.d
+
+I need to figure out why and what I am missing here.
+
+Cheers
+Sylvain
+
+2013/11/4 Sylvain Le Gall <sylvain+ocaml at le-gall.net>:
+> 2013/11/4 Mika Illouz <mika at illouz.net>:
+>> Hi Everyone,
+>>
+>> Thanks for the discussion. A tool which publishes an existing OPAM
+>> installation as one or more deb's would match our internal needs
+>> rather nicely.  Since my knowlege of OPAM's and Debian's package
+>> systems is superficial, I don't understand two technical questions:
+>> First, how would the tool infer the dependencies to non-opam packages
+>> managed by debian?  (Sylvain says this is easy).
+>
+> For runtime dependencies (once the package is built), this is rather
+> easy. Debian maintainer script detect exec and library and compute
+> dependencies from there. I.e:
+>
+> $ ldd /usr/bin/man
+>         linux-vdso.so.1 =>  (0x00007fff7a9ff000)
+>         libmandb-2.6.2.so => /usr/lib/man-db/libmandb-2.6.2.so
+>         libman-2.6.2.so => /usr/lib/man-db/libman-2.6.2.so
+>         libgdbm.so.3 => /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+>         libpipeline.so.1 => /usr/lib/x86_64-linux-gnu/libpipeline.so.1
+>         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
+>         libz.so.1 => /lib/x86_64-linux-gnu/libz.so.1
+>         /lib64/ld-linux-x86-64.so.2
+>
+> Then you just have to ask the packaging system which package provide
+> the given libraries:
+> $  dpkg -S /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+> libgdbm3:amd64: /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+>
+> Et voila ! You know that /usr/bin/man depends on the package libgdbm3.
+>
+> For OCaml binary:
+> - native: works just as a normal binary:
+> $ ldd /usr/bin/unison-gtk
+>         linux-vdso.so.1 =>  (0x00007fff8efa6000)
+>         libgtk-x11-2.0.so.0 =>  ...
+>
+> - bytecode: the binary itself doesn't have dependencies, but if it has
+> a non-OCaml dependencies, there will be a .so somewhere (stub
+> libraries) that will create the link.
+>
+> All above is what is needed to compute runtime dependencies. We have
+> additional tools to compute dependencies of .cmo/.cmx/.cmxa/.cma but
+> this doesn't apply to what I want to do sine the generated package
+> should be self-contained (except in the case of compiler=system, but I
+> have injected a the usual Debian OCaml Maintainer trick for that by
+> depending on ocaml-nox-${F:OCamlABI}).
+>
+> Now there are remaining problem:
+> - build dependencies cannot be guessed
+> - runtime dependencies on executable cannot be guessed (e.g. if you
+> use Sys.command "patch" it is hard to guess that you depend on patch)
+>
+> I plan to solve this through a small DB, should be enough to start.
+>
+>>  Second, how would it
+>> expose individual OPAM packages as debian packages?  On one extreme,
+>> the entire OPAM installation is packaged as one deb; on the other, a
+>> debian package is created from each corresponding OPAM package.
+>
+> I plan to create on big source package containing a checkout of the
+> repository and a script that allow to build the package on specific
+> architecture. Basically you get:
+> opam2debian-le-gall.net-4.01_20131104.tar.gz
+> opam2debian-le-gall.net-4.01_20131104.dsc
+>
+> This is the bare minimum to have a source package, then on each arch
+> (i386, amd64, armhf) you extract the source package and build it. This
+> will generate:
+> opam2debian-le-gall.net_20131104_amd64.deb (or _i386 or _armhf).
+> opam2debian-le-gall.net_20131104_amd64.changes (or _i386 or _armhf).
+>
+> You just have to sign the changes file before uploading.
+>
+> Note that given the way I built it, you ALSO get a snapshot of the
+> OPAM repository inside the archive! Which means that if you want to
+> build additional packages, you will use the snapshot from inside the
+> debian package you are building!
+>
+> I am trying to see how I will translate the copyright to be nice to
+> upstream contributor (this is a pretty big issue, trying to figure a
+> solution).
+>
+>>
+>> While this approach calls for a tool separate from OPAM itself, it
+>> preserves OPAM's OS/distribution-neutrality.
+>>
+>> On Oct 31 2013, Fabrice Le Fessant wrote:
+>>> Is it important to target RPMs and DEBs, or would it be enough to
+>>> have binary packages _inside_ opam ? i.e. "opam install MYPACKAGE"
+>>> would install binary versions instead of source versions of
+>>> MYPACKAGE and all its dependencies ?
+>>
+>> Fabrice: I'm not sure I understand what your are proposing.  One of my
+>> goals is to be able to distribute deb's derived from OPAM, but without
+>> requiring OPAM.
+>>
+>> On Oct 31 2013, Sylvain le Gall wrote:
+>>> Maybe you are talking about directly generating a binary .deb ? (like
+>>> directly an ar archive, but that is super tricky to do)
+>>
+>> Sylvain:  I think that's what I want ...
+>>
+>>> I could not resist the temptation to start the project:
+>>> https://github.com/gildor478/opam2debian
+>>
+>> Cool!
+>>
+>> thanks
+>> mika illouz
+
+From catseye.chandra at gmail.com  Fri Nov 15 17:53:26 2013
+From: catseye.chandra at gmail.com (Felipe Gonzalez)
+Date: Fri, 15 Nov 2013 18:53:26 +0100
+Subject: [opam-devel] opam 1.1.0 failure on debian wheezy i386
+Message-ID: <CA+zxp18u+-56ve_NwGUMF-QHws9sZR+0GQO10ZSepSQhZ9nT1Q@mail.gmail.com>
+
+  }The following actions will be performed:
+ - install base-threads.base
+ - install base-unix.base
+ - install base-bigarray.base
+3 to install | 0 to reinstall | 0 to upgrade | 0 to downgrade | 0 to remove
+Do you want to continue ? [Y/n] y
+00:04.123  029259  FILE(comp)              Read
+~/.opam/compilers/4.01.0/4.01.0/4.01.0.comp in 0.000s
+00:04.123  029259  FILE(comp)              Read
+~/.opam/compilers/system/system/system.comp in 0.000s
+00:04.124  029259  FILE(comp)              Read
+~/.opam/compilers/4.01.0/4.01.0/4.01.0.comp in 0.000s
+00:04.124  029259  FILE(installed)         Wrote ~/.opam/4.01.0/installed
+in 0.000s
+00:04.124  029259  FILE(installed.roots)   Wrote
+~/.opam/4.01.0/installed.roots in 0.000s
+00:04.124  029259  FILE(reinstall)         Wrote ~/.opam/4.01.0/reinstall
+in 0.000s
+00:04.124  029259  FILE(installed)         Read ~/.opam/4.01.0/installed in
+0.000s
+00:04.124  029259  FILE(installed)         Read ~/.opam/system/installed in
+0.000s
+00:04.124  029259  PARALLEL                Iterate over 3 task(s) with 1
+process(es)
+00:04.127  029259  PARALLEL                Creating process 29264
+00:04.127  029259  PARALLEL                waiting for a child process to
+finish
+00:04.127  029264  PARALLEL                Spawning a new process
+00:04.127  029264  STATE                   LOAD-STATE(child)
+00:04.128  029264  FILE(config)            Read ~/.opam/config in 0.000s
+00:04.133  029264  STATE                   Loaded
+/home/philou/.opam/state.cache in 0.004s
+00:04.133  029264  FILE(aliases)           Read ~/.opam/aliases in 0.000s
+00:04.135  029264  FILE(repo-config)       Read ~/.opam/repo/default/config
+in 0.000s
+00:04.155  029264  FILE(repo-index)        Read ~/.opam/repo/package-index
+in 0.019s
+00:04.155  029264  FILE(repo-index)        Read ~/.opam/repo/compiler-index
+in 0.001s
+00:04.155  029264  FILE(pinned)            Cannot find
+/home/philou/.opam/4.01.0/pinned
+00:04.155  029264  FILE(installed)         Read ~/.opam/4.01.0/installed in
+0.000s
+00:04.155  029264  FILE(installed.roots)   Read
+~/.opam/4.01.0/installed.roots in 0.000s
+00:04.165  029264  FILE(reinstall)         Read ~/.opam/4.01.0/reinstall in
+0.000s
+00:04.165  029264  STATE                   ROOT      : /home/philou/.opam
+00:04.165  029264  STATE                   SWITCH    : 4.01.0
+00:04.165  029264  STATE                   COMPILER  : 4.01.0
+00:04.165  029264  STATE                   COMPILERS : { 3.11.2, 3.12.1,
+3.12.1+natdynlink-osx, 4.00.0, 4.00.0+debug-runtime, 4.00.0+fp, 4.00.1,
+4.00.1+BER, 4.00.1+alloc-profiling, 4.00.1+annot, 4.00.1+french,
+4.00.1+mirage-unix, 4.00.1+mirage-xen, 4.00.1+open-types,
+4.00.1+raspberrypi, 4.00.1+short-types, 4.01.0, 4.01.0+fp, 4.01.0beta1,
+4.01.0beta1+no-camlp4, 4.01.0dev+extension-points, 4.01.0dev+fp,
+4.01.0dev+trunk, 4.02.0dev+fp, 4.02.0dev+trunk, system }
+00:04.165  029264  STATE                   REPOS     : { default }
+00:04.165  029264  STATE                   PACKAGES  : 1629 packages
+00:04.165  029264  STATE                   INSTALLED : {}
+00:04.165  029264  STATE                   ROOTS     : {}
+00:04.165  029264  STATE                   REINSTALL : {}
+00:04.165  029264  STATE                   State child loaded in 0.036s
+
+=-=-= Installing base-bigarray.base =-=-=
+00:04.165  029264  ACTION                  extract_package:
+base-bigarray.base
+00:04.165  029264  FILENAME                rmdir
+/home/philou/.opam/4.01.0/build/base-bigarray.base
+00:04.165  029264  STATE                   get_archive base-bigarray.base
+00:04.165  029264  CURL                    pull-archive
+00:04.345  029264  FILE(file_attributes)   Read
+~/.opam/repo/default/urls.txt in 0.180s
+default    Downloading
+https://opam.ocaml.org/archives/base-bigarray.base+opam.tar.gz
+00:05.697  029264  CURL                    curl
+00:05.697  029264  CURL                    dowloading
+https://opam.ocaml.org/archives/base-bigarray.base+opam.tar.gz
+Downloading https://opam.ocaml.org/archives/base-bigarray.base+opam.tar.gz
+00:05.697  029264  PARALLEL                write_error
+00:05.702  029259  PARALLEL                29264 is dead (exit 1)
+00:05.702  029259  PARALLEL                read_error
+00:05.705  029259  PARALLEL                Creating process 29265
+00:05.705  029259  PARALLEL                waiting for a child process to
+finish
+00:05.705  029265  PARALLEL                Spawning a new process
+00:05.705  029265  STATE                   LOAD-STATE(child)
+00:05.706  029265  FILE(config)            Read ~/.opam/config in 0.000s
+00:05.711  029265  STATE                   Loaded
+/home/philou/.opam/state.cache in 0.005s
+00:05.711  029265  FILE(aliases)           Read ~/.opam/aliases in 0.000s
+00:05.713  029265  FILE(repo-config)       Read ~/.opam/repo/default/config
+in 0.000s
+00:05.732  029265  FILE(repo-index)        Read ~/.opam/repo/package-index
+in 0.019s
+00:05.733  029265  FILE(repo-index)        Read ~/.opam/repo/compiler-index
+in 0.000s
+00:05.733  029265  FILE(pinned)            Cannot find
+/home/philou/.opam/4.01.0/pinned
+00:05.733  029265  FILE(installed)         Read ~/.opam/4.01.0/installed in
+0.000s
+00:05.733  029265  FILE(installed.roots)   Read
+~/.opam/4.01.0/installed.roots in 0.000s
+00:05.742  029265  FILE(reinstall)         Read ~/.opam/4.01.0/reinstall in
+0.000s
+00:05.742  029265  STATE                   ROOT      : /home/philou/.opam
+00:05.742  029265  STATE                   SWITCH    : 4.01.0
+00:05.742  029265  STATE                   COMPILER  : 4.01.0
+00:05.742  029265  STATE                   COMPILERS : { 3.11.2, 3.12.1,
+3.12.1+natdynlink-osx, 4.00.0, 4.00.0+debug-runtime, 4.00.0+fp, 4.00.1,
+4.00.1+BER, 4.00.1+alloc-profiling, 4.00.1+annot, 4.00.1+french,
+4.00.1+mirage-unix, 4.00.1+mirage-xen, 4.00.1+open-types,
+4.00.1+raspberrypi, 4.00.1+short-types, 4.01.0, 4.01.0+fp, 4.01.0beta1,
+4.01.0beta1+no-camlp4, 4.01.0dev+extension-points, 4.01.0dev+fp,
+4.01.0dev+trunk, 4.02.0dev+fp, 4.02.0dev+trunk, system }
+00:05.742  029265  STATE                   REPOS     : { default }
+00:05.742  029265  STATE                   PACKAGES  : 1629 packages
+00:05.742  029265  STATE                   INSTALLED : {}
+00:05.742  029265  STATE                   ROOTS     : {}
+00:05.742  029265  STATE                   REINSTALL : {}
+00:05.742  029265  STATE                   State child loaded in 0.036s
+
+=-=-= Installing base-threads.base =-=-=
+00:05.742  029265  ACTION                  extract_package:
+base-threads.base
+00:05.742  029265  FILENAME                rmdir
+/home/philou/.opam/4.01.0/build/base-threads.base
+00:05.742  029265  STATE                   get_archive base-threads.base
+00:05.742  029265  CURL                    pull-archive
+00:05.922  029265  FILE(file_attributes)   Read
+~/.opam/repo/default/urls.txt in 0.179s
+default    Downloading
+https://opam.ocaml.org/archives/base-threads.base+opam.tar.gz
+00:07.143  029265  CURL                    curl
+00:07.143  029265  CURL                    dowloading
+https://opam.ocaml.org/archives/base-threads.base+opam.tar.gz
+Downloading https://opam.ocaml.org/archives/base-threads.base+opam.tar.gz
+00:07.144  029265  PARALLEL                write_error
+00:07.148  029259  PARALLEL                29265 is dead (exit 1)
+00:07.148  029259  PARALLEL                read_error
+00:07.151  029259  PARALLEL                Creating process 29266
+00:07.151  029259  PARALLEL                waiting for a child process to
+finish
+00:07.151  029266  PARALLEL                Spawning a new process
+00:07.151  029266  STATE                   LOAD-STATE(child)
+00:07.151  029266  FILE(config)            Read ~/.opam/config in 0.000s
+00:07.156  029266  STATE                   Loaded
+/home/philou/.opam/state.cache in 0.005s
+00:07.156  029266  FILE(aliases)           Read ~/.opam/aliases in 0.000s
+00:07.159  029266  FILE(repo-config)       Read ~/.opam/repo/default/config
+in 0.000s
+00:07.178  029266  FILE(repo-index)        Read ~/.opam/repo/package-index
+in 0.018s
+00:07.178  029266  FILE(repo-index)        Read ~/.opam/repo/compiler-index
+in 0.000s
+00:07.178  029266  FILE(pinned)            Cannot find
+/home/philou/.opam/4.01.0/pinned
+00:07.178  029266  FILE(installed)         Read ~/.opam/4.01.0/installed in
+0.000s
+00:07.178  029266  FILE(installed.roots)   Read
+~/.opam/4.01.0/installed.roots in 0.000s
+00:07.187  029266  FILE(reinstall)         Read ~/.opam/4.01.0/reinstall in
+0.000s
+00:07.187  029266  STATE                   ROOT      : /home/philou/.opam
+00:07.187  029266  STATE                   SWITCH    : 4.01.0
+00:07.188  029266  STATE                   COMPILER  : 4.01.0
+00:07.188  029266  STATE                   COMPILERS : { 3.11.2, 3.12.1,
+3.12.1+natdynlink-osx, 4.00.0, 4.00.0+debug-runtime, 4.00.0+fp, 4.00.1,
+4.00.1+BER, 4.00.1+alloc-profiling, 4.00.1+annot, 4.00.1+french,
+4.00.1+mirage-unix, 4.00.1+mirage-xen, 4.00.1+open-types,
+4.00.1+raspberrypi, 4.00.1+short-types, 4.01.0, 4.01.0+fp, 4.01.0beta1,
+4.01.0beta1+no-camlp4, 4.01.0dev+extension-points, 4.01.0dev+fp,
+4.01.0dev+trunk, 4.02.0dev+fp, 4.02.0dev+trunk, system }
+00:07.188  029266  STATE                   REPOS     : { default }
+00:07.188  029266  STATE                   PACKAGES  : 1629 packages
+00:07.188  029266  STATE                   INSTALLED : {}
+00:07.188  029266  STATE                   ROOTS     : {}
+00:07.188  029266  STATE                   REINSTALL : {}
+00:07.188  029266  STATE                   State child loaded in 0.036s
+
+=-=-= Installing base-unix.base =-=-=
+00:07.188  029266  ACTION                  extract_package: base-unix.base
+00:07.188  029266  FILENAME                rmdir
+/home/philou/.opam/4.01.0/build/base-unix.base
+00:07.188  029266  STATE                   get_archive base-unix.base
+00:07.188  029266  CURL                    pull-archive
+00:07.367  029266  FILE(file_attributes)   Read
+~/.opam/repo/default/urls.txt in 0.179s
+default    Downloading
+https://opam.ocaml.org/archives/base-unix.base+opam.tar.gz
+00:08.582  029266  CURL                    curl
+00:08.582  029266  CURL                    dowloading
+https://opam.ocaml.org/archives/base-unix.base+opam.tar.gz
+Downloading https://opam.ocaml.org/archives/base-unix.base+opam.tar.gz
+00:08.583  029266  PARALLEL                write_error
+00:08.587  029259  PARALLEL                29266 is dead (exit 1)
+00:08.587  029259  PARALLEL                read_error
+
+
+===== ERROR while installing base-bigarray.base =====
+Could not get the source for base-bigarray.base.
+
+===== ERROR while installing base-threads.base =====
+Could not get the source for base-threads.base.
+
+===== ERROR while installing base-unix.base =====
+Could not get the source for base-unix.base.
+00:08.587  029259  STATE                   LOAD-STATE(switch-backup-err)
+00:08.587  029259  FILE(config)            Read ~/.opam/config in 0.000s
+00:08.593  029259  STATE                   Loaded
+/home/philou/.opam/state.cache in 0.006s
+00:08.593  029259  FILE(aliases)           Read ~/.opam/aliases in 0.000s
+00:08.596  029259  FILE(repo-config)       Read ~/.opam/repo/default/config
+in 0.000s
+00:08.614  029259  FILE(repo-index)        Read ~/.opam/repo/package-index
+in 0.017s
+00:08.614  029259  FILE(repo-index)        Read ~/.opam/repo/compiler-index
+in 0.000s
+00:08.614  029259  FILE(pinned)            Cannot find
+/home/philou/.opam/4.01.0/pinned
+00:08.614  029259  FILE(installed)         Read ~/.opam/4.01.0/installed in
+0.000s
+00:08.614  029259  FILE(installed.roots)   Read
+~/.opam/4.01.0/installed.roots in 0.000s
+00:08.622  029259  FILE(reinstall)         Read ~/.opam/4.01.0/reinstall in
+0.000s
+00:08.622  029259  STATE                   ROOT      : /home/philou/.opam
+00:08.622  029259  STATE                   SWITCH    : 4.01.0
+00:08.622  029259  STATE                   COMPILER  : 4.01.0
+00:08.622  029259  STATE                   COMPILERS : { 3.11.2, 3.12.1,
+3.12.1+natdynlink-osx, 4.00.0, 4.00.0+debug-runtime, 4.00.0+fp, 4.00.1,
+4.00.1+BER, 4.00.1+alloc-profiling, 4.00.1+annot, 4.00.1+french,
+4.00.1+mirage-unix, 4.00.1+mirage-xen, 4.00.1+open-types,
+4.00.1+raspberrypi, 4.00.1+short-types, 4.01.0, 4.01.0+fp, 4.01.0beta1,
+4.01.0beta1+no-camlp4, 4.01.0dev+extension-points, 4.01.0dev+fp,
+4.01.0dev+trunk, 4.02.0dev+fp, 4.02.0dev+trunk, system }
+00:08.622  029259  STATE                   REPOS     : { default }
+00:08.622  029259  STATE                   PACKAGES  : 1629 packages
+00:08.622  029259  STATE                   INSTALLED : {}
+00:08.622  029259  STATE                   ROOTS     : {}
+00:08.622  029259  STATE                   REINSTALL : {}
+00:08.622  029259  STATE                   State switch-backup-err loaded
+in 0.034s
+00:08.622  029259  SYSTEM                  rm
+/home/philou/.opam/4.01.0/backup/state-20131015174852.export
+00:08.622  029259  SYSTEM                  unlocking
+/home/philou/.opam/4.01.0/lock (29259)
+00:08.622  029259  SYSTEM                  rm /home/philou/.opam/4.01.0/lock
+'opam install -v --debug base-threads base-bigarray base-unix' failed.
+
+
+The write_errors looks suspicious right after the CURL, but I've triple
+checked .opam permissions, seems ok.
+This box is really low on ram, only 512M without swap!
+
+
+Thanks!
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131115/9aa96d33/attachment-0001.html>
+
+From seanmcl at gmail.com  Sun Nov 17 21:54:15 2013
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Sun, 17 Nov 2013 16:54:15 -0500
+Subject: [opam-devel] shared directory
+Message-ID: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+
+I'm trying to package a library that installs files in share.  When I had
+only one compiler installed, the %{prefix}% argument sent them to
+.opam/system/share.  However, when I installed another compiler and made it
+current, the files went into .opam/4.00.1/share.  I am trying to tell the
+user where to find the files.  Is there a generic directory where I could
+point the user?   Perhaps you could make a symlink 'current' for the
+current compiler?
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131117/87361ba4/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Mon Nov 18 08:30:08 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 18 Nov 2013 09:30:08 +0100
+Subject: [opam-devel] shared directory
+In-Reply-To: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+Message-ID: <1904922.PBaVoutouQ@agaric>
+
+Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+> I'm trying to package a library that installs files in share.  When I had
+> only one compiler installed, the %{prefix}% argument sent them to
+> .opam/system/share.  However, when I installed another compiler and made it
+> current, the files went into .opam/4.00.1/share.  I am trying to tell the
+> user where to find the files.  Is there a generic directory where I could
+> point the user?   Perhaps you could make a symlink 'current' for the
+> current compiler?
+
+You should use $(opam config var prefix)/share, or even $(opam config var share). A symlink could be an option worth considering, but it has its own issues.
+
+Best,
+Louis
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131118/1881fd27/attachment.html>
+
+From seanmcl at gmail.com  Mon Nov 18 15:17:56 2013
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Mon, 18 Nov 2013 10:17:56 -0500
+Subject: [opam-devel] shared directory
+In-Reply-To: <1904922.PBaVoutouQ@agaric>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+Message-ID: <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+
+Hi Louis,
+
+What are the issues to using a symlink?  Couldn't opam switch just move it
+around?
+
+Best,
+
+Sean
+
+
+On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+<louis.gesbert at ocamlpro.com>wrote:
+
+>  Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+>
+> > I'm trying to package a library that installs files in share. When I had
+>
+> > only one compiler installed, the %{prefix}% argument sent them to
+>
+> > .opam/system/share. However, when I installed another compiler and made
+> it
+>
+> > current, the files went into .opam/4.00.1/share. I am trying to tell the
+>
+> > user where to find the files. Is there a generic directory where I could
+>
+> > point the user? Perhaps you could make a symlink 'current' for the
+>
+> > current compiler?
+>
+>
+>
+> You should use $(opam config var prefix)/share, or even $(opam config var
+> share). A symlink could be an option worth considering, but it has its own
+> issues.
+>
+>
+>
+> Best,
+>
+> Louis
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131118/3881a972/attachment.html>
+
+From anil at recoil.org  Mon Nov 18 16:53:09 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 18 Nov 2013 08:53:09 -0800
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+Message-ID: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+
+Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+
+I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+
+My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+
+-anil
+
+From amc79 at cam.ac.uk  Mon Nov 18 17:12:50 2013
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Mon, 18 Nov 2013 17:12:50 +0000
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+Message-ID: <DCF0D4DC-4D05-40E4-AA12-4652344A6FAC@cam.ac.uk>
+
+Just curiosity (and more of a side note, so feel free to ignore): Is there some way to check how may people may be on OPAM 1.0?  I'm assuming the logs may be able to tell how frequently `opam update` gets used.
+
+Amir
+
+On 18 Nov 2013, at 16:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+> 
+> I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+> 
+> My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Mon Nov 18 17:15:16 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 18 Nov 2013 09:15:16 -0800
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <DCF0D4DC-4D05-40E4-AA12-4652344A6FAC@cam.ac.uk>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+ <DCF0D4DC-4D05-40E4-AA12-4652344A6FAC@cam.ac.uk>
+Message-ID: <7FDB045B-9054-4809-9A93-822DF3485F68@recoil.org>
+
+The opam.OCamlPro.org server will have this information.  It would be most useful to keep an eye on this and ensure that we migrate people to the new repository.  Louis, I think you're the only one with access...?
+
+-anil
+
+On 18 Nov 2013, at 09:12, Amir Chaudhry <amc79 at cam.ac.uk> wrote:
+
+> Just curiosity (and more of a side note, so feel free to ignore): Is there some way to check how may people may be on OPAM 1.0?  I'm assuming the logs may be able to tell how frequently `opam update` gets used.
+> 
+> Amir
+> 
+> On 18 Nov 2013, at 16:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+>> Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+>> 
+>> I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+>> 
+>> My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Mon Nov 18 18:43:59 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 18 Nov 2013 10:43:59 -0800
+Subject: [opam-devel] OPAM + Docker
+Message-ID: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+
+I've made some notes about using OPAM and Docker for easier local bulk builds here:
+http://anil.recoil.org/2013/11/15/docker-and-opam.html
+
+One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+
+This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+
+-anil
+
+From ygrek at autistici.org  Tue Nov 19 04:03:04 2013
+From: ygrek at autistici.org (ygrek)
+Date: Tue, 19 Nov 2013 12:03:04 +0800
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+Message-ID: <20131119120304.3dbc3d83@kiwi.local.tld>
+
+On Mon, 18 Nov 2013 10:43:59 -0800
+Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> I've made some notes about using OPAM and Docker for easier local bulk builds here:
+> http://anil.recoil.org/2013/11/15/docker-and-opam.html
+> 
+> One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+> 
+> This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+
+I personally dislike this depexts field to mention OS packages at all.
+Maybe it's better to specify which external libraries are needed (as .so or as pkg-config files) and then
+use native OS way (at installation time) to determine which package contains that .so or .pc file (e.g. apt-file on Debian).
+If apt-file is not present it is at least possible to tell (with dpkg -S or ldconfig -p) whether the .so is present and what is
+precisely needed for the build to succeed (and mention how to find the needed package manually).
+It may be even possible to gater information about .so files automatically - by inspecting generated cmxa and cma
+files with ocamlobjinfo - so it can be done by ocamlot or something like that.
+
+-- 
+
+From nicolas at braud-santoni.eu  Tue Nov 19 09:12:20 2013
+From: nicolas at braud-santoni.eu (Nicolas Braud-Santoni)
+Date: Tue, 19 Nov 2013 10:12:20 +0100
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <20131119120304.3dbc3d83@kiwi.local.tld>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+ <20131119120304.3dbc3d83@kiwi.local.tld>
+Message-ID: <528B2B74.7060704@braud-santoni.eu>
+
+On 19/11/2013 05:03, ygrek wrote:
+> On Mon, 18 Nov 2013 10:43:59 -0800
+> Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+>> I've made some notes about using OPAM and Docker for easier local bulk builds here:
+>> http://anil.recoil.org/2013/11/15/docker-and-opam.html
+>>
+>> One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+>>
+>> This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+Two remarks:
+1. Using the version numbers might be much less confusing than the codenames
+2. I agree that we need to agree on useable syntax (and semantics) for
+depexts. See https://github.com/ocaml/opam/issues/991
+
+> I personally dislike this depexts field to mention OS packages at all.
+Why ?
+This seems to be the most sane and generic option if we wish to interact
+with the system's package manager [0].
+
+> Maybe it's better to specify which external libraries are needed (as .so or as pkg-config files) and then
+> use native OS way (at installation time) to determine which package contains that .so or .pc file (e.g. apt-file on Debian).
+Not all package managers provide these kind of facilities.
+That is someting that, for instance, will not exist in any source-based
+distribution that I am aware of.
+
+Moreover, it seems unwise to fill in information that ought to belong in
+the distribution's packages :
+if I depend on libfoo, major version 1, any minor version, should
+I specify ?libfoo-1.so?, ?libfoo-1(.\d+)*.so? (dots implicitly
+escaped), or some crazier scheme ?
+Where will I look for the .so ?
+(And while using pkg-config is better, it still isn't supported by all
+external dependencies)
+
+> If apt-file is not present it is at least possible to tell (with dpkg -S or ldconfig -p) whether the .so is present and what is
+> precisely needed for the build to succeed (and mention how to find the needed package manually).
+Don't the conf-* packages already achieve this (in an hackish way) ?
+
+> It may be even possible to gater information about .so files automatically - by inspecting generated cmxa and cma
+> files with ocamlobjinfo - so it can be done by ocamlot or something like that.
+How would you get them to build in the first place ?
+
+
+Regards,
+Nicolas
+
+[0]: Though our definition should include thing such as Homebrew (and
+other equivalents for OSX and/or Windows).
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131119/96f03836/attachment-0001.sig>
+
+From ygrek at autistici.org  Tue Nov 19 09:50:37 2013
+From: ygrek at autistici.org (ygrek)
+Date: Tue, 19 Nov 2013 17:50:37 +0800
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <528B2B74.7060704@braud-santoni.eu>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+ <20131119120304.3dbc3d83@kiwi.local.tld>
+ <528B2B74.7060704@braud-santoni.eu>
+Message-ID: <20131119175037.765edfb2@kiwi.local.tld>
+
+On Tue, 19 Nov 2013 10:12:20 +0100
+Nicolas Braud-Santoni <nicolas at braud-santoni.eu> wrote:
+
+> > I personally dislike this depexts field to mention OS packages at all.
+> Why ?
+> This seems to be the most sane and generic option if we wish to interact
+> with the system's package manager [0].
+
+It is a subjective feeling. Per your request I am trying to rationalize it below %)
+Logically, because this is one step missed in the chain of dependencies. OCaml library doesn't depend on system package,
+it depends on shared object and (usually) header files. This information (that library author
+is fully aware of) is trustworthy and pretty precise, and worth recording because it is a useful bit of information
+in any environment (that you cannot envision beforehand). The mapping of files to system packages is the job of system package manager.
+
+> Not all package managers provide these kind of facilities.
+> That is someting that, for instance, will not exist in any source-based
+> distribution that I am aware of.
+
+So what does a gentoo user do when trying to compile some third-party code and finding that libxxx.so is missing?
+How do they find the gentoo package that will provide this .so?
+
+> Moreover, it seems unwise to fill in information that ought to belong in
+> the distribution's packages :
+> if I depend on libfoo, major version 1, any minor version, should
+> I specify ?libfoo-1.so?, ?libfoo-1(.\d+)*.so? (dots implicitly
+> escaped), or some crazier scheme ?
+> Where will I look for the .so ?
+> (And while using pkg-config is better, it still isn't supported by all
+> external dependencies)
+
+I think providing library name without ABI versions is good enough. 
+And you don't look for .so, ldconfig does..
+
+> > If apt-file is not present it is at least possible to tell (with dpkg -S or ldconfig -p) whether the .so is present and what is
+> > precisely needed for the build to succeed (and mention how to find the needed package manually).
+> Don't the conf-* packages already achieve this (in an hackish way) ?
+
+I, as a code author, know which library I am linking with (because I hardcode it's name in Makefile), but I don't have 
+a slightest idea how the package for that library will be called in some ObscureBSD. So I cannot actually fill any correct value
+in depexts. On the other hand the user of ObscureBSD compiling my library will be able to find a correct package given the
+correct clue from opam - that it will need specific .so and .h files installed.
+
+> > It may be even possible to gater information about .so files automatically - by inspecting generated cmxa and cma
+> > files with ocamlobjinfo - so it can be done by ocamlot or something like that.
+> How would you get them to build in the first place ?
+
+You got me here %)
+
+-- 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131119/624567aa/attachment.sig>
+
+From sylvain+ocaml at le-gall.net  Tue Nov 19 10:14:37 2013
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Tue, 19 Nov 2013 11:14:37 +0100
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <528B2B74.7060704@braud-santoni.eu>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+ <20131119120304.3dbc3d83@kiwi.local.tld>
+ <528B2B74.7060704@braud-santoni.eu>
+Message-ID: <CAOCAUGOEr4B=dYrVr2-010546bBGZJ_BwZCy3Phc7Qr1WeVAUg@mail.gmail.com>
+
+2013/11/19 Nicolas Braud-Santoni <nicolas at braud-santoni.eu>:
+> On 19/11/2013 05:03, ygrek wrote:
+>> On Mon, 18 Nov 2013 10:43:59 -0800
+>> Anil Madhavapeddy <anil at recoil.org> wrote:
+>>
+>>> I've made some notes about using OPAM and Docker for easier local bulk builds here:
+>>> http://anil.recoil.org/2013/11/15/docker-and-opam.html
+>>>
+>>> One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+>>>
+>>> This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+> Two remarks:
+> 1. Using the version numbers might be much less confusing than the codenames
+> 2. I agree that we need to agree on useable syntax (and semantics) for
+> depexts. See https://github.com/ocaml/opam/issues/991
+>
+>> I personally dislike this depexts field to mention OS packages at all.
+> Why ?
+> This seems to be the most sane and generic option if we wish to interact
+> with the system's package manager [0].
+
+The problem is that each time you want to extend to a new OS
+distribution, you may need to do a lot of work. Not to mention that
+this work will probably need to be done when upgrading as well,
+although it may be less expensive. On the long term you may need to
+dedicate a fair amount of time dealing with updating the depext. But
+that is my rough estimate, and I do prefer to see people try it than
+not do anything about that (but we should be open and consider
+dropping this if it turns to be a not that sustainable solution).
+
+>
+>> Maybe it's better to specify which external libraries are needed (as .so or as pkg-config files) and then
+>> use native OS way (at installation time) to determine which package contains that .so or .pc file (e.g. apt-file on Debian).
+> Not all package managers provide these kind of facilities.
+> That is someting that, for instance, will not exist in any source-based
+> distribution that I am aware of.
+>
+> Moreover, it seems unwise to fill in information that ought to belong in
+> the distribution's packages :
+> if I depend on libfoo, major version 1, any minor version, should
+> I specify ?libfoo-1.so?, ?libfoo-1(.\d+)*.so? (dots implicitly
+> escaped), or some crazier scheme ?
+
+Not really crazy when you think about it but you should probably not
+depends on the .so. You just focus on what you need extracting data
+from the package:
+- scan .c -> extract #include "X.h", it defines a dependencies
+- scan build system -> --libs X or -lX -> you need libX.a
+
+Most of the package manager allow you to do file lookup: e.g. "dpkg
+-S" on Debian, example:
+$ dpkg -S libpcre.a
+libpcre3-dev: /usr/lib/i386-linux-gnu/libpcre.a
+
+Lets take a real example:
+$ cd ocaml-zmq
+$ grep -r -e '-l.*' .
+./_oasis:  CCLib:          -lzmq
+./myocamlbuild.ml:          (* When one link an OCaml
+library/binary/package, one should use -linkpkg *)
+./myocamlbuild.ml:          flag ["ocaml"; "link"; "program"] & A"-linkpkg";
+./myocamlbuild.ml:           * options when using this tag. When using
+the "-linkpkg" option with
+./myocamlbuild.ml:                     (S[A"-dllib"; A("-l"^lib);
+A"-cclib"; A("-l"^lib)]);
+./myocamlbuild.ml:                     (S[A"-cclib"; A("-l"^lib)]);
+./myocamlbuild.ml:            [(OASISExpr.EBool true, S [A "-cclib"; A
+"-lzmq"])]);
+./myocamlbuild.ml:            [(OASISExpr.EBool true, S [A "-lzmq"])])
+./setup.ml:                   don't use the right command-line
+arguments, rerun \
+./setup.ml:            "-no-log";
+./setup.ml:            "-no-links";
+./setup.ml:            "-install-lib-dir";
+./setup.ml:                      bs_cclib = [(OASISExpr.EBool true, ["-lzmq"])]
+
+$ grep -r -e '#include <.*>' .
+./src/caml_zmq_stubs.c:#include <stdlib.h>
+./src/caml_zmq_stubs.c:#include <stdint.h>
+./src/caml_zmq_stubs.c:#include <string.h>
+./src/caml_zmq_stubs.c:#include <stdio.h>
+./src/caml_zmq_stubs.c:#include <stdbool.h>
+./src/caml_zmq_stubs.c:#include <caml/mlvalues.h>
+./src/caml_zmq_stubs.c:#include <caml/alloc.h>
+./src/caml_zmq_stubs.c:#include <caml/fail.h>
+./src/caml_zmq_stubs.c:#include <caml/callback.h>
+./src/caml_zmq_stubs.c:#include <caml/memory.h>
+./src/caml_zmq_stubs.c:#include <caml/custom.h>
+./src/caml_zmq_stubs.c:#include <caml/intext.h>
+./src/caml_zmq_stubs.c:#include <caml/threads.h>
+./src/caml_zmq_stubs.c:#include <zmq.h>
+
+$ dpkg -S libzmq.a
+libzmq-dev:i386: /usr/lib/i386-linux-gnu/libzmq.a
+
+$ dpkg -S zmq.h
+libzmq-dev:i386: /usr/include/zmq.hpp
+libzmq-dev:i386: /usr/include/zmq.h
+
+You don't even have to do crazy comlpex thing here (a simple grep in
+the source will already provide you good insight). Although, you may
+replace dpkg by apt-file, because dpkg only rely on files installed.
+
+The first step (extract information with grep), is distribution
+agnostic and the second steps need to be translated once per OS
+distribution. If you do the math, 8h spend on refining information
+extraction will easily translate to huge savings of time. (and we are
+not using crazy complex regexp).
+
+> Where will I look for the .so ?
+> (And while using pkg-config is better, it still isn't supported by all
+> external dependencies)
+>
+>> If apt-file is not present it is at least possible to tell (with dpkg -S or ldconfig -p) whether the .so is present and what is
+>> precisely needed for the build to succeed (and mention how to find the needed package manually).
+> Don't the conf-* packages already achieve this (in an hackish way) ?
+>
+>> It may be even possible to gater information about .so files automatically - by inspecting generated cmxa and cma
+>> files with ocamlobjinfo - so it can be done by ocamlot or something like that.
+> How would you get them to build in the first place ?
+
+The .so is not really the official linking target, this is the .a
+which is not versionned !
+
+Cheers
+Sylvain
+
+>
+>
+> Regards,
+> Nicolas
+>
+> [0]: Though our definition should include thing such as Homebrew (and
+> other equivalents for OSX and/or Windows).
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+
+From sylvain+ocaml at le-gall.net  Tue Nov 19 10:20:31 2013
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Tue, 19 Nov 2013 11:20:31 +0100
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <CAOCAUGOEr4B=dYrVr2-010546bBGZJ_BwZCy3Phc7Qr1WeVAUg@mail.gmail.com>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+ <20131119120304.3dbc3d83@kiwi.local.tld>
+ <528B2B74.7060704@braud-santoni.eu>
+ <CAOCAUGOEr4B=dYrVr2-010546bBGZJ_BwZCy3Phc7Qr1WeVAUg@mail.gmail.com>
+Message-ID: <CAOCAUGN0sf+e0tWrM-FF1g=trWkbmtuHpA3Dk1Yi+JDckBEj9w@mail.gmail.com>
+
+Hey, just think about an even more "reliable" way to do all that: make
+it fails ! ;-)
+
+Not really kidding:
+1. try to build
+2. it fails because of missing deps
+3. parse the output log and spot the error (pretty easy in fact, vim
+quickfix as a lot of regex to extract them)
+4. you will get the missing file in a standard error format
+5. replace the result of grep above by the missing filename
+6. fill the depext
+7. goto 1.
+
+On the first try it will not be very efficient, but you can send the
+result for ObscureOS Y to opam and register it for other ObscureOS Y
+users.
+
+
+2013/11/19 Sylvain Le Gall <sylvain+ocaml at le-gall.net>:
+> 2013/11/19 Nicolas Braud-Santoni <nicolas at braud-santoni.eu>:
+>> On 19/11/2013 05:03, ygrek wrote:
+>>> On Mon, 18 Nov 2013 10:43:59 -0800
+>>> Anil Madhavapeddy <anil at recoil.org> wrote:
+>>>
+>>>> I've made some notes about using OPAM and Docker for easier local bulk builds here:
+>>>> http://anil.recoil.org/2013/11/15/docker-and-opam.html
+>>>>
+>>>> One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+>>>>
+>>>> This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+>> Two remarks:
+>> 1. Using the version numbers might be much less confusing than the codenames
+>> 2. I agree that we need to agree on useable syntax (and semantics) for
+>> depexts. See https://github.com/ocaml/opam/issues/991
+>>
+>>> I personally dislike this depexts field to mention OS packages at all.
+>> Why ?
+>> This seems to be the most sane and generic option if we wish to interact
+>> with the system's package manager [0].
+>
+> The problem is that each time you want to extend to a new OS
+> distribution, you may need to do a lot of work. Not to mention that
+> this work will probably need to be done when upgrading as well,
+> although it may be less expensive. On the long term you may need to
+> dedicate a fair amount of time dealing with updating the depext. But
+> that is my rough estimate, and I do prefer to see people try it than
+> not do anything about that (but we should be open and consider
+> dropping this if it turns to be a not that sustainable solution).
+>
+>>
+>>> Maybe it's better to specify which external libraries are needed (as .so or as pkg-config files) and then
+>>> use native OS way (at installation time) to determine which package contains that .so or .pc file (e.g. apt-file on Debian).
+>> Not all package managers provide these kind of facilities.
+>> That is someting that, for instance, will not exist in any source-based
+>> distribution that I am aware of.
+>>
+>> Moreover, it seems unwise to fill in information that ought to belong in
+>> the distribution's packages :
+>> if I depend on libfoo, major version 1, any minor version, should
+>> I specify ?libfoo-1.so?, ?libfoo-1(.\d+)*.so? (dots implicitly
+>> escaped), or some crazier scheme ?
+>
+> Not really crazy when you think about it but you should probably not
+> depends on the .so. You just focus on what you need extracting data
+> from the package:
+> - scan .c -> extract #include "X.h", it defines a dependencies
+> - scan build system -> --libs X or -lX -> you need libX.a
+>
+> Most of the package manager allow you to do file lookup: e.g. "dpkg
+> -S" on Debian, example:
+> $ dpkg -S libpcre.a
+> libpcre3-dev: /usr/lib/i386-linux-gnu/libpcre.a
+>
+> Lets take a real example:
+> $ cd ocaml-zmq
+> $ grep -r -e '-l.*' .
+> ./_oasis:  CCLib:          -lzmq
+> ./myocamlbuild.ml:          (* When one link an OCaml
+> library/binary/package, one should use -linkpkg *)
+> ./myocamlbuild.ml:          flag ["ocaml"; "link"; "program"] & A"-linkpkg";
+> ./myocamlbuild.ml:           * options when using this tag. When using
+> the "-linkpkg" option with
+> ./myocamlbuild.ml:                     (S[A"-dllib"; A("-l"^lib);
+> A"-cclib"; A("-l"^lib)]);
+> ./myocamlbuild.ml:                     (S[A"-cclib"; A("-l"^lib)]);
+> ./myocamlbuild.ml:            [(OASISExpr.EBool true, S [A "-cclib"; A
+> "-lzmq"])]);
+> ./myocamlbuild.ml:            [(OASISExpr.EBool true, S [A "-lzmq"])])
+> ./setup.ml:                   don't use the right command-line
+> arguments, rerun \
+> ./setup.ml:            "-no-log";
+> ./setup.ml:            "-no-links";
+> ./setup.ml:            "-install-lib-dir";
+> ./setup.ml:                      bs_cclib = [(OASISExpr.EBool true, ["-lzmq"])]
+>
+> $ grep -r -e '#include <.*>' .
+> ./src/caml_zmq_stubs.c:#include <stdlib.h>
+> ./src/caml_zmq_stubs.c:#include <stdint.h>
+> ./src/caml_zmq_stubs.c:#include <string.h>
+> ./src/caml_zmq_stubs.c:#include <stdio.h>
+> ./src/caml_zmq_stubs.c:#include <stdbool.h>
+> ./src/caml_zmq_stubs.c:#include <caml/mlvalues.h>
+> ./src/caml_zmq_stubs.c:#include <caml/alloc.h>
+> ./src/caml_zmq_stubs.c:#include <caml/fail.h>
+> ./src/caml_zmq_stubs.c:#include <caml/callback.h>
+> ./src/caml_zmq_stubs.c:#include <caml/memory.h>
+> ./src/caml_zmq_stubs.c:#include <caml/custom.h>
+> ./src/caml_zmq_stubs.c:#include <caml/intext.h>
+> ./src/caml_zmq_stubs.c:#include <caml/threads.h>
+> ./src/caml_zmq_stubs.c:#include <zmq.h>
+>
+> $ dpkg -S libzmq.a
+> libzmq-dev:i386: /usr/lib/i386-linux-gnu/libzmq.a
+>
+> $ dpkg -S zmq.h
+> libzmq-dev:i386: /usr/include/zmq.hpp
+> libzmq-dev:i386: /usr/include/zmq.h
+>
+> You don't even have to do crazy comlpex thing here (a simple grep in
+> the source will already provide you good insight). Although, you may
+> replace dpkg by apt-file, because dpkg only rely on files installed.
+>
+> The first step (extract information with grep), is distribution
+> agnostic and the second steps need to be translated once per OS
+> distribution. If you do the math, 8h spend on refining information
+> extraction will easily translate to huge savings of time. (and we are
+> not using crazy complex regexp).
+>
+>> Where will I look for the .so ?
+>> (And while using pkg-config is better, it still isn't supported by all
+>> external dependencies)
+>>
+>>> If apt-file is not present it is at least possible to tell (with dpkg -S or ldconfig -p) whether the .so is present and what is
+>>> precisely needed for the build to succeed (and mention how to find the needed package manually).
+>> Don't the conf-* packages already achieve this (in an hackish way) ?
+>>
+>>> It may be even possible to gater information about .so files automatically - by inspecting generated cmxa and cma
+>>> files with ocamlobjinfo - so it can be done by ocamlot or something like that.
+>> How would you get them to build in the first place ?
+>
+> The .so is not really the official linking target, this is the .a
+> which is not versionned !
+>
+> Cheers
+> Sylvain
+>
+>>
+>>
+>> Regards,
+>> Nicolas
+>>
+>> [0]: Though our definition should include thing such as Homebrew (and
+>> other equivalents for OSX and/or Windows).
+>>
+>>
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>>
+
+From louis.gesbert at ocamlpro.com  Tue Nov 19 15:21:48 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 19 Nov 2013 16:21:48 +0100
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <7FDB045B-9054-4809-9A93-822DF3485F68@recoil.org>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+ <DCF0D4DC-4D05-40E4-AA12-4652344A6FAC@cam.ac.uk>
+ <7FDB045B-9054-4809-9A93-822DF3485F68@recoil.org>
+Message-ID: <3377697.7VqP5r5u7E@agaric>
+
+Note that the data shown on opam.ocaml.org is agregated, and reports accesses to both opam.ocaml.org and opam.ocamlpro.com. That is, until the last time I rsync'd the stats, which needs to be done manually since I didn't bother setting up some secure pipe between the servers.
+
+I've just added a run of opam2web on the ocamlpro.com logs only at http://opam.ocaml.org/1.0/, for easy comparison ; it's a quick hack but enables to compare stats.
+Keep in mind that the latter is only updated when I manually rsync the logs (last time, just now)
+
+Hope this helps ; does anyone have a better idea ?
+
+Louis
+
+Le lundi 18 novembre 2013 09:15:16 Anil Madhavapeddy a ?crit :
+> The opam.OCamlPro.org server will have this information.  It would be most useful to keep an eye on this and ensure that we migrate people to the new repository.  Louis, I think you're the only one with access...?
+> 
+> -anil
+> 
+> On 18 Nov 2013, at 09:12, Amir Chaudhry <amc79 at cam.ac.uk> wrote:
+> 
+> > Just curiosity (and more of a side note, so feel free to ignore): Is there some way to check how may people may be on OPAM 1.0?  I'm assuming the logs may be able to tell how frequently `opam update` gets used.
+> > 
+> > Amir
+> > 
+> > On 18 Nov 2013, at 16:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+> > 
+> >> Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+> >> 
+> >> I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+> >> 
+> >> My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+> >> 
+> >> -anil
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131119/dac6f698/attachment.html>
+
+From thomas.gazagnaire at gmail.com  Tue Nov 19 16:30:43 2013
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Tue, 19 Nov 2013 17:30:43 +0100
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <3377697.7VqP5r5u7E@agaric>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+ <DCF0D4DC-4D05-40E4-AA12-4652344A6FAC@cam.ac.uk>
+ <7FDB045B-9054-4809-9A93-822DF3485F68@recoil.org> <3377697.7VqP5r5u7E@agaric>
+Message-ID: <04D7A730-34C1-457B-BDDB-E999596B66D6@gmail.com>
+
+> Note that the data shown on opam.ocaml.org is agregated, and reports accesses to both opam.ocaml.org and opam.ocamlpro.com. That is, until the last time I rsync'd the stats, which needs to be done manually since I didn't bother setting up some secure pipe between the servers.
+
+I think this is a problem as this means we have regular stat bumps (ie. ~1200 yesterday and ~2100 today) which looks like a bit weird (as the only meaningful semantics we can attach to these stats is their evolution).
+>  
+> I've just added a run of opam2web on the ocamlpro.com logs only at http://opam.ocaml.org/1.0/, for easy comparison ; it's a quick hack but enables to compare stats.
+> Keep in mind that the latter is only updated when I manually rsync the logs (last time, just now)
+
+seems that the CSS is missing.
+
+> Hope this helps ; does anyone have a better idea ?
+
+Would be nice to expose anonymous stats at some points ...
+
+>  
+> Louis
+>  
+> Le lundi 18 novembre 2013 09:15:16 Anil Madhavapeddy a ?crit :
+> > The opam.OCamlPro.org server will have this information. It would be most useful to keep an eye on this and ensure that we migrate people to the new repository. Louis, I think you're the only one with access...?
+> >
+> > -anil
+> >
+> > On 18 Nov 2013, at 09:12, Amir Chaudhry <amc79 at cam.ac.uk> wrote:
+> >
+> > > Just curiosity (and more of a side note, so feel free to ignore): Is there some way to check how may people may be on OPAM 1.0? I'm assuming the logs may be able to tell how frequently `opam update` gets used.
+> > >
+> > > Amir
+> > >
+> > > On 18 Nov 2013, at 16:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+> > >
+> > >> Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+> > >>
+> > >> I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+> > >>
+> > >> My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+> > >>
+> > >> -anil
+> > >> _______________________________________________
+> > >> opam-devel mailing list
+> > >> opam-devel at lists.ocaml.org
+> > >> http://lists.ocaml.org/listinfo/opam-devel
+> > >
+> >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131119/ade7d4c9/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Tue Nov 19 17:33:00 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 19 Nov 2013 18:33 +0100
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <04D7A730-34C1-457B-BDDB-E999596B66D6@gmail.com>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+ <3377697.7VqP5r5u7E@agaric> <04D7A730-34C1-457B-BDDB-E999596B66D6@gmail.com>
+Message-ID: <3321288.CSRyhchaxS@agaric>
+
+Le mardi 19 novembre 2013 17:30:43 Thomas Gazagnaire a ?crit :
+> > Note that the data shown on opam.ocaml.org is agregated, and reports accesses to both opam.ocaml.org and opam.ocamlpro.com. That is, until the last time I rsync'd the stats, which needs to be done manually since I didn't bother setting up some secure pipe between the servers.
+> 
+> I think this is a problem as this means we have regular stat bumps (ie. ~1200 yesterday and ~2100 today) which looks like a bit weird (as the only meaningful semantics we can attach to these stats is their evolution).
+
+I know... it's only transitional though, so is it worth setting up a "safe" place on ocamlpro.com so that ocaml.org can get the logs ?
+I could also put an alarm to remember to do it everyday, not sure the total amount of time would be bigger :D
+ 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131119/693ee57d/attachment-0001.html>
+
+From louis.gesbert at ocamlpro.com  Wed Nov 20 13:53:50 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 20 Nov 2013 14:53:50 +0100
+Subject: [opam-devel] shared directory
+In-Reply-To: <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+Message-ID: <1408508.NFeGmXnGQm@agaric>
+
+Updating a symlink whenever you do `opam switch` wouldn't be too much of a problem indeed. What I am concerned about is that people may start using it from opam, which would break when the OPAMROOT and --root opam options are used.
+
+But perhaps I am being too cautious ? I'm myself using a ~/opam link pointing to ~/.opam/4.01.0 ...
+
+Best,
+Louis
+
+Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+> Hi Louis,
+> 
+> What are the issues to using a symlink?  Couldn't opam switch just move it
+> around?
+> 
+> Best,
+> 
+> Sean
+> 
+> 
+> On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+> <louis.gesbert at ocamlpro.com>wrote:
+> 
+> >  Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+> >
+> > > I'm trying to package a library that installs files in share. When I had
+> >
+> > > only one compiler installed, the %{prefix}% argument sent them to
+> >
+> > > .opam/system/share. However, when I installed another compiler and made
+> > it
+> >
+> > > current, the files went into .opam/4.00.1/share. I am trying to tell the
+> >
+> > > user where to find the files. Is there a generic directory where I could
+> >
+> > > point the user? Perhaps you could make a symlink 'current' for the
+> >
+> > > current compiler?
+> >
+> >
+> >
+> > You should use $(opam config var prefix)/share, or even $(opam config var
+> > share). A symlink could be an option worth considering, but it has its own
+> > issues.
+> >
+> >
+> >
+> > Best,
+> >
+> > Louis
+> >
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131120/e97cf47a/attachment.html>
+
+From anil at recoil.org  Wed Nov 20 18:08:49 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 20 Nov 2013 18:08:49 +0000
+Subject: [opam-devel] Fwd: [homebrew] opam 1.1.0 fails to find system.comp
+	(#24315)
+References: <mxcl/homebrew/issues/24315/28913048@github.com>
+Message-ID: <A5F78935-6A15-404D-97BB-90176357F493@recoil.org>
+
+FYI, there are some upgrade bugs cropping up on the MacOS X Homebrew too, if anyone has a chance to help triage.
+
+Begin forwarded message:
+
+> From: Marco Seguri <notifications at github.com>
+> Subject: Re: [homebrew] opam 1.1.0 fails to find system.comp (#24315)
+> Date: 20 November 2013 18:04:53 GMT
+> To: mxcl/homebrew <homebrew at noreply.github.com>
+> Cc: Anil Madhavapeddy <anil at recoil.org>
+> Reply-To: mxcl/homebrew <reply+i-22679675-d91d60e14c937f9cc2e04ff7c8415d303ad38e2b-53164 at reply.github.com>
+> 
+> I did a opam init and it recognizes the need for an update, but it fails with:
+> 
+> [ERROR] opam2cudf: Cannot find zed.1.2
+> It also gives a command to restore previous state, backed up by opam, but the restore fails. I'm blocked.
+> 
+> ?
+> Reply to this email directly or view it on GitHub.
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131120/ea2379cd/attachment.html>
+
+From yminsky at gmail.com  Wed Nov 20 23:55:56 2013
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Wed, 20 Nov 2013 18:55:56 -0500
+Subject: [opam-devel] shared directory
+In-Reply-To: <1408508.NFeGmXnGQm@agaric>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric>
+Message-ID: <CADKNfhJ8oghWU6uD_3DsM+5P8MZEvndMLb039yVGDUJ9qo0v=g@mail.gmail.com>
+
++1 for the symlink.
+On Nov 20, 2013 8:54 AM, "Louis Gesbert" <louis.gesbert at ocamlpro.com> wrote:
+
+>  Updating a symlink whenever you do `opam switch` wouldn't be too much of
+> a problem indeed. What I am concerned about is that people may start using
+> it from opam, which would break when the OPAMROOT and --root opam options
+> are used.
+>
+>
+>
+> But perhaps I am being too cautious ? I'm myself using a ~/opam link
+> pointing to ~/.opam/4.01.0 ...
+>
+>
+>
+> Best,
+>
+> Louis
+>
+>
+>
+> Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+>
+> > Hi Louis,
+>
+> >
+>
+> > What are the issues to using a symlink? Couldn't opam switch just move it
+>
+> > around?
+>
+> >
+>
+> > Best,
+>
+> >
+>
+> > Sean
+>
+> >
+>
+> >
+>
+> > On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+>
+> > <louis.gesbert at ocamlpro.com>wrote:
+>
+> >
+>
+> > > Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+>
+> > >
+>
+> > > > I'm trying to package a library that installs files in share. When I
+> had
+>
+> > >
+>
+> > > > only one compiler installed, the %{prefix}% argument sent them to
+>
+> > >
+>
+> > > > .opam/system/share. However, when I installed another compiler and
+> made
+>
+> > > it
+>
+> > >
+>
+> > > > current, the files went into .opam/4.00.1/share. I am trying to tell
+> the
+>
+> > >
+>
+> > > > user where to find the files. Is there a generic directory where I
+> could
+>
+> > >
+>
+> > > > point the user? Perhaps you could make a symlink 'current' for the
+>
+> > >
+>
+> > > > current compiler?
+>
+> > >
+>
+> > >
+>
+> > >
+>
+> > > You should use $(opam config var prefix)/share, or even $(opam config
+> var
+>
+> > > share). A symlink could be an option worth considering, but it has its
+> own
+>
+> > > issues.
+>
+> > >
+>
+> > >
+>
+> > >
+>
+> > > Best,
+>
+> > >
+>
+> > > Louis
+>
+> > >
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131120/7a09be73/attachment-0001.html>
+
+From anil at recoil.org  Thu Nov 21 00:17:47 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 21 Nov 2013 00:17:47 +0000
+Subject: [opam-devel] shared directory
+In-Reply-To: <1408508.NFeGmXnGQm@agaric>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric>
+Message-ID: <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+
+It breaks the nice property that you can start a shell with "opam exec" and have it do the right thing with respect to dependent tools.  If your scripts depend on an environment variable, then they'll work, but a symlink approach isn't quite as flexible.
+
+Having said that, if people think that the symlink is really convenient and don't care about `opam exec`, I have no objection to a symlink being maintained.
+
+-anil
+
+On 20 Nov 2013, at 13:53, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+
+> Updating a symlink whenever you do `opam switch` wouldn't be too much of a problem indeed. What I am concerned about is that people may start using it from opam, which would break when the OPAMROOT and --root opam options are used.
+>  
+> But perhaps I am being too cautious ? I'm myself using a ~/opam link pointing to ~/.opam/4.01.0 ...
+>  
+> Best,
+> Louis
+>  
+> Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+> > Hi Louis,
+> > 
+> > What are the issues to using a symlink?  Couldn't opam switch just move it
+> > around?
+> > 
+> > Best,
+> > 
+> > Sean
+> > 
+> > 
+> > On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+> > <louis.gesbert at ocamlpro.com>wrote:
+> > 
+> > >  Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+> > >
+> > > > I'm trying to package a library that installs files in share. When I had
+> > >
+> > > > only one compiler installed, the %{prefix}% argument sent them to
+> > >
+> > > > .opam/system/share. However, when I installed another compiler and made
+> > > it
+> > >
+> > > > current, the files went into .opam/4.00.1/share. I am trying to tell the
+> > >
+> > > > user where to find the files. Is there a generic directory where I could
+> > >
+> > > > point the user? Perhaps you could make a symlink 'current' for the
+> > >
+> > > > current compiler?
+> > >
+> > >
+> > >
+> > > You should use $(opam config var prefix)/share, or even $(opam config var
+> > > share). A symlink could be an option worth considering, but it has its own
+> > > issues.
+> > >
+> > >
+> > >
+> > > Best,
+> > >
+> > > Louis
+> > >
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/bd958e4b/attachment.html>
+
+From seanmcl at gmail.com  Thu Nov 21 00:59:28 2013
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Nov 2013 19:59:28 -0500
+Subject: [opam-devel] shared directory
+In-Reply-To: <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric> <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+Message-ID: <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+
+I'm installing elisp files.  What would you tell the user to put in their
+.emacs?
+This is Louis' proposal:
+
+(setq path-to-opam-shared
+  (replace-regexp-in-string "\n" "" (shell-command-to-string "opam config
+var share")))
+
+It would be nicer to do
+
+(setq path-to-opam-shared "~/.opam/current/shared")
+
+What is opam exec?
+
+$ opam --version
+1.1.0
+$ opam exec
+opam: unknown command `exec'
+Usage: opam COMMAND ...
+Try `opam --help' for more information.
+EXIT STATUS 1
+
+
+
+
+On Wed, Nov 20, 2013 at 7:17 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> It breaks the nice property that you can start a shell with "opam exec"
+> and have it do the right thing with respect to dependent tools.  If your
+> scripts depend on an environment variable, then they'll work, but a symlink
+> approach isn't quite as flexible.
+>
+> Having said that, if people think that the symlink is really convenient
+> and don't care about `opam exec`, I have no objection to a symlink being
+> maintained.
+>
+> -anil
+>
+> On 20 Nov 2013, at 13:53, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> wrote:
+>
+> Updating a symlink whenever you do `opam switch` wouldn't be too much of a
+> problem indeed. What I am concerned about is that people may start using it
+> from opam, which would break when the OPAMROOT and --root opam options are
+> used.
+>
+>
+> But perhaps I am being too cautious ? I'm myself using a ~/opam link
+> pointing to ~/.opam/4.01.0 ...
+>
+>
+> Best,
+> Louis
+>
+>
+> Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+> > Hi Louis,
+> >
+> > What are the issues to using a symlink? Couldn't opam switch just move it
+> > around?
+> >
+> > Best,
+> >
+> > Sean
+> >
+> >
+> > On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+> > <louis.gesbert at ocamlpro.com>wrote:
+> >
+> > > Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+> > >
+> > > > I'm trying to package a library that installs files in share. When I
+> had
+> > >
+> > > > only one compiler installed, the %{prefix}% argument sent them to
+> > >
+> > > > .opam/system/share. However, when I installed another compiler and
+> made
+> > > it
+> > >
+> > > > current, the files went into .opam/4.00.1/share. I am trying to tell
+> the
+> > >
+> > > > user where to find the files. Is there a generic directory where I
+> could
+> > >
+> > > > point the user? Perhaps you could make a symlink 'current' for the
+> > >
+> > > > current compiler?
+> > >
+> > >
+> > >
+> > > You should use $(opam config var prefix)/share, or even $(opam config
+> var
+> > > share). A symlink could be an option worth considering, but it has its
+> own
+> > > issues.
+> > >
+> > >
+> > >
+> > > Best,
+> > >
+> > > Louis
+> > >
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131120/19a04524/attachment.html>
+
+From anil at recoil.org  Thu Nov 21 01:25:19 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 21 Nov 2013 01:25:19 +0000
+Subject: [opam-devel] shared directory
+In-Reply-To: <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric> <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+ <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+Message-ID: <BA0D6CEC-0A9E-46FB-84AB-25839874B087@recoil.org>
+
+On 21 Nov 2013, at 00:59, Sean McLaughlin <seanmcl at gmail.com> wrote:
+
+> I'm installing elisp files.  What would you tell the user to put in their .emacs?  
+> This is Louis' proposal:
+> 
+> (setq path-to-opam-shared 
+>   (replace-regexp-in-string "\n" "" (shell-command-to-string "opam config var share")))
+> 
+> It would be nicer to do 
+> 
+> (setq path-to-opam-shared "~/.opam/current/shared")
+
+If both of them work, does the specific details of the elisp file matter? The first version will work with a non-standard OPAMROOT (which a distribution might choose to alter, for instance for NFS sharing).
+
+> What is opam exec?
+> 
+> $ opam --version
+> 1.1.0
+> $ opam exec
+> opam: unknown command `exec'
+> Usage: opam COMMAND ...
+> Try `opam --help' for more information.
+> EXIT STATUS 1
+
+Sorry, `opam config exec`:
+
+exec
+  Execute the shell script given in parameter with the correct environment variables. This option
+  can be used to cross-compile between switches using opam config exec "CMD ARG1 ... ARGn"
+  --switch=SWITCH
+
+This is very useful in scripted builds.
+
+-anil
+
+
+From seanmcl at gmail.com  Thu Nov 21 01:34:44 2013
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Wed, 20 Nov 2013 20:34:44 -0500
+Subject: [opam-devel] shared directory
+In-Reply-To: <BA0D6CEC-0A9E-46FB-84AB-25839874B087@recoil.org>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric> <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+ <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+ <BA0D6CEC-0A9E-46FB-84AB-25839874B087@recoil.org>
+Message-ID: <CAO4dZbd8NrooAwt8-iT0sUGxG5+V2bSkbs0rdhffj+0ZgoJM2g@mail.gmail.com>
+
+> >
+> > (setq path-to-opam-shared
+> >   (replace-regexp-in-string "\n" "" (shell-command-to-string "opam
+> config var share")))
+> >
+> > It would be nicer to do
+> >
+> > (setq path-to-opam-shared "~/.opam/current/shared")
+>
+> If both of them work, does the specific details of the elisp file matter?
+
+
+I just mean, the less code someone needs to add to their .emacs, the
+better.  You're right though; it's not the end of the world... ;)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131120/4a52563b/attachment.html>
+
+From thomas.gazagnaire at gmail.com  Thu Nov 21 09:27:08 2013
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Thu, 21 Nov 2013 10:27:08 +0100
+Subject: [opam-devel] shared directory
+In-Reply-To: <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <1904922.PBaVoutouQ@agaric>
+ <CAO4dZbdwzEjEQONH2FLBPsycX=HwARZtKXzuc0qJFvUd7E9gRA@mail.gmail.com>
+ <1408508.NFeGmXnGQm@agaric> <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+ <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+Message-ID: <0A873F88-CE1E-4007-9972-DC2F0537C059@gmail.com>
+
+As Louis and Anil already stated, the symlink-only approach is  bit fragile currently as most of the OCaml binaries are not relocatable (so you need to install them in the right symlink and then you cannot use them outside that path, which means cross-compilation won't work), so we didn't go that way as we though tweaking the PATH was more flexible and portable (don't forget, you have OS and file-systems which do not support symlinks).
+
+An other point, where you can't go without tweaking the PATH anyway is when you use the system compiler: you need to export CAML_LD_LIBRARY_PATH anyway.
+
+I think the right approach for this is to have a "global" switch where you can install everything you want to export in there -- or have a separate OPAM root for this. We can also improve the output of 'opam config var <VAR> --sexp' to remove the \n.
+
+--
+Thomas
+
+On 21 Nov 2013, at 01:59, Sean McLaughlin <seanmcl at gmail.com> wrote:
+
+> I'm installing elisp files.  What would you tell the user to put in their .emacs?  
+> This is Louis' proposal:
+> 
+> (setq path-to-opam-shared 
+>   (replace-regexp-in-string "\n" "" (shell-command-to-string "opam config var share")))
+> 
+> It would be nicer to do 
+> 
+> (setq path-to-opam-shared "~/.opam/current/shared")
+> 
+> What is opam exec?
+> 
+> $ opam --version
+> 1.1.0
+> $ opam exec
+> opam: unknown command `exec'
+> Usage: opam COMMAND ...
+> Try `opam --help' for more information.
+> EXIT STATUS 1
+> 
+> 
+> 
+> 
+> On Wed, Nov 20, 2013 at 7:17 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> It breaks the nice property that you can start a shell with "opam exec" and have it do the right thing with respect to dependent tools.  If your scripts depend on an environment variable, then they'll work, but a symlink approach isn't quite as flexible.
+> 
+> Having said that, if people think that the symlink is really convenient and don't care about `opam exec`, I have no objection to a symlink being maintained.
+> 
+> -anil
+> 
+> On 20 Nov 2013, at 13:53, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+>> Updating a symlink whenever you do `opam switch` wouldn't be too much of a problem indeed. What I am concerned about is that people may start using it from opam, which would break when the OPAMROOT and --root opam options are used.
+>>  
+>> But perhaps I am being too cautious ? I'm myself using a ~/opam link pointing to ~/.opam/4.01.0 ...
+>>  
+>> Best,
+>> Louis
+>> 
+>> 
+>>  
+>> Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+>> > Hi Louis,
+>> 
+>> 
+>> > 
+>> > What are the issues to using a symlink?  Couldn't opam switch just move it
+>> 
+>> 
+>> > around?
+>> > 
+>> > Best,
+>> 
+>> 
+>> > 
+>> > Sean
+>> > 
+>> 
+>> > 
+>> > On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+>> > <louis.gesbert at ocamlpro.com>wrote:
+>> > 
+>> > >  Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+>> 
+>> 
+>> > >
+>> > > > I'm trying to package a library that installs files in share. When I had
+>> 
+>> 
+>> > >
+>> > > > only one compiler installed, the %{prefix}% argument sent them to
+>> 
+>> 
+>> > >
+>> > > > .opam/system/share. However, when I installed another compiler and made
+>> 
+>> 
+>> > > it
+>> > >
+>> > > > current, the files went into .opam/4.00.1/share. I am trying to tell the
+>> > >
+>> > > > user where to find the files. Is there a generic directory where I could
+>> > >
+>> > > > point the user? Perhaps you could make a symlink 'current' for the
+>> > >
+>> > > > current compiler?
+>> 
+>> 
+>> > >
+>> > >
+>> > >
+>> 
+>> 
+>> > > You should use $(opam config var prefix)/share, or even $(opam config var
+>> > > share). A symlink could be an option worth considering, but it has its own
+>> > > issues.
+>> > >
+>> 
+>> 
+>> > >
+>> > >
+>> > > Best,
+>> 
+>> 
+>> > >
+>> > > Louis
+>> > >
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/c40beae8/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Thu Nov 21 09:32:32 2013
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 21 Nov 2013 10:32:32 +0100
+Subject: [opam-devel] shared directory
+In-Reply-To: <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+ <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+Message-ID: <17106593.gl74sS8Sz9@agaric>
+
+Le mercredi 20 novembre 2013 19:59:28 Sean McLaughlin a ?crit :
+> I'm installing elisp files.  What would you tell the user to put in their
+> .emacs?
+> This is Louis' proposal:
+> 
+> (setq path-to-opam-shared
+>   (replace-regexp-in-string "\n" "" (shell-command-to-string "opam config
+> var share")))
+> 
+> It would be nicer to do
+> 
+> (setq path-to-opam-shared "~/.opam/current/shared")
+> 
+
+I agree the symlink looks cleaner, and is probably slightly more efficient. There might be another difference between the two if you use `opam switch` after you started emacs though.
+
+To sum up, there is no problem with adding the symlink for convenience, but we're afraid it may cause issues if used unknowingly. So the question is really "is it worth that risk ?"
+I can add it if the answer is yes.
+
+
+> What is opam exec?
+> 
+> $ opam --version
+> 1.1.0
+> $ opam exec
+> opam: unknown command `exec'
+> Usage: opam COMMAND ...
+> Try `opam --help' for more information.
+> EXIT STATUS 1
+> 
+> 
+> 
+> 
+> On Wed, Nov 20, 2013 at 7:17 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+> > It breaks the nice property that you can start a shell with "opam exec"
+> > and have it do the right thing with respect to dependent tools.  If your
+> > scripts depend on an environment variable, then they'll work, but a symlink
+> > approach isn't quite as flexible.
+> >
+> > Having said that, if people think that the symlink is really convenient
+> > and don't care about `opam exec`, I have no objection to a symlink being
+> > maintained.
+> >
+> > -anil
+> >
+> > On 20 Nov 2013, at 13:53, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> > wrote:
+> >
+> > Updating a symlink whenever you do `opam switch` wouldn't be too much of a
+> > problem indeed. What I am concerned about is that people may start using it
+> > from opam, which would break when the OPAMROOT and --root opam options are
+> > used.
+> >
+> >
+> > But perhaps I am being too cautious ? I'm myself using a ~/opam link
+> > pointing to ~/.opam/4.01.0 ...
+> >
+> >
+> > Best,
+> > Louis
+> >
+> >
+> > Le lundi 18 novembre 2013 10:17:56 Sean McLaughlin a ?crit :
+> > > Hi Louis,
+> > >
+> > > What are the issues to using a symlink? Couldn't opam switch just move it
+> > > around?
+> > >
+> > > Best,
+> > >
+> > > Sean
+> > >
+> > >
+> > > On Mon, Nov 18, 2013 at 3:30 AM, Louis Gesbert
+> > > <louis.gesbert at ocamlpro.com>wrote:
+> > >
+> > > > Le dimanche 17 novembre 2013 16:54:15 Sean McLaughlin a ?crit :
+> > > >
+> > > > > I'm trying to package a library that installs files in share. When I
+> > had
+> > > >
+> > > > > only one compiler installed, the %{prefix}% argument sent them to
+> > > >
+> > > > > .opam/system/share. However, when I installed another compiler and
+> > made
+> > > > it
+> > > >
+> > > > > current, the files went into .opam/4.00.1/share. I am trying to tell
+> > the
+> > > >
+> > > > > user where to find the files. Is there a generic directory where I
+> > could
+> > > >
+> > > > > point the user? Perhaps you could make a symlink 'current' for the
+> > > >
+> > > > > current compiler?
+> > > >
+> > > >
+> > > >
+> > > > You should use $(opam config var prefix)/share, or even $(opam config
+> > var
+> > > > share). A symlink could be an option worth considering, but it has its
+> > own
+> > > > issues.
+> > > >
+> > > >
+> > > >
+> > > > Best,
+> > > >
+> > > > Louis
+> > > >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> >
+> >
+> >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> >
+> >
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/2530803a/attachment-0001.html>
+
+From anil at recoil.org  Thu Nov 21 11:34:01 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 21 Nov 2013 11:34:01 +0000
+Subject: [opam-devel] OPAM + Docker
+In-Reply-To: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+References: <021DF61F-F680-4EF4-A64D-71823F6AB766@recoil.org>
+Message-ID: <1766E574-0B02-4E0B-8E73-10C130D82AAC@recoil.org>
+
+I've extended this to autopush to a GitHub repo, so the logs are more easily
+readable by others (there are some experimental branches in there too).
+
+https://github.com/avsm/opam-bulk-logs
+
+I've also just merged the mega depexts diff into the repository master.
+More triage and fixes to missing depexts (e.g. from the above logs) welcome!
+
+-anil
+
+On 18 Nov 2013, at 18:43, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> I've made some notes about using OPAM and Docker for easier local bulk builds here:
+> http://anil.recoil.org/2013/11/15/docker-and-opam.html
+> 
+> One semi-interesting issue I've already discovered with depexts is that just a "ubuntu" tag isn't enough, since  some depexts are only valid in a specific version of Ubuntu.
+> 
+> This unfortunately feels like it might be a job for the constraint system and not for flat tags (since I want to say >precise or <saucy).  We could do it with flat tags for now, but I have a bad feeling that it'll get unmanageable quite quickly..
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Thu Nov 21 11:42:23 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 21 Nov 2013 11:42:23 +0000
+Subject: [opam-devel] removing opam 1.0 from the travis test matrix
+In-Reply-To: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+References: <AD7A11F9-5D80-4865-A6CB-293245AA1584@recoil.org>
+Message-ID: <38C3808C-DE6C-492D-B27D-D089C55B83DA@recoil.org>
+
+I've now removed OPAM 1.0 from the test matrix in opam/opam-repository trunk.
+https://github.com/ocaml/opam-repository/pull/1320
+
+We did actually find a few cases of missing lower constraints with this one,
+but overall it's not worth all the test failures.
+
+-anil
+
+On 18 Nov 2013, at 16:53, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> Now that the OPAM 1.1 repository has split, are there any objections to me removing 1.0 from the Travis testing matrix for the 1.1 repository (i.e. github.com/ocaml/opam-repository) ?
+> 
+> I plan to rotate in 1.2 Debs to the live test matrix just as soon as the repository diverges enough to make such testing worthwhile, so we need to retire 1.0 sooner rather than later.
+> 
+> My only point of concern is to ensure that Debian has an OPAM 1.1 package update soon, as otherwise users of Debian Testing will only see the old package set.
+> 
+> -anil
+
+
+From amirmc at gmail.com  Thu Nov 21 14:06:14 2013
+From: amirmc at gmail.com (Amir Chaudhry)
+Date: Thu, 21 Nov 2013 14:06:14 +0000
+Subject: [opam-devel] package list is in reverse order
+Message-ID: <AF60FC6B-E6BC-40A4-A558-C9850AD17B64@cam.ac.uk>
+
+Hy folks,  
+
+I just noticed that the 'recent updates' panel on opam.ocaml.org is now in reverse alphabetical order.  Just curious what happened here.  
+
+Also, is this the right list to report this to?  I wasn't sure if it should have gone to platform@ instead.
+
+Best wishes,
+Amir
+
+From thomas.gazagnaire at gmail.com  Thu Nov 21 14:40:04 2013
+From: thomas.gazagnaire at gmail.com (Thomas Gazagnaire)
+Date: Thu, 21 Nov 2013 15:40:04 +0100
+Subject: [opam-devel] package list is in reverse order
+In-Reply-To: <AF60FC6B-E6BC-40A4-A558-C9850AD17B64@cam.ac.uk>
+References: <AF60FC6B-E6BC-40A4-A558-C9850AD17B64@cam.ac.uk>
+Message-ID: <24693D92-5B8F-4712-BDB0-C46E9C12579A@gmail.com>
+
+> I just noticed that the 'recent updates' panel on opam.ocaml.org is now in reverse alphabetical order.  Just curious what happened here.  
+
+This is due to https://github.com/ocaml/opam-repository/pull/1307 which renamed all the files (and then reset their timestamp).
+
+Philippe has the same problem (https://github.com/ocaml/ocaml.org/issues/326) and Louis is working on fixing it!
+
+Thanks for noticing,
+Thomas
+
+
+
+
+> 
+> Also, is this the right list to report this to?  I wasn't sure if it should have gone to platform@ instead.
+> 
+> Best wishes,
+> Amir
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From seanmcl at gmail.com  Thu Nov 21 14:42:21 2013
+From: seanmcl at gmail.com (Sean McLaughlin)
+Date: Thu, 21 Nov 2013 09:42:21 -0500
+Subject: [opam-devel] shared directory
+In-Reply-To: <17106593.gl74sS8Sz9@agaric>
+References: <CAO4dZbdbZQXJDzUQuyyfpJaSy5G4sbE6G7JY1USNhaAopnX_Rg@mail.gmail.com>
+ <F81E7524-7B0C-41C3-B658-DE52238DFD95@recoil.org>
+ <CAO4dZbcKamd+5he+DKAy9NcpbqLfEMWT0+ELzxR945j9+2BTBA@mail.gmail.com>
+ <17106593.gl74sS8Sz9@agaric>
+Message-ID: <CAO4dZbcyTnCPdppRxb6YuRYbd+zxD8fPQxb+cYmXGYdY9vuO1A@mail.gmail.com>
+
+Perhaps 'symlink' has been a diversion.  If the 'current' compiler and all
+its 'share' files were copied into a 'current' or 'global' directory that
+would work.
+I don't think the majority of users are cross compiling their code, but I
+could be wrong.
+
+If having a single place to look for files causes too much difficulty for
+the cross compilation case, being able to remove the newline from the opam
+config output would be great.
+
+Thanks!
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/c5c82b33/attachment.html>
+
+From fabien.dagnat at telecom-bretagne.eu  Thu Nov 21 17:12:38 2013
+From: fabien.dagnat at telecom-bretagne.eu (Dagnat Fabien)
+Date: Thu, 21 Nov 2013 18:12:38 +0100
+Subject: [opam-devel] can we remove directory build
+Message-ID: <E3EEFE62-B616-4148-9ABE-8B4A9049D85E@telecom-bretagne.eu>
+
+Hello,
+While auditing the space occupied by .opam, I found out that when using switch the directory for the new compiler say for exemple 4.01.0 contains a huge build directory that is kept after build whereas the build of each package is removed after the installation finishes.
+
+Can we safely remove the content of this build directory? In my case it would save 350M over 670M for my students that have quotas...
+
+Fabien
+
+	Fabien DAGNAT
+Ma?tre de conf?rences au d?partement informatique
+Responsable de la fili?re Syst?mes Logiciels et R?seaux
+T?l. : (0 | 33) 2 29 00 14 09 Technop?le Brest-Iroise, CS 83818
+29238 Brest Cedex 3, France 
+
+Une ?cole de l'Institut Mines-T?l?com     
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/ce08aa6d/attachment.html>
+
+From thomas at gazagnaire.org  Thu Nov 21 17:15:02 2013
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 21 Nov 2013 18:15:02 +0100
+Subject: [opam-devel] can we remove directory build
+In-Reply-To: <E3EEFE62-B616-4148-9ABE-8B4A9049D85E@telecom-bretagne.eu>
+References: <E3EEFE62-B616-4148-9ABE-8B4A9049D85E@telecom-bretagne.eu>
+Message-ID: <8A6E77FB-C0F5-4C26-9CD9-40EA4676727A@gazagnaire.org>
+
+Yes you can remove that safely.
+
+Your issue is tracked by https://github.com/ocaml/opam/issues/1006
+
+Thomas
+
+On 21 Nov 2013, at 18:12, Dagnat Fabien <fabien.dagnat at telecom-bretagne.eu> wrote:
+
+> Hello,
+> While auditing the space occupied by .opam, I found out that when using switch the directory for the new compiler say for exemple 4.01.0 contains a huge build directory that is kept after build whereas the build of each package is removed after the installation finishes.
+> 
+> Can we safely remove the content of this build directory? In my case it would save 350M over 670M for my students that have quotas...
+> 
+> Fabien
+> 
+> 	Fabien DAGNAT
+> Ma?tre de conf?rences au d?partement informatique
+> Responsable de la fili?re Syst?mes Logiciels et R?seaux
+> T?l. : (0 | 33) 2 29 00 14 09 Technop?le Brest-Iroise, CS 83818
+> 29238 Brest Cedex 3, France 
+> 
+> Une ?cole de l'Institut Mines-T?l?com     
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131121/b97f4acf/attachment.html>
+
+From gje.hennequin at gmail.com  Fri Nov 22 12:26:14 2013
+From: gje.hennequin at gmail.com (Guillaume Hennequin)
+Date: Fri, 22 Nov 2013 12:26:14 +0000
+Subject: [opam-devel] "waitpid" failed: No child processes
+Message-ID: <20131122122614.GA20878@ldlc>
+
+Hi,
+
+not sure the opam "devel" list is the right place to post this, but I
+couldn't find any opam "users" list...
+
+I'm trying to install opam locally on a server on which I don't have
+admin rights; open-Suse,  kenel 2.6.11.4-21.11;
+I have ocaml 4.01.0 installed already (had to install it separately,
+because this server had an old ocaml version (3.08.1) which caused the
+opam ./configure to complain);
+
+I had no problem compiling opam itself, but running "opam init" results
+in
+
+'opam init' failed.
+Fatal error:
+# opam-version  1.1.0
+# os            Linux
+opam: "waitpid" failed: No child processes
+
+... and I'm stuck...
+
+Any help greatly appreciated !
+
+best
+Guillaume
+
+
+
+From agarwal1975 at gmail.com  Fri Nov 22 13:59:30 2013
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Fri, 22 Nov 2013 08:59:30 -0500
+Subject: [opam-devel] "waitpid" failed: No child processes
+In-Reply-To: <20131122122614.GA20878@ldlc>
+References: <20131122122614.GA20878@ldlc>
+Message-ID: <CAMu2m2JeC40YyyMN6pWOFVf3dAep1u=W9=cogk1HUXW+_g8joQ@mail.gmail.com>
+
+FYI, I think the Platform list is meant to be used for end-user questions:
+http://lists.ocaml.org/listinfo/platform
+
+
+
+On Fri, Nov 22, 2013 at 7:26 AM, Guillaume Hennequin <
+gje.hennequin at gmail.com> wrote:
+
+> Hi,
+>
+> not sure the opam "devel" list is the right place to post this, but I
+> couldn't find any opam "users" list...
+>
+> I'm trying to install opam locally on a server on which I don't have
+> admin rights; open-Suse,  kenel 2.6.11.4-21.11;
+> I have ocaml 4.01.0 installed already (had to install it separately,
+> because this server had an old ocaml version (3.08.1) which caused the
+> opam ./configure to complain);
+>
+> I had no problem compiling opam itself, but running "opam init" results
+> in
+>
+> 'opam init' failed.
+> Fatal error:
+> # opam-version  1.1.0
+> # os            Linux
+> opam: "waitpid" failed: No child processes
+>
+> ... and I'm stuck...
+>
+> Any help greatly appreciated !
+>
+> best
+> Guillaume
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20131122/7d712d0b/attachment.html>
+

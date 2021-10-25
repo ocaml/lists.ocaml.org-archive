@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20no-use%20of%20camlp4%20syntax%20extensions%20for%20Otags&In-Reply-To=%3C51683434.9050907%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000400.html">
+   <LINK REL="Next"  HREF="000407.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My no-use of camlp4 syntax extensions for Otags</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20no-use%20of%20camlp4%20syntax%20extensions%20for%20Otags&In-Reply-To=%3C51683434.9050907%40lexifi.com%3E"
+       TITLE="[wg-camlp4] My no-use of camlp4 syntax extensions for Otags">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Apr 12 17:20:04 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000400.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+        <LI>Next message: <A HREF="000407.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#403">[ date ]</a>
+              <a href="thread.html#403">[ thread ]</a>
+              <a href="subject.html#403">[ subject ]</a>
+              <a href="author.html#403">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 04/12/2013 11:26 AM, Hendrik Tews wrote:
+&gt;<i> and nothing is clear. When I look up mkpat, then all I know is
+</I>&gt;<i> that an or-pattern is not a Ppat_or node, it is some record, for
+</I>&gt;<i> which I don't even know the type. So I would have to search for
+</I>&gt;<i> ppat_desc, and select the right one of the 100 matches that grep
+</I>&gt;<i> reports. Note that I have been lucky here, because mkpat is very
+</I>&gt;<i> simple and is defined in parser.mly . There are surely more
+</I>&gt;<i> complicated functions that are elsewhere defined.
+</I>
+In order to write robust AST rewriters, you'll need to be quite familiar 
+with the definition of the Parsetree structure, so reading parsetree.mli 
+once will be more or less necessary anyway.
+
+The fact that most fragments are represented with a record containing a 
+&quot;location&quot; field, a &quot;description&quot; field (and now, an &quot;attributes&quot; field) 
+is pretty uniform.  I agree that the Parsetree definition would deserve 
+some documentation and some introductory content will be useful as well, 
+but even without any further documentation, finding the information 
+relative to &quot;Ppat_or&quot; is not very difficult if you read parsetree.mli.
+
+&gt;<i> There might however be cases with the danger of wrong
+</I>&gt;<i> generalization. What I mean with this is the following: The
+</I>&gt;<i> ocamlast tool only works on correct OCaml code. I cannot feed
+</I>&gt;<i> it with &quot;assert _ &quot; in order to get the most general ast
+</I>&gt;<i> tree for assertions. So instead I have to feed it with, for
+</I>&gt;<i> instance, &quot;assert true&quot; and get Pexp_assert ... I might now
+</I>&gt;<i> believe that &quot;assert false&quot; is also represented with Pexp_assert,
+</I>&gt;<i> which is wrong.
+</I>&gt;<i>
+</I>&gt;<i> So, if there are cases, where similar looking concrete syntax is
+</I>&gt;<i> represented differently, then they should be listed somewhere.
+</I>
+It makes sense to list all such weird cases, or, when it makes sense, to 
+fix them.  For this specific examples (Pexp_assertfalse), Romain Bardou 
+(email on Jan. 28) argued that it should stay as of today.  Do other 
+people agree?
+
+&gt;<i> For documentation need (2), ocamlast is not really a help. For
+</I>&gt;<i> (2) I would suggest to annotate each constructor in parsetree.mli
+</I>&gt;<i> with the concrete syntax. For instance
+</I>&gt;<i>
+</I>&gt;<i>    | Pexp_while of expression * expression
+</I>&gt;<i>       (** while &lt;expression&gt; do &lt;expression&gt; done *)
+</I>
+Good idea. I've started with type expressions:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/parsetree.mli?r1=13512&amp;r2=13517">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/parsetree.mli?r1=13512&amp;r2=13517</A>
+
+Do you feel this brings useful information in this form?
+
+&gt;<i> There are probably a lot of side conditions. For
+</I>&gt;<i> instance, &quot;expr_1; expr_2; expr_3&quot; is
+</I>&gt;<i> Pexp_sequence(expr_1, Pexp_sequence (expr_2, expr3) and not
+</I>&gt;<i> Pexp_sequence( Pexp_sequence(expr_1, expr_2), expr3) (or vice
+</I>&gt;<i> versa).
+</I>
+(e1; e2; e3) is indeed parsed as (e1; (e2; e3)), but ((e1; e2); e3) will 
+be represented as you expect (confirmed by ocamlast).  I don't think it 
+is worth documenting again the definition of the Parsetree 
+disambiguation and associativity rules; this is already done in the 
+manual, and rules can be discovered with ocamlast.
+
+Moreover, I'd argue that authors of ppx extensions don't really need to 
+be familiar with this topic, since they operate on abstract syntax. 
+What's important is rather to specify invariants on the Parsetree data 
+structure, especially those which are not checked by the type-checker. 
+(And we should probably strengthen the type-checker to test more of 
+those conditions such as the validity of identifier strings, etc.)
+
+&gt;<i> Another kind of side condition is that certain nodes do not and
+</I>&gt;<i> must not occur inside other nodes. For instance, the left
+</I>&gt;<i> expression in Pexp_sequence is never a Pexp_sequence. (This is
+</I>&gt;<i> probably wrong, but you get the idea.)
+</I>
+Indeed, this is wrong, but I get the idea :-)  Luckily, there aren't 
+many such structural invariants, and it should not be too difficult to 
+list them.
+
+&gt;<i> You could write the documentation for (1) and (2) in comments or
+</I>&gt;<i> ocamldoc comments in the source files. However, I would prefer
+</I>&gt;<i> something like a wiki page, where we users can immediately
+</I>&gt;<i> contribute.
+</I>
+Authors of ppx extensions are probably going to have parsetree.mli under 
+they eyes quite often.  It seems good to me to put some documentation 
+directly there.  Which is not to say that an external wiki won't be 
+useful as well.
+
+
+Alain
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000400.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+	<LI>Next message: <A HREF="000407.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#403">[ date ]</a>
+              <a href="thread.html#403">[ thread ]</a>
+              <a href="subject.html#403">[ subject ]</a>
+              <a href="author.html#403">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,116 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Managing $PKG_CONFIG_PATH in opam
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Managing%20%24PKG_CONFIG_PATH%20in%20opam&In-Reply-To=%3CCAC-LLDjDnyLk6m1VsmnwC%3D%3DFBJcSey8w6SARMPH8mFNjXCq8uQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001222.html">
+   <LINK REL="Next"  HREF="001217.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Managing $PKG_CONFIG_PATH in opam</H1>
+    <B>Tim Cuthbertson</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Managing%20%24PKG_CONFIG_PATH%20in%20opam&In-Reply-To=%3CCAC-LLDjDnyLk6m1VsmnwC%3D%3DFBJcSey8w6SARMPH8mFNjXCq8uQ%40mail.gmail.com%3E"
+       TITLE="[opam-devel] Managing $PKG_CONFIG_PATH in opam">tim at gfxmonk.net
+       </A><BR>
+    <I>Tue Sep 15 12:49:55 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001222.html">[opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+</A></li>
+        <LI>Next message: <A HREF="001217.html">[opam-devel] OPAM on Native Windows - Status update
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1219">[ date ]</a>
+              <a href="thread.html#1219">[ thread ]</a>
+              <a href="subject.html#1219">[ subject ]</a>
+              <a href="author.html#1219">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Sun, Sep 13, 2015 at 11:07 PM, Thomas Leonard &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">talex5 at gmail.com</A>&gt; wrote:
+&gt;<i> On 12 September 2015 at 08:49, Tim Cuthbertson &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">tim at gfxmonk.net</A>&gt; wrote:
+</I>&gt;&gt;<i> On the MirageOS mailing list, I submitted some patches[0] to make some
+</I>&gt;&gt;<i> mirage libraries build without assuming a strict `opam` destination
+</I>&gt;&gt;<i> directory layout. Mainly this was about the build scripts explicitly
+</I>&gt;&gt;<i> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+</I>&gt;&gt;<i> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+</I>&gt;&gt;<i> building[1]), there is no such path, but that's OK - the build
+</I>&gt;&gt;<i> environment will have already set $PKG_CONFIG_PATH correctly.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> [0] <A HREF="http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html">http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html</A>
+</I>&gt;&gt;<i> [1] <A HREF="https://github.com/gfxmonk/opam2nix">https://github.com/gfxmonk/opam2nix</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> It was generally agreed that having the build scripts perform this
+</I>&gt;&gt;<i> task is not ideal, and Thomas Leonard suggested we could change `opam`
+</I>&gt;&gt;<i> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+</I>&gt;&gt;<i> assume too much about their environment. That way a build script can
+</I>&gt;&gt;<i> assume its pkg-config dependencies are available without caring
+</I>&gt;&gt;<i> exactly where they live.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This seems like a good idea to me, and I've written up a fairly simple
+</I>&gt;&gt;<i> patch which (I think) will do so:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config">https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I have only superficially tested it, but in thinking about that it
+</I>&gt;&gt;<i> seems like this almost certainly won't be enough. All &quot;pure&quot; opam
+</I>&gt;&gt;<i> packages providing pkg-config libraries should work just fine, however
+</I>&gt;&gt;<i> there exist a large number of opam packages (conf-*) which exist
+</I>&gt;&gt;<i> solely to force installation of system packages, and therefore most of
+</I>&gt;&gt;<i> them actually rely on the system $PKG_CONFIG_PATH being used.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> We could make `opam` prefix the opam pkgconfig path with the system
+</I>&gt;&gt;<i> one, but this could lead to accidental impurity (in the case of these
+</I>&gt;&gt;<i> mirage libraries, it would mean that dependencies might accidentally
+</I>&gt;&gt;<i> be provided by the system rather than opam deps, which makes builds
+</I>&gt;&gt;<i> fragile).
+</I>&gt;<i>
+</I>&gt;<i> Since the opam environment is also the user's shell environment, we
+</I>&gt;<i> should always add to the path, I think. Using opam shouldn't prevent
+</I>&gt;<i> compiling non-OCaml software.
+</I>
+One of the main points in favour of the current approach is that a
+build script setting `PKG_CONFIG_PATH=`opam config var
+prefix`/lib/pkgconfig` ensures that all dependencies are satisfied by
+opam (and not accidentally satisfied by system dependencies). You lose
+that assurance with my patches, and also if you go the approach of
+only adding to the path. So would this actually be acceptable to those
+mirage packages? Or would you still want to explicitly override
+$PKG_CONFIG_PATH to get this additional assurance?
+
+Cheers,
+ - Tim.
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001222.html">[opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+</A></li>
+	<LI>Next message: <A HREF="001217.html">[opam-devel] OPAM on Native Windows - Status update
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1219">[ date ]</a>
+              <a href="thread.html#1219">[ thread ]</a>
+              <a href="subject.html#1219">[ subject ]</a>
+              <a href="author.html#1219">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

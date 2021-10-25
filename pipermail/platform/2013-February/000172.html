@@ -1,0 +1,203 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302271416410.14929%40hermes-1.csi.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000170.html">
+   <LINK REL="Next"  HREF="000174.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302271416410.14929%40hermes-1.csi.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Feb 27 14:16:41 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000170.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000174.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#172">[ date ]</a>
+              <a href="thread.html#172">[ thread ]</a>
+              <a href="subject.html#172">[ subject ]</a>
+              <a href="author.html#172">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i>I want to see concrete examples!  
+</I>
+It is difficult to provide examples of people doing something that is not 
+currently supported. Using the compiler itself as source of possible module 
+names, I see the following module names that I could easily picture 
+multiple libraries using:
+
+ Warnings, Tbl, Misc, Config, Errors, Env, Types,
+ Protocol, Shell, Common, Table, Log, Options
+
+&gt;<i>Maybe you want to use both String.Set and Int.Set, but 
+</I>&gt;<i>you're not going to &quot;open&quot; String and Int anyway.
+</I>
+I can easily imagine libraries that provide there own specialised set 
+implementation as Foo.Set. I can also easily imagine that the kind of 
+program that requires specialised sets for one kind of data would also 
+require specialised sets for another kind of data.
+
+&gt;<i>use Xmllight.parse and Xmlm.parse (although it is not clear that this 
+</I>&gt;<i>will happen in the same module), but you're not going to open Xmllight 
+</I>&gt;<i>or Xmlm globally in your unit.
+</I>
+But I might open Xmlm and Json (an imaginary json parsing library) in the 
+same unit.
+
+&gt;<i>
+</I>&gt;&gt;<i> I also think that open statements (even at the top of a file) are a very
+</I>&gt;&gt;<i> good thing.
+</I>&gt;<i>
+</I>&gt;<i>If put at the top of the file, I don't see them as fundamentally 
+</I>&gt;<i>different from command-line arguments, and the meaning of the short name 
+</I>&gt;<i>is decided by the order of open statements, which is also quite fragile.
+</I>
+Except that open is written by a programmer, whilst command line arguments 
+are often written by a tool/build system.
+
+&gt;<i>And &quot;open statements&quot; (for modules, not even namespaces) are generally 
+</I>&gt;<i>considered as a dangerous feature, because they are the source of 
+</I>&gt;<i>technical problems (dependency analysis), because they make the code 
+</I>&gt;<i>harder to read and refactorize, and because it makes modules more 
+</I>&gt;<i>fragile (if a module B is extended with more components, they can hide 
+</I>&gt;<i>components with the same name from another module A which is open before 
+</I>&gt;<i>B in some client code).  Making &quot;opens&quot; more local is a way to reduce 
+</I>&gt;<i>those problems.  I'm thus surprised by your claim that open statements 
+</I>&gt;<i>are very good thing.
+</I>
+They are a good thing in comparison to command-line arguments. It is 
+obviously better if people open things locally, or use the full name 
+explicitly (although this can clutter the code and reduce readability).
+
+&gt;&gt;<i> They show which libraries the file is going to use.
+</I>&gt;<i>
+</I>&gt;<i>This seems to confirm that what you're aiming at is really a way to 
+</I>&gt;<i>specify in the source code which libraries are used.  But then we should 
+</I>&gt;<i>push the reasoning further and ensure this specification is the only one 
+</I>&gt;<i>required to use a library.  Why should we accept to pass -I / -pp / -ppx 
+</I>&gt;<i>flags to the compiler (and specify again libraries at link time) when 
+</I>&gt;<i>the information is already part of the source code?
+</I>
+I'm certainly not against support for inferring command-line arguments from 
+the contents of files, but I do think that they are separate issues.
+
+The &quot;open Foo&quot; is part of the semantics of the program, it has meaning 
+regardless of the environment it is being compiled in. Command-line 
+arguments are about providing an interface between the program's semantics 
+and its surrounding environment (e.g. the filesystem).
+
+There is also a reasonable argument that inferring the compiler arguments 
+is the job of tools like ocamldep and the build system, rather than the 
+compiler.
+
+&gt;&gt;<i> Currently, a file using a library that does not use pack will simply
+</I>&gt;&gt;<i> launch straight into using modules with short names that give no
+</I>&gt;&gt;<i> indication of their origin.
+</I>&gt;<i>
+</I>&gt;<i>Many of the third-party libraries I use export a single module, which I 
+</I>&gt;<i>never &quot;open&quot;, and whose name is unique enough to avoid clashes (e.g. 
+</I>&gt;<i>Postgresql, Sqlite3, Xmlm).  Some libraries use prefixes (Nethtml, with 
+</I>&gt;<i>an internal Nethtml_scanner module; Lwt comes with Lwt_util, 
+</I>&gt;<i>Lwt_condition, Lwt_mutex, etc).  It would have been crazy, indeed, for 
+</I>&gt;<i>Nethtml to have an internal &quot;Scanner&quot; module, or for Lwt to expose a 
+</I>&gt;<i>&quot;Mutex&quot; module.  I'm fine with this situation, but I can understand that 
+</I>&gt;<i>in some cases, it would make sense, for instance, to alias Lwt_mutex to 
+</I>&gt;<i>Mutex in a given project.
+</I>
+More than just make sense, it would actively improve the readability of 
+code using modules like Lwt_mutex.
+
+&gt;<i>So I don't agree with the opinion that -pack is currently the only way 
+</I>&gt;<i>to avoid clashes!  It would be useful to get some statistics about the 
+</I>&gt;<i>use of -pack in OPAM.
+</I>
+I think that it is a little dangerous to judge how much people would use a 
+proposal based on how many people used its complicated and deeply flawed 
+predecessor.
+
+&gt;<i> &gt; I must look in the build system to find out
+</I>&gt;&gt;<i> what they refer to. By encouraging people to use namespaces, these files
+</I>&gt;&gt;<i> will instead start with &quot;open namespace Foo&quot;, and it will be obvious
+</I>&gt;&gt;<i> what libraries they are using.
+</I>&gt;<i>
+</I>&gt;<i>So if you have a program like:
+</I>&gt;<i>
+</I>&gt;<i>  open namespace Foo
+</I>&gt;<i>  open namespace Bar
+</I>&gt;<i>
+</I>&gt;<i>  (* ... several hundreds of lines ... *)
+</I>&gt;<i>
+</I>&gt;<i>   .... Baz.parse ...
+</I>&gt;<i>
+</I>&gt;<i>then, yes, you know that this program uses the Foo and Bar 
+</I>&gt;<i>libraries/namespaces, but you have no idea where Baz comes from.  This 
+</I>&gt;<i>is fine, as long as you don't have clashes of &quot;short&quot; names, i.e. Foo 
+</I>&gt;<i>and Bar are different enough to not provide top-level components of the 
+</I>&gt;<i>same name.
+</I>
+I certainly agree that it is bad practise to rely on shadowing, it would be 
+better to open the modules more locally when they have clashes. This is why 
+we should provide a way to open namespaces locally. I also think that the 
+&quot;open&quot;s at the top of the file are a definite improvement on command-line 
+arguments.
+
+
+&gt;&gt;<i> OCamlDep would simply treat any namespace for which it could find
+</I>&gt;&gt;<i> no &quot;.ns&quot; file as an implicit namespace.
+</I>&gt;<i>
+</I>&gt;<i>I have to admit that I'm a little bit lost and I don't really know which 
+</I>&gt;<i>&quot;namespace proposal&quot; we are talking about (mine has only &quot;.ns&quot; file, no 
+</I>&gt;<i>other notion of namespaces).
+</I>
+The parts of my post that referred to ocamldep were in response to your 
+commments about my addition to your proposal (I think I see how you got 
+lost). In other words, they were about adding support for having files like 
+&quot;core-mutex.mli&quot; which would automatically be placed in a Core namespace. 
+The idea (which I will call implicit namespaces) is that, for convenience, 
+you would not need to provide a &quot;.ns&quot; file for these files.
+
+I think that it could cover a majority of the uses of namespaces, while 
+still allowing explicit &quot;.ns&quot; files for more complex namespaces and to make 
+life easier for build systems. I particularly like how simple this would be 
+to explain to a beginner.
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000170.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000174.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#172">[ date ]</a>
+              <a href="thread.html#172">[ thread ]</a>
+              <a href="subject.html#172">[ subject ]</a>
+              <a href="author.html#172">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

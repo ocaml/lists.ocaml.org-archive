@@ -1,0 +1,294 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3CCAPFanBFhAkfqJ9DiyRuM6D0HBetFy2KtUyQAj1VmEJM3tj4rAw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000371.html">
+   <LINK REL="Next"  HREF="000373.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3CCAPFanBFhAkfqJ9DiyRuM6D0HBetFy2KtUyQAj1VmEJM3tj4rAw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Mar 29 15:12:42 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000371.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+        <LI>Next message: <A HREF="000373.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#372">[ date ]</a>
+              <a href="thread.html#372">[ thread ]</a>
+              <a href="subject.html#372">[ subject ]</a>
+              <a href="author.html#372">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Fri, Mar 29, 2013 at 3:35 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt;wrote:
+
+&gt;<i> I'd write it as:
+</I>&gt;<i>
+</I>&gt;<i> let add_register e body =
+</I>&gt;<i>   let_in [pany, app (evar &quot;ExceptionHandling.register&quot;) [e]] body
+</I>&gt;<i>
+</I>&gt;<i> which does not look so bad.  This relies on the following definitions,
+</I>&gt;<i> which could go e.g. in a Ast_helper.Convenience module:
+</I>&gt;<i>
+</I>&gt;<i> let evar s = E.ident (mknoloc (Longident.parse s))
+</I>&gt;<i> let let_in l body = E.let_ Nonrecursive l b
+</I>&gt;<i>    (* maybe with an optional argument for the recursive case *)
+</I>&gt;<i> let pany = P.any ()
+</I>&gt;<i> let app f args = apply f (List.map (fun a -&gt; &quot;&quot;, a) args)
+</I>&gt;<i>
+</I>
+That is better indeed. I can only encourage you to add these kind of
+conveniences in the E submodule (or maybe somewhere else) as usage suggests
+that they are useful. I originally planned to report on that through proper
+(?) channels, but that got lost in the noise of things to do, sorry.
+
+I'm still not sure that quasi-quotations are not a better approach, because
+the problem here is that the user has to learn a new interface to describe
+code fragments instead of using the syntax he's already familiar with. You
+have convincingly argued that the OCaml syntax cannot always be used to
+describe AST fragments (even in Camlp4, if you use the classic syntax in
+quotations some ambiguities force you to revert to plain AST constructors
+from time to time), and I hear the argument about fitting lots of small
+pieces together instead of inserting large chunks of code. I still have the
+intuition that those arguments are more relevant to the expert extension
+writer, and that for a large set of use cases that concern *simple*
+extensions and beginner extension writers, quasiquotations are still
+noticeably easier to use. That this feeling appears to be reflected by
+Xavier Clerc, which is one of the other early-triers of -ppx, gives me a
+hint that it may have some objective qualities.
+
+
+&gt;<i>
+</I>&gt;<i> The rest of the code is interesting as well:
+</I>&gt;<i>
+</I>&gt;<i> Camlp4:
+</I>&gt;<i>
+</I>&gt;<i>   value rec map_handler =
+</I>&gt;<i>     let patvar = &quot;__exn&quot; in
+</I>&gt;<i>     fun
+</I>&gt;<i>     [ &lt;:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">match_case at _loc</A>&lt; $m1$ | $m2$ &gt;&gt; -&gt;
+</I>&gt;<i>         &lt;:match_case&lt; $map_handler m1$ | $map_handler m2$ &gt;&gt;
+</I>&gt;<i>     | &lt;:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">match_case at _loc</A>&lt; $p$ when $w$ -&gt; $e$ &gt;&gt; -&gt;
+</I>&gt;<i>         &lt;:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">match_case at _loc</A>&lt;
+</I>&gt;<i>           ($p$ as $lid:patvar$) when $w$ -&gt; $add_debug_expr _loc patvar e$
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i>     | m -&gt; m ];
+</I>&gt;<i>
+</I>&gt;<i>   value filter = object
+</I>&gt;<i>     inherit Ast.map as super;
+</I>&gt;<i>     method expr = fun
+</I>&gt;<i>     [ &lt;:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">expr at _loc</A>&lt; try $e$ with [ $h$ ] &gt;&gt; -&gt;
+</I>&gt;<i>       &lt;:expr&lt; try $e$ with [ $map_handler h$ ] &gt;&gt;
+</I>&gt;<i>     | x -&gt; super#expr x ];
+</I>&gt;<i>   end;
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> PPX:
+</I>&gt;<i>
+</I>&gt;<i>   method expr e =
+</I>&gt;<i>     let e = super#expr e in
+</I>&gt;<i>     { e with pexp_desc =
+</I>&gt;<i>         match e.pexp_desc with
+</I>&gt;<i>           | Pexp_try (body, handler) -&gt;
+</I>&gt;<i>             let instrument_case (pat, body) =
+</I>&gt;<i>               let patvar_str =  &quot;__exn&quot; in
+</I>&gt;<i>               let patvar = Location.mknoloc (Longident.parse patvar_str) in
+</I>&gt;<i>               let pat = { pat with ppat_desc =
+</I>&gt;<i>                 Ppat_alias (pat, Location.mknoloc patvar_str) } in
+</I>&gt;<i>               (pat, add_register patvar body) in
+</I>&gt;<i>             Pexp_try (body, List.map instrument_case handler)
+</I>&gt;<i>           | other -&gt; other
+</I>&gt;<i>     }
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This might be a matter of taste, but I prefer the PPX version, which I can
+</I>&gt;<i> read only by knowing about the Parsetree (which is required anyway to write
+</I>&gt;<i> any such code), a normal OCaml library.  The quotation and anti-quotations
+</I>&gt;<i> in the Camlp4 version look very noisy, and it relies on a syntax I'm not
+</I>&gt;<i> familiar with (revised syntax) and syntactic extensions
+</I>&gt;<i> (quotations/antiquotations), with their own conventions (&quot;&lt;:match_case&lt;&quot;,
+</I>&gt;<i> $lid:$).  Since I'm not writing extensions every day, I really prefer
+</I>&gt;<i> having to learn how to use simple OCaml data types and libraries
+</I>&gt;<i> (Parsetree, Ast_helper) rather than to learn new syntax and new concepts.
+</I>&gt;<i>  Also, I'd write the code above as:
+</I>&gt;<i>
+</I>&gt;<i> (* --&gt; in Ast_helper.Convenience *)
+</I>&gt;<i> let palias p x = P.alias p (mknoloc x)
+</I>&gt;<i> let evar s = E.ident (mknoloc (Longident.parse s))
+</I>&gt;<i> ...
+</I>&gt;<i>
+</I>&gt;<i>   method expr e =
+</I>&gt;<i>     let e = super#expr e in
+</I>&gt;<i>     match e.pexp_desc with
+</I>&gt;<i>     | Pexp_try (body, handler) -&gt;
+</I>&gt;<i>         let instrument_case (pat, body) =
+</I>&gt;<i>           (palias pat &quot;__exn&quot;, add_register (evar &quot;__exn&quot;) body)
+</I>&gt;<i>         in
+</I>&gt;<i>         {e with pexp_desc = Pexp_try (body, List.map instrument_case
+</I>&gt;<i> handler)}
+</I>&gt;<i>     | e -&gt; e
+</I>
+
+
+I used this example specifically to discuss the quasiquotation feature, not
+as a general comparison of -ppx and Camlp4's extension writing facilities.
+I do agree that, in this example, the AST traversal framework of -ppx is in
+fact better than Camlp4's. This is related to the fact that the AST
+structure is simpler and more closely reflect the way I logically think
+about pieces of OCaml code: match only takes a (pattern * expr) list
+instead of being a recursive expression of nested branches. That's a plus
+for ppx's design (and I like your approach of improving the upstream AST
+description to make it even better, at least while we don't have extension
+writers with code that breaks when we change it).
+
+That said, I think you're also a bit quick to jump to conclusions here. The
+question of whether the extension uses classical or revised syntax is
+largely orthogonal to the design of the extension itself (except
+occasionally with quotation ambiguities concerns), and I could have used
+the classic syntax to write the Camlp4 extension just as well. What
+happened in practice is that I looked at the set of old Camlp4 extensions I
+had lying around, copy-pasted the code of the one that looked most closely
+like what I was looking for (traversing the &quot;match&quot; structure), and spent
+the rest of the time wondering which output code to produce (the
+&quot;add_register&quot; function I quoted, plus the pattern-alias stuff).
+
+So the bottleneck in practice was in the code production part. It was just
+as true for the -ppx version (the traversal part was easy to write), but my
+experience producing code in the -ppx version was much less gratifying. Of
+course, it was my first use of your Ast_mapper.E interface, so there was
+some learning cost to take into account. But then I had type errors, I had
+to look at the documentation again, and it was a bit painful. Finally, I
+only handle Camlp4 extensions about once a year, so I have time to forget
+most details about how they work, in particular I *always* look at the
+documentation for the concrete AST constructor names in the (rare) cases
+where I need them. I found that there was no such re-learning curve with
+quasiquotations, they just work out of the box -- once you've been
+rebrained, once and forall, to see those &lt;:stuff&lt; &gt;&gt; as structured code
+rather than ASCII noise.
+
+I think the small tool you just introduced (translating OCaml code into
+AST-building ocaml code) may have made this &quot;code production&quot; part easier,
+but I'm not fond of the idea of pasting auto-generated code in my own code.
+In any case, it would be better if it produced code using the nice
+high-level interface, rather than the hard-to-read AST definitions, but
+that may be much more painful to implement so I'm not really asking for
+that.
+
+
+
+&gt;<i>  But maybe we
+</I>&gt;&gt;<i> can have quasiquotations with the current extension mechanism?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> let add_register patvar body =
+</I>&gt;&gt;<i>    [%quote
+</I>&gt;&gt;<i>      let _ = ExceptionHandling.register [%anti patvar] in [%anti body]
+</I>&gt;&gt;<i>    ]
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Implementing this &quot;quote&quot; expander is not very difficult, just a little
+</I>&gt;<i> bit tedious (and this can be automated by parsing the definition of the
+</I>&gt;<i> Parsetree).
+</I>
+
+Isn't that essentially the same thing as the tool you implemented for
+Xavier above? (Can you reuse code between both?)
+If I understand correctly, this is also the &quot;Meta&quot; operation of Camlp4,
+turning the AST for the expression &lt;foo&gt; into the AST for the OCaml
+expression representing the AST for &lt;foo&gt;. When you say &quot;automated by
+parsing the definition of the Parsetree&quot;, do you have a realistic design in
+mind for such boilerplate code generators, or do you plan in practice to
+implement them by hand?
+
+Note that nothing forces to use [%anti x] for antiquotations.  We could
+&gt;<i> very well decide on a more lightweight convention, like prefixing
+</I>&gt;<i> identifiers, or using a dedicated operator:
+</I>
+
+&gt;<i>     [%quote
+</I>&gt;<i>       let _ = ExceptionHandling.register __patvar in __body
+</I>&gt;<i>     ]
+</I>&gt;<i>
+</I>&gt;<i>     [%quote
+</I>&gt;<i>       let _ = ExceptionHandling.register !!patvar in !!body
+</I>&gt;<i>     ]
+</I>&gt;<i>
+</I>
+Same old battle-horse: I dislike the idea that [%quote ] would change the
+meaning of syntactically valid OCaml code such as __patvar or !!patvar. I
+think I would with [%anti ] for now, or maybe just [%a ] if need be -- in
+any case this is not part of the eventually-crowded extension namespace as
+they really are only markers to be rewritten by the implementation of
+%quote.
+
+
+&gt;<i> But this approach would work nicely only for writing expressions or
+</I>&gt;<i> patterns on OCaml expressions, not on other syntactic categories (because
+</I>&gt;<i> the content of an extension node is an expression).  The problem is that
+</I>&gt;<i> AST-manipulating code tend to require to work a lot with many different
+</I>&gt;<i> categories (like &quot;match cases&quot;) even to build expressions.
+</I>&gt;<i>
+</I>
+That's a good point.
+
+
+&gt;<i> Quasi-quotations would be useful if the expanders had to generate big
+</I>&gt;<i> fragments of mostly static code, with only a few &quot;dynamic&quot; placeholders.
+</I>&gt;<i>  In my experience, this is rarely the case: you assemble the resulting
+</I>&gt;<i> OCaml code by combining many small fragments generated programmatically.
+</I>&gt;<i>  For these cases, a nice library of &quot;AST constructors&quot; seems better to me.
+</I>&gt;<i>
+</I>
+Maybe we need both, but if we eventually get nice constructor names for the
+AST definitions (I know that doesn't depend on you) I think if we only had
+time/energy/maintenance for two among (1) AST definitions (2) AST
+combinator library and (3) quasiquotation mechanism, I would suggest we
+keep (1) and (3) rather than (1) and (2).
+
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> -- Alain
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130329/2be180d9/attachment-0001.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130329/2be180d9/attachment-0001.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000371.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+	<LI>Next message: <A HREF="000373.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#372">[ date ]</a>
+              <a href="thread.html#372">[ thread ]</a>
+              <a href="subject.html#372">[ subject ]</a>
+              <a href="author.html#372">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

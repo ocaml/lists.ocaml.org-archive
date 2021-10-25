@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%20shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3C5110AC4F.6010209%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000214.html">
+   <LINK REL="Next"  HREF="000191.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%20shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3C5110AC4F.6010209%40frisch.fr%3E"
+       TITLE="[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations">alain at frisch.fr
+       </A><BR>
+    <I>Tue Feb  5 06:53:03 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000214.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+        <LI>Next message: <A HREF="000191.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#190">[ date ]</a>
+              <a href="thread.html#190">[ thread ]</a>
+              <a href="subject.html#190">[ subject ]</a>
+              <a href="author.html#190">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/1/2013 4:38 PM, Gabriel Scherer wrote:
+&gt;<i> Regarding concrete syntax, I would be tempted to suggest that (prefix
+</I>&gt;<i> or postfix) annotations be attached to non-terminals (including
+</I>&gt;<i> parenthesis). I believe there is an important difference between
+</I>&gt;<i> &quot;modulating this AST node&quot; and &quot;modulating the whole enclosed
+</I>&gt;<i> expression&quot; that would relevant for reasoning on the locality and
+</I>&gt;<i> composability of syntactic extensions. I'm not sure yet what's the
+</I>&gt;<i> best way to go (I'll try to see what Leo and you suggest).
+</I>
+I don't see the benefits of allowing annotations on parenthesis (and 
+why, not, comments), or individual tokens (the &quot;for&quot; &quot;=&quot; &quot;to&quot; or &quot;do&quot; in 
+&quot;for i = 1 to 10 do&quot;), only extra complexity in the definition of the 
+Parsetree.
+
+Can you give an example where putting an annotation on e.g. a 
+parenthesis would be the right thing to do?
+
+
+&gt;<i> (For example by only passing to the
+</I>&gt;<i> extension writer the part(s) of the AST that have been annotated).
+</I>&gt;<i> Unfortunately, I don't see how Bisect would fit any such restriction.
+</I>&gt;<i> Maybe that's a problem best solved by socialization (writing a
+</I>&gt;<i> documentation on good practices, and yelling on people)
+</I>
+I'm strongly in favor of solving that by socialization, if any problem 
+actually occur, rather than restricting technically what an AST rewriter 
+can do.  My arguments:
+
+1.  I don't think there will be any problem in practice.  At least this 
+discussion should be motivated by some concrete problems to be expected 
+in the interaction of common extensions.  For instance, the bad 
+interaction between type-conv and deriving as of today would disappear, 
+and I don't see how they could be written to introduce other problems 
+(and if they do and some people want to use both, this should be easy to 
+fix).
+
+2.  Jeremy's proposal more or less requires all rewriters to be in the 
+same process.  This requires either Dynlink (which is not available 
+under all platforms in native code;  in the past there has been a strong 
+resistance to have the compiler and basic tools depend on it) or custom 
+static linking (which is not very &quot;build system&quot; friendly).
+
+3.  Some very legitimate uses of ppx don't work nicely with the 
+constraint that they can operate only on a marked fragment.  You cite 
+Bisect, but this is already the case for Sedlex, which injects some 
+shared declarations at the beginning of the unit.  Yes, if two 
+&quot;extensions&quot; do that, the order in which they will be applied will 
+produce different result, but I cannot imagine a case where this would 
+be problematic.  I can see a lot more situations where injecting code 
+non-locally makes sense.  Just as an example, consider an extension to 
+mark some methods as &quot;memoized&quot;:
+
+    object
+      ...
+      (@memoized) method foo = ....
+      ...
+    end
+
+
+   ===&gt;
+
+    object
+      ...
+      val mutable foo_memo = None
+      method foo =
+         match foo_memo with
+         | Some x -&gt; x
+         | None -&gt; let r = ... in foo_memo &lt;- Some r; r
+      ...
+    end
+
+   Here we need to inject code &quot;just above&quot;.  In other cases, one might 
+want to inject code &quot;at the beginning&quot; or &quot;at the end&quot;  (of the whole 
+unit, of the current structure, etc), or at a completely different place 
+(example: macro expansion).
+
+
+4. Having &quot;registered&quot; expanders called when they are identified by a 
+specific marker during a top-down traversal hard-codes a top-down 
+rewriting strategy.  There are cases where this is not optimal. 
+Consider for instance the interaction between a macro system (or 
+conditional compilation) and other extensions.  I can easily imagine 
+cases where one really wants macros to be expanded before other 
+extensions operate on the AST (e.g. because the result of macro 
+expansion generate extension markers / attributes).  Sedlex could for 
+instance benefit from a macro system on patterns (in order to replace 
+it's hard-coded notion of declared regexps).  One should at least allow 
+each expander to apply explicitly the &quot;complete rewriting&quot; on a sub-tree 
+and inspect the result (allowing bottom-up rewriting on demand).  But 
+then we loose all nice reasoning properties.
+
+5. It is always possible to add a marker at the top of the compilation 
+unit and do all the rewriting there, so bad things are still possible.
+
+6. Order in which ppx rewriters are applied matters, but I don't believe 
+it is difficult to reason on the resulting composition, nor to devise a 
+&quot;good&quot; order for most cases.  At least, the behavior of the composition 
+only depends on the behavior of each rewriter (which can be observed 
+with the -dsource compiler option).  Users don't have to understand how 
+an extension is implemented, but only what it does (in terms of AST 
+rewriting), in order to understand how it will compose with other 
+extensions.  I'm not sure that reasoning on nested rewriting, especially 
+if expanders are allowed to call other expanders on sub-terms and 
+post-process the result, will be any simpler.  In practice, I suspect 
+that simple priority rules between ppx rewriting would be enough to 
+eliminate most problems (e.g. run first all &quot;macro expanders / 
+conditional compilation&quot;, most of the other extensions would interact 
+nicely in whichever order they are applied).
+
+7.  A nice property of &quot;ppx&quot; is that it is not a &quot;system&quot;, which reduces 
+the risks of over engineering and design mistakes, and simplifies the 
+learning curve.  I suggest to keep to extra layers / libraries the role 
+of providing higher level APIs with a more restricted semantics but 
+stronger invariants.  Nothing prevent people from proposing such systems 
+on top of the current -ppx flag and syntactic extensions being 
+discussed, but those extensions should not be tightly coupled with these 
+systems.
+
+
+
+Alain
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000214.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+	<LI>Next message: <A HREF="000191.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#190">[ date ]</a>
+              <a href="thread.html#190">[ thread ]</a>
+              <a href="subject.html#190">[ subject ]</a>
+              <a href="author.html#190">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

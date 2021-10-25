@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCAPFanBGR-r%2B6T1_x1SPpOSBw1qottsyVVKEz4MeV9VK%2Bb6RUsw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000221.html">
+   <LINK REL="Next"  HREF="000200.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCAPFanBGR-r%2B6T1_x1SPpOSBw1qottsyVVKEz4MeV9VK%2Bb6RUsw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Feb  7 16:49:18 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000221.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000200.html">[wg-camlp4] Runtime types and no -pp(x)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#223">[ date ]</a>
+              <a href="thread.html#223">[ thread ]</a>
+              <a href="subject.html#223">[ subject ]</a>
+              <a href="author.html#223">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;&gt;<i> c) Sebastien Mondet suggested that run-time types or dyntype might be
+</I>&gt;&gt;<i> sufficient without ppx for many extensions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Markus Mottl pointed out that there are runtime performance
+</I>&gt;&gt;<i> implications for using those solutions.
+</I>&gt;<i>
+</I>&gt;<i> I strongly agree with Markus on this.  Run-time types are lovely, but
+</I>&gt;<i> we really need something more efficient for the vast majority of our
+</I>&gt;<i> camlp4 needs.  Using a comparison function constructed with run-time
+</I>&gt;<i> types, for example, would be a disaster performance wise.  We've done
+</I>&gt;<i> experiments internally, and the performance hit is absolutely
+</I>&gt;<i> crushing.
+</I>
+Two remarks on this.
+
+First, it is unclear that runtime types (or any form of internalized
+type-driven value generation) will scale to higher-kinded settings
+(generating a &quot;Functor&quot; instance out of a parametrized datatype), so
+there is also an argument of expressivity. In the current state of the
+OCaml type system, &quot;a ty&quot; is only robustly defined for closed types or
+type schemes (as opposed to parametrized types as type operators, that
+is anything of kind different from '*'), and while I don't exclude
+impressive workarounds from Alain or other, I wouldn't trust the
+dyntype approach to work really well on type operators.
+
+Second, Pierre Chambart and Gr&#233;goire Henry are working on a different
+take on type-directed code injection that is more general than just
+inferred dynamic type representations, and could make much of that
+performance overhead you're mentioning go away, at least on paper
+(whether the actually generated terms will be actually optimized as
+you would hope is another question in which I'm sure they are also
+interested). The idea is that instead of having a type-directed
+generation of a ('a ty) and then a function ('a ty -&gt; 'a printer), you
+could directly generate ('a printer) in a type-directed way. This
+generalization allows to express type-directed behavior that are not
+defined on all types (eg. comparison rejected statically rather than
+at runtime on function types), and could potentially make the
+performance issue simpler. Note that in theory clever partial
+evaluation could work on the previous dyntype approach (but I think
+that's beyond hope for now).
+
+On Thu, Feb 7, 2013 at 4:48 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">yminsky at janestreet.com</A>&gt; wrote:
+&gt;<i> Thanks Leo!  This is very helpful.  Maybe we should throw this up on a
+</I>&gt;<i> wiki page somewhere, and keep it up to date as proposals show up.
+</I>&gt;<i>
+</I>&gt;<i> A few notes of my own below.
+</I>&gt;<i>
+</I>&gt;<i> On Wed, Feb 6, 2013 at 1:11 PM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;&gt;<i> c) Sebastien Mondet suggested that run-time types or dyntype might be
+</I>&gt;&gt;<i> sufficient without ppx for many extensions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Markus Mottl pointed out that there are runtime performance
+</I>&gt;&gt;<i> implications for using those solutions.
+</I>&gt;<i>
+</I>&gt;<i> I strongly agree with Markus on this.  Run-time types are lovely, but
+</I>&gt;<i> we really need something more efficient for the vast majority of our
+</I>&gt;<i> camlp4 needs.  Using a comparison function constructed with run-time
+</I>&gt;<i> types, for example, would be a disaster performance wise.  We've done
+</I>&gt;<i> experiments internally, and the performance hit is absolutely
+</I>&gt;<i> crushing.
+</I>&gt;<i>
+</I>&gt;&gt;<i> d) Jeremy suggested that rather than implementing extensions as AST
+</I>&gt;&gt;<i> transformers that operate over the whole AST they might be implemented    as
+</I>&gt;&gt;<i> transformers only for the part of the AST that they were to operate    on.
+</I>&gt;&gt;<i> So an extension used like this:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      (:perform
+</I>&gt;&gt;<i>          x &lt;-- m;
+</I>&gt;&gt;<i>          y &lt;-- n;
+</I>&gt;&gt;<i>          return (x y))
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    would be implemented as a function with type:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      val perform : Parsetree.expression -&gt; Parsetree.expression
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    He suggests that this may help with scoping, safety and
+</I>&gt;&gt;<i> compositionality.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    Alain pointed out that some legitimate uses of ppx don't work nicely
+</I>&gt;&gt;<i> with the constraint that they can operate only on a marked fragment. He
+</I>&gt;&gt;<i> also pointed out that handling extensions as those extensions are found
+</I>&gt;&gt;<i> within the source forces a top-down expansion order, which is not
+</I>&gt;&gt;<i> necessarily desirable.
+</I>&gt;<i>
+</I>&gt;<i> I wonder if this is a place where we can have it both ways: have an
+</I>&gt;<i> underlying ppx mechanism that is a whole-AST transformation; and
+</I>&gt;<i> expose libraries that support more disciplined, scoped
+</I>&gt;<i> transformations.  We could strongly encourage the latter, but still
+</I>&gt;<i> allow the former when necessary.
+</I>&gt;<i>
+</I>&gt;&gt;<i> e) I suggested an extension to Jeremy's proposal. This involves giving the
+</I>&gt;&gt;<i> expansion functions in their own kind of file (&quot;.mlq&quot; - compiled to
+</I>&gt;&gt;<i> &quot;.cmq&quot;), referring to them using a namespace mechanism, and then having
+</I>&gt;&gt;<i> the compiler itself perform the expansion of the extensions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    There are more details in my blog post:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      <A HREF="http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html">http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    Since such a solution would take a while to implement, and since moving
+</I>&gt;&gt;<i> an extension from ppx to it would be trivial, I proposed using ppx for
+</I>&gt;&gt;<i> the short/medium term.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    I suggested that such a mechanism might improving tooling and make it
+</I>&gt;&gt;<i> easier for average users to use extensions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    Both Gabriel and Alain suggested that the use of namespaces might be
+</I>&gt;&gt;<i> unnecessary and too heavyweight. Alain also questioned the need for
+</I>&gt;&gt;<i> special &quot;.mlq&quot; files.
+</I>&gt;<i>
+</I>&gt;<i> I do like the idea of eventually getting to a name-spaced solution.
+</I>&gt;<i> In our world, there are really two cases: one, where we really just
+</I>&gt;<i> want to extend the language, and we're happy to specify which language
+</I>&gt;<i> we're using fairly broadly at the build-system level.  For such
+</I>&gt;<i> things, namespaces do not seem helpful.
+</I>&gt;<i>
+</I>&gt;<i> The other case is where you want to invoke a particular,
+</I>&gt;<i> special-purpose syntax extension for just one file.  There, having
+</I>&gt;<i> something that would allow the specification of the extension in the
+</I>&gt;<i> file, ideally with some integration with namespaces, seems lovely.
+</I>&gt;<i> That said, I think it's a less important use-case in the current
+</I>&gt;<i> world.
+</I>&gt;<i>
+</I>&gt;<i> I wonder, does anyone on the list of have much experience with
+</I>&gt;<i> Scheme's approach to macros?  There's been a lot of work there,
+</I>&gt;<i> covering everything from hygeine to integration with module systems.
+</I>&gt;<i> It would be great to leverage off of that experience.
+</I>&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000221.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000200.html">[wg-camlp4] Runtime types and no -pp(x)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#223">[ date ]</a>
+              <a href="thread.html#223">[ thread ]</a>
+              <a href="subject.html#223">[ subject ]</a>
+              <a href="author.html#223">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

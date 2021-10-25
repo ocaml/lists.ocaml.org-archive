@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] ocaml as callback to C code with event loop
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20ocaml%20as%20callback%20to%20C%20code%20with%20event%20loop&In-Reply-To=%3CCAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ%3D-gFXg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000235.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] ocaml as callback to C code with event loop</H1>
+    <B>Serge Sivkov</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20ocaml%20as%20callback%20to%20C%20code%20with%20event%20loop&In-Reply-To=%3CCAOUGqWxa4mQEVJjOdzYqwcn4svwtJkTNzd99BjemkKiZ%3D-gFXg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] ocaml as callback to C code with event loop">ssp.mryau at gmail.com
+       </A><BR>
+    <I>Thu May  4 18:50:23 BST 2017</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000235.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#234">[ date ]</a>
+              <a href="thread.html#234">[ thread ]</a>
+              <a href="subject.html#234">[ subject ]</a>
+              <a href="author.html#234">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I'm write program which uses C library with main event loop. So, I call
+init function of this library from ocaml code, register callback and call
+main loop of this library. After that monent, ocaml code will be called
+only from this library.
+
+Here is some relevant lines of code:
+
+let bus_handler = ptr void @-&gt; size_t @-&gt; ptr (ptr void) @-&gt; ptr size_t @-&gt;
+returning int
+
+type handlers
+let handlers: handlers structure typ = structure &quot;handlers_t&quot;
+
+let topic_name = field handlers &quot;topic_name&quot; string
+let topic_handler = field handlers &quot;topic_handler&quot; (funptr
+~thread_registration:true bus_handler)
+let topic_type = field handlers &quot;topic_type&quot; int
+let () = seal handlers
+
+let bus_init = foreign &quot;bus_init&quot; (int @-&gt; ptr (ptr void) @-&gt; returning int)
+let loop = foreign &quot;loop&quot; (ptr void @-&gt; returning int)
+let register_server = foreign &quot;register_server&quot; (ptr void @-&gt; string @-&gt;
+ptr handlers @-&gt; size_t @-&gt; returning int)
+
+let floop fhandler name () =
+        let handler = make handlers in
+        let () = (
+                setf handler topic_name name;
+                setf handler topic_handler fhandler;
+                setf handler topic_type 0
+        ) in
+        let () = (
+                (* Gc.compact (); #1 *)
+                let r = bus_init 1 bus_ptr in
+                Printf.printf &quot;bus_init: %d\n&quot; r
+        ) in
+        let r1 = register_server (!@ bus_ptr) name (addr handler) (of_int
+1) in
+        (* let () = Gc.compact () in #2 *)
+        loop (!@ bus_ptr)
+
+In case I comment out both calls to Gc.compact I see
+
+Cannot find handler (Resource temporarily unavailable)
+Cannot get address handler item (Resource temporarily unavailable)
+
+after 100-200 test calls on x86 and I get CallToExpiredClosure on ARM just
+on the first test call.
+In case I uncomment #1 or #2 code line with Gc.compact call I got same
+error (Cannot find handler ...) on first test call on x86 too. I've added
+
+        let addr1 = Root.create fhandler in
+        let addr2 = Root.create handler in
+
+to begin of floop function but nothing changed on program behaviour under
+tests.
+How can I protect struct handler and fhandler function pointer from garbage
+collection?
+
+WBR, ssp
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20170504/8ca7f899/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20170504/8ca7f899/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000235.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#234">[ date ]</a>
+              <a href="thread.html#234">[ thread ]</a>
+              <a href="subject.html#234">[ subject ]</a>
+              <a href="author.html#234">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

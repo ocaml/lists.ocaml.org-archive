@@ -1,0 +1,1049 @@
+From jdimino at janestreet.com  Mon Apr 29 11:18:57 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 11:18:57 +0100
+Subject: [wg-parallel] About Lwt and Async
+Message-ID: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+
+Hi everybody and welcome to the wg-parallel mailing list,
+
+The aim of this group is to discuss the future of monadic cooperative
+concurrent programing in OCaml.  There are currently two well-known
+libraries for that purpose, lwt and async. Lwt is historically the
+first one, async was developed at Jane Street and has been
+open-sourced recently.
+
+These libraries are quite 'invasive' since they require to write the
+code in a cooperative way.  It is not possible to use both of them in
+the same program and even if a third-party library can sometime be
+made to work with both, it is in general complex and not very
+convenient.
+
+So while they are both important having two such 'core' and
+incompatible libraries is not a very good thing for the OCaml
+community.  Switching brutally from one to the other is not realistic
+since it would require a huge amount of time and efforts.  The idea
+would be to make them evolve so they are close enough and, if
+possible, eventually have only one.
+
+One strategy developped by big projects using both lwt and async such
+as Mirage/Xen is to interact at the RPC level.  This can be done on
+top of lwt and async without modifying them and there are people
+working in this direction.
+
+They are currently two big semantic divergences in the kernel of both
+libraries: execution order and error handling. Plus they are a number
+of other more or less important differences.  I try to describe them
+in the rest of this email.
+
+Semantic of bind
+----------------
+
+The general idea in lwt is to run the most it can immediatly and
+yielding is always explicit, while in async the precedence is given to
+knowing exactly when the code is going to be executed.
+
+So for [return x >>= f]:
+
+- lwt evaluates [f x] immediatly
+- async returns a non-determined deferred and will evaluate [f x]
+during the next cycle
+
+This semantic of the bind is very important for lwt users, but async
+is already planning to add a second monad with lwt's behavior, so it
+shouldn't be an issue.
+
+Lwt and async also differs regarding Lwt.wait/Ivar.fill but there
+seems to be an agreement that the async's behavior is better and it is
+trivial to change in lwt so that shouldn't be an issue.
+
+Error handling
+--------------
+
+The ['a Lwt.t] type 'inline' the error monad [Value of 'a | Error of
+exn] while in async all errors are explicit.  So the async equivalent
+of ['a Lwt.t] would be [('a, exn) Result.t Deferred.t].
+
+As a result, while most functions in lwt return a [something Lwt.t],
+in async they return a variant or a [something Or_error.t Deferred.t]
+when the result may be an error status.
+
+This may be tedious to handle.
+
+Local storage
+-------------
+
+Lwt allows to define global variables with different values in
+different threads.  This was introduced so logs can display 'thread
+identifiers' but is now also used for other things.  Async internally
+has such a mechanism, it could be adapted and exported.
+
+Scheduler
+---------
+
+The kernel of lwt can be used without a scheduler, which is important
+for javascript for instance.  The scheduler is part of the lwt.unix
+package and can be run multiple times in the lifetime of a program.
+
+This is not true for async but it is something that can be considered.
+
+Portability
+-----------
+
+The kernel of lwt depends only on the standard library and has no C.
+As a result it is very portable and can be used without problem in
+javascript or any other exotic environment.
+
+The kernel of async (Async_core) currently depends on Core which
+depends on Unix and contains C bindings.  It is planned to split Core
+to get a small kernel for Core and Async.
+
+Lwt is also more portable, for example it runs on Windows.  Windows
+support could be added to Async.
+
+There are questions about whether this should be done like in
+unix/lwt.unix, i.e. emulate unix's behavior on Windows, or binds the
+Win32 API directly and write the dispatching code in OCaml.
+
+General experience
+------------------
+
+Async is part of the core suite and use core's convention.  Code using
+it starts with:
+
+    open Core.Std
+    open Async.Std
+
+which brings all the core and async world into the environment.
+
+The core style is generally considered better and async has a huge
+number of utilities well integrated together, but switching code to it
+may require a lot of work.
+
+On the other hand lwt is more independent so it is easier to integrate
+it into an existing project.
+
+
+
+In conclusion there is a lot to think about but no blocker.
+
+Jeremie
+
+From mshinwell at janestreet.com  Mon Apr 29 11:38:40 2013
+From: mshinwell at janestreet.com (Mark Shinwell)
+Date: Mon, 29 Apr 2013 11:38:40 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+Message-ID: <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+
+On 29 April 2013 11:18, Jeremie Dimino <jdimino at janestreet.com> wrote:
+> Lwt and async also differs regarding Lwt.wait/Ivar.fill but there
+> seems to be an agreement that the async's behavior is better and it is
+> trivial to change in lwt so that shouldn't be an issue.
+
+I might be misunderstanding something about Lwt here, but as far as I
+see it, this latter point is quite important.  I believe one of the
+most important features of Async is the fact that you cannot be
+interrupted "between binds" by some arbitrary other job---whereas I
+do not think that is the case with the Lwt semantics (as far as I know,
+the equivalent to filling an ivar could cause something else to be
+run immediately; is that correct?).
+
+> Error handling
+> --------------
+>
+> The ['a Lwt.t] type 'inline' the error monad [Value of 'a | Error of
+> exn] while in async all errors are explicit.  So the async equivalent
+> of ['a Lwt.t] would be [('a, exn) Result.t Deferred.t].
+>
+> As a result, while most functions in lwt return a [something Lwt.t],
+> in async they return a variant or a [something Or_error.t Deferred.t]
+> when the result may be an error status.
+
+I think it's worth noting the [Monitor] construct of Async here,
+which encapsulates jobs with wrappers to direct any exceptions they
+might throw to appropriate places.
+
+Mark
+
+From anil at recoil.org  Mon Apr 29 11:48:43 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 29 Apr 2013 11:48:43 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+Message-ID: <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+
+On 29 Apr 2013, at 11:38, Mark Shinwell <mshinwell at janestreet.com> wrote:
+
+> On 29 April 2013 11:18, Jeremie Dimino <jdimino at janestreet.com> wrote:
+>> Lwt and async also differs regarding Lwt.wait/Ivar.fill but there
+>> seems to be an agreement that the async's behavior is better and it is
+>> trivial to change in lwt so that shouldn't be an issue.
+> 
+> I might be misunderstanding something about Lwt here, but as far as I
+> see it, this latter point is quite important.  I believe one of the
+> most important features of Async is the fact that you cannot be
+> interrupted "between binds" by some arbitrary other job---whereas I
+> do not think that is the case with the Lwt semantics (as far as I know,
+> the equivalent to filling an ivar could cause something else to be
+> run immediately; is that correct?).
+
+If I understand this right, Lwt exposes `wakeup` and `wakeup_later`,
+and the latter defers the wakeup until the scheduler is entered again.
+Therefore, `wakeup_later` is most similar to Async's model.
+
+I'm not sure if there are other ways in Lwt to interrupt a running
+thread, aside from Lwt_preemptive.  Is it sufficient to alias Lwt.wakeup
+to Lwt.wakeup_later?
+
+-anil
+
+From jdimino at janestreet.com  Mon Apr 29 11:49:10 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 11:49:10 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+Message-ID: <CANhEzE4MvCA9kOQv=qR-=O-SOFnNqszQLn2iGzpNTwf+ukKWCQ@mail.gmail.com>
+
+On Mon, Apr 29, 2013 at 11:38 AM, Mark Shinwell
+<mshinwell at janestreet.com> wrote:
+> I might be misunderstanding something about Lwt here, but as far as I
+> see it, this latter point is quite important.  I believe one of the
+> most important features of Async is the fact that you cannot be
+> interrupted "between binds" by some arbitrary other job---whereas I
+> do not think that is the case with the Lwt semantics (as far as I know,
+> the equivalent to filling an ivar could cause something else to be
+> run immediately; is that correct?).
+
+You are right.  The equivalent of Ivar.fill is Lwt.wakeup (not wait,
+my mistake) and it runs all thunk functions immediately.  However I
+believe that people don't often rely on this behavior and changing it
+to be the same as async wouldn't be a problem.  In fact there is
+already a Lwt.wakeup_later function in lwt since Lwt.wakeup can be
+problematic. It used to cause a stack overflow in Lwt_mutex for
+instance.  That would require an addition to the signature of the Lwt
+module to still be able to use it in an environment without a
+scheduler (basically running all pending jobs).
+
+> I think it's worth noting the [Monitor] construct of Async here,
+> which encapsulates jobs with wrappers to direct any exceptions they
+> might throw to appropriate places.
+
+Indeed.  In lwt such exceptions are captured inside the lwt monad.
+
+From jdimino at janestreet.com  Mon Apr 29 11:54:19 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 11:54:19 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+Message-ID: <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+
+On Mon, Apr 29, 2013 at 11:48 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> If I understand this right, Lwt exposes `wakeup` and `wakeup_later`,
+> and the latter defers the wakeup until the scheduler is entered again.
+> Therefore, `wakeup_later` is most similar to Async's model.
+
+Almost.  The idea is that Lwt.wakeup_later pushes pending jobs to a
+global queue and they are run at the end of the topmost
+Lwt.wakeup/Lwt.wakeup_later, to avoid a stack overflow in some cases.
+
+> I'm not sure if there are other ways in Lwt to interrupt a running
+> thread, aside from Lwt_preemptive.  Is it sufficient to alias Lwt.wakeup
+> to Lwt.wakeup_later?
+
+Yes but that's not enough, we also need to remove the code running
+pending jobs from Lwt.wakeup/wakeup_later, put it in its own exported
+function, and call this function in the scheduler.  In scheduler-free
+environment the latter may have to be called in some hook or at the
+end of callbacks.
+
+From anil at recoil.org  Mon Apr 29 15:57:48 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 29 Apr 2013 15:57:48 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+Message-ID: <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+
+On 29 Apr 2013, at 11:54, Jeremie Dimino <jdimino at janestreet.com> wrote:
+
+> On Mon, Apr 29, 2013 at 11:48 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> If I understand this right, Lwt exposes `wakeup` and `wakeup_later`,
+>> and the latter defers the wakeup until the scheduler is entered again.
+>> Therefore, `wakeup_later` is most similar to Async's model.
+> 
+> Almost.  The idea is that Lwt.wakeup_later pushes pending jobs to a
+> global queue and they are run at the end of the topmost
+> Lwt.wakeup/Lwt.wakeup_later, to avoid a stack overflow in some cases.
+> 
+>> I'm not sure if there are other ways in Lwt to interrupt a running
+>> thread, aside from Lwt_preemptive.  Is it sufficient to alias Lwt.wakeup
+>> to Lwt.wakeup_later?
+> 
+> Yes but that's not enough, we also need to remove the code running
+> pending jobs from Lwt.wakeup/wakeup_later, put it in its own exported
+> function, and call this function in the scheduler.  In scheduler-free
+> environment the latter may have to be called in some hook or at the
+> end of callbacks.
+
+Got it. I don't have a feel for the performance impact of such deferred
+scheduling, except that the difference between busy-spinning if there are
+outstanding requests, vs dropping into select/kqueue/epoll more frequently
+is very significant.
+
+For example, the Arakoon folks anecdotally reported a 20x performance loss
+between a direct Unix implementation of their database layer vs an Lwt
+one.  A loss that large can only be explained by context switching or
+pathological scheduling somewhere (given we know that Lwt doesn't result
+in a lot more allocation on the major heap).
+http://www.slideshare.net/eikke/arakoon (slide 14/15)
+(I'm CCing Romain, who might have details).
+
+Either way, this seems like a good time to establish a few simple
+microbenchmarks such as a TCP iperf or HTTPbench, just to have a few
+baseline numbers to evaluate such design decisions against.  I do believe
+that the Async 'drop to scheduler' behaviour is far easier to understand
+than Lwt's, but not if it costs an order of magnitude in I/O throughput.
+
+-anil
+
+
+From sweeks at janestreet.com  Mon Apr 29 16:06:44 2013
+From: sweeks at janestreet.com (Stephen Weeks)
+Date: Mon, 29 Apr 2013 11:06:44 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+Message-ID: <CAPYVAiKvC7XAXnyLBbZcQV_f_DBXUSmAfP0BXHs9i9cpmaQcyg@mail.gmail.com>
+
+Async's approach shouldn't cause more select/epoll calls.  It is only
+a different order in which the closures run.  It does require more
+allocation, because one has to create a "job" to run later rather than
+immediately run a closure.  But that's very small.  Plus, we have a
+patch coming soon that will eliminate even that allocation, by reusing
+the memory for jobs.
+
+> Got it. I don't have a feel for the performance impact of such deferred
+> scheduling, except that the difference between busy-spinning if there are
+> outstanding requests, vs dropping into select/kqueue/epoll more frequently
+> is very significant.
+>
+> For example, the Arakoon folks anecdotally reported a 20x performance loss
+> between a direct Unix implementation of their database layer vs an Lwt
+> one.  A loss that large can only be explained by context switching or
+> pathological scheduling somewhere (given we know that Lwt doesn't result
+> in a lot more allocation on the major heap).
+> http://www.slideshare.net/eikke/arakoon (slide 14/15)
+> (I'm CCing Romain, who might have details).
+>
+> Either way, this seems like a good time to establish a few simple
+> microbenchmarks such as a TCP iperf or HTTPbench, just to have a few
+> baseline numbers to evaluate such design decisions against.  I do believe
+> that the Async 'drop to scheduler' behaviour is far easier to understand
+> than Lwt's, but not if it costs an order of magnitude in I/O throughput.
+>
+> -anil
+>
+> _______________________________________________
+> wg-parallel mailing list
+> wg-parallel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-parallel
+
+From jdimino at janestreet.com  Mon Apr 29 16:12:25 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 16:12:25 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+Message-ID: <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+
+On Mon, Apr 29, 2013 at 3:57 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Got it. I don't have a feel for the performance impact of such deferred
+> scheduling, except that the difference between busy-spinning if there are
+> outstanding requests, vs dropping into select/kqueue/epoll more frequently
+> is very significant.
+
+As Stephen said there shouldn't be more select/kqueue/epoll calls.
+The idea is to run all jobs until there is no one left (with a limit)
+before doing the blocking select/kqueue/epoll call.
+
+> For example, the Arakoon folks anecdotally reported a 20x performance loss
+> between a direct Unix implementation of their database layer vs an Lwt
+> one.  A loss that large can only be explained by context switching or
+> pathological scheduling somewhere (given we know that Lwt doesn't result
+> in a lot more allocation on the major heap).
+> http://www.slideshare.net/eikke/arakoon (slide 14/15)
+> (I'm CCing Romain, who might have details).
+
+I believe this was about the disk IO.  Disk IO are done using
+preemptive threads since unix doesn't support asynchronous disk IO.
+When data are cached it is indeed much slower.  You can get about the
+same as direct IO after some tweaking: set the async_method to
+'switch' and force the process to run only on one cpu. But the switch
+method doesn't work with the threaded runtime.
+
+From anil at recoil.org  Mon Apr 29 16:34:56 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 29 Apr 2013 16:34:56 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+ <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+Message-ID: <514F0BA1-6F86-414D-88DC-9D731009C74B@recoil.org>
+
+On 29 Apr 2013, at 16:12, Jeremie Dimino <jdimino at janestreet.com> wrote:
+
+> On Mon, Apr 29, 2013 at 3:57 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> Got it. I don't have a feel for the performance impact of such deferred
+>> scheduling, except that the difference between busy-spinning if there are
+>> outstanding requests, vs dropping into select/kqueue/epoll more frequently
+>> is very significant.
+> 
+> As Stephen said there shouldn't be more select/kqueue/epoll calls.
+> The idea is to run all jobs until there is no one left (with a limit)
+> before doing the blocking select/kqueue/epoll call.
+> 
+>> For example, the Arakoon folks anecdotally reported a 20x performance loss
+>> between a direct Unix implementation of their database layer vs an Lwt
+>> one.  A loss that large can only be explained by context switching or
+>> pathological scheduling somewhere (given we know that Lwt doesn't result
+>> in a lot more allocation on the major heap).
+>> http://www.slideshare.net/eikke/arakoon (slide 14/15)
+>> (I'm CCing Romain, who might have details).
+> 
+> I believe this was about the disk IO.  Disk IO are done using
+> preemptive threads since unix doesn't support asynchronous disk IO.
+
+Right... and at the block level and not the filesystem level.  Many
+modern operating systems do expose an async block interface that isn't
+POSIX that would be better to bind against than POSIX AIO, such as
+libaio on Linux.
+
+However, the specific decision of block scheduler depends on whether
+your writes are page-aligned (so that O_DIRECT is suitable), and if
+you need kernel-level elevator scheduling (often more harmful than
+good on VMs or large RAID arrays with many spindles).
+
+> When data are cached it is indeed much slower.  You can get about the
+> same as direct IO after some tweaking: set the async_method to
+> 'switch' and force the process to run only on one cpu. But the switch
+> method doesn't work with the threaded runtime.
+
+Yeah, I'd say that most high-performance databases gave up trying to do
+anything useful with POSIX AIO a long time ago, and are mostly O_DIRECT
+based.  At the filesystem layer, there are similar extensions in Linux
+to query the internal details of filesystem layouts via fiemap [1,2].
+
+One of our PhD students has also been noticing similar performance
+artefacts for *network* traffic in the matrix of operating system,
+destination (localhost vs remote) and protocol (TCP/UDP/pipe/shmem).
+
+All of this makes me worry that we're entering a mire of cross-platform
+issues as Async goes more open.  libuv [3], for example, takes care of
+many of these async-IO issues, and has a large userbase thanks to our
+Javascript-loving friends at Nodejs.  I wonder if a good intern project
+would be to bind libuv to Async and test its performance profile vs
+the current tree...
+
+
+[1] https://github.com/Incubaid/baardskeerder/blob/master/src/posix.c
+[2] http://lwn.net/Articles/297696/
+
+From jdimino at janestreet.com  Mon Apr 29 16:48:39 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 16:48:39 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <514F0BA1-6F86-414D-88DC-9D731009C74B@recoil.org>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+ <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+ <514F0BA1-6F86-414D-88DC-9D731009C74B@recoil.org>
+Message-ID: <CANhEzE41SzZd+0C5dniq6hS0E9Vi7s6_iC3CQtCu9X8ikmwv4w@mail.gmail.com>
+
+On Mon, Apr 29, 2013 at 4:34 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Right... and at the block level and not the filesystem level.  Many
+> modern operating systems do expose an async block interface that isn't
+> POSIX that would be better to bind against than POSIX AIO, such as
+> libaio on Linux.
+
+Yeah, I did a few experiments with that.  We could bind to libaio but
+definitely not make it the default.  It requires O_DIRECT which
+destroys performances when data are already cached by the kernel.
+Also it transparently default to synchronous IO when AIO is not
+supported by the filesystem and there is no way to detect it.
+
+So it could be a third-party library for specific use but cannot
+replace the generic disk IO interface.
+
+> All of this makes me worry that we're entering a mire of cross-platform
+> issues as Async goes more open.  libuv [3], for example, takes care of
+> many of these async-IO issues, and has a large userbase thanks to our
+> Javascript-loving friends at Nodejs.  I wonder if a good intern project
+> would be to bind libuv to Async and test its performance profile vs
+> the current tree...
+
+Interesting.  I think it would be worth trying.
+
+From jdimino at janestreet.com  Mon Apr 29 17:01:54 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Mon, 29 Apr 2013 17:01:54 +0100
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <517E97DA.3000800@incubaid.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+ <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+ <517E97DA.3000800@incubaid.com>
+Message-ID: <CANhEzE5Mxcnb-E9KGN1m83_6C0KzFdaqEuf3xC2SHmm8DR05VA@mail.gmail.com>
+
+On Mon, Apr 29, 2013 at 4:55 PM, Romain Slootmaekers
+<romain at incubaid.com> wrote:
+> Posix is indeed broken for all things related to file IO.
+> * not all file descriptors are equal:
+> [select on a file descriptor for a regular file, always returns true, while
+> for a socket you get more relevant results]
+
+Yeah, in the POSIX world blocking means an operation that can block
+forever, like reading on a socket.  Reading from a regular file is not
+considered as blocking for instance because the data are there on the
+disk so you will get them at some point, even if it takes ages because
+the disk is slow or because it is in fact a NFS.
+
+> In essence: the situation is a mess.
+
+True.
+
+
+Jeremie
+
+From romain at incubaid.com  Mon Apr 29 16:55:06 2013
+From: romain at incubaid.com (Romain Slootmaekers)
+Date: Mon, 29 Apr 2013 17:55:06 +0200
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CAM3Ki77FrZGJHu2WH6OLLwiNW-YytY4SJnA=3S7sT-n467PDKQ@mail.gmail.com>
+ <78149F76-FBA0-48C3-9F02-8A791F8FC630@recoil.org>
+ <CANhEzE5aADb42TEObD1AAUkossmOU4v3tdwhEdKxhan6bD4jRA@mail.gmail.com>
+ <3ED6C028-C723-482A-85DF-327A2677D93B@recoil.org>
+ <CANhEzE7Eb19vEhi9DKeLqCydZVr=kjVeWGDUHwHkT+CANn2cdA@mail.gmail.com>
+Message-ID: <517E97DA.3000800@incubaid.com>
+
+On 04/29/2013 05:12 PM, Jeremie Dimino wrote:
+> On Mon, Apr 29, 2013 at 3:57 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> Got it. I don't have a feel for the performance impact of such deferred
+>> scheduling, except that the difference between busy-spinning if there are
+>> outstanding requests, vs dropping into select/kqueue/epoll more frequently
+>> is very significant.
+> As Stephen said there shouldn't be more select/kqueue/epoll calls.
+> The idea is to run all jobs until there is no one left (with a limit)
+> before doing the blocking select/kqueue/epoll call.
+>
+>> For example, the Arakoon folks anecdotally reported a 20x performance loss
+>> between a direct Unix implementation of their database layer vs an Lwt
+>> one.  A loss that large can only be explained by context switching or
+>> pathological scheduling somewhere (given we know that Lwt doesn't result
+>> in a lot more allocation on the major heap).
+>> http://www.slideshare.net/eikke/arakoon (slide 14/15)
+>> (I'm CCing Romain, who might have details).
+> I believe this was about the disk IO.  Disk IO are done using
+> preemptive threads since unix doesn't support asynchronous disk IO.
+> When data are cached it is indeed much slower.  You can get about the
+> same as direct IO after some tweaking: set the async_method to
+> 'switch' and force the process to run only on one cpu. But the switch
+> method doesn't work with the threaded runtime.
+Yes. it was about disk IO, on Linux.
+
+(from the top of my head, we did something like this:
+
+     Lwt_unix.execute_job
+-            (pread_job (Lwt_unix.unix_file_descr ch) len offset)
+-            (fun job -> pread_result job buf pos)
+-            pread_free
+
+
+which was dead slow.
+
+
+At that point in time, we also experimented with Lwt_unix.Async_switch
+but that gave SEGVs
+
+Some more remarks:
+we have seen scheduling differences between different Lwt versions,
+In the past, the scheduling was eager, while the current one is very 
+round-robin-ish,
+and performance impact for us is about -10%. (we have no problem with 
+that, it's just an observation)
+
+Posix is indeed broken for all things related to file IO.
+* not all file descriptors are equal:
+[select on a file descriptor for a regular file, always returns true, 
+while for a socket you get more relevant results]
+* things can have empty implementations (fe I believe the fsync 
+implementation on OSX is something like this:
+    int fsync(int fd) {return 0;}
+
+    )
+
+* for a lot of behaviour,
+   you depend on file system choices and sys-admin choices (mount options)
+   and they have a talent for the wrong choices.
+
+
+In essence: the situation is a mess.
+
+have fun,
+
+Romain.
+
+
+
+From yminsky at gmail.com  Mon Apr 29 20:41:01 2013
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Mon, 29 Apr 2013 15:41:01 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+Message-ID: <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+
+I'm not sure that the right goal is "to make them evolve so they are
+close enough".  If we're going to end up with just one implementation,
+it's hard for me to see how it's not going to be Async, because Jane
+Street is not going to be able to move away from Async as a practical
+matter.
+
+If people sign on to that understanding (a big if), then we should
+focus less on evolving the two towards each other, and more on:
+
+- Making Async more hospitable to LWT users
+- Making it easier to interoperate between the two in the meantime
+
+In terms of hospitality, there are a few clear things to do that Jane
+Street can work on directly.
+
+  - Breaking out Core and Async to have _kernel_ versions (e.g.,
+    Core_kernel and Async_kernel) that don't depend on things like
+    threads, C-bindings or objects.
+
+  - Rearrange functionality so that you have the maximum available
+    functionality when you're only using the kernel.
+
+  - add an "immediate deferred" version of the Deferred monad that has
+    the semantics that Lwt users are used to that the RHS of a bind
+    whose LHS is filled in fires immediately.
+
+There are also some pieces we're less well equipped to do, in
+particular, porting to Windows and Javascript.  The windows part in
+particular is perhaps an area where we can get help from OCamlPro.
+
+Here are some other things that might help:
+
+- Have a skin to the Async library that is easier to use without
+  Core.  I suspect that opening Async.Std without opening Core.Std is
+  already not a complete disaster, but there's probably a less
+  invasive wrapper for Core that could help here, and maybe an
+  alternate layout for Async.  Anil, do you have a view as to what's
+  needed here?  Have you tried Async without opening Core.Std?
+
+- Have a skin for Async that makes transitioning over from Lwt easier.
+  I'm not sure whether this makes sense, but it certainly seems
+  reasonable.  Maybe we can get some experience porting some existing
+  Lwt code over and figure out what the pain points are.
+
+In terms of interop, making an LWT equivalent of Async-RPC certainly
+seems appealing.  I don't know if there are any other reasonable
+interop tricks that one could want.  You could imagine having an
+in-process Lwt/Async interop layer, but I suspect that madness lies
+that way....
+
+y
+
+On Mon, Apr 29, 2013 at 6:18 AM, Jeremie Dimino <jdimino at janestreet.com> wrote:
+> Hi everybody and welcome to the wg-parallel mailing list,
+>
+> The aim of this group is to discuss the future of monadic cooperative
+> concurrent programing in OCaml.  There are currently two well-known
+> libraries for that purpose, lwt and async. Lwt is historically the
+> first one, async was developed at Jane Street and has been
+> open-sourced recently.
+>
+> These libraries are quite 'invasive' since they require to write the
+> code in a cooperative way.  It is not possible to use both of them in
+> the same program and even if a third-party library can sometime be
+> made to work with both, it is in general complex and not very
+> convenient.
+>
+> So while they are both important having two such 'core' and
+> incompatible libraries is not a very good thing for the OCaml
+> community.  Switching brutally from one to the other is not realistic
+> since it would require a huge amount of time and efforts.  The idea
+> would be to make them evolve so they are close enough and, if
+> possible, eventually have only one.
+>
+> One strategy developped by big projects using both lwt and async such
+> as Mirage/Xen is to interact at the RPC level.  This can be done on
+> top of lwt and async without modifying them and there are people
+> working in this direction.
+>
+> They are currently two big semantic divergences in the kernel of both
+> libraries: execution order and error handling. Plus they are a number
+> of other more or less important differences.  I try to describe them
+> in the rest of this email.
+>
+> Semantic of bind
+> ----------------
+>
+> The general idea in lwt is to run the most it can immediatly and
+> yielding is always explicit, while in async the precedence is given to
+> knowing exactly when the code is going to be executed.
+>
+> So for [return x >>= f]:
+>
+> - lwt evaluates [f x] immediatly
+> - async returns a non-determined deferred and will evaluate [f x]
+> during the next cycle
+>
+> This semantic of the bind is very important for lwt users, but async
+> is already planning to add a second monad with lwt's behavior, so it
+> shouldn't be an issue.
+>
+> Lwt and async also differs regarding Lwt.wait/Ivar.fill but there
+> seems to be an agreement that the async's behavior is better and it is
+> trivial to change in lwt so that shouldn't be an issue.
+>
+> Error handling
+> --------------
+>
+> The ['a Lwt.t] type 'inline' the error monad [Value of 'a | Error of
+> exn] while in async all errors are explicit.  So the async equivalent
+> of ['a Lwt.t] would be [('a, exn) Result.t Deferred.t].
+>
+> As a result, while most functions in lwt return a [something Lwt.t],
+> in async they return a variant or a [something Or_error.t Deferred.t]
+> when the result may be an error status.
+>
+> This may be tedious to handle.
+>
+> Local storage
+> -------------
+>
+> Lwt allows to define global variables with different values in
+> different threads.  This was introduced so logs can display 'thread
+> identifiers' but is now also used for other things.  Async internally
+> has such a mechanism, it could be adapted and exported.
+>
+> Scheduler
+> ---------
+>
+> The kernel of lwt can be used without a scheduler, which is important
+> for javascript for instance.  The scheduler is part of the lwt.unix
+> package and can be run multiple times in the lifetime of a program.
+>
+> This is not true for async but it is something that can be considered.
+>
+> Portability
+> -----------
+>
+> The kernel of lwt depends only on the standard library and has no C.
+> As a result it is very portable and can be used without problem in
+> javascript or any other exotic environment.
+>
+> The kernel of async (Async_core) currently depends on Core which
+> depends on Unix and contains C bindings.  It is planned to split Core
+> to get a small kernel for Core and Async.
+>
+> Lwt is also more portable, for example it runs on Windows.  Windows
+> support could be added to Async.
+>
+> There are questions about whether this should be done like in
+> unix/lwt.unix, i.e. emulate unix's behavior on Windows, or binds the
+> Win32 API directly and write the dispatching code in OCaml.
+>
+> General experience
+> ------------------
+>
+> Async is part of the core suite and use core's convention.  Code using
+> it starts with:
+>
+>     open Core.Std
+>     open Async.Std
+>
+> which brings all the core and async world into the environment.
+>
+> The core style is generally considered better and async has a huge
+> number of utilities well integrated together, but switching code to it
+> may require a lot of work.
+>
+> On the other hand lwt is more independent so it is easier to integrate
+> it into an existing project.
+>
+>
+>
+> In conclusion there is a lot to think about but no blocker.
+>
+> Jeremie
+> _______________________________________________
+> wg-parallel mailing list
+> wg-parallel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-parallel
+
+From vincent.balat at univ-paris-diderot.fr  Tue Apr 30 13:43:18 2013
+From: vincent.balat at univ-paris-diderot.fr (Vincent Balat)
+Date: Tue, 30 Apr 2013 14:43:18 +0200
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+Message-ID: <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+
+Hi,
+
+I want to thank very much Yaron and all of you for taking time to try to find 
+a solution to this problem. I also want to remind the position of the Ocsigen 
+project on this list (and make it clear that we do not plan to switch to 
+Async).
+
+> I'm not sure that the right goal is "to make them evolve so they are
+> close enough".  If we're going to end up with just one implementation,
+> it's hard for me to see how it's not going to be Async, because Jane
+> Street is not going to be able to move away from Async as a practical
+> matter.
+
+I understand but I think it is even worse for Lwt, because it is used by many 
+projects (representing several hundreds of thousand of lines, written by many 
+people). Ending up with one implementation is unfortunately a very unlikely 
+hypothesis. That's why I proposed, not to drop one of the implementation, but 
+to try to converge in term of features and semantics, in order to make it 
+easier to adapt libraries for one or the other, and thus limit the impact of 
+the schism Async is creating.
+
+It is not possible to ask Lwt projects to switch to the current implementation 
+of Async, because there are too many projects and most of them will probably 
+just do nothing.The Ocsigen Web framework itself is a large piece of code, 
+relying a lot on very precise details of the semantics of Lwt. We are 
+currently working on ambititous projects that have a much higher level of 
+priority. Besides, we cannot take this decision for all our users.
+
+If Jane Street does not want to switch to Lwt (which would be the best 
+solution for the community but I understand that it is not easy), the only 
+possibility I see to end up with one implementation is to make Async evolve so 
+that it could really be used in some way as an exact replacement for Lwt.
+
+In the current state of things, I want to make it clear that Ocsigen will not 
+switch to Async, and will not abandon Lwt users, and continue to encourage 
+people using Lwt rather than Async, in order to keep a consistency between 
+libraries.
+
+But we would be happy if Jane Street could help avoid a split of the OCaml 
+community ... The solutions you propose are a very good first step, and we 
+appreciate it.
+
+Vincent
+
+
+From yminsky at gmail.com  Tue Apr 30 13:58:58 2013
+From: yminsky at gmail.com (Yaron Minsky)
+Date: Tue, 30 Apr 2013 08:58:58 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+References: <CANhEzE4MkRhdhdEWJCDbsa_+xhQixpwnEEc_ZbmmGx4rPwWjcw@mail.gmail.com>
+ <CADKNfhJe7wWOuPjOMEXc7y5BZ1EPJVhqvhcb1HcfDL60rBqJvw@mail.gmail.com>
+ <201304301443.18776.vincent.balat@univ-paris-diderot.fr>
+Message-ID: <CADKNfhLArip0chsO9h0zjvt066_zmOM1nuUUFO=o-L4qeJ=xRA@mail.gmail.com>
+
+On Tue, Apr 30, 2013 at 8:43 AM, Vincent Balat
+<vincent.balat at univ-paris-diderot.fr> wrote:
+> Hi,
+>
+> I want to thank very much Yaron and all of you for taking time to try to find
+> a solution to this problem. I also want to remind the position of the Ocsigen
+> project on this list (and make it clear that we do not plan to switch to
+> Async).
+>
+>> I'm not sure that the right goal is "to make them evolve so they are
+>> close enough".  If we're going to end up with just one implementation,
+>> it's hard for me to see how it's not going to be Async, because Jane
+>> Street is not going to be able to move away from Async as a practical
+>> matter.
+>
+> I understand but I think it is even worse for Lwt, because it is used by many
+> projects (representing several hundreds of thousand of lines, written by many
+> people). Ending up with one implementation is unfortunately a very unlikely
+> hypothesis. That's why I proposed, not to drop one of the implementation, but
+> to try to converge in term of features and semantics, in order to make it
+> easier to adapt libraries for one or the other, and thus limit the impact of
+> the schism Async is creating.
+
+Unfortunately, I don't see how having two libraries with different
+implementations and similar semantics is much of an improvement over
+the current state of affairs.  Using functors for making libraries
+portable over the two is no way to live!
+
+I understand your reluctance to switch away from Lwt --- surely,
+dealing with the migration would be disruptive and would take
+significant time and effort.  Indeed, our own situation is that we
+have a few million lines of code using Async, 100 or so active
+developers internally, and many mission-critical applications that
+depend on the details of Async's semantics and performance, so moving
+away from it is a non-starter for us as well.
+
+In any case, I think the question of how to maximize interoperatbility
+between Async and Lwt seems on topic.  Beyond that, we're interested
+in understanding what can be done to make Async more broadly useful to
+people outside of Jane Street.
+
+y
+
+> It is not possible to ask Lwt projects to switch to the current implementation
+> of Async, because there are too many projects and most of them will probably
+> just do nothing.The Ocsigen Web framework itself is a large piece of code,
+> relying a lot on very precise details of the semantics of Lwt. We are
+> currently working on ambititous projects that have a much higher level of
+> priority. Besides, we cannot take this decision for all our users.
+>
+> If Jane Street does not want to switch to Lwt (which would be the best
+> solution for the community but I understand that it is not easy), the only
+> possibility I see to end up with one implementation is to make Async evolve so
+> that it could really be used in some way as an exact replacement for Lwt.
+>
+> In the current state of things, I want to make it clear that Ocsigen will not
+> switch to Async, and will not abandon Lwt users, and continue to encourage
+> people using Lwt rather than Async, in order to keep a consistency between
+> libraries.
+>
+> But we would be happy if Jane Street could help avoid a split of the OCaml
+> community ... The solutions you propose are a very good first step, and we
+> appreciate it.
+>
+> Vincent
+>
+
+From daniel.buenzli at erratique.ch  Tue Apr 30 18:25:21 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 30 Apr 2013 18:25:21 +0100
+Subject: [wg-parallel]  About Lwt and Async
+Message-ID: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+
+(sorry for the top post I was not subscribed)
+
+To be honest I'm neither content with either lwt nor async. I actually toyed with my own implementation of these concepts, that may, or not, be released in the future. A few hints of what lead me to that are given here [1]. 
+
+That being said I would like to stress that a lot of foundational libraries can avoid making a choice *without* functorizing as Yaron (doesn't) suggest.
+
+Notably codecs can be made both lwt and async friendly by following this pattern [2] (the repo has a toy example, see the readme), which I already implemented for Unicode and JSON decoding [3,4]; xmlm will adopt it once I get time to work on the library again; the Vg library on which I'm currently working on [5] also uses that pattern.
+
+Given the positions on both sides, I actually think we should take that "schism" as a chance rather than a curse. Striving for independence from the concrete asynchronous programming mechanism (with or without functorizing) and cutting down on dependencies in foundational libraries may actually lead to software that is more composable, adaptable and reusable in the long term.
+
+My opinion is that most of the time choosing a particular asynchronous programming library should be a choice left to the developer of *applications* not to the developer of libraries --- but I have a bias towards small and focused libraries rather than "solve everything frameworks".
+
+Best,
+
+Daniel
+
+[1] https://github.com/dbuenzli/fut/blob/master/RATIONALE
+[2] https://github.com/dbuenzli/nbcodec/blob/master/RATIONALE
+[3] http://erratique.ch/software/uutf
+[4] http://erratique.ch/software/jsonm
+[5] https://github.com/dbuenzli/vg/
+
+
+
+From yminsky at janestreet.com  Tue Apr 30 22:15:11 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Tue, 30 Apr 2013 17:15:11 -0400
+Subject: [wg-parallel] About Lwt and Async
+In-Reply-To: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+References: <3E7D3178A81143979C47D6C9E012039C@erratique.ch>
+Message-ID: <CACLX4jTsVU=NafyrVxRYYmEGLXQDdBGXs_wZ3ir5ZsPq=EUxiw@mail.gmail.com>
+
+It's a beautiful dream, but it sounds implausible to me.  I think one
+might as well propose writing programs in a way that is independent of
+the programming language.  This is doable in some small ways on the
+margin, but it's not a practical approach.
+
+I do think that some libraries, like the parsing associated with XML
+or JSON, can be made independent in this way.  But this represents
+only a small part of the concurrent code that one writes, and so only
+solves a small part of the problem.
+
+In the end, I do still think we will be better off if we can settle on
+one major concurrent programming library.
+
+y
+
+On Tue, Apr 30, 2013 at 1:25 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> (sorry for the top post I was not subscribed)
+>
+> To be honest I'm neither content with either lwt nor async. I
+> actually toyed with my own implementation of these concepts, that
+> may, or not, be released in the future. A few hints of what lead me
+> to that are given here [1].
+>
+> That being said I would like to stress that a lot of foundational
+> libraries can avoid making a choice *without* functorizing as Yaron
+> (doesn't) suggest.
+>
+> Notably codecs can be made both lwt and async friendly by following
+> this pattern [2] (the repo has a toy example, see the readme), which
+> I already implemented for Unicode and JSON decoding [3,4]; xmlm will
+> adopt it once I get time to work on the library again; the Vg
+> library on which I'm currently working on [5] also uses that
+> pattern.
+>
+> Given the positions on both sides, I actually think we should take
+> that "schism" as a chance rather than a curse. Striving for
+> independence from the concrete asynchronous programming mechanism
+> (with or without functorizing) and cutting down on dependencies in
+> foundational libraries may actually lead to software that is more
+> composable, adaptable and reusable in the long term.
+>
+> My opinion is that most of the time choosing a particular
+> asynchronous programming library should be a choice left to the
+> developer of *applications* not to the developer of libraries ---
+> but I have a bias towards small and focused libraries rather than
+> "solve everything frameworks".
+>
+> Best,
+>
+> Daniel
+>
+> [1] https://github.com/dbuenzli/fut/blob/master/RATIONALE
+> [2] https://github.com/dbuenzli/nbcodec/blob/master/RATIONALE
+> [3] http://erratique.ch/software/uutf
+> [4] http://erratique.ch/software/jsonm
+> [5] https://github.com/dbuenzli/vg/
+>
+>
+> _______________________________________________
+> wg-parallel mailing list
+> wg-parallel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-parallel
+

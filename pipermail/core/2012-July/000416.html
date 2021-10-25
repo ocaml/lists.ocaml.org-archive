@@ -1,0 +1,134 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Erlang-like Gen server using Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3C9b40d1e9-72c2-455e-be65-7c6787d54d44%40googlegroups.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000427.html">
+   <LINK REL="Next"  HREF="000417.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Erlang-like Gen server using Async</H1>
+    <B>Sam</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3C9b40d1e9-72c2-455e-be65-7c6787d54d44%40googlegroups.com%3E"
+       TITLE="Erlang-like Gen server using Async">sdefabbiakane at gmail.com
+       </A><BR>
+    <I>Tue Jul  3 05:34:54 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000427.html">[was: [Caml-list] [ANN] oasis v0.3.0: Architecture for building OCaml libraries and applications] Pb with type_conv
+</A></li>
+        <LI>Next message: <A HREF="000417.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#416">[ date ]</a>
+              <a href="thread.html#416">[ thread ]</a>
+              <a href="subject.html#416">[ subject ]</a>
+              <a href="author.html#416">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I haven't had a chance to take a very long look, but I do have a few 
+comments. Feel free to ignore me if I'm misunderstanding what you're trying 
+to do :).
+
+You're refererencing some things in Async's Deferred module (like 
+'Deferred.return', etc) with their qualified names, which is unnecessary: 
+you can just use 'return'. This is partially a style point, but Deferred is 
+generally understood to be the top-level monad if you have Async open. 
+(This is also the case for some functions in other modules, like printf, 
+which is in the top level in Core.)
+
+You're also using the named 'bind', 'upon', etc. Unless there's a good 
+reason to do that, I'd use the inline operators instead--they're much nicer 
+to read. (&gt;&gt;= is bind, &gt;&gt;&gt; is upon, &gt;&gt;| is map) For example, with minimal 
+other changes, this is how I'd write your 'test_gen_server' function:
+
+let test_gen_server () =
+  Test_server.start 0
+  &gt;&gt;&gt; function
+  | Result.Error _ -&gt; shutdown 2
+  | Result.Ok gs   -&gt;
+    incr gs 1;
+    incr gs 2;
+    Ivar.read (get gs) 
+    &gt;&gt;&gt; function
+    | 3 -&gt; shutdown gs
+    | n -&gt;
+      eprintf &quot;Error: Got %d\n&quot; n; (* eprintf goes to stderr instead of 
+stdout *)
+      Shutdown.shutdown 1
+
+Also, I see a lot of use of upon, return, and ivars. There are certainly 
+times to use all of them, but there are often nicer abstractions already in 
+Async that do the hard work for you. Take a look at the Pipe module: I 
+think you'll be able to eliminate a lot of code (and better types for your 
+own interfaces will flow much more naturally from the underlying types). 
+Generally functions that do deferred things should generally have a 
+Deferred type. Don't use upon to try to give yourself functions of type 
+'unit'.
+
+
+
+
+On Tuesday, July 3, 2012 4:05:09 AM UTC+8, orbitz wrote:
+&gt;<i>
+</I>&gt;<i> Hello!
+</I>&gt;<i>
+</I>&gt;<i> I implemented an Erlang-like gen server in Async and was hoping someone 
+</I>&gt;<i> familiar with Core might provide some feedback.  Is the code good?  Is the 
+</I>&gt;<i> idea good?
+</I>&gt;<i>
+</I>&gt;<i> The code is here:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="https://github.com/orbitz/web_typed/blob/master/libs/ort_async/gen_server.ml">https://github.com/orbitz/web_typed/blob/master/libs/ort_async/gen_server.ml</A>
+</I>&gt;<i>
+</I>&gt;<i> And an example is here:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="https://github.com/orbitz/web_typed/blob/master/libs/ort_async/gen_server_test.ml">https://github.com/orbitz/web_typed/blob/master/libs/ort_async/gen_server_test.ml</A>
+</I>&gt;<i>
+</I>&gt;<i> One thing that I do not like about this is the init function.  The problem 
+</I>&gt;<i> is:
+</I>&gt;<i> I want the init function to get a reference to itself so it can create 
+</I>&gt;<i> other services and give itself to that service.  The problem is, the type 
+</I>&gt;<i> that represents the server doesn't exist when the init function is defined 
+</I>&gt;<i> so I can't pass it a value.  Instead I pass it the server stream and exited 
+</I>&gt;<i> Ivar, but that is rather ugly since it really breaks the abstraction.  Any 
+</I>&gt;<i> suggestions?
+</I>&gt;<i>
+</I>&gt;<i> Thank you.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120702/be2d2acb/attachment.html">http://lists.ocaml.org/pipermail/core/attachments/20120702/be2d2acb/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000427.html">[was: [Caml-list] [ANN] oasis v0.3.0: Architecture for building OCaml libraries and applications] Pb with type_conv
+</A></li>
+	<LI>Next message: <A HREF="000417.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#416">[ date ]</a>
+              <a href="thread.html#416">[ thread ]</a>
+              <a href="subject.html#416">[ subject ]</a>
+              <a href="author.html#416">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

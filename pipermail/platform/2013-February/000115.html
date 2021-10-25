@@ -1,0 +1,257 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBF8tOi7dfuFGsmL4hA7QhfWkskhyr-G3dFeMq2MrDaKqA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000110.html">
+   <LINK REL="Next"  HREF="000125.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBF8tOi7dfuFGsmL4hA7QhfWkskhyr-G3dFeMq2MrDaKqA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Feb 26 09:37:14 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000110.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000125.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#115">[ date ]</a>
+              <a href="thread.html#115">[ thread ]</a>
+              <a href="subject.html#115">[ subject ]</a>
+              <a href="author.html#115">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>In this post, I'll try to take a high-level view of the discussion that has
+happened so far. You can take this as an (opinionated) summary.
+
+The main ideas of my proposal linked at the top, or more generally my work
+on what people have been suggesting for namespaces, are the following:
+
+1. Namespaces are about the out-of-the-language-question of how a given
+in-source compilation unit name (masquerading as a module name) maps to an
+in-filesystem compilation unit.
+2. I was suggesting new features that (mostly) do not change the OCaml
+language itself, but the semantics of this mapping and the way it is given
+to the type-checker. This is a choice that some people may not agree with
+(more on that later).
+3. Actual OCaml implementations also have a notion of &quot;internal module
+name&quot; that is contained in compiled object files; two modules of the same
+internal name cannot be mixed together. This has important practical
+implication, and we can consider the implementation space for internal
+module names.
+
+Alain has a large codebase with house-developed tools, unique build process
+conventions, and the ironically unusual constraint of compiling quickly on
+Windows. He pushes for having as few changes as possible. No change to the
+internal module names (this means developers should use long
+hopefully-unique filename to avoid conflicts), no change to the structure
+of compilation unit names (no hierarchy), and a simple
+compunit-name-to-compunit-name mapping to alleviate the pains. In my
+initial proposal, this corresponds to restricting the compilation
+environment descriptions to a flat mapping built by literals and merging
+only.
+
+Leo has the fairly different use case of Janestreet Core's library in mind:
+hierarchy is important (Core.Foo looks better than Core_Foo and &quot;open
+namespace Core&quot; is important), changing the language for greater good is
+ok, and his particular suggestion is an in-language, compunit-wide &quot;in
+Core.Foo&quot; construct that would both be added to the internal module name,
+and be used to generate the mapping from compunit names from compunit *on
+the developer side*, rather than on the user side (with then the simple
+semantics that all mappings from the search path are merged). This can
+against be seen as a way to define the compilation environment, giving
+slightly more control to the module provider (mostly a placement in a
+hierarchy). It corresponds to a restriction of the way to define
+compilation environments that is even more severe, the user having no
+control (compilation environments are built as the merging of all
+developer-generated environments present in the search path).
+
+Daniel is opposed to the addition of a new &quot;namespace&quot; concept to the OCaml
+language. It is not completely clear to me whether he objects to:
+1. the addition of more flexibility in the way compilation unit names are
+mapped to compilation units, outside the language (the mapping file Alain
+suggests, the more expressive mapping languages I have considered, or a
+compilation-option version of the &quot;in Foo.Bar&quot; proposed by Leo)
+2. or only the addition of a new concept *in the language itself*, such as
+can be seen if we insist to write Core#Std#Map.Make rather than
+Core.Std.Map.Make
+
+I lament that, expect Alain, nobody gives a damn about letting users
+redefine their own names or paths in a different way that what the module
+provider planned for. I think it's an important part of the design space
+that may allow quite convenient things (eg. scenarios of companies
+maintaining a in-house repository of modules with pinned version, and still
+being to interact with non-curated module collections in the same
+programs), but apparently this is not something people care about. Well,
+that's how it is, and hopefully this won't turn out to be overly
+restrictive in the mid-term future.
+
+
+## A more detailed discussion of Daniel's arguments
+
+Daniel, I am glad that you defend this point of view, as I myself grow more
+and more conservative of language extension ideas (maybe it's a contagious
+effect of vicinity to OCaml designers...). I do completely agree that new
+language features should be motivated by a (expressivity vs. complexity /
+kludgeness) estimation, and that it is not a priori clear that we need
+another &quot;programming in the large&quot; concept above modules.
+
+Regarding point (2): About a year ago, I have worked with Nicolas Pouillard
+on a way to make the objection go away, by seeing compilation unit names
+only as modules in the source code: given a hierarchical compilation
+environment, there is a principled way to turn any non-leaf path (that does
+not denote a compilation unit by itself) into a module. Instead of
+Core#Std#Map, we could write Core#Std.Map (seeing Core#Std as a module) or
+even Core.Std.Map (seeing Core as module) without changing the semantics of
+my proposal (or any consensual restriction of it). You can find this
+specified in an older design document,
+  <A HREF="http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html">http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html</A>
+I had decided not to link it in my introductory mail because it add a bit
+more complexity to the semantics of mapping compilation unit names to
+compilation units, and my feeling was that discussing the design space of a
+simpler basis was a better way to start a discussion that would certainly
+become unwieldy to the risk of being improductive.
+
+Summing things up: if you have a hierarchical mapping outside the language,
+you can make it appear in OCaml source code as just as module hierarchy, as
+you suggest. I think it actually adds *complexity* to the underlying
+design, so there is a price to pay to hide this distinct notion of
+(structured) compilation unit name. I would be ready to pay that price if
+there is a wide agreement it is the right thing to do, but I personally
+favor more explicit designs, at least as an experimentation and discussion
+device (I think we should make the difference explicit and have a (module
+Core#Std) construct turning a non-leaf compilation unit path into a module
+with submodules, with the shared understanding that we can decide to hide
+it under a syntactic ambiguity).
+
+(The documentation also discusses the possibility of having *functors* that
+span several compilation units, and that is something Yaron has requested
+in the past. It is more complex and I don't think it is as ready, robust
+and canonical as the module part, so I encourage you to ignore it in the
+context of this discussion.)
+
+Regarding point (1), your suggestion to use .cma as an already-existing
+grouping of modules in submodules that could help solve module name
+conflicts, I feel this is a more anecdotal part of your (still imprecise)
+proposal that is more in the &quot;you see it doesn't need to be that complex&quot;
+league that an actual principled design. I have a sympathy for the &quot;least
+effort&quot; design process that it shares with Alain's proposal, but I think it
+should not stop us from thinking about the whole design space in a
+scientific way. (For example: unless I'm mistaken, .cma cannot currently
+embed .cma, so your proposal for implementation reasons cannot expression
+non-flat module hierarchies.) There are important technical details left to
+be defined, such as how to avoid internal name clashes between submodules
+of different .cma-packs. My intuition is that getting the details
+straightened out would amount to re-implementing -pack (in particular the
+-for-pack approach to internal module names prefixing) in terms of .cma
+rather than .cmo. So the mapping from compilation unit names to compilation
+units would still be entirely directed by the filesystem and search path as
+it currently is, but with link-economic module packs. Why not, that's an
+idea we could explore in more details, but note that its semantics would
+still be split in two different &quot;phases&quot;:
+- a new notion of structured paths Foo#Bar that allows to denote a
+compilation unit for bar.cmo embedded into foo.cma
+- a possible way to hide this additional structure to source code,
+masquerading Foo as a module, with a precise semantics when it is used for
+something else than a projection (as in the document linked above; in fact
+you could reuse the same proposal, I think)
+
+This particular implementation choice gives away on quite a few things we
+might want to have, such as:
+- the ability to merge two sets of submodules that share a common parent
+name (admittedly this is not useful in a provenance-oriented view of
+compilation unit naming, but more in a Data.List view that is not
+necessarily the good one to start with)
+- the ability for users to build new/distinct parallel module organizations
+- more-than-depth-2 hierarchies (implementation detail; might be fixed with
+non-neglectible amount of work)
+- compilation unit name aliasing / redefinition
+
+But it looks interesting. Please go ahead with more detailed proposals!
+
+On Mon, Feb 25, 2013 at 3:15 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">anil at recoil.org</A>&gt; wrote:
+
+&gt;<i> On 24 Feb 2013, at 19:26, Christophe TROESTLER &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Christophe.Troestler at umons.ac.be</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;<i> &gt; On Fri, 22 Feb 2013 11:41:10 +0000, Anil Madhavapeddy wrote:
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; There's one scenario which absolutely requires the ability to
+</I>&gt;<i> explicitly open a particular namespace: camlp4 code generation.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Right now, several camlp4 extensions break because they use modules
+</I>&gt;<i> from the standard Pervasives library, and have no way to explicitly state
+</I>&gt;<i> that.  If Core.Std is opened, then compilation fails.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; The two workarounds are:
+</I>&gt;<i> &gt;&gt; - hack the build system to pass -pp options to the camlp4 generator.
+</I>&gt;<i> Painful.
+</I>&gt;<i> &gt;&gt; - have some facility to explicitly open 'Caml_std' or 'Core_std'
+</I>&gt;<i> locally, irrespective of the current module environment.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; I believe namespaces addresses the latter workaround.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Camlp4 can insert some code to alias the standard modules needed by code
+</I>&gt;<i> generation at the beginning of the source files (not foolproof because a
+</I>&gt;<i> name needs to be generated but good enough in practice).  It would be
+</I>&gt;<i> better if that facility was provided by a Camlp4 module instead of needing
+</I>&gt;<i> to be redone by each extension.
+</I>&gt;<i>
+</I>&gt;<i> That's an interesting idea.  The only hitch is that it's a little hard to
+</I>&gt;<i> do in one pass, as the code generation is called on the local AST fragment.
+</I>&gt;<i>
+</I>&gt;<i> I think it would work if placed as a feature into type_conv itself, as the
+</I>&gt;<i> individual generators (e.g. sexp/orm) all register themselves with it quite
+</I>&gt;<i> early.  They could request global modules, which type_conv does in one pass
+</I>&gt;<i> (thus also avoiding duplicate requests for the original namespace).
+</I>&gt;<i>
+</I>&gt;<i> CCing Markus Mottl to see what he thinks...
+</I>&gt;<i>
+</I>&gt;<i> -anil
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/platform/attachments/20130226/ac196941/attachment-0001.html">http://lists.ocaml.org/pipermail/platform/attachments/20130226/ac196941/attachment-0001.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000110.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000125.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#115">[ date ]</a>
+              <a href="thread.html#115">[ thread ]</a>
+              <a href="subject.html#115">[ subject ]</a>
+              <a href="author.html#115">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

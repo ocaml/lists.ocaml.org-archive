@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Re%3A%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3CCAHJESt0O3yLjNPkexha_37OZQoLFobX4S-R1CZhvfzOasXWXgA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001155.html">
+   <LINK REL="Next"  HREF="001163.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Caml-list] Re: Unix.getlogin () fails when stdin is redirected</H1>
+    <B>Till Varoquaux</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Re%3A%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3CCAHJESt0O3yLjNPkexha_37OZQoLFobX4S-R1CZhvfzOasXWXgA%40mail.gmail.com%3E"
+       TITLE="[Caml-list] Re: Unix.getlogin () fails when stdin is redirected">till at pps.jussieu.fr
+       </A><BR>
+    <I>Tue Mar 20 20:12:36 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001155.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+        <LI>Next message: <A HREF="001163.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1156">[ date ]</a>
+              <a href="thread.html#1156">[ thread ]</a>
+              <a href="subject.html#1156">[ subject ]</a>
+              <a href="author.html#1156">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+As far as I can tell getpwuid(geteuid()) is what the (deprecated)
+cuserid function does. The linux man page explains the difference
+between the two functions like this:
+
+  _ These functions let your program identify positively the user who
+is running (cuserid()) or the user who logged in this session
+(getlogin()). (These can differ when set-user-ID programs are
+involved.)
+
+I expect there to be more points were the behaviours of those two
+functions diverge (e.g.: sudo, deamons etc...).
+
+In general I am very skeptic any time I see a one liner that is sold
+as a working alternative to a glibc function. The glibc has issues and
+pitfalls but they tend to be very well documented. &quot;Better the devil
+you know&quot;...
+
+Till
+
+On Tue, Mar 20, 2012 at 3:41 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at gmail.com</A>&gt; wrote:
+&gt;<i> Is there a concrete difference in behavior you're concerned about?
+</I>&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On Tue, Mar 20, 2012 at 2:48 PM, Till Varoquaux &lt;<A HREF="http://lists.ocaml.org/listinfo/core">till at pps.jussieu.fr</A>&gt; wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> getpwuid(getuid()) is not a synonym for get_login (refer to the
+</I>&gt;&gt;<i> discussion in the POSIX standard[^1]). You should not shadow posix
+</I>&gt;&gt;<i> functions by functions with different semantics in the Unix modules;
+</I>&gt;&gt;<i> providing your own abstraction over the OS is a commendable goal but
+</I>&gt;&gt;<i> you should do so without silently bypassing core functions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Till
+</I>&gt;&gt;<i> [1]:<A HREF="http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html">http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue, Mar 20, 2012 at 2:28 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt;
+</I>&gt;&gt;<i> wrote:
+</I>&gt;&gt;<i> &gt; Note that Jane Street's core library [1] does not use getlogin(3) in its
+</I>&gt;&gt;<i> &gt; replacement Unix module, for exactly this reason:
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; (* The standard getlogin function goes through utmp which is unreliable,
+</I>&gt;&gt;<i> &gt; &#160;see the BUGS section of getlogin(3) *)
+</I>&gt;&gt;<i> &gt; let getlogin_orig = Unix.getlogin
+</I>&gt;&gt;<i> &gt; let getlogin () = (Unix.getpwuid (getuid ())).Unix.pw_name
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; [1]: <A HREF="https://bitbucket.org/yminsky/ocaml-core/wiki/Home">https://bitbucket.org/yminsky/ocaml-core/wiki/Home</A>
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; I just tested your specific example, and it worked fine.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; On Tue 20 Mar 2012 06:07:59 PM GMT, Ricardo Catalinas Jim&#233;nez wrote:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; On Tue, Mar 20, 2012 at 06:51:13PM +0100, Ricardo Catalinas Jim&#233;nez
+</I>&gt;&gt;<i> &gt;&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; I found out the next issue in this simple code:
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; let () =
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160; print_endline &quot;Hello&quot;;
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160; print_endline (Unix.getlogin ())
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; Running in the normal case, with `./a.out' gives:
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; Hello
+</I>&gt;&gt;<i> &gt;&gt;&gt; ricardo
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; But running like `./a.out&lt;/dev/null' makes Unix.getlogin fail:
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; Hello
+</I>&gt;&gt;<i> &gt;&gt;&gt; Fatal error: exception Unix.Unix_error(20, &quot;getlogin&quot;, &quot;&quot;)
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; A simple strace reveals the problem:
+</I>&gt;&gt;<i> &gt;&gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;open(&quot;/etc/passwd&quot;, O_RDONLY|O_CLOEXEC) = 3
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;fstat(3, {st_mode=S_IFREG|0644, st_size=509, ...}) = 0
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;mmap(NULL, 4096, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS,
+</I>&gt;&gt;<i> &gt;&gt;&gt; -1,
+</I>&gt;&gt;<i> &gt;&gt;&gt; 0) = 0x7fb125554000
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;read(3, &quot;root:x:0:0:root:/root:/bin/bash\n&quot;..., 4096) = 509
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;read(3, &quot;&quot;, 4096) &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; = 0
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;close(3) &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160;= 0
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;munmap(0x7fb125554000, 4096) &#160; &#160; &#160; &#160; &#160; &#160;= 0
+</I>&gt;&gt;<i> &gt;&gt;&gt; -&gt; &#160;ioctl(0, SNDCTL_TMR_TIMEBASE or SNDRV_TIMER_IOCTL_NEXT_DEVICE or
+</I>&gt;&gt;<i> &gt;&gt;&gt; TCGETS, 0x7fff12682c98) = -1 ENOTTY (Inappropriate ioctl for device)
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;write(2, &quot;Fatal error: exception Unix.Unix&quot;..., 59) = 59
+</I>&gt;&gt;<i> &gt;&gt;&gt; &#160; &#160;exit_group(2) &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; &#160; = ?
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; Someone knew the answer, man 3 getlogin reads:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; &#160; &#160; &#160; &#160;Note that glibc does not follow the POSIX specification and uses
+</I>&gt;&gt;<i> &gt;&gt; &#160; &#160; &#160; &#160;stdin instead of /dev/tty. &#160;A bug. &#160;(Other recent systems, like
+</I>&gt;&gt;<i> &gt;&gt; &#160; &#160; &#160; &#160;SunOS 5.8 and HP-UX 11.11 and FreeBSD 4.8 all return the login
+</I>&gt;&gt;<i> &gt;&gt; &#160; &#160; &#160; &#160;name also when stdin is redirected.)
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; Regards
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; --
+</I>&gt;&gt;<i> &gt; Caml-list mailing list. &#160;Subscription management and archives:
+</I>&gt;&gt;<i> &gt; <A HREF="https://sympa-roc.inria.fr/wws/info/caml-list">https://sympa-roc.inria.fr/wws/info/caml-list</A>
+</I>&gt;&gt;<i> &gt; Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+</I>&gt;&gt;<i> &gt; Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> Caml-list mailing list. &#160;Subscription management and archives:
+</I>&gt;&gt;<i> <A HREF="https://sympa-roc.inria.fr/wws/info/caml-list">https://sympa-roc.inria.fr/wws/info/caml-list</A>
+</I>&gt;&gt;<i> Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+</I>&gt;&gt;<i> Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001155.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+	<LI>Next message: <A HREF="001163.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1156">[ date ]</a>
+              <a href="thread.html#1156">[ thread ]</a>
+              <a href="subject.html#1156">[ subject ]</a>
+              <a href="author.html#1156">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

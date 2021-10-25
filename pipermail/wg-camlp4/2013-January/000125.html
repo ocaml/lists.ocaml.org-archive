@@ -1,0 +1,188 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Meta Programming from the view of the implementaion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu4CnjsJcVWTK3N0Q9iEMLWzHWtRM41u6EKRYX2T1we0wQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000124.html">
+   <LINK REL="Next"  HREF="000147.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Meta Programming from the view of the implementaion</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu4CnjsJcVWTK3N0Q9iEMLWzHWtRM41u6EKRYX2T1we0wQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Meta Programming from the view of the implementaion">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Wed Jan 30 13:18:25 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000124.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000147.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#125">[ date ]</a>
+              <a href="thread.html#125">[ thread ]</a>
+              <a href="subject.html#125">[ subject ]</a>
+              <a href="author.html#125">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Wed, Jan 30, 2013 at 4:12 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain at frisch.fr</A>&gt; wrote:
+
+&gt;<i> On 01/30/2013 03:34 AM, Hongbo Zhang wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This looks very bad to me:
+</I>&gt;<i>
+</I>&gt;<i> 1. You loose all support from your editor (indentation, coloring,
+</I>&gt;<i> parentheses matching).  Am I the only one who finds this really
+</I>&gt;<i> problematic?  With quotations, my emacs looks like notepad... Indentation
+</I>&gt;<i> and coloring do find typos on the fly; automatic indentation makes it easy
+</I>&gt;<i> to copy/paste code from one context to another one.
+</I>&gt;<i>
+</I>Weird, my emacs works pretty well for me, I choose &quot;{| |}&quot; since it's more
+friendly to emacs. *On the contrary, quotation is great for IDE
+integration, since when you type {:lex||}, the IDE knows the context already
+*
+
+&gt;<i>
+</I>&gt;<i> 2. Quotation &quot;with OCaml code in them&quot; does not combine well with other
+</I>&gt;<i> AST rewriters.  If you have a -ppx filter implementing, say, macro
+</I>&gt;<i> expansion (in patterns and expressions), would you apply it before or after
+</I>&gt;<i> the one expanding the {:lex| ... |} quotations?  Probably both. (And won't
+</I>&gt;<i> be able to benefit of macro on patterns for the &quot;regexps&quot;.)
+</I>&gt;<i>
+</I>Ast Rewriter is *bad *for arbitrary code generation, its neat case is
+something like bisect. And Ast Rewriter is not composable at  all, suppose
+you have two AST Rewriters A,B ,there are no guarantee that  A.B == B.A, it
+just gives you an illusion that it works, probably it silently fails.
+
+&gt;<i>
+</I>&gt;<i> 3. How do you implement the expander?  Somehow, you need to parse the
+</I>&gt;<i> content of the quotation (stored as a string in the AST), which involves
+</I>&gt;<i> non trivial stuff, like a parser being able to parse OCaml code mixed with
+</I>&gt;<i> something else.  Personally, I don't know how to implement the quotation
+</I>&gt;<i> expander with the parsing technologies I'm familiar with.
+</I>&gt;<i>
+</I>&gt;<i> when you design your DSL, the left part is pretty easy to parse, when you
+</I>see the delimiter &quot;-&gt;&quot;, invoking an existing parser.
+
+&gt;<i>
+</I>&gt;<i> For me quotations (in position of expression) are useful only for one
+</I>&gt;<i> thing: escape from the lexical conventions of OCaml string literals.
+</I>&gt;<i> Otherwise, strings are just fine.  There are very few cases where with
+</I>&gt;<i> actually matters.  A decent example might be something like Pa_tyxml,
+</I>&gt;<i> allowing to write XML code in XML syntax within OCaml sources.  But even
+</I>&gt;<i> there, I'm not absolutely sure that quotations are the best solution: would
+</I>&gt;<i> it really be so bad to use normal OCaml strings (with an attribute):
+</I>&gt;<i>
+</I>&gt;<i>   (@xml)&quot;&lt;div&gt;xyz&lt;/div&gt;&quot;
+</I>&gt;<i>
+</I>&gt;<i> or OCaml syntax interpreted specially:
+</I>&gt;<i>
+</I>&gt;<i>   (@xml)(div &quot;xyz&quot;)
+</I>&gt;<i>
+</I>&gt;<i> instead of the current:
+</I>&gt;<i>
+</I>&gt;<i>  &lt;:html5&lt; &lt;div&gt;xyz&lt;/div&gt; &gt;&gt;
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> They all work great for me, but since they all work, why not only
+</I>introduce one,* I am happy to see the less ad-hoc rules.*
+I did not mention that in Fan, we already support {:|?  ?|} , like Perl you
+can supply an extra matching char to handle more complex cases.
+
+Anyway, I think it would great to get the Abstract Syntax right before the
+details on concrete syntax.
+
+&gt;<i> But maybe for some cases (embedding a language with a lot of double quoted
+</I>&gt;<i> and backslashes), escaping from the lexical conventions of OCaml string
+</I>&gt;<i> literals might really be useful.  This could be actually be the case for
+</I>&gt;<i> standard string literals, with no special syntactic processing.  So why not
+</I>&gt;<i> simply address this need by allowing an alternative syntax for string
+</I>&gt;<i> literals, where no special character is interpreted?  The opening delimiter
+</I>&gt;<i> would define the closing delimiter.  For instance:
+</I>&gt;<i>
+</I>&gt;<i>   {xxx{ ..... }xxx}
+</I>&gt;<i>
+</I>&gt;<i> (here I've assumed that { } are hard-coded, but xxx could be replaced say,
+</I>&gt;<i> by any sequence of identifier/digit/operator characters). In the AST, this
+</I>&gt;<i> could be represented as a normal string literal (or maybe we should keep
+</I>&gt;<i> the &quot;xxx&quot; annotation, to avoid having to put an extra attribute in front of
+</I>&gt;<i> the literal).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I've yet to be convinced that quotations really have other interesting
+</I>&gt;<i> uses than escaping from lexical conventions of OCaml string literals...
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>&gt;<i>
+</I>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130130/39d29a7c/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130130/39d29a7c/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000124.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000147.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#125">[ date ]</a>
+              <a href="thread.html#125">[ thread ]</a>
+              <a href="subject.html#125">[ subject ]</a>
+              <a href="author.html#125">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

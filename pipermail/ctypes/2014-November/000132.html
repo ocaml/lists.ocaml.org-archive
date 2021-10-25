@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Defines,	and Structs with platform-specific fields
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAAxsn%3DEdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU%2BCUbRHw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000133.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Defines,	and Structs with platform-specific fields</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAAxsn%3DEdMC_C8A-JDx29-jVSHOJk50AZVXtUJjmq0vU%2BCUbRHw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Defines,	and Structs with platform-specific fields">yallop at gmail.com
+       </A><BR>
+    <I>Mon Nov  3 15:45:59 GMT 2014</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000133.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#132">[ date ]</a>
+              <a href="thread.html#132">[ thread ]</a>
+              <a href="subject.html#132">[ subject ]</a>
+              <a href="author.html#132">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 30 October 2014 12:34, Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">trevorsummerssmith at gmail.com</A>&gt; wrote:
+&gt;<i> Thanks for this work! I just got a chance this morning to take a look. This
+</I>&gt;<i> work should save me a ton of time.
+</I>&gt;<i>
+</I>&gt;<i> I'm having problems referencing a cstub'd struct within another cstub'd
+</I>&gt;<i> struct. Looking at the types it doesn't seem that this would work  - the
+</I>&gt;<i> cstubs typ is different than the Ctypes.typ. I reproduced a tiny example in
+</I>&gt;<i> the cstubs test files (diff below).
+</I>
+Right: this is a difficulty with the current approach.  You can work
+round it, of course, by generating each struct via a separate functor,
+but that's terribly clunky, especially where there are self references
+involved.
+
+We really need to embrace the fact that the stub generation approach
+involves staging, and make that explicit in the interface somehow.
+David Sheets and I have considered adding an 'applicative' for staging
+in the past, but I've been reluctant because it makes the interface
+more complicated.
+
+An interface with staging might work as follows: values, and
+specifically values that represent types, are classified as either
+'present' or 'future' according to whether we know about them now or
+whether we have to generate some code to learn about them.  For
+example, 'int' is present, since we know its size etc. now, but
+'struct uv_loop_s' is future: we have to generate some C code to
+determine its properties.  Present values can be used to build either
+present or future values, but future values can only be used to build
+future values: we don't get access to the future in advance.
+
+The interface looks like this:
+
+    <A HREF="https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli">https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli</A>
+
+There are a couple of extra functions !^ and &lt;*&gt; for lifting present
+values into the future and for future application, and the structure,
+union, etc. functions now create future typ values rather than values
+of an abstract type.  In practice it looks much the same as before,
+except for a little extra syntactic noise when you use a present value
+in a future definition -- for example, when you build a future struct
+definition with an int field:
+
+   <A HREF="https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli#L16-L17">https://github.com/yallop/ocaml-ctypes/blob/staged-struct-stubs/src/cstubs/cstubs_structs.mli#L16-L17</A>
+
+Is this approach intelligible?  Overly complex?  Thoughts welcome.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000133.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#132">[ date ]</a>
+              <a href="thread.html#132">[ thread ]</a>
+              <a href="subject.html#132">[ subject ]</a>
+              <a href="author.html#132">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

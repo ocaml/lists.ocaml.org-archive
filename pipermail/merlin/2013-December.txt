@@ -1,0 +1,151 @@
+From thomas.refis  Mon Dec  2 18:43:43 2013
+From: thomas.refis (Thomas Refis)
+Date: Mon, 2 Dec 2013 19:43:43 +0100
+Subject: [Merlin-discuss] Merlin's configuration
+In-Reply-To: <CAPZv3x9Cw2uc2N5e+6-DteYiQLD3544WascwMjAEugYUwuopnw@mail.gmail.com>
+References: <CAJ_epFNhw7LJ3ip3LtVYT9JpqnAMWz3PwN7hvs-aA5j-W-fJHg@mail.gmail.com>
+	<CAOCAUGOi1vSQQfVyp=QXF8VDse_h+wtt=hhT6PwOJEJiZBG0fw@mail.gmail.com>
+	<CAPFanBF+b+6XHw1Sxe3uvFPrgF2RN_YJUkRrSONzk7jSayfJFg@mail.gmail.com>
+	<CAOCAUGO55TjRdMwSsvQGDegR80YPb7yxEfbmhK305w3Z5MUJMA@mail.gmail.com>
+	<CAN_VbetnEV9VJXZsqU7qbZa-321jR87B5qiJx=04_3kzzOo9Dw@mail.gmail.com>
+	<CAPZv3x9Cw2uc2N5e+6-DteYiQLD3544WascwMjAEugYUwuopnw@mail.gmail.com>
+Message-ID: <CAJ_epFOLVWo+LdKJgZ3fmD=UffhC7xZN3DGrWs_tVUcKMVohNg@mail.gmail.com>
+
+Hi,
+
+Thank you everyone for the quick answer, and sorry for the delay of ours.
+
+  * * *
+
+Gabriel said:
+> I think trying to reimplement the build system's
+> job in Merlin is a dead end. You must defer to the existing build
+> system(s) to provide you this information.'
+
+Yes, we think so too. We wanted to make sure others would agree.
+
+  * * *
+
+Sylvain said:
+> I will be more than happy to help you on the second point to
+> integrate an external process that can ask directly oasis to
+> generate a configuration. I can help you on this project and
+> even help you write the extension.
+
+Thank you!
+We will contact you when we start working on that.
+
+  * * *
+
+Roshan said:
+> A. There should be a way to state this information per file.
+> B. The merlin command should use the same syntax as an ocamlopt
+>    call for expressing the information.
+> C. The information from the command-line in B also be used to
+>    determine other aspects of type checking, e.g. warnings.
+> D. An auxiliary file (.merlin) be used for expressing only things
+>    that the ocamlopt call doesn't express, e.g. (3).
+> E. A running merlin process should accept a command that updates
+>    this information.
+> F. A running merlin process should accept a command that tells it
+>    when a .cmt or .cmi changes, and should update its internal
+>    cache.
+
+A. Yes, that's what we want too, hence this thread.
+
+B. Well, the command does use the same syntax as an ocamlopt call, for
+   example you can call merlin like that :
+
+      ocamlmerlin -I<some dir> -I<some other dir> -w +w32
+
+   Except that's not the way you do it, because you (as an user) never
+   call merlin, your editor does. And your editor just call merlin and
+   then tell him the absolute path of the file currently under
+   edition, and it's then to merlin to find the relevant configuration
+   for this file (at the moment in the associated .merlin).
+   It works that way because you don't want your editor to know the
+   logic of your project.
+
+C. You can already do that.
+
+D. Right.
+
+E. It's already the case.
+
+F. It's already the case.
+
+Roshan said:
+> The thinking behind using an ocamlopt call as the mechanism of
+> expression is that it is already present in all build systems,
+> and is thus very likely to reflect what the build system is
+> actually doing.
+> [...]
+> How should the compilation command be communicated to merlin?
+> There are at least three approaches that one can think of, of
+> which we think the third has several advantages:
+> (i) Write things into files: As you proposed, ...
+> (ii) Have merlin ask the build system: ...
+> (iii) Have the build system notify merlin: ...
+
+Ok so, I'll pass on the first part since (I think) we're more
+interested by the global mechanisms than the concrete syntax.
+
+So, one clarification, I think what we propose is closer to (ii) than
+to (i) : what we want to store in a (unique) file is the information
+merlin needs to retrieve informations from the build system (i.e.
+"call 'oasis setup merlin'" or "send this query to jenga on this
+port").
+
+I'll comment a bit on (iii), so let me quote it in full :
+
+> Have the build system notify merlin: Merlin can provide a
+> command that the build system calls to communicate the ocamlopt
+> compilation command to the current running instance of
+> merlin. This has the advantage that merlin gets updates whenever
+> the build system needs to recompile files. Further, merlin can be
+> notified of successful build completion of each .ml file.
+
+That could be an option, we could have merlin "listening" for new
+information about the "project state".
+But I think there are several drawbacks to this:
+
+1/ what if there are several instance of merlin running?
+   You have emacs so you probably have only one instance of emacs
+   running, which in turn has only one merlin subprocessed launched.
+   Which is fine. But I use vim, I have several vim process launched,
+   and with that several instances of merlin.
+   It's gonna be a bit of a pain to tell your build system which
+   instance of merlin it should be talking too.
+
+2/ The build system has no way to know which file merlin is currently
+   handling (except if you provide a way for the build system to ask
+   that information to merlin, but then you need a real protocol and
+   need to seriously extend the existing build systems), so it would
+   feed merlin information about the entire project.
+   Which is what we do at the moment, except this information are
+   "global", "unprecise" if you want. But we are discussing having
+   information on a "per file" basis, so that's gonna be a bit bigger.
+   Which is fine for the project I write in my cellar. But that's
+   gonna be a whole lot bigger at janestreet for example.
+   How much memory does jenga need to stay in polling mode on your
+   tree?
+
+3/ OMake and/or jenga can be run in polling mode, which is fine for
+   that kind of usage, they can discuss with merlin without user
+   interraction. But people using oasis, ocamlbuild, make would need
+   to call their build system everytime they launch merlin, and
+   everytime the project configuration changes; it's annoying.
+   I'd rather have merlin ask the build system by itself.
+
+As for notifying merlin when a successful build completed, there
+already is a way to do that.
+
+   * * *
+
+There was one last point to Roshan's mail (the "best effort" behavior)
+but that is off-topic. There are certainly things to say on that
+topic, but I think it should be on a thread of its own.
+
+Cheers.
+
+

@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBG%3DLHDGQ%3DDV3nahSpL0%2BtOLkuOwGPivFXFDPPrLOFOTyA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000197.html">
+   <LINK REL="Next"  HREF="000201.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBG%3DLHDGQ%3DDV3nahSpL0%2BtOLkuOwGPivFXFDPPrLOFOTyA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Feb  5 14:51:07 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000197.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+        <LI>Next message: <A HREF="000201.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#198">[ date ]</a>
+              <a href="thread.html#198">[ thread ]</a>
+              <a href="subject.html#198">[ subject ]</a>
+              <a href="author.html#198">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I don't really like Leo's proposal.
+
+On the semantic side, I very much like Jeremy's idea, even if it still
+has shortcomings pointed out by Alain, and partially addressed by Leo,
+such as the need to get contextual information when applying a syntax
+extension. I'm interested in seeing if we can go further in that
+direction.
+
+On the practical side, adding a notion of staged compilation and
+namespaces to handle syntax extensions seems really overkill. I
+believe I was in the same room as Alain and Leo when namespaces where
+last discussed, and my personal impression was really not that they
+were &quot;likely to be included in the language in the near future&quot; (I
+would actually be surprised to see them before a monadic notation!);
+there is little agreement on that.
+
+Alain's ppx mechanism has the property of doing away with the idea
+that syntax extensions have to be linked together, and I believe he is
+right in pointing that out as a practical advantage. Even the previous
+camlp4 mechanism had a stronger separation between syntax-time and
+compile-time than in Leo's proposal, as the linking happened against
+an *external* executable (which allowed other fairly independent
+preprocessors to reuse the -pp option without being camlp4-related).
+My gut feeling is that less coupling, rather than more, is the right
+way to go -- which is not contradictory with an approach favoring
+locality such as Jeremy and Leo's proposal of representing macros as
+functions. I'm ready to discuss the advantages of such integration,
+but I find it unlikely that their are worth tying syntax extensions to
+such semantic behemoths as staged compilation and namespaces.
+
+A reasonable compromise I would see between the point of view of Alain
+and Jeremy/Leo is to have an &quot;unsafe&quot; interface for global
+preprocessing, which we would discourage people from using by being
+very good at breaking backward compatibility (we can do better than
+Camlp4!), and *maintaining* at the same time one or several safer
+entry point that provide the local structure and conventional syntax
+that we think will bring more robustness to syntax extensions (like
+type-conv can currently be seen as a protective hub around type-driven
+boilerplate generation). I would have several questions:
+- can Fan make use of the same unsafe interface as everyone else? I've
+been impressed by some of the work done by Hongbo so far
+(reimplementing the parsing stack on top of dypgen is no small feat),
+and I wouldn't want this brand of work to be alienated from the
+&quot;practical&quot; syntax extensibility people.
+- what safe interface could we provide (I imagine something based on
+Jeremy's proposal (plus good concrete syntax choices) with a notion of
+context as in Leo's proposal; Leo, I'm a bit unclear on what kind of
+GADT you're thinking of, could you elaborate? If it's as good a use of
+GADTs as Alain's runtime type representations, I'm all ears.
+- how should extensions built upon the safe interface be composed?
+Must we link extension functions together, or use program/process
+boundaries as in the wider -ppx framework? What are the
+advantage/costs of either choices?
+- Leo suggests using an in-language feature (namespaces) to handle
+addressing of syntax extensions; what is the picture of
+outside-language tools to do this? I've had reasonable luck using
+'ocamlfind' as a backbone for plugin discovery in Stog. Is this what
+Alain imagine users will use? Is it portable to Windows-land?
+
+On Tue, Feb 5, 2013 at 3:19 PM, Hongbo Zhang &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">hongboz at seas.upenn.edu</A>&gt; wrote:
+&gt;<i>
+</I>&gt;<i> We have the same ideas. ;-)
+</I>&gt;<i> proposals 1, 2, 3, 4 are implemented in Fan as well.
+</I>&gt;<i>
+</I>&gt;<i> For Proposal 4, we introduced overloaded quotations,
+</I>&gt;<i> {:Ast.expr| 1 + $x |} can expand to ast with or without locations. Ast with
+</I>&gt;<i> locations introduce a lot of unnecessary complexity when people are just
+</I>&gt;<i> doing code generation
+</I>&gt;<i>
+</I>&gt;<i> Proposal 3 is applied in camlp4 itself(see the quotation module)
+</I>&gt;<i>
+</I>&gt;<i> On Tue, Feb 5, 2013 at 8:50 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I will try to put my own proposals in that blog post early next week.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> That blog post is now up:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html">http://www.lpw25.net/2013/02/05/camlp4-alternative-part-2.html</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Please respond to it on this list rather than in its comment box.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> -- Regards, Hongbo
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000197.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+	<LI>Next message: <A HREF="000201.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#198">[ date ]</a>
+              <a href="thread.html#198">[ thread ]</a>
+              <a href="subject.html#198">[ subject ]</a>
+              <a href="author.html#198">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

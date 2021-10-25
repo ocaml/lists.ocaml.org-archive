@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Benchmarking in OPAM
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Benchmarking%20in%20OPAM&In-Reply-To=%3C5148CB2E.1070108%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000356.html">
+   <LINK REL="Next"  HREF="000289.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Benchmarking in OPAM</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Benchmarking%20in%20OPAM&In-Reply-To=%3C5148CB2E.1070108%40etorok.net%3E"
+       TITLE="[ocaml-platform] Benchmarking in OPAM">edwin at etorok.net
+       </A><BR>
+    <I>Tue Mar 19 20:31:42 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000356.html">[ocaml-platform] Benchmarking in OPAM
+</A></li>
+        <LI>Next message: <A HREF="000289.html">[ocaml-platform] Wireframe demo of OCaml.og
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#359">[ date ]</a>
+              <a href="thread.html#359">[ thread ]</a>
+              <a href="subject.html#359">[ subject ]</a>
+              <a href="author.html#359">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/19/2013 07:43 PM, Thomas Gazagnaire wrote:
+&gt;&gt;&gt;<i> So for the moment, focussing on the benchmark library would seem to
+</I>&gt;&gt;&gt;<i> be the best thing to do: I've not really used any of them, and would
+</I>&gt;&gt;&gt;<i> be interested in knowing what I ought to adopt for (e.g.) the Mirage
+</I>&gt;&gt;&gt;<i> protocol libraries.  Once we have that in place, the OPAM test integration
+</I>&gt;&gt;&gt;<i> should be much more straightforward.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Maybe this is also a good time to promote a single benchmarking
+</I>&gt;&gt;<i> framework.  As the other two libraries mentioned by T&#246;r&#246;k Edwin,
+</I>&gt;&gt;<i> Benchmark computes the mean and std deviation &#8212; it just does not
+</I>&gt;&gt;<i> expose them to the user.  All these libs have a lot in common and,
+</I>&gt;&gt;<i> IMHO, it would be best to merge the features of the 3 libraries.
+</I>
+FWIW edobench is not a benchmarking library per se, sorry for the bad name choice.
+It is the name I've given to my set of OCaml benchmarks, which includes a wrapper on top of bench,
+a benchmark runner, the benchmarks themselves and a simple (text) post-processor.
+
+It is not my intention to fork/merge bench or benchmark, but since both you and Edgar have expressed interest in merging the libraries, I can spend some time to
+help towards that.
+
+As a start I was thinking:
+ - prepare a patch on top of bench that includes the minimum needed to run/store/read the benchmark data (just raw timings, not the  stats themselves)
+ - prepare a patch on top of benchmark to add/move some bench features related to running/timing the benchmark (mostly the increased resolution)
+ - prepare a patch on top of bench to expose its statistical computations
+ - update my code to use the above, and move the statistical tests to its benchmark manager and to the layout proposed by Gabriel
+ - finish the ocaml-re benchmarks that I promised
+ - ... merge bench (to) benchmark eventually, but I'm probably not the right person to do that
+
+When I have a draft of the above, should I post the git URL to the platform list, or Cc everyone individually as well?
+(i.e. is everyone subscribed there?)
+
+&gt;<i>  I
+</I>&gt;&gt;<i> agree with the proposed split.  As I understand it:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - Benchmark: type defining what is a benchmarking sample, functions to
+</I>&gt;&gt;<i>  write and read it to a simple format [more complex formats,
+</I>&gt;&gt;<i>  e.g. XML, can be supported by Benchmark_manager], functions to
+</I>&gt;&gt;<i>  perform tests (min number of samples, min running time).
+</I>
+I was using a simple CSV-like format as it is quite simple to deal with that without additional dependencies
+(i.e. Print/Scanf with %S, etc.).
+Currently I'm storing the statistics, but perhaps storing the raw timings is a better idea (they don't take up that much space), as that allows
+various independent post-processing to happen in the benchmark manager (like plotting raw timings, CDF, boxplot with median as well as the mean, etc.),
+without having to bother the benchmark library with all those details.
+
+&gt;&gt;<i>
+</I>&gt;&gt;<i> - Benchmark_manager: all the rest. Statistical tests,... as already
+</I>&gt;&gt;<i>  described by Gabriel.
+</I>
+For a general purpose benchmark library I think that the statistics belong to the benchmark library (as is the case now with both libs),
+at least as a module, but I tend to agree that for the purpose of compiler benchmarking here a separate (or at least separatable) statistical module is a good idea.
+That way the choice of base benchmarking library doesn't have to mean a choice in what statistics to use, and it'd be possible
+to plot the results at a later time without being limited by the statistics computed in the benchmark library.
+
+&gt;&gt;<i>
+</I>&gt;<i> 
+</I>&gt;<i> FWI, few months ago Pierre has also started to work on a bench framework (which uses OPAM to set-up some kind of environment for the benchs):
+</I>&gt;<i> 
+</I>&gt;<i> <A HREF="https://github.com/chambart/ocp-bench">https://github.com/chambart/ocp-bench</A>
+</I>
+I was not aware of that until recently, but it appears to have a tight dependency on lwt.
+I do have quite a few lwt benchmarks myself, but not all benchmarks need lwt, and I think it is quite important that the benchmark library has minimal dependencies
+so you can rebuild it quickly (lwt also has some optional dependencies, and enabling/disabling those would then trigger a rebuild of every benchmark).
+
+Can the lwt dependency be turned into something optional? In that case I would definitely be interested in seeing if we can share some code
+between ocp-bench and what I have currently.
+
+Best regards,
+--Edwin
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000356.html">[ocaml-platform] Benchmarking in OPAM
+</A></li>
+	<LI>Next message: <A HREF="000289.html">[ocaml-platform] Wireframe demo of OCaml.og
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#359">[ date ]</a>
+              <a href="thread.html#359">[ thread ]</a>
+              <a href="subject.html#359">[ subject ]</a>
+              <a href="author.html#359">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

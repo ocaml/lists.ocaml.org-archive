@@ -1,0 +1,144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with strings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3CCAAxsn%3DFgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000248.html">
+   <LINK REL="Next"  HREF="000254.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with strings</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3CCAAxsn%3DFgUw2tzm-vxToCJGYUX9FOxHSZ585VNMqTsHLBmUd4hw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Help with strings">yallop at gmail.com
+       </A><BR>
+    <I>Wed Dec 27 13:20:59 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000248.html">[ocaml-ctypes] Help with strings
+</A></li>
+        <LI>Next message: <A HREF="000254.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#252">[ date ]</a>
+              <a href="thread.html#252">[ thread ]</a>
+              <a href="subject.html#252">[ subject ]</a>
+              <a href="author.html#252">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 26 December 2017 at 23:45, john skaller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at internode.on.net</A>&gt; wrote:
+&gt;&gt;<i> On 27 Dec. 2017, at 10:04, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+</I>&gt;<i> Hi! Sorry for the email mixuo, i&#8217;m subscribed twice now,
+</I>&gt;<i> once at sourceforge and once at internode.
+</I>&gt;<i>
+</I>&gt;<i> I have another question: what&#8217;s the best way to bind an &#8220;enum&#8221;?
+</I>&gt;<i> If the codes are sequential is there a builtin way to map the enum
+</I>&gt;<i> into an Ocaml variant?
+</I>
+Ctypes provides two functions for this:
+
+   'constant' retrieves the value of a compile-time constant
+(enumeration constant, #define value, etc.)
+   <A HREF="http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant">http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant</A>
+
+   'enum' builds a 'typ' value from a mapping between constants and OCaml values
+   <A HREF="http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum">http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum</A>
+
+Besides the documentation there are examples in various packages, such
+as the OCaml yaml bindings:
+
+   <A HREF="https://github.com/avsm/ocaml-yaml/blob/v0.1.0/types/bindings/yaml_bindings_types.ml#L59-L103">https://github.com/avsm/ocaml-yaml/blob/v0.1.0/types/bindings/yaml_bindings_types.ml#L59-L103</A>
+
+ctypes_of_clang also provides an alternative method of bindings enums
+(see the README):
+
+   <A HREF="https://github.com/ujamjar/ctypes_of_clang">https://github.com/ujamjar/ctypes_of_clang</A>
+
+&gt;<i> Right, thanks! That&#8217;s a definite spec, perhaps please you could add those
+</I>&gt;<i> comments to the documentation?
+</I>
+Good idea!  I'll get to that soon
+(<A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/558">https://github.com/ocamllabs/ocaml-ctypes/issues/558</A>).
+
+&gt;<i> I may have some more questions, hope you don&#8217;t mind.
+</I>&gt;<i> Perhaps the answers will be useful to others starting out.
+</I>&gt;<i>
+</I>&gt;<i> BTW: some of the code appears in  several places.
+</I>&gt;<i> Why is that?
+</I>&gt;<i> (Ctypes vs Ctypes_types.TYPE)
+</I>
+Ctypes_type.TYPE is an abstract interface to type descriptions.  The
+Ctypes module gives a default implementation of the interface.  The
+interface is also used elsewhere, though; in particular, it's used for
+describing C types whose layout is retrieved from C:
+
+    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli">https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli</A>
+
+For example, you can bind a struct using the 'structure' and 'field'
+values in the TYPE interface:
+
+   let s = structure &quot;s&quot;
+   let x  = field s &quot;x&quot; int
+   ....
+
+If you use the implementations of 'structure' and 'field in the Ctypes
+module then the struct layout is computed using an implementation that
+computes offsets using the alignment information for each type.  But
+if you use the implementations of 'structure' and 'field' from the
+Cstubs module then the layout information is retrieved by generating C
+code that's run through a C compiler.  The interface (i.e. TYPE) is
+the same in both cases, but it's useful to have different
+implementations of that interface.
+
+&gt;<i> Ok, so that&#8217;s a pointer to the live Ocaml string, and we&#8217;re relying
+</I>&gt;<i> on the string not being modified or moved during the C call.
+</I>
+Right.
+
+&gt;<i> Current rules say Ocaml strings are immutable, use bytes instead.
+</I>&gt;<i> However, if several threads are running, normally Ocaml is using
+</I>&gt;<i> a global lock to serialise them. However the lock is normally
+</I>&gt;<i> released when calling C code. That would not be safe in this
+</I>&gt;<i> case, using ocaml_string, so presumably in this case the lock
+</I>&gt;<i> is not released. Is that correct?
+</I>
+Yes, that's correct.  Ctypes supports releasing the lock (via the
+~release_runtime_lock argument in Foreign.foreign, or via the
+concurrency policy in Cstubs), but the lock isn't released by default.
+
+Kind regards,
+
+Jeremy
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000248.html">[ocaml-ctypes] Help with strings
+</A></li>
+	<LI>Next message: <A HREF="000254.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#252">[ date ]</a>
+              <a href="thread.html#252">[ thread ]</a>
+              <a href="subject.html#252">[ subject ]</a>
+              <a href="author.html#252">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

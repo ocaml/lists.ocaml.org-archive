@@ -1,0 +1,702 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-opengl] which structure for the ideal project ?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opengl%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-opengl%5D%20which%20structure%20for%20the%20ideal%20project%20%3F&In-Reply-To=%3C51EA6235.5000709%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000027.html">
+   <LINK REL="Next"  HREF="000029.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-opengl] which structure for the ideal project ?</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:opengl%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-opengl%5D%20which%20structure%20for%20the%20ideal%20project%20%3F&In-Reply-To=%3C51EA6235.5000709%40etorok.net%3E"
+       TITLE="[ocaml-opengl] which structure for the ideal project ?">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Sat Jul 20 11:11:01 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000027.html">[ocaml-opengl] which structure for the ideal project ?
+</A></li>
+        <LI>Next message: <A HREF="000029.html">[ocaml-opengl] which structure for the ideal project ?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#28">[ date ]</a>
+              <a href="thread.html#28">[ thread ]</a>
+              <a href="subject.html#28">[ subject ]</a>
+              <a href="author.html#28">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 07/20/2013 12:25 AM, Florent Monnier wrote:
+&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> I've not made any OpenGL over the last year (only 2D), but I'm planing
+</I>&gt;<i> to make some 3D again soon, so I'm wondering how to make things evolve
+</I>&gt;<i> in the right direction, and I would like to get opinions about it.
+</I>&gt;<i> 
+</I>&gt;<i> So I've started a new experimentation almost from scratch, and before
+</I>&gt;<i> to go further too much I would like to validate or invalidate my
+</I>&gt;<i> choices, based on your opinions about it.
+</I>
+Thanks for the very detailed plan. See below for some comments, but note
+that I haven't developed any real OpenGL application in OCaml, beyond some simple tests/toy applications, and the one that I've done in C was more than 10 years ago, so take it with a grain of salt :)
+
+&gt;<i> 
+</I>&gt;<i> * the gl-enums use polymorphic variants
+</I>&gt;<i> why?
+</I>&gt;<i> - standard variant are more efficient but the difference is so small
+</I>&gt;<i> that it can be considered negligeable.
+</I>&gt;<i> - polymorphic variants makes it more easy for version handling (see below)
+</I>&gt;<i> - possibility to remove dependencies from different modules.
+</I>&gt;<i> - using standard variants require that some are module packed (cf
+</I>&gt;<i> glMLite) and this is ugly and tedious
+</I>&gt;<i> 
+</I>&gt;<i> * the gl-enums are wrapped using a pattern matching on the ocaml side
+</I>&gt;<i> and only an int is send to C stub
+</I>&gt;<i> why?
+</I>&gt;<i> - the C stub is then the same for every version (see below for version handling)
+</I>&gt;<i> - the C stub is simpler, only Int_val() to convert every gl-enum
+</I>&gt;<i> - more things managed on the ocaml side, means simpler code
+</I>&gt;<i> - people comfotable with ocaml but not C can more easily modify the code
+</I>&gt;<i> - see [REF-1] at the end of this email for an example of code
+</I>
+Keep in mind that extensions can add new enums for both parameters and returned values.
+At least for the returned values it'd probably be good to have an `Unknown of int, just in case
+the user has a newer OpenGL version, or an extension we don't know about.
+Similarly for the return values we should include all enums allowed for that field by OpenGL versions/extensions that we know about, even if we haven't checked for their presence. I'm thinking mostly about texture format queries, etc.
+
+&gt;<i> 
+</I>&gt;<i> * each OpenGL C function stub is in its own C file
+</I>&gt;<i> why?
+</I>&gt;<i> - more easy to choose which set of functions we want to use (see
+</I>&gt;<i> version handling below)
+</I>&gt;<i> - split code in small files, easier to find a single function, or
+</I>&gt;<i> evetually make alternative versions for testing purposes.
+</I>
+This also makes it easier to handle some OpenGL 3.x+ vs 2.x differences, like gl3.h.
+But if you use some wrangler lib (or do it on your own), then perhaps we don't need that anyway.
+
+&gt;<i> 
+</I>&gt;<i> * each ocaml external function also in its own file
+</I>&gt;<i> why?
+</I>&gt;<i> - version sets also easy to generate from it (see version handling below)
+</I>&gt;<i> - also easy to have alternative versions for testing purposes
+</I>&gt;<i> - for example for glBegin we have func_glBegin.{ml,mli} and func_glBegin_stub.c
+</I>
+These will all be automatically generated, right?
+
+&gt;<i> 
+</I>&gt;<i> * two ocaml interfaces are provided,
+</I>&gt;<i>  one with LablGL's functions style, and
+</I>&gt;<i>  one with native OpenGL functions names (like in glMLite and GLcaml)
+</I>&gt;<i>  (I call the first one the Labeled interface, because it's similar to LablGL)
+</I>&gt;<i>  (I call the second one the Garrys's interface,
+</I>&gt;<i>   I offer an orange from organic farming for the one who guess why)
+</I>&gt;<i> why?
+</I>&gt;<i> - some people prefer the LablGL style, some people prefer native
+</I>&gt;<i> OpenGL functions style,
+</I>&gt;<i>   so how to choose ? just don't choose, take them both to make everyone happy.
+</I>&gt;<i> - this is not an issue, the C stub is the same for both, and the way
+</I>&gt;<i> gl-enums are managed makes it easy to
+</I>
+I like the idea of choice (same for the BA vs Raw discussion below), and that one shouldn't
+duplicate all the work of creating a new OpenGL binding just to support a different style.
+
+&gt;<i> 
+</I>&gt;<i> * one module for each OpenGL version,
+</I>&gt;<i>   GL11 provides all the function set and gl-enums from OpenGL version 1.1,
+</I>&gt;<i>   GL21 for OGL 2.1, GL33 for 3.3, and ES1, ES2, and so on...
+</I>&gt;<i> why?
+</I>&gt;<i> - Then we know exactly where we are.
+</I>&gt;<i> - what if I want my program to work with both OGL 2.1 and OGL 3.3 ?
+</I>&gt;<i> see next point
+</I>&gt;<i> 
+</I>&gt;<i> * we may generate modules that are intersection sets between 2 or more
+</I>&gt;<i> OpenGL versions
+</I>&gt;<i> why?
+</I>&gt;<i> - we also know exactly where we are, we're writing for target that may
+</I>&gt;<i> use OGL 2.1 or 3.3
+</I>&gt;<i> - what if I want a very large version target (even every OGL version)
+</I>&gt;<i> ? see next point
+</I>
+A useful intersection might be OGL 2.1 without all functions/enums deprecated/removed in OGL3+.
+
+&gt;<i> 
+</I>&gt;<i> # If I want my program to work for large target, from OGL 1.1 up to 4.1
+</I>&gt;<i>   then I just write several implementations, one with the fixed
+</I>&gt;<i> pipeline for old computers,
+</I>&gt;<i>   and one with modern style VBO+GLSL, in each implementation we are
+</I>&gt;<i> sure of which
+</I>&gt;<i>   functions we use because we only open the matching module :
+</I>&gt;<i> open GL11
+</I>&gt;<i> or
+</I>&gt;<i> open GL33
+</I>&gt;<i>   then at run-time we can test which version of opengl is running
+</I>&gt;<i>   and select the right implementation
+</I>&gt;<i> 
+</I>&gt;<i> * to generate each module version, we use an over simple script,
+</I>&gt;<i>   with over simple input data.
+</I>&gt;<i> why?
+</I>&gt;<i> - because we love KISS programming
+</I>&gt;<i> - please no XML hell when not needed
+</I>&gt;<i> - see [REF-2] at the end of this email for an example of input data
+</I>&gt;<i> - we generate each version module with the set of functions that
+</I>&gt;<i> matches this input
+</I>&gt;<i> - generating each gl-enum is also quite straight foreward
+</I>&gt;<i> - if very KISS everyone, even beginners, can modify it
+</I>&gt;<i> - input data that can be shared with other projects (REF-2 is actually
+</I>&gt;<i> taken from
+</I>&gt;<i>   another project, but only contains functions, gl-enums still have to be added)
+</I>
+There is a text format .spec here (based on the ones from opengl.org) that might be easier to process than XML:
+<A HREF="https://bitbucket.org/alfonse/gl-xml-specs/src/3c6936f1636fe3cb9cc0b4edea76dda6a22c5504/glspecs/enum.spec?at=default">https://bitbucket.org/alfonse/gl-xml-specs/src/3c6936f1636fe3cb9cc0b4edea76dda6a22c5504/glspecs/enum.spec?at=default</A>
+<A HREF="https://bitbucket.org/alfonse/gl-xml-specs/src/3c6936f1636fe3cb9cc0b4edea76dda6a22c5504/glspecs?at=default">https://bitbucket.org/alfonse/gl-xml-specs/src/3c6936f1636fe3cb9cc0b4edea76dda6a22c5504/glspecs?at=default</A>
+
+Although opengl.org has deprecated the text .spec files (so they won't get updated
+for future versions/extensions) in favour of the XML registry:
+<A HREF="https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/api/">https://cvs.khronos.org/svn/repos/ogl/trunk/doc/registry/public/api/</A>
+
+If we go with some other format, then you should probably use one that is shared with another C wrangler lib to: avoid duplication of effort, find bugs more easily.
+
+&gt;<i> 
+</I>&gt;<i> * we use a wrangler lib by default, even on Linux.
+</I>&gt;<i> why?
+</I>&gt;<i> - because for portability with MS/Windows we have to
+</I>&gt;<i> - even on Linux it's better to. glMLite chooses an OpenGL version at
+</I>&gt;<i> compile time,
+</I>&gt;<i>   it's lame for packaging purpose where when the package is compiled
+</I>&gt;<i> we don't know yet
+</I>&gt;<i>   which OGL version will be on the target computer where the package
+</I>&gt;<i> will finally
+</I>&gt;<i>   be installed and run.
+</I>&gt;<i>   It was quite OK to do so until recently, because most people were
+</I>&gt;<i> using OGL 2.1 for a while,
+</I>&gt;<i>   but now more and more people will use more modern versions.
+</I>&gt;<i>   So we now need to go further.
+</I>&gt;<i> 
+</I>&gt;<i> * so which wrangler lib? glew?
+</I>&gt;<i> <A HREF="http://www.opengl.org/wiki/OpenGL_Loading_Library">http://www.opengl.org/wiki/OpenGL_Loading_Library</A>
+</I>&gt;<i> <A HREF="http://rastergrid.com/blog/2010/03/sad-facts-about-opengl-extension-libraries/">http://rastergrid.com/blog/2010/03/sad-facts-about-opengl-extension-libraries/</A>
+</I>&gt;<i> I'm not sure which to use, glew seems to be the most used and adviced,
+</I>&gt;<i> but as long as I know there is no perfect one that has all the advantages.
+</I>&gt;<i> Each has its pros and cons, advantages and drawbacks.
+</I>&gt;<i> Last time I browsed about opengl wrangler libs comparisions was maybe
+</I>&gt;<i> more than one year ago. I don't know if the situation has evolved nowaday.
+</I>&gt;<i> / Maybe the project should make it switchable at compile time,
+</I>&gt;<i> so each user can decide which suits the best his/her needs.
+</I>&gt;<i> The default recommanded for Linux packaging could be glew.
+</I>
+I remember that it was quite easy for glew to crash with a null-pointer dereference on Nvidia if you enabled glewExperimental, which you needed to if you wanted some newer opengl version/extensions.
+The situation might've improved lately, I don't use my Nvidia card anymore so I can't tell.
+Also it is a quite widely used lib, so we might as well report bugs upstream when we encounter problems with it.
+
+For a minimal, portable opengl platform interface: glfw.org.
+It has glfwExtensionSupported, glfwGetProcAddress, glfwGetVersion only, and it is quite easy
+to cross compile it (version 2 at least, haven't tried version 3 yet).
+But your OCaml OpenGL library needs to know which extension has which functions/enums anyway,
+so might as well do the &quot;wrangling&quot; itself.
+Another argument in favor of doing wrangling in the OCaml lib is that you'll be more consistent,
+and avoid problems when your wrangler lib supports a newer version that you don't support yet,
+or doesn't support the version/extension that you want (perhaps because it is a system library
+that wasn't updated).
+
+If you'd use ocaml-ctypes then this would be a nice fit, although thats perhaps a bit too unsafe.
+
+Another alternative is gl_load from glsdk, it has per-opengl-version includes:
+<A HREF="http://glsdk.sourceforge.net/docs/html/group__module__glload.html">http://glsdk.sourceforge.net/docs/html/group__module__glload.html</A>
+
+&gt;<i> The default for people who don't know and who are compiling the
+</I>&gt;<i> sources could be SDL2.
+</I>&gt;<i> - currently my experimentation uses SDL2 wrangling mechanism
+</I>&gt;<i> why?
+</I>&gt;<i> - so that I'm using only one single lib, for windowing/user input, and
+</I>&gt;<i>   for OGL wrangling (and even for pure 2D), and even sound
+</I>&gt;<i> - SDL2 provides everything we need, even the OpenGL headers.
+</I>&gt;<i> - SDL2 is very portable (should we even say a portability Heaven?)
+</I>&gt;<i> even if still a devel version (oops no now RC), compiles out of the box on both
+</I>&gt;<i> Linux and Cygwin (and probably the same for most used environments)
+</I>&gt;<i> On cygwin compiles out of the box even with MingW's toolchain
+</I>&gt;<i> (just do export CC=&quot;/bin/i686-w64-mingw32-gcc&quot; before ./configure and make)
+</I>
+Sounds good.
+
+&gt;<i> 
+</I>&gt;<i> * should the OpenGL bindings provide highier level things?
+</I>&gt;<i> (like memory management, or anykind of abstraction or simplification)
+</I>&gt;<i> In my opinion no. Or at least not at the base modules.
+</I>&gt;<i> why?
+</I>&gt;<i> IMHO the functions should be useable at their low-level level, and so
+</I>&gt;<i> the project should only relay the opengl functions calls IMO.
+</I>&gt;<i> - But building other modules on top of the lowlevel ones or next to it
+</I>&gt;<i> could be a good idea IMO.
+</I>&gt;<i>   (like I tryed in glmlite with FunGL, and Ogl_draw / Ogl_matrix)
+</I>
+
+I think there are four aspects to a higher level &quot;thing&quot;:
+
+1. Safe (or &quot;debug&quot; mode)
+
+One thing I like about glMLite is that it has a separate type (like shader_object, texture_id)
+for things that would just be an int on the C side.
+This could allow to detect double-frees if some extra data would be associated with them
+(perhaps only in a debug mode), and certainly prevents mixing different object types by accident.
+
+Perhaps there could be such a higher-level &quot;safe&quot; module built on top of the low-level &quot;unsafe&quot; module.
+With VBOs, etc. you no longer have to call glColor/glVertex a million times, so the performance overhead of a few additional checks per OpenGL call might be worth it.
+I wouldn't mind if only the &quot;safe&quot; module was available though.
+
+Initially I thought abut automatically calling glGetError, but with ARB_debug_output that is not really
+necessary.
+
+2. Convenience functions
+
+Setting up a FBO is a PITA with the low-level calls as you need some 10+ calls, having a sane/simple interface for that would be nice.
+
+And there are a few other things, for example SRGB surface support:
+Some drivers support getting a visual with SRGB (ehrm, the closed-source ones), some only support it for a FBO (Mesa). And then you need like 3 or 4 variants:
+ * use SRGB visual if available
+ * use FBO with SRGB if available, render everything to that, and blit to main buffer
+ * just use a shader with the necessary (perhaps simplified) SRGB calculation
+ * use a (3D) texture to do some more advanced color correction and don't use the SRGB acceleration at all
+
+And see above in my comments for automatic shader choice based on runtime OpenGL version / extensions.
+
+3. Math functions (i.e. Ogl_matrix, vectors, matrixes, quaternions)
+
+Not really OpenGL specific stuff, so perhaps all the necessary math stuff could go into an independent lib
+(like Gg).
+
+4. A functional interface
+
+OpenGL is inherently imperative with a focus on setting, changing and keeping track of state.
+It is necessary for a binding to provide that interface, to allow reusing knowledge from tutorials, other languages, etc.
+A little improvement would be something like Batteries' with_file_in, i.e. with_shader_object, etc. to prevent resource leaks.
+It would be hard to make the rest of the API more &quot;functional&quot; style, I think the only sane option would be something like a scenegraph, where you describe your world, how to render it, what shaders, extensions to use, etc. i.e. something similar to OpenSceneGraph but without binding to that lib.
+But that could be a completely separate library from these bindings. (In fact it has to be separate
+at least at the ocamlfind level).
+
+&gt;<i> 
+</I>&gt;<i> * How to manage buffers?
+</I>&gt;<i> / BAs?
+</I>&gt;<i> / Strings?
+</I>&gt;<i> / Arrays?
+</I>&gt;<i> / LablGL's Raw?
+</I>&gt;<i> / any other suggestions?
+</I>&gt;<i> pros and cons :
+</I>&gt;<i> - BA: nice for the absence of any dependency,
+</I>&gt;<i>   but in glMLite I get segfault with buffers that comes from mapped memory
+</I>
+Bug in C binding, OpenGL driver, or something else? Would it be worth tracking down the root cause?
+
+&gt;<i>   BAs are very slow to alloc and finalise, which is an issue if
+</I>&gt;<i>   we want to do it between two frames at runtime.
+</I>&gt;<i> - Strings: I haven't tried yet, but I seriously envisage this option
+</I>&gt;<i>   also nice for absence of dependency for interactions with other components
+</I>&gt;<i>   storing 16bits/32bits ints / floats in it could still be easily
+</I>&gt;<i> managed with a dedicated module
+</I>&gt;<i>   Strings are faster to alloc and finalise than BAs.
+</I>
+Strings are moved by the GC though, so the C lib would need to make a copy for functions
+that would use the buffer beyond the call itself.
+
+&gt;<i> - Arrays: not possible, we need 32 bits floats not doubles,
+</I>&gt;<i>   also not possible for ints of various size and even mini-floats
+</I>&gt;<i> - a dedicated module like LablGL's Raw,
+</I>&gt;<i>   we could tailor it for what we need,
+</I>&gt;<i>   but IMHO it should be a separated project for the dependency removing
+</I>&gt;<i>   of other components that would have to interoperate with it.
+</I>&gt;<i>   Other projects like pure 2D things could also use such a project.
+</I>&gt;<i> - the opengl functions that would need buffer management could also be
+</I>&gt;<i>   isolated in a separated modules and then different options could be
+</I>&gt;<i> written and tried.
+</I>&gt;<i>   (which is why in glmlite VertArray and VBO modules were separated
+</I>&gt;<i> from the main module,
+</I>&gt;<i>    thinking that I could try something else than BAs later (which i never did)
+</I>&gt;<i>    but is it a good idea?)
+</I>&gt;<i> so:
+</I>&gt;<i> I really don't know what would be the best option(s), maybe Raw or strings,
+</I>&gt;<i> but for strings would need to try and experiment with it to get a
+</I>&gt;<i> better opinion,
+</I>&gt;<i> and to see if we don't have segfaults like with BAs with video mapped memory.
+</I>&gt;<i> Or if we provide several options, is it a good idea? How to integrate the
+</I>&gt;<i> alternatives together with the other functions? Sub-modules? or different .cma?
+</I>&gt;<i> or suffixes?
+</I>&gt;<i> 
+</I>&gt;<i> * Which type for matrices?
+</I>&gt;<i> I personally prefer using float arrays like I do in glMLite.
+</I>&gt;<i> why?
+</I>&gt;<i> - this is highly comfortable to not have any dependency
+</I>&gt;<i> @ but I do understand people willing other kind of types,
+</I>&gt;<i>   as i would like to make something that other people would
+</I>&gt;<i>   want to use, i would like to get the more opinions possible
+</I>&gt;<i>   to see what most people think about it, and maybe try to
+</I>&gt;<i>   please the majority
+</I>&gt;<i> 
+</I>&gt;<i> * which type for vectors, points, colors?
+</I>&gt;<i> I personally prefer tuples like I now do in all my modules.
+</I>&gt;<i> why?
+</I>&gt;<i> - this is highly comfortable to not have any dependency
+</I>&gt;<i> - but idem than for matrices (the @ point)
+</I>&gt;<i> 
+</I>&gt;<i> * Which license?
+</I>&gt;<i> - If I continue this experimentation further to make it reach a usable
+</I>&gt;<i> state it would be a liberal license.
+</I>&gt;<i> - but MIT, BSD, zlib/png are even not simple enough for me,
+</I>&gt;<i>   I still don't like their conditions and restrictions that I think are useless.
+</I>&gt;<i> - I'm thinking to use this one below that is zlib with its restriction removed:
+</I>&gt;<i> &quot;&quot;&quot;
+</I>&gt;<i> This software is provided &quot;AS-IS&quot;, without any express or implied
+</I>&gt;<i> warranty.  In no event will the authors be held liable for any damages
+</I>&gt;<i> arising from the use of this software.
+</I>&gt;<i> 
+</I>&gt;<i> Permission is granted to anyone to use this software for any purpose,
+</I>&gt;<i> including commercial applications, and to alter it and redistribute it
+</I>&gt;<i> freely.
+</I>&gt;<i> &quot;&quot;&quot;
+</I>&gt;<i> I still don't like the use of the word &quot;software&quot; which excludes the
+</I>&gt;<i> documentations, eventually not clear about the tests (strictly
+</I>&gt;<i> speaking it's not part of the software),
+</I>
+Each source file should have a copyright header, then it'll be clear that the tests
+have the same license as the rest of the library. You can put a notice in the documentation's appendix
+about its license, but see MIT license below which includes documentation explicitly.
+
+&gt;<i> and also exclude images that
+</I>&gt;<i> could be joined for testing purpose. An image is not software.
+</I>
+I think you could have a README or LICENSE file in the directory of the images that explicitly states
+that all images in that directory are under the &lt;license-of-main-library&gt;.
+Then you could freely insert those images into the documentation, etc.
+
+&gt;<i> I talked about it with Richard Jones (about another piece of code) who
+</I>&gt;<i> strongly discourages me to use a non standard license.
+</I>&gt;<i> What are your opinions about it?
+</I>
+Please use a standard license, it'll make it easier for future contributors and users of the library
+(they don't need to worry about possible issues introduced by a non-standard license).
+<A HREF="http://opensource.org/licenses/MIT">http://opensource.org/licenses/MIT</A>
+<A HREF="http://opensource.org/licenses/ISC">http://opensource.org/licenses/ISC</A>
+<A HREF="http://opensource.org/licenses/BSD-2-Clause">http://opensource.org/licenses/BSD-2-Clause</A>
+
+&gt;<i> Would license options be an acceptable solution?
+</I>&gt;<i> like in this project:
+</I>&gt;<i> <A HREF="https://github.com/blue-prawn/ocaml-xlib/blob/master/README.txt">https://github.com/blue-prawn/ocaml-xlib/blob/master/README.txt</A>
+</I>&gt;<i> see the sections &quot;LICENSE&quot; and &quot;ALTERNATIVE LICENSES&quot; in the README file.
+</I>
+IMHO it would only complicate things and create confusion, since you want to use an already liberal license. I wouldn't go beyond dual-licensing anyway.
+FWIW in the places that I worked we were allowed to link/embed BSD/MIT/Apache-licensed code in commercial software without any problems.
+
+&gt;<i> 
+</I>&gt;<i> * which build tool?
+</I>&gt;<i> / make?
+</I>&gt;<i> / ocamlbuild?g
+</I>&gt;<i> / ocp-build?
+</I>&gt;<i> - none
+</I>&gt;<i> why?
+</I>&gt;<i> - not really none, I just mean I'm thinking it could be managed in
+</I>&gt;<i> separated projects,
+</I>&gt;<i> like a set of Makefile that would share the same directory hierarchy,
+</I>&gt;<i> like the sources of Mesa do,
+</I>&gt;<i> so that tarballs could be untared in the same place a produce a
+</I>&gt;<i> consistent source directory ready to be build.
+</I>&gt;<i> Would be easier to deprecate a build if itg's outside of the main project,
+</I>&gt;<i> but I'm not sure I want to use something else than make yet.
+</I>
+You could have an oasis-based build, and a Makefile.custom for your custom makefile.
+
+&gt;<i> 
+</I>&gt;<i> ------
+</I>&gt;<i> 
+</I>&gt;<i> If you have any comments, opinions, advices, suggestions, critics,
+</I>&gt;<i> trolls, crazy ideas about all this, please share!
+</I>&gt;<i> Even if you have completely other ideas about what should be the ideal
+</I>&gt;<i> ocaml-opengl bindings, I would appreciate to hear about it.
+</I>
+See above for comments.
+Some things that are missing and would be nice to have:
+ * tests for at least the major OpenGL APIs, some of them could be automatically generated.
+The idea is that you could run the tests to ensure it doesn't crash due to a bad prototype,
+on various platforms with various drivers. 
+Also on Linux I'd very much like to have a testsuite that I could run under valgrind to find subtle
+bugs.
+
+ * tests for extensions would be very much needed, to at least test that we don't crash due to a NULL dereference somewhere (if you automatically generate the bindings, then such checks could automatically be 
+added to raise an exception instead).
+
+ * version testing mode
+
+Allow faking a lower OpenGL version, and removing extensions that are not core for a test mode.
+Say I got an OpenGL 3.1 driver, and I want the lib to fake OpenGL 2.1 and not expose anything newer
+(including functions, shader language, extensions, etc.).
+This would allow to do some basic testing on the same machine to ensure that the application would
+work with older OpenGL versions (perhaps by turning off effects that require newer extensions).
+(Of course its not a replacement for testing with an older OpenGL implementation on another platform).
+
+ * managing shader versions
+
+You probably need different shaders for OpenGL 3.x/2.x, and since the shader source usually has a #version and #extension anyway we could manage that automatically, depending on what you have available.
+This would also interact nicely with the version testing mode above!
+
+Something like:
+ val choose_shader_source: OGL.context -&gt; string list -&gt; shader_object
+
+ * modules for extensions
+I like the idea of modules per OpenGL versions. We should have something similar for extensions, although there are some restrictions. Some extensions are part of 3.0 core module, or are not compatible with 3.0 and shouldn't be used there. So perhaps the OGL_2_1 module could have submodules with all allowed extensions (that we know of). Same for the other versions.
+
+And you should be allowed to call functions from an extension only *after* you've checked that it is available. I was thinking of a dummy type, but maybe it is too inconvenient
+module type Foo = sig
+type present = private unit
+val check : OGL.context -&gt; present option
+val func1 : present -&gt; ...parameters
+...
+end
+
+So maybe we should use first-class modules:
+module OGL_2_1
+...
+val ext_Foo : OGL.context -&gt; (module FooSig) option
+val ext_Bar : OGL.context -&gt; (module BarSig) option
+
+And internally it'd be like:
+
+let ext_Foo context =
+ if has_extension context &quot;Foo&quot; then
+  Some (module Foo_impl : FooSig)
+ 
+Of course if someone wants to shoot themselves in the foot they can use Foo_impl directly in an unsafe way.
+
+&gt;<i> 
+</I>&gt;<i> Also notice that if I don't take webgl into considarations, it's only
+</I>&gt;<i> because I've not started to learn it yet, so I know nothing about it
+</I>&gt;<i> yet.
+</I>&gt;<i> If you have ideas about if and how it should be taken into account
+</I>&gt;<i> into a bindings for desktop programs, please feel free to talk about
+</I>&gt;<i> it.
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> === REF SAMPLES ===
+</I>&gt;<i> 
+</I>&gt;<i> [REF-1] :
+</I>&gt;<i> 
+</I>&gt;<i> From the .ml part :
+</I>&gt;<i> 
+</I>&gt;<i> type gl_enum = Gl_enum.t
+</I>&gt;<i> 
+</I>&gt;<i> (* each gl-enums will be (eventually) different in each module version,
+</I>&gt;<i>    in module GL21 `GL_QUADS, `GL_QUAD_STRIP and `GL_POLYGON
+</I>&gt;<i>    will be there but not in GL32.
+</I>&gt;<i>    And GL33 and GL41 will have additional ones:
+</I>&gt;<i>    `GL_LINES_ADJACENCY
+</I>&gt;<i>    `GL_LINE_STRIP_ADJACENCY
+</I>&gt;<i>    `GL_TRIANGLES_ADJACENCY
+</I>&gt;<i>    `GL_TRIANGLE_STRIP_ADJACENCY
+</I>&gt;<i>    So each gl-enum would be generated accordingly for each version module *)
+</I>&gt;<i> type primitive = [
+</I>&gt;<i>   | `GL_POINTS
+</I>&gt;<i>   | `GL_LINES
+</I>&gt;<i>   | `GL_LINE_LOOP
+</I>&gt;<i>   | `GL_LINE_STRIP
+</I>&gt;<i>   | `GL_TRIANGLES
+</I>&gt;<i>   | `GL_TRIANGLE_STRIP
+</I>&gt;<i>   | `GL_TRIANGLE_FAN
+</I>&gt;<i>   | `GL_QUADS  (** deprecated in core profile *)
+</I>&gt;<i>   | `GL_QUAD_STRIP  (** deprecated in core profile *)
+</I>&gt;<i>   | `GL_POLYGON  (** deprecated in core profile *)
+</I>&gt;<i>   | `GL_LINES_ADJACENCY  (** new in 3.3 and 4.1 *)
+</I>&gt;<i>   | `GL_LINE_STRIP_ADJACENCY  (** new in 3.3 and 4.1 *)
+</I>&gt;<i>   | `GL_TRIANGLES_ADJACENCY  (** new in 3.3 and 4.1 *)
+</I>&gt;<i>   | `GL_TRIANGLE_STRIP_ADJACENCY  (** new in 3.3 and 4.1 *)
+</I>&gt;<i>   ]
+</I>&gt;<i> 
+</I>&gt;<i> let int_of_primitive = function
+</I>&gt;<i>   | `GL_POINTS          -&gt; Gl_enum.gl_points
+</I>&gt;<i>   | `GL_LINES           -&gt; Gl_enum.gl_lines
+</I>&gt;<i>   | `GL_LINE_LOOP       -&gt; Gl_enum.gl_line_loop
+</I>&gt;<i>   | `GL_LINE_STRIP      -&gt; Gl_enum.gl_line_strip
+</I>&gt;<i>   | `GL_TRIANGLES       -&gt; Gl_enum.gl_triangles
+</I>&gt;<i>   | `GL_TRIANGLE_STRIP  -&gt; Gl_enum.gl_triangle_strip
+</I>&gt;<i>   | `GL_TRIANGLE_FAN    -&gt; Gl_enum.gl_triangle_fan
+</I>&gt;<i>   | `GL_QUADS           -&gt; Gl_enum.gl_quads
+</I>&gt;<i>   | `GL_QUAD_STRIP      -&gt; Gl_enum.gl_quad_strip
+</I>&gt;<i>   | `GL_POLYGON         -&gt; Gl_enum.gl_polygon
+</I>&gt;<i> 
+</I>&gt;<i> external glBegin : gl_enum -&gt; unit = &quot;caml_glBegin&quot; &quot;noalloc&quot;
+</I>&gt;<i> let glBegin prim =
+</I>&gt;<i>   glBegin (int_of_primitive prim)
+</I>&gt;<i> 
+</I>&gt;<i> let bit_of_clear_buffer = function
+</I>&gt;<i>   | `GL_COLOR_BUFFER      -&gt; Gl_enum.gl_color_buffer_bit
+</I>&gt;<i>   | `GL_DEPTH_BUFFER      -&gt; Gl_enum.gl_depth_buffer_bit
+</I>&gt;<i>   | `GL_ACCUM_BUFFER      -&gt; Gl_enum.gl_accum_buffer_bit
+</I>&gt;<i>   | `GL_STENCIL_BUFFER    -&gt; Gl_enum.gl_stencil_buffer_bit
+</I>&gt;<i> 
+</I>&gt;<i> let enum_lor = Gl_enum.(lor)
+</I>&gt;<i> 
+</I>&gt;<i> let int_of_clear_buffer lst =
+</I>&gt;<i>   List.fold_left (fun mask v -&gt;
+</I>&gt;<i>     enum_lor mask (bit_of_clear_buffer v)
+</I>&gt;<i>   ) Gl_enum.zero lst
+</I>&gt;<i> 
+</I>&gt;<i> external glClear : gl_enum -&gt; unit = &quot;caml_glClear&quot; &quot;noalloc&quot;
+</I>&gt;<i> let glClear buffers =
+</I>&gt;<i>   glClear (int_of_clear_buffer buffers)
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> From .mli part :
+</I>&gt;<i> 
+</I>&gt;<i> val glBegin : primitive -&gt; unit
+</I>&gt;<i> val glClear : clear_buffer list -&gt; unit
+</I>&gt;<i> 
+</I>&gt;<i> cat gl_funcs/stub_glBegin.c
+</I>&gt;<i> 
+</I>&gt;<i> CAMLprim value
+</I>&gt;<i> caml_glBegin(value prim)
+</I>&gt;<i> {
+</I>&gt;<i>     glBegin(Long_val(prim));
+</I>&gt;<i>     return Val_unit;
+</I>&gt;<i> }
+</I>&gt;<i> 
+</I>&gt;<i> cat gl_funcs/stub_glClear.c
+</I>&gt;<i> 
+</I>&gt;<i> CAMLprim value
+</I>&gt;<i> caml_glClear(value mask)
+</I>&gt;<i> {
+</I>&gt;<i>     glClear(Int_val(mask));
+</I>&gt;<i>     return Val_unit;
+</I>&gt;<i> }
+</I>&gt;<i> 
+</I>&gt;<i> From the Labeled interface :
+</I>&gt;<i> - module GlClear :
+</I>&gt;<i> 
+</I>&gt;<i> type shape = [
+</I>&gt;<i>   | `points
+</I>&gt;<i>   | `lines
+</I>&gt;<i>   | `line_loop
+</I>&gt;<i>   | `line_strip
+</I>&gt;<i>   | `triangles
+</I>&gt;<i>   | `triangle_strip
+</I>&gt;<i>   | `triangle_fan
+</I>&gt;<i>   | `quads
+</I>&gt;<i>   | `quad_strip
+</I>&gt;<i>   | `polygon
+</I>&gt;<i>   ]
+</I>&gt;<i> 
+</I>&gt;<i> let int_of_shape = function
+</I>&gt;<i>   | `points           -&gt; Gl_enum.gl_points
+</I>&gt;<i>   | `lines            -&gt; Gl_enum.gl_lines
+</I>&gt;<i>   | `line_loop        -&gt; Gl_enum.gl_line_loop
+</I>&gt;<i>   | `line_strip       -&gt; Gl_enum.gl_line_strip
+</I>&gt;<i>   | `triangles        -&gt; Gl_enum.gl_triangles
+</I>&gt;<i>   | `triangle_strip   -&gt; Gl_enum.gl_triangle_strip
+</I>&gt;<i>   | `triangle_fan     -&gt; Gl_enum.gl_triangle_fan
+</I>&gt;<i>   | `quads            -&gt; Gl_enum.gl_quads
+</I>&gt;<i>   | `quad_strip       -&gt; Gl_enum.gl_quad_strip
+</I>&gt;<i>   | `polygon          -&gt; Gl_enum.gl_polygon
+</I>&gt;<i> 
+</I>&gt;<i> external begins : gl_enum -&gt; unit = &quot;caml_glBegin&quot; &quot;noalloc&quot;
+</I>&gt;<i> let begins shape =
+</I>&gt;<i>   begins (int_of_shape shape)
+</I>&gt;<i> 
+</I>&gt;<i> - module GlDraw :
+</I>&gt;<i> 
+</I>&gt;<i> let bit_of_clear_buffer = function
+</I>&gt;<i>   | `color      -&gt; Gl_enum.gl_color_buffer_bit
+</I>&gt;<i>   | `depth      -&gt; Gl_enum.gl_depth_buffer_bit
+</I>&gt;<i>   | `accum      -&gt; Gl_enum.gl_accum_buffer_bit
+</I>&gt;<i>   | `stencil    -&gt; Gl_enum.gl_stencil_buffer_bit
+</I>&gt;<i> 
+</I>&gt;<i> let int_of_clear_buffer lst =
+</I>&gt;<i>   List.fold_left (fun mask v -&gt;
+</I>&gt;<i>     enum_lor mask (bit_of_clear_buffer v)
+</I>&gt;<i>   ) Gl_enum.zero lst
+</I>&gt;<i> 
+</I>&gt;<i> external clear : gl_enum -&gt; unit = &quot;caml_glClear&quot; &quot;noalloc&quot;
+</I>&gt;<i> let clear buffers =
+</I>&gt;<i>   clear (int_of_clear_buffer buffers)
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> From file gl_enum.ml :
+</I>&gt;<i> (* this file not generated, because gl-enums values never change *)
+</I>&gt;<i> (* this file just reformated from C to ocaml code from the GL.h header
+</I>&gt;<i>    with some interactive regexps in vim *)
+</I>&gt;<i> 
+</I>&gt;<i> type t = int
+</I>&gt;<i> 
+</I>&gt;<i> let ( lor ) = ( lor )
+</I>&gt;<i> let zero = 0
+</I>&gt;<i> 
+</I>&gt;<i> (* Primitives *)
+</I>&gt;<i> let gl_points                         = 0x0000
+</I>&gt;<i> let gl_lines                          = 0x0001
+</I>&gt;<i> let gl_line_loop                      = 0x0002
+</I>&gt;<i> let gl_line_strip                     = 0x0003
+</I>&gt;<i> let gl_triangles                      = 0x0004
+</I>&gt;<i> let gl_triangle_strip                 = 0x0005
+</I>&gt;<i> let gl_triangle_fan                   = 0x0006
+</I>&gt;<i> let gl_quads                          = 0x0007
+</I>&gt;<i> let gl_quad_strip                     = 0x0008
+</I>&gt;<i> let gl_polygon                        = 0x0009
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> From file gl_enum.mli :
+</I>&gt;<i> 
+</I>&gt;<i> type t
+</I>&gt;<i> 
+</I>&gt;<i> val ( lor ) : t -&gt; t -&gt; t
+</I>&gt;<i> 
+</I>&gt;<i> val zero : t
+</I>&gt;<i> 
+</I>&gt;<i> val gl_points : t
+</I>&gt;<i> val gl_lines : t
+</I>&gt;<i> val gl_line_loop : t
+</I>&gt;<i> val gl_line_strip : t
+</I>&gt;<i> val gl_triangles : t
+</I>&gt;<i> val gl_triangle_strip : t
+</I>&gt;<i> val gl_triangle_fan : t
+</I>&gt;<i> val gl_quads : t
+</I>&gt;<i> val gl_quad_strip : t
+</I>&gt;<i> val gl_polygon : t
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> [REF-2] :
+</I>&gt;<i> 
+</I>&gt;<i> glAccum                               1.1  1.3  .    2.1  .    .    .
+</I>&gt;<i> glBegin                               1.1  1.3  .    2.1  .    .    .
+</I>&gt;<i> glBindFramebuffer                     .    .    .    .    3.3  4.1  es2
+</I>&gt;<i> glClipPlanef                          1.1  1.3  es1  2.1  .    .    .
+</I>&gt;<i> GL_QUADS                              1.1  1.3  es1  2.1  3.3  4.1  es2
+</I>&gt;<i> GL_TRIANGLE_STRIP_ADJACENCY           .    .    .    .    3.3  4.1  ?
+</I>&gt;<i> 
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000027.html">[ocaml-opengl] which structure for the ideal project ?
+</A></li>
+	<LI>Next message: <A HREF="000029.html">[ocaml-opengl] which structure for the ideal project ?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#28">[ date ]</a>
+              <a href="thread.html#28">[ thread ]</a>
+              <a href="subject.html#28">[ subject ]</a>
+              <a href="author.html#28">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opengl">More information about the OpenGL
+mailing list</a><br>
+</body></html>

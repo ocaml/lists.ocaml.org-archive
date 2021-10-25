@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] ocamlc.opt and pthreads
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20ocamlc.opt%20and%20pthreads&In-Reply-To=%3C1D0468AA-C28C-42C3-B793-0EE6B57F2FB8%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000563.html">
+   <LINK REL="Next"  HREF="000565.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] ocamlc.opt and pthreads</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20ocamlc.opt%20and%20pthreads&In-Reply-To=%3C1D0468AA-C28C-42C3-B793-0EE6B57F2FB8%40recoil.org%3E"
+       TITLE="[opam-devel] ocamlc.opt and pthreads">anil at recoil.org
+       </A><BR>
+    <I>Fri Jun 13 10:55:23 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000563.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+        <LI>Next message: <A HREF="000565.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#564">[ date ]</a>
+              <a href="thread.html#564">[ thread ]</a>
+              <a href="subject.html#564">[ subject ]</a>
+              <a href="author.html#564">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Without looking closely at the specifics, this does seem like a configure script
+issue.  I suspect it would be better reported on Mantis with the configure outputs
+pasted into the report, as that should take care of linking pthread or not depending
+on the OS it's running on.
+
+-anil
+
+On 13 Jun 2014, at 02:43, Mika Illouz &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">mika at illouz.net</A>&gt; wrote:
+
+&gt;<i> Dear OPAM-ers,
+</I>&gt;<i> 
+</I>&gt;<i> I have two systems on which opam is installed.  System A runs Ubuntu
+</I>&gt;<i> 11.10 (ancient, I know) and opam 1.0.0, with the 4.00.1 ocaml compiler.
+</I>&gt;<i> 
+</I>&gt;<i> A $ lsb_release -i -c
+</I>&gt;<i> Distributor ID: Ubuntu
+</I>&gt;<i> Codename:       natty
+</I>&gt;<i> A $ opam --version
+</I>&gt;<i> 1.0.0
+</I>&gt;<i> 
+</I>&gt;<i> I have a second system, system B, running Ubuntu 13.10 (less ancient)
+</I>&gt;<i> and opam 1.1.1, with the 3.12.1 and 4.01.0 compilers
+</I>&gt;<i> 
+</I>&gt;<i> B $ lsb_release -i -c
+</I>&gt;<i> Distributor ID: Ubuntu
+</I>&gt;<i> Codename:       saucy
+</I>&gt;<i> B $ opam --version
+</I>&gt;<i> 1.1.1
+</I>&gt;<i> 
+</I>&gt;<i> I will try to compile a simple ocaml program into bytecode, on both
+</I>&gt;<i> systems, and for the heck of it, link against system threads library:
+</I>&gt;<i> A $ echo &quot;let _ = print_endline \&quot;hi\&quot;&quot; &gt; /tmp/x.ml
+</I>&gt;<i> A $ /home/mika/.opam/4.00.1/bin/ocamlc -thread /home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+</I>&gt;<i> A $ /home/mika/.opam/4.00.1/bin/ocamlc.opt -thread /home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+</I>&gt;<i> 
+</I>&gt;<i> No problem so far.
+</I>&gt;<i> 
+</I>&gt;<i> Now on system B:
+</I>&gt;<i> B $ echo &quot;let _ = print_endline \&quot;hi\&quot;&quot; &gt; /tmp/x.ml
+</I>&gt;<i> B $ /home/mika/.opam/3.12.1/bin/ocamlc -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+</I>&gt;<i> B $ /home/mika/.opam/3.12.1/bin/ocamlc.opt -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+</I>&gt;<i> File &quot;/tmp/x.ml&quot;, line 1, characters 0-1:
+</I>&gt;<i> Error: Error on dynamically loaded library: /home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: /home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: undefined symbol: pthread_sigmask
+</I>&gt;<i> 
+</I>&gt;<i> On system B, ocamlc.opt seems to have trouble, whereas ocamlc does
+</I>&gt;<i> not.  (4.01.0 also has the identical issue).  Trying to figure out
+</I>&gt;<i> why, I looked at the DLL dependencies of the ocamlc.opt's :
+</I>&gt;<i> 
+</I>&gt;<i> A $ ldd /home/mika/.opam/4.00.1/bin/ocamlc.opt
+</I>&gt;<i>         linux-vdso.so.1 =&gt;  (0x00007fffa29ff000)
+</I>&gt;<i>         libm.so.6 =&gt; /lib/x86_64-linux-gnu/libm.so.6 (0x00007fad8291b000)
+</I>&gt;<i>         libdl.so.2 =&gt; /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fad82717000)
+</I>&gt;<i>         libncurses.so.5 =&gt; /lib/libncurses.so.5 (0x00007fad824d2000)
+</I>&gt;<i>         libpthread.so.0 =&gt; /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007fad822b4000)
+</I>&gt;<i>         libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007fad81f1c000)
+</I>&gt;<i>         /lib64/ld-linux-x86-64.so.2 (0x00007fad82bc7000)
+</I>&gt;<i> 
+</I>&gt;<i> B $ ldd /home/mika/.opam/3.12.1/bin/ocamlc.opt
+</I>&gt;<i>         linux-vdso.so.1 =&gt;  (0x00007fff8affe000)
+</I>&gt;<i>         libm.so.6 =&gt; /lib/x86_64-linux-gnu/libm.so.6 (0x00007f128410c000)
+</I>&gt;<i>         libdl.so.2 =&gt; /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f1283f08000)
+</I>&gt;<i>         libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1283b3f000)
+</I>&gt;<i>         /lib64/ld-linux-x86-64.so.2 (0x00007f128441c000)
+</I>&gt;<i> 
+</I>&gt;<i> The critical difference seems to be that system A's ocamlc.opt is linked
+</I>&gt;<i> against libpthread.so (and libncurses.so, for whatever reason), and
+</I>&gt;<i> system B's does not.  In fact, compilation succeeds on system B if I
+</I>&gt;<i> use LD_PRELOAD:
+</I>&gt;<i> 
+</I>&gt;<i> B $ LD_PRELOAD=/lib/x86_64-linux-gnu/libpthread.so.0  /home/mika/.opam/3.12.1/bin/ocamlc -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+</I>&gt;<i> 
+</I>&gt;<i> Incidentally, if I compile ocaml from Inria's tarball, compilation
+</I>&gt;<i> using ocamlc.opt also fails on system B, unless I configure the the
+</I>&gt;<i> compilation of the compiler with &quot;./configure -libs -lpthread&quot; .
+</I>&gt;<i> 
+</I>&gt;<i> The ocaml installed through opam on system A seems to do the right
+</I>&gt;<i> thing.  Does anyone have any idea how I can make system B's compiler
+</I>&gt;<i> behave similarly?
+</I>&gt;<i> 
+</I>&gt;<i> thanks
+</I>&gt;<i> mika
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20140613/d252ff87/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20140613/d252ff87/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000563.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+	<LI>Next message: <A HREF="000565.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#564">[ date ]</a>
+              <a href="thread.html#564">[ thread ]</a>
+              <a href="subject.html#564">[ subject ]</a>
+              <a href="author.html#564">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My P4 uses
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20P4%20uses&In-Reply-To=%3CCAAoLEWsqBqOtXxWXafUV1GTSv1Xp21DMJwjyGLPPmd4JX_0cmg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000123.html">
+   <LINK REL="Next"  HREF="000103.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My P4 uses</H1>
+    <B>Jun Furuse</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20P4%20uses&In-Reply-To=%3CCAAoLEWsqBqOtXxWXafUV1GTSv1Xp21DMJwjyGLPPmd4JX_0cmg%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] My P4 uses">jun.furuse at gmail.com
+       </A><BR>
+    <I>Tue Jan 29 15:03:41 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000123.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+        <LI>Next message: <A HREF="000103.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#92">[ date ]</a>
+              <a href="thread.html#92">[ thread ]</a>
+              <a href="subject.html#92">[ subject ]</a>
+              <a href="author.html#92">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+Here are the things I do with CamlP4. Lots are just simple variants of
+the already reported things, though.
+
+pa_monad for &quot;perform&quot; notation
+===================================
+
+URL: <A HREF="https://bitbucket.org/camlspotter/pa_monad_custom">https://bitbucket.org/camlspotter/pa_monad_custom</A>
+
+I modified the original pa_monad so that I can write I/O code easily inside
+perform:
+
+    perform
+      ...;
+      let () = prerr_endline &quot;debug&quot; in     (* Writing  let () = ... in  is
+boring *)
+      ...;
+
+    peform
+      ...;
+      \ prerr_endline &quot;debug&quot;;          (* It is not unit monad, but a
+simple unit *)
+      ...;
+
+Here \ behaves like a prefix operator with very low power,
+less than function application.
+I wish -ppx could provide an easy way to handle those operators with
+custom connectivity configurations, including pa_monad's &lt;--.
+
+Code generations from data type definitions
+======================================================
+
+I have bunch of type_conv based pa modules, such as meta_conv, and other
+iterator/visitor/mapper generators. I believe they can be easily ported
+from
+type_conv to -ppx, if we could do for sexplib.
+
+Record like syntax
+======================================================
+
+URL: <A HREF="https://bitbucket.org/camlspotter/ocaml-pure-polyrecord">https://bitbucket.org/camlspotter/ocaml-pure-polyrecord</A>
+
+I introduced record like syntax for pure polymorphic records
+(they are not objects so they can be marshalled). The syntax is like:
+
+    let r = {| x = 1; y = &quot;hello&quot;; |}
+
+    let x = r..x
+
+So this is a variant of js_of_ocaml's javascript object syntax.
+
+Perl/Python/Shell like string literals
+======================================================
+
+URL: <A HREF="https://bitbucket.org/camlspotter/orakuda">https://bitbucket.org/camlspotter/orakuda</A>
+
+ORakuda provides some scripting language like string literals like:
+
+    $/^(.*)\.mli$/                                   (* Regexp. See \ is
+not doubled. *)
+    $s/template/replace/g
+    let myname = &quot;Jun&quot; in $&quot;My name is $myname and my age is %d&quot; 42
+ (* printf *)
+    let dir = Sys.getenv &quot;HOME&quot; in $`ls $dir`
+
+It is very useful to write quick one time OCaml scripts, however, it
+requires
+a patch to CamlP4 to modify its lexer. CamlP4 can actually replace its
+lexer, but
+it is not integrated into pa_*.cmo framework.
+
+So without the patch, the above must be written:
+
+    &lt;:m&lt;^(.*)\.mli$&gt;&gt;
+    &lt;:s&lt;template/replace/g&gt;&gt;
+    let myname = &quot;Jun&quot; in &lt;:qq&lt;My name is $myname and my age is %d&gt;&gt; 42
+    let dir = Sys.getenv &quot;HOME&quot; in &lt;:qx&lt;ls $dir&gt;&gt;
+
+It is a bit cumbersome to type &lt;:&lt; &gt;&gt; around, but still they are useful to
+me.
+Note that $ is NOT used as anti-quotation for these quotes.
+So I think fixing anti-quotation symbol to some character like $
+uniformly is a bad idea.
+
+I do not expect -ppx is going to handle lexer hacks like $/.../, however,
+I hope it could be simple enough to write a patch to support $/.../. :-)
+
+Partial evaluation
+======================================================
+
+In Planck LL parser library, I wrote a small pa module to partial-evaluate
+monadic binds for optimzation. This is purely a program transformation,
+so there should be no problem to do the same thing in -ppx.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130129/12b179b0/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130129/12b179b0/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000123.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+	<LI>Next message: <A HREF="000103.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#92">[ date ]</a>
+              <a href="thread.html#92">[ thread ]</a>
+              <a href="subject.html#92">[ subject ]</a>
+              <a href="author.html#92">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

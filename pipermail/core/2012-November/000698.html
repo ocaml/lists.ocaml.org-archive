@@ -1,0 +1,295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> any logger in core?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20any%20logger%20in%20core%3F&In-Reply-To=%3C04cc5df5-105f-4f90-8769-f499596d58ed%40googlegroups.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000692.html">
+   <LINK REL="Next"  HREF="000705.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>any logger in core?</H1>
+    <B>Francois</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20any%20logger%20in%20core%3F&In-Reply-To=%3C04cc5df5-105f-4f90-8769-f499596d58ed%40googlegroups.com%3E"
+       TITLE="any logger in core?">francois.berenger.fun at gmail.com
+       </A><BR>
+    <I>Thu Nov  8 03:48:14 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000692.html">any logger in core?
+</A></li>
+        <LI>Next message: <A HREF="000705.html">any logger in core?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#698">[ date ]</a>
+              <a href="thread.html#698">[ thread ]</a>
+              <a href="subject.html#698">[ subject ]</a>
+              <a href="author.html#698">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+On Wednesday, November 7, 2012 6:57:04 PM UTC+9, David House wrote:
+&gt;<i>
+</I>&gt;<i> You need to start the scheduler. You should do this in all async 
+</I>&gt;<i> programs, or else nothing will get run. Creating a log creates an 
+</I>&gt;<i> async Pipe.t, and doing Log.foo puts things onto that Pipe.t. There is 
+</I>&gt;<i> an async job to read things off of the pipe and to write them out. But 
+</I>&gt;<i> if you don't start the scheduler, this job won't get run. So add the 
+</I>&gt;<i> following at bottom of your code: 
+</I>&gt;<i>
+</I>&gt;<i> let () = 
+</I>&gt;<i>   main (); 
+</I>&gt;<i>   never_returns (Scheduler.go ()) 
+</I>&gt;<i>
+</I>
+I don't know where to find never_returns.
+
+But the following did work (and never stop):
+---
+module Log   = Async_extra.Log
+module Sched = Async.Std.Scheduler
+
+let main () =
+
+  let logger = Log.create (Log.Level.of_string &quot;Debug&quot;) [Log.Output.screen] 
+in
+
+  Log.raw   logger &quot;%s\n&quot; &quot;raw log&quot;;
+  Log.info  logger &quot;%s\n&quot; &quot;info log&quot;;
+  Log.error logger &quot;%s\n&quot; &quot;error log&quot;;
+  Log.debug logger &quot;%s\n&quot; &quot;debug log&quot;;
+
+  Log.close logger
+;;
+
+main();
+Sched.go ()
+---
+ 
+
+&gt;<i>
+</I>&gt;<i> The reason this is done, rather than just writing immediately, is in 
+</I>&gt;<i> case the write blocks,
+</I>
+
+I see.
+
+ 
+
+&gt;<i> which would halt the whole process. If you 
+</I>&gt;<i> decide you don't care about this risk (e.g. if you're writing to a 
+</I>&gt;<i> terminal then it's not very likely), you can use Log.Blocking. 
+</I>&gt;<i>
+</I>
+I'll try to use that. 
+
+
+&gt;<i> Also, a smaller point, it's more idiomatic to write &quot;open Async.Std&quot; 
+</I>&gt;<i> rather than referring directly to one of the three async 
+</I>&gt;<i> sub-libraries. 
+</I>&gt;<i>
+</I>
+I'm affraid of open directives, I try to keep my code _very_ explicit
+about what it is doing and which function from which module is used
+(maybe because of past overexposure to some C++ code).
+
+For the moment, I use the stdlib + batteries
++ (async and async_extra for just the logger).
+
+In some other future thread, I might ask for some help on the
+best way to remove batteries, then remove the stdlib,
+hopefully to just depend on core and async in the future.
+
+Thanks for all the help,
+Francois.
+ 
+
+&gt;<i>
+</I>&gt;<i> On Wed, Nov 7, 2012 at 8:34 AM, Francois Berenger 
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A> &lt;javascript:&gt;&gt; wrote: 
+</I>&gt;<i> &gt; I could create a test program. 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; It compiles, at least, but has the funny property of not logging 
+</I>&gt;<i> anything out. 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; --- 
+</I>&gt;<i> &gt; module Log  = Async_extra.Log 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; let main () = 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt;   let logger = Log.create (Log.Level.of_string &quot;Debug&quot;) 
+</I>&gt;<i> [Log.Output.screen] in 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt;   Log.raw   logger &quot;%s\n&quot; &quot;raw log&quot;; 
+</I>&gt;<i> &gt;   Log.info  logger &quot;%s\n&quot; &quot;info log&quot;; 
+</I>&gt;<i> &gt;   Log.error logger &quot;%s\n&quot; &quot;error log&quot;; 
+</I>&gt;<i> &gt;   Log.debug logger &quot;%s\n&quot; &quot;debug log&quot;; 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt;   Log.close logger 
+</I>&gt;<i> &gt; ;; 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; main() 
+</I>&gt;<i> &gt; --- 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Here is the oasis file for it: 
+</I>&gt;<i> &gt; --- 
+</I>&gt;<i> &gt; OASISFormat: 0.3 
+</I>&gt;<i> &gt; Name:        Toto 
+</I>&gt;<i> &gt; Version:     0.1 
+</I>&gt;<i> &gt; Synopsis:    Titi 
+</I>&gt;<i> &gt; Authors:     Me 
+</I>&gt;<i> &gt; License:     LGPL-3 
+</I>&gt;<i> &gt; Plugins:     META (0.3), DevFiles (0.3) 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Executable logger_test 
+</I>&gt;<i> &gt;   Path:           . 
+</I>&gt;<i> &gt;   BuildDepends:   async_extra 
+</I>&gt;<i> &gt;   BuildTools:     ocamlbuild 
+</I>&gt;<i> &gt;   CompiledObject: native 
+</I>&gt;<i> &gt;   MainIs:         logger_test.ml 
+</I>&gt;<i> &gt; --- 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; I was thinking all logs would print right away. 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Regards, 
+</I>&gt;<i> &gt; F. 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; On Wed, Nov 7, 2012 at 4:18 PM, Francois Berenger 
+</I>&gt;<i> &gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A> &lt;javascript:&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt; Hello, 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; How can I construct a value of type Async_extra.Log.Level 
+</I>&gt;<i> &gt;&gt; and an Async_extra.Log.Output? 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; Sorry for the stupid question but I have never used 
+</I>&gt;<i> &gt;&gt; polymorphic variants. 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; If you can point me to some simple explanation 
+</I>&gt;<i> &gt;&gt; on them, I will go and read it too 
+</I>&gt;<i> &gt;&gt; (I looked at <A HREF="http://caml.inria.fr/pub/docs/manual-ocaml/manual006.html">http://caml.inria.fr/pub/docs/manual-ocaml/manual006.html</A> 
+</I>&gt;<i> &gt;&gt; but it does not tell me why I should use them, just how). 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; Thanks a lot, 
+</I>&gt;<i> &gt;&gt; F. 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; On Wednesday, November 7, 2012 10:59:54 AM UTC+9, Francois Berenger 
+</I>&gt;<i> wrote: 
+</I>&gt;<i> &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; Yes I saw it, thanks. 
+</I>&gt;<i> &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; I'll also take a look at the .mli file, as I was advised to do so by 
+</I>&gt;<i> &gt;&gt;&gt; David House. 
+</I>&gt;<i> &gt;&gt;&gt; I'll try to make an example program to check I can use it correctly. 
+</I>&gt;<i> &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; On Tue, Nov 6, 2012 at 12:12 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">ymi... at janestreet.com</A>&lt;javascript:&gt;&gt; 
+</I>&gt;<i>
+</I>&gt;<i> &gt;&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt; No, did you see my link?  You can read the ocamldocs: 
+</I>&gt;<i> &gt;&gt;&gt; &gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt; 
+</I>&gt;<i> <A HREF="https://ocaml.janestreet.com/ocaml-core/108.07.01/doc/async_extra/Log.html">https://ocaml.janestreet.com/ocaml-core/108.07.01/doc/async_extra/Log.html</A> 
+</I>&gt;<i> &gt;&gt;&gt; &gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt; On Mon, Nov 5, 2012 at 9:51 PM, Francois Berenger 
+</I>&gt;<i> &gt;&gt;&gt; &gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A> &lt;javascript:&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt; Argh! I'm forced to read an mli file. ;) 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt; On Mon, Nov 5, 2012 at 8:15 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dho... at janestreet.com</A>&lt;javascript:&gt;&gt; 
+</I>&gt;<i>
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; Judging from the mli, there should be some ocamldocs, yes. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; However, I recommend just looking at the mli. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; On Mon, Nov 5, 2012 at 6:08 AM, Francois Berenger 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A> &lt;javascript:&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; Is there some ocamldoc for it? 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; I think I managed to compile the ocamldoc for core and async, but 
+</I>&gt;<i> did 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; not find anything about a Log module into it. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; On Sunday, November 4, 2012 9:15:45 PM UTC+9, Yaron Minsky wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; Don't feel too bad about knowing about it.  It's quite new. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; But yeah, moving to it eventually sounds right. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; On Sat, Nov 3, 2012 at 6:43 PM, Sean McLaughlin &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/core">sea... at gmail.com</A>&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; No, sorry.  I didn't know about Async.Log, and I wrote my own 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; logger. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; Switching to this one is probably a good idea in the long run 
+</I>&gt;<i> for 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; omake-server. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; On Thu, Nov 1, 2012 at 10:14 PM, Yaron Minsky 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">ymi... at janestreet.com</A>&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; Sean, does your omake-server use Async.Log?  That might be a 
+</I>&gt;<i> good 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; example. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; y 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; On Thu, Nov 1, 2012 at 9:59 PM, Francois Berenger 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A>&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; Is there some example program using this logger? 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; On Friday, November 2, 2012 10:40:40 AM UTC+9, Francois 
+</I>&gt;<i> Berenger 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; wrote: 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; OK, I'm hooked now. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; I plus core in my new project. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; Thanks! 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; F. 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt;&gt; &gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt;&gt; 
+</I>&gt;<i> &gt;&gt;&gt; &gt;&gt;&gt;&gt; 
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20121107/1ca31e29/attachment.html">http://lists.ocaml.org/pipermail/core/attachments/20121107/1ca31e29/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000692.html">any logger in core?
+</A></li>
+	<LI>Next message: <A HREF="000705.html">any logger in core?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#698">[ date ]</a>
+              <a href="thread.html#698">[ thread ]</a>
+              <a href="subject.html#698">[ subject ]</a>
+              <a href="author.html#698">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,121 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] About Ptyp_poly nodes in the Parsetree
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20About%20Ptyp_poly%20nodes%20in%20the%20Parsetree&In-Reply-To=%3C5164282C.5010507%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000387.html">
+   <LINK REL="Next"  HREF="000408.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] About Ptyp_poly nodes in the Parsetree</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20About%20Ptyp_poly%20nodes%20in%20the%20Parsetree&In-Reply-To=%3C5164282C.5010507%40lexifi.com%3E"
+       TITLE="[wg-camlp4] About Ptyp_poly nodes in the Parsetree">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Tue Apr  9 15:39:40 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000387.html">[wg-camlp4] About 'a loc in the Parsetree
+</A></li>
+        <LI>Next message: <A HREF="000408.html">[wg-camlp4] About Ptyp_poly nodes in the Parsetree
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#388">[ date ]</a>
+              <a href="thread.html#388">[ thread ]</a>
+              <a href="subject.html#388">[ subject ]</a>
+              <a href="author.html#388">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear all,
+
+I'd like to get your opinion about the representation of &quot;polymorphic 
+types&quot; (Ptyp_poly) nodes in the Parsetree.  Such nodes can only appear 
+on specific places (currently as record field type or method type), but 
+this invariant is not enforced by the Parsetree definition, thus making 
+it possible for AST rewriters breaking it (problem I).  Currently, the 
+type-checker would accept such ill-formed types (and probably complain 
+later with weird error messages).  Dually, where the type-checker 
+supports a Ptyp_poly node, the Parsetree has to be such a node, even if 
+the list of quantified variable is empty.  This is enforced by 
+parser.mly, but again, AST rewriters can break this invariant (problem II).
+
+Problem II is probably the most serious one in practice, since it forces 
+authors of ppx rewriters to insert explicitly Ptyp_poly nodes where needed.
+
+In this commit:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi?view=revision&amp;sortby=date&amp;revision=13491">http://caml.inria.fr/cgi-bin/viewvc.cgi?view=revision&amp;sortby=date&amp;revision=13491</A>
+
+I've addressed problem II by pushing to the type-checker the 
+responsibility to add &quot;empty&quot; Ptyp_poly quantification wherever needed 
+(if the Parsetree is not already a Ptyp_poly node).
+
+
+Do you think this is enough, or should we do something about problem I 
+as well?
+
+A simple option would be to add runtime checks, i.e. ensure that the 
+type-checker fails with a proper error message is a Ptyp_poly node is 
+found in a context where it is not supported.  This would probably allow 
+authors of ppx rewriters to identify problems quickly.  A stricter 
+approach would be to encode in the Parsetree definition itself the 
+invariant about where Ptyp_poly node can appear.  Concretely, one could 
+simply define a type:
+
+  poly_type = string list * core_type
+
+remove the Ptyp_poly constructor, and use poly_type instead of core_type 
+where applicable.
+
+This approach is more robust, of course, but also less flexible: tools 
+which manipulate Parsetree need to explicitly wrap core_types into 
+poly_types where applicable.  And if OCaml ever supports poly types in 
+more contexts (e.g. as sum type constructor arguments, which should not 
+pose any theoretical problem), the code of the tools will need to be 
+changed accordingly.
+
+A variant would be to &quot;inline&quot; the &quot;string list&quot; in the surrounding 
+structure (e.g. as an extra field in label_declaration), and use an 
+optional argument in Ast_helper to facilitate the creation of those 
+structures for the case where the list is empty.
+
+What's your opinion?
+
+
+Alain
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000387.html">[wg-camlp4] About 'a loc in the Parsetree
+</A></li>
+	<LI>Next message: <A HREF="000408.html">[wg-camlp4] About Ptyp_poly nodes in the Parsetree
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#388">[ date ]</a>
+              <a href="thread.html#388">[ thread ]</a>
+              <a href="subject.html#388">[ subject ]</a>
+              <a href="author.html#388">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

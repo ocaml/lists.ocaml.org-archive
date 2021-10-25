@@ -1,0 +1,179 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3C5113D846.3080703%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000220.html">
+   <LINK REL="Next"  HREF="000225.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3C5113D846.3080703%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Feb  7 16:37:26 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000220.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000225.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#222">[ date ]</a>
+              <a href="thread.html#222">[ thread ]</a>
+              <a href="subject.html#222">[ subject ]</a>
+              <a href="author.html#222">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/7/2013 3:56 PM, Hongbo Zhang wrote:
+&gt;<i> Not always, as I pointed out, as long as you combine several global Ast
+</I>&gt;<i> Rewriter, I am  optimistic that Fan has a great chance to outperform
+</I>&gt;<i> ppx.
+</I>
+Oh sorry, I thought you were referring to the compilation of Fan itself.
+
+&gt;<i> Well, things are always possible, but just too difficult in some cases,
+</I>&gt;<i> remember that (Camlp4/Camlp5/Fan) preprocess the intermediate Ast, if we
+</I>&gt;<i> clutter Parsetree too much, like adding some attributes node per syntax
+</I>&gt;<i> category and ignored by the compiler later, which may require all other
+</I>&gt;<i> tools to mix Intermediate Ast with Parsetree, it's always possible, just
+</I>&gt;<i> too hard.
+</I>
+I don't follow. We are talking, basically, about adding simple 
+constructions to the AST, like:
+
+   Pexp_annotation of expression * expression
+   Pexp_extension of string * expression
+
+and you were suggesting that this would almost kill Camlp4/Fan. Why?
+
+&gt;<i> I am perfectly fine with ppx so far, and I am happy to see
+</I>&gt;<i> bisect switch to ppx, because global Ast Rewriter happen to be very fit
+</I>&gt;<i> there, but  if we try to make everything possible in ppx, there's a
+</I>&gt;<i> large chance that it will result in a ugly design in the compiler.
+</I>
+Again, we are talking about adding a few constructs to the AST.  The 
+only real &quot;consumer&quot; of the AST in the compiler is the type-checker, and 
+its behavior is pretty clear for the new nodes:  attributes are ignored, 
+extensions raise a type error.  Where is the &quot;ugly design&quot;?
+
+&gt;<i> Let me explain a bit why quosi-quotation is superb here:
+</I>&gt;<i> 1. It quickly goes into my muscle memory, because I write ocaml everyday
+</I>&gt;<i> (not parsetree)
+</I>
+So do I and thus I'm more familiar with constructors of a standard sum 
+types (wrapped into simple functions) than something which requires a 
+new syntax.
+
+&gt;<i>, it's just my *intuition* that the Ast should be
+</I>&gt;<i> constructed that way, and I don't need to remember those alien function
+</I>&gt;<i> names, to be honest, I don't know what's the module E here. If I want to
+</I>&gt;<i> make a piece of code into data, I just need to quote them, add
+</I>&gt;<i> &quot;{:expr||}&quot; surrounding them, that's all. How would that happen in your
+</I>&gt;<i> &quot;E&quot; module?
+</I>
+I don't see where &quot;lifting ASTs&quot; is required in order to implement all 
+the interesting tools we are discussing here (except Fan itself).
+
+&gt;<i> 2. The E module seems to be a bit magic here
+</I>
+E is defined in Ast_mapper:
+
+<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/trunk/parsing/ast_mapper.mli?view=markup</A>
+
+For instance, let_ is defined very cleverly as:
+
+let mk ?(loc = Location.none) x = {pexp_desc = x; pexp_loc = loc}
+...
+let let_ ?loc a b c = mk ?loc (Pexp_let (a, b, c))
+
+There is absolutely no magic.
+
+
+&gt;<i> 3. For the parsetree, if you want to do syntactic grep over bigarray,
+</I>&gt;<i> you will get into much trouble:
+</I>&gt;<i>     ({pexp_desc=Pexp_ident
+</I>&gt;<i>                      {txt= Ldot (Ldot (Lident &quot;Bigarray&quot;, array),
+</I>&gt;<i> (&quot;get&quot;|&quot;set&quot; as gs)) ;_};_}
+</I>&gt;<i>     This does not solve the problem at all, since it can not
+</I>&gt;<i> discriminate &quot;a.{b,c}&quot; from &quot;Bigarray.get a b c &quot; in Fan, you only need
+</I>&gt;<i> to do say
+</I>&gt;<i>     &quot;`Bigarray (a,b,c)&quot;
+</I>&gt;<i>     There are so many syntax desugaring in the parsetree that I don't
+</I>&gt;<i> know where to stop.
+</I>
+This is a valid point, and I believe there would not be any strong 
+opposition to move some desugaring logic from parser.mly into the 
+typechecker, i.e. make Parsetree look more like a parse tree than an AST.
+
+That said, I've no idea what
+
+  `Bigarray (a,b,c)
+
+means.
+
+
+&gt;<i>  &gt; Can you describe in more detail your position concerning the
+</I>&gt;<i> following points?
+</I>&gt;<i>  &gt;
+</I>&gt;<i> If it can be implemented by ppx, it can be straightforwardly translated
+</I>&gt;<i> into Fan, since ppx is simply a tiny proper subset of Fan(the part of
+</I>&gt;<i> global Ast Rewriter).
+</I>
+Will you introduce in Fan the notion of attributes attached to every 
+possible category and represented explicitly in the (Fan) AST?  I 
+thought you only had the intention to extend the syntax of OCaml with a 
+single construct {:xxx| ... |}  with  .... being left unparsed.  I don't 
+see how you can simulate &quot;ignorable attributes&quot; with that. Can you 
+elaborate?
+
+&gt;<i> Fan provides first class parser/lexer(or in-line parser
+</I>&gt;<i> lexer), which is good, and there are people who appreciate
+</I>&gt;<i> it(<A HREF="https://sympa.inria.fr/sympa/arc/caml-list/2013-02/msg00020.html">https://sympa.inria.fr/sympa/arc/caml-list/2013-02/msg00020.html</A>),
+</I>
+I'm fine with Camlp4/Fan as a &quot;parsing technology&quot;, and I've used it 
+quite a lot (e.g. the parser for CDuce was implemented in Camlp4).  But 
+this is largely independent of the use of Camlp4 to write &quot;syntax 
+extensions&quot;.  I believe that most interesting uses of Camlp4 to write 
+syntax extensions today don't require any parsing technology at all, 
+because they are not about really extending the syntax per so, but 
+rather about providing convenient tools to OCaml developpers, and this 
+does not require to play with the syntax.
+
+
+Alain
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000220.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000225.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#222">[ date ]</a>
+              <a href="thread.html#222">[ thread ]</a>
+              <a href="subject.html#222">[ subject ]</a>
+              <a href="author.html#222">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

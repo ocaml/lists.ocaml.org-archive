@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DHHr85tCkG3dR4tDdfhR0ZNEbhL2-JW%3DqJxKdX_2LA8yg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000188.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DHHr85tCkG3dR4tDdfhR0ZNEbhL2-JW%3DqJxKdX_2LA8yg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?">yallop at gmail.com
+       </A><BR>
+    <I>Mon Aug 17 11:24:13 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000188.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I thought I'd rejig the conversions a bit and put together a complete
+working example.
+
+First, the value type definition from an earlier message:
+
+   type value =
+      Null
+    | True
+    | FloatValue of float
+    | StringValue of string
+    | AtomValue of string
+    | BuiltinFunctionValue of (value -&gt; value)
+
+Next, a module for converting back and forth between Emily values and
+OCaml values.  This combines the two conversions that you currently
+store in the 'valueToCFn' and 'cToValueFn' types.
+
+  module Conversion :
+  sig
+     type 'a t
+     (** A value of type 'a t' can be used to convert between
+         the types 'value' and 'a' *)
+
+     val val_of : 'a t -&gt; ('a -&gt; value)
+     val of_val : 'a t -&gt; (value -&gt; 'a)
+
+     val float : float t
+     (** Conversions for floats *)
+
+     val (^-&gt;) : 'a t -&gt; 'b t -&gt; ('a -&gt; 'b) t
+     (** Conversions for functions *)
+  end =
+  struct
+    type 'a t = { val_of: 'a -&gt; value;
+                  of_val: value -&gt; 'a }
+
+    (* If you're not keen on puns, you can write
+       'let val_of c = c.val_of' etc. instead *)
+    let val_of {val_of} = val_of
+    let of_val {of_val} = of_val
+
+    let value_of_float f = FloatValue f
+
+    let float_of_value = function
+      | FloatValue f -&gt; f
+      | _ -&gt; failwith &quot;Expected float&quot;
+
+    let float = { val_of = value_of_float;
+                  of_val = float_of_value }
+
+    let value_of_function arg ret f =
+       BuiltinFunctionValue (fun x -&gt; val_of ret (f (of_val arg x)))
+
+    let function_of_value arg ret = function
+      | BuiltinFunctionValue f -&gt; (fun x -&gt; of_val ret (f (val_of arg x)))
+      | _ -&gt; failwith &quot;Expected function&quot;
+
+    let (^-&gt;) arg ret = { val_of = value_of_function arg ret;
+                          of_val = function_of_value arg ret }
+  end
+
+(I've chosen '^-&gt;' for the Conversion.t function value because
+operators beginning with '^' associate right, so 'x ^-&gt; y ^-&gt; z' means
+'x ^-&gt; (y ^-&gt; z)' rather than '(x ^-&gt; y) ^-&gt; z', just as in the
+corresponding OCaml function types.)
+
+Here's the conversion module in action:
+
+   # Conversion.(of_val (float ^-&gt; float));;
+   - : value -&gt; float -&gt; float = &lt;fun&gt;
+   # Conversion.(val_of (float ^-&gt; float));;
+   - : (float -&gt; float) -&gt; value = &lt;fun&gt;
+   # Conversion.(val_of (float ^-&gt; float ^-&gt; float));;
+   - : (float -&gt; float -&gt; float) -&gt; value = &lt;fun&gt;
+   # Conversion.(of_val ((float ^-&gt; float) ^-&gt; float));;
+   - : value -&gt; (float -&gt; float) -&gt; float = &lt;fun&gt;
+
+Let's use these conversions to write the general function that binds C
+functions using Ctypes and exposes them to Emily.  The following two
+types play a similar role to valueToCFn etc., combining a type
+representation and a conversion function:
+
+   type ty = Ty : 'a Ctypes.typ * 'a Conversion.t -&gt; ty
+   type fn = Fn : ('a -&gt; 'b) Ctypes.fn * ('a -&gt; 'b) Conversion.t -&gt; fn
+
+Here's the analogue of your 'typeConvert' function:
+
+   let typeConvert = function
+       &quot;float&quot; -&gt; Ty (Ctypes.float, Conversion.float)
+     | _ -&gt; failwith &quot;??&quot;
+
+Next comes a slightly irritating part.  Since 'Foreign.foreign'
+doesn't support nullary functions the base case for binding is the one
+argument function type.  So for a function with arguments 'a', 'b',
+'c' and 'd' and return type 'e' we'll need to to build an initial
+function specification from 'd' and 'e', then fold in the other
+argument types ('a', 'b', 'c').  Towards that goal here's a function
+which splits a list into its initial elements and last element:
+
+   (* 'a list -&gt; 'a list * 'a *)
+  let split_last l =
+  let rec loop aux = function
+      [] -&gt; invalid_arg &quot;split_last&quot;
+    | [x] -&gt; List.rev aux, x
+    | x :: xs -&gt; loop (x :: aux) xs
+  in loop [] l
+
+  # split_last ['a'; 'b'; 'c'; 'd'];;
+  - : char list * char = (['a'; 'b'; 'c'], 'd')
+
+We now have all the bits we need to write the binding function.  The
+following builds type representations and conversions in parallel,
+then combines them at the end, like your 'valueForeignUnary':
+
+  (* val functionFrom : string -&gt; string list -&gt; string -&gt; value *)
+  let functionFrom name args returning =
+    let args, last_arg = split_last args in
+    let Ty (rty, r) = typeConvert returning in
+    let Ty (aty, a) = typeConvert last_arg in
+    let Fn (fnty, fn) = List.fold_right
+      (fun arg (Fn (fty, f)) -&gt;
+        let Ty (tty, t) = typeConvert arg in
+        Fn (Ctypes.(tty @-&gt; fty), Conversion.(t ^-&gt; f)))
+      args
+      (Fn (Ctypes.(aty @-&gt; returning rty), Conversion.(a ^-&gt; r)))
+    in Conversion.val_of fn (Foreign.foreign name fnty)
+
+In order to test it'll be helpful to have an 'apply' function:
+
+   (* val ( $ ) : value -&gt; value -&gt; value *)
+   let ($) f p = match f with
+       BuiltinFunctionValue f -&gt; f p
+     | _ -&gt; failwith &quot;Application of non-function&quot;
+
+Here's an example of using 'functionFrom' to call a unary function
+from the C standard library:
+
+   # let expf = functionFrom &quot;expf&quot; [&quot;float&quot;] &quot;float&quot;;;
+   val expf : value = BuiltinFunctionValue &lt;fun&gt;
+   # expf $ FloatValue 1.0;;
+   - : value = FloatValue 2.71828174591064453
+
+And here's a call to a binary function:
+
+   # let powf = functionFrom &quot;powf&quot; [&quot;float&quot;; &quot;float&quot;] &quot;float&quot;;;
+   val powf : value = BuiltinFunctionValue &lt;fun&gt;
+   # powf $ FloatValue 2.0 $ FloatValue 3.0;;
+   - : value = FloatValue 8.
+
+I hope that helps, but feel free to follow up on anything that's unclear!
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000188.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,155 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Opam 1.2 breaks emacs on the mac sortof
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Opam%201.2%20breaks%20emacs%20on%20the%20mac%20sortof&In-Reply-To=%3CCACLX4jQuOgEvUXUUAZiVy93mV6M%3DGxR9FaAZW%2B6sS0CNHMOU-g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000636.html">
+   <LINK REL="Next"  HREF="000638.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Opam 1.2 breaks emacs on the mac sortof</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Opam%201.2%20breaks%20emacs%20on%20the%20mac%20sortof&In-Reply-To=%3CCACLX4jQuOgEvUXUUAZiVy93mV6M%3DGxR9FaAZW%2B6sS0CNHMOU-g%40mail.gmail.com%3E"
+       TITLE="[opam-devel] Opam 1.2 breaks emacs on the mac sortof">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Sep  9 12:11:11 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000636.html">[opam-devel] Opam 1.2 breaks emacs on the mac sortof
+</A></li>
+        <LI>Next message: <A HREF="000638.html">[opam-devel] Opam 1.2 breaks emacs on the mac sortof
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#637">[ date ]</a>
+              <a href="thread.html#637">[ thread ]</a>
+              <a href="subject.html#637">[ subject ]</a>
+              <a href="author.html#637">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Nice!  I'll look at that.
+
+Can someone confirm that the change in how &quot;opam config env&quot; really
+happened between 1.1.2 and 1.2?  I wonder if so whether it would make
+sense to revert it, since that would avoid breaking lots of emacs
+configs for people, and also because the new behavior also seems worse
+than the old one.
+
+y
+
+On Tue, Sep 9, 2014 at 5:09 AM, Richard Mortier &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">mort at cantab.net</A>&gt; wrote:
+&gt;<i> On 9 September 2014 03:08, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> Apologies for the following bits of emacs nonsense.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Sadly, I think that opam 1.2 has broken the emacs configuration that I
+</I>&gt;&gt;<i> documented here:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="https://github.com/realworldocaml/book/wiki/Installation-Instructions#emacs">https://github.com/realworldocaml/book/wiki/Installation-Instructions#emacs</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I'm looking for advice as to how to fix things.  It has to do with how
+</I>&gt;&gt;<i> paths are set up.  Emacs for the mac has the annoying property of not
+</I>&gt;&gt;<i> propagating ordinary shell settings.  Instead what I did was this:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> ;; -- Tweaks for OS X -------------------------------------
+</I>&gt;&gt;<i> ;; Tweak for problem on OS X where Emacs.app doesn't run the right
+</I>&gt;&gt;<i> ;; init scripts when invoking a sub-shell
+</I>&gt;&gt;<i> (cond
+</I>&gt;&gt;<i>  ((eq window-system 'ns) ; macosx
+</I>&gt;&gt;<i>   ;; Invoke login shells, so that .profile or .bash_profile is read
+</I>&gt;&gt;<i>   (setq shell-command-switch &quot;-lc&quot;)))
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This caused the .profile to get run again on every incoming shell.
+</I>&gt;&gt;<i> This has the property of rerunning &quot;eval `opam config env`&quot;.  That
+</I>&gt;&gt;<i> used to work because opam would throw its entries on the path when it
+</I>&gt;&gt;<i> ran.  But I believe opam has been changed to not re-add entries when
+</I>&gt;&gt;<i> they're already there.  This means that when you run the shell with
+</I>&gt;&gt;<i> &quot;-lc&quot;, it redumps the entries from /etc/paths on top, thus shadowing
+</I>&gt;&gt;<i> the opam entries.
+</I>&gt;<i>
+</I>&gt;<i> the fragment i have in my `~/.emacs`
+</I>&gt;<i> (<A HREF="https://github.com/mor1/rc-files/blob/master/emacs.d/init.el">https://github.com/mor1/rc-files/blob/master/emacs.d/init.el</A>) that
+</I>&gt;<i> attempts to deal with this is:
+</I>&gt;<i>
+</I>&gt;<i> ```
+</I>&gt;<i> ;; &lt;<A HREF="http://stackoverflow.com/questions/8606954/">http://stackoverflow.com/questions/8606954/</A>
+</I>&gt;<i> ;;    path-and-exec-path-set-but-emacs-does-not-find-executable&gt;
+</I>&gt;<i> (defun set-exec-path-from-shell-PATH ()
+</I>&gt;<i>   &quot;Set up Emacs' `exec-path' and PATH environment variable to
+</I>&gt;<i>   match that used by the user's shell.
+</I>&gt;<i>
+</I>&gt;<i> This is particularly useful under Mac OSX, where GUI apps are not
+</I>&gt;<i> started from a shell.&quot;
+</I>&gt;<i>   (interactive)
+</I>&gt;<i>   (let ((path-from-shell
+</I>&gt;<i>          (replace-regexp-in-string
+</I>&gt;<i>           &quot;[ \t\n]*$&quot; &quot;&quot;
+</I>&gt;<i>           (shell-command-to-string &quot;$SHELL --login -i -c 'echo $PATH'&quot;))
+</I>&gt;<i>          ))
+</I>&gt;<i>     (setenv &quot;PATH&quot; path-from-shell)
+</I>&gt;<i>     (setq exec-path (split-string path-from-shell path-separator)))
+</I>&gt;<i>   )
+</I>&gt;<i> (set-exec-path-from-shell-PATH)
+</I>&gt;<i> ```
+</I>&gt;<i>
+</I>&gt;<i> ie., extract $PATH from a shell and then set various emacs variables
+</I>&gt;<i> accordingly. but it's hardly pleasant.
+</I>&gt;<i>
+</I>&gt;&gt;<i> We could change opam 1.2 so that instead of not adding entries when
+</I>&gt;&gt;<i> they're already there, it instead deletes the old version of the entry
+</I>&gt;&gt;<i> and re-adds it to the top.  Or we could come up with a more principled
+</I>&gt;&gt;<i> emacs-on-the-mac setup, but I can't quite figure out a good way of
+</I>&gt;&gt;<i> doing that.
+</I>&gt;<i>
+</I>&gt;<i> well, encouraging emacs on the mac to propagate shell settings
+</I>&gt;<i> properly would do it for me ;)
+</I>&gt;<i>
+</I>&gt;<i> failing that, i like the idea of opam deleting old instances of PATH
+</I>&gt;<i> mods and then re-adding at the front. that seems the least surprising
+</I>&gt;<i> and tidiest option.
+</I>&gt;<i>
+</I>&gt;<i> (probably not much help for the rwo documentation, but fwiw i got
+</I>&gt;<i> bored of shell environment confusion a while back and wrote some shell
+</I>&gt;<i> functions to help me keep things clean and attempt to make shell
+</I>&gt;<i> initialisation largely idempotent; i basically never now have lines of
+</I>&gt;<i> the form VAR=value:$VAR in any of my startup scripts.
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="https://github.com/mor1/rc-files/blob/master/envfns.sh">https://github.com/mor1/rc-files/blob/master/envfns.sh</A>
+</I>&gt;<i> <A HREF="https://github.com/mor1/rc-files/blob/master/environment">https://github.com/mor1/rc-files/blob/master/environment</A>
+</I>&gt;<i>
+</I>&gt;<i> )
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Richard Mortier
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">mort at cantab.net</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000636.html">[opam-devel] Opam 1.2 breaks emacs on the mac sortof
+</A></li>
+	<LI>Next message: <A HREF="000638.html">[opam-devel] Opam 1.2 breaks emacs on the mac sortof
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#637">[ date ]</a>
+              <a href="thread.html#637">[ thread ]</a>
+              <a href="subject.html#637">[ subject ]</a>
+              <a href="author.html#637">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

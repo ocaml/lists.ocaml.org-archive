@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [MirageOS-devel] experimental opam bulk build logs	on GitHub
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20experimental%20opam%20bulk%20build%20logs%0A%09on%20GitHub&In-Reply-To=%3C1655D67C-31EC-4939-A4C3-5B9199EAFA2D%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000563.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [MirageOS-devel] experimental opam bulk build logs	on GitHub</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20experimental%20opam%20bulk%20build%20logs%0A%09on%20GitHub&In-Reply-To=%3C1655D67C-31EC-4939-A4C3-5B9199EAFA2D%40recoil.org%3E"
+       TITLE="[opam-devel] [MirageOS-devel] experimental opam bulk build logs	on GitHub">anil at recoil.org
+       </A><BR>
+    <I>Fri Jun  6 12:31:21 BST 2014</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000563.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#562">[ date ]</a>
+              <a href="thread.html#562">[ thread ]</a>
+              <a href="subject.html#562">[ subject ]</a>
+              <a href="author.html#562">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I was discussing this very problem with Thomas in fact!  Right now we deliberately do a separate opam install for each package, and do not cover depopts at all.
+
+The plan is to integrate the scripts into using Irmin to record the log outputs, since git is hitting congestion collapse with &gt;20 workers (GitHub rejects the push due to another process having the lock).  With Irmin, we can record all the logs into a memory instance, and have one pushing process to GitHub.
+
+When we do have Irmin support, we can calculate a static schedule of all the packages that should be built, and just have spare CPUs pick up some work.  It would be great to build the risky packages (i.e. early up the dependency chain) first, and then move to the leaf packages.
+
+I'm not sure if re-using packages and snapshotting is a good idea in general, but it's very useful for common ones like ocamlfind, Lwt or Core.  Depopts are a big problem here though, particularly for Lwt...
+
+-anil
+
+On 23 May 2014, at 09:50, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt; wrote:
+
+&gt;<i> Very nice !
+</I>&gt;<i>  
+</I>&gt;<i> I am wondering, do you 'opam install' every package individually ? We may play some clever tricks with the solver here, like `opam upgrade --criteria=-notuptodate,+new` which will attempt to install as many packages as possible, after which we could iterate on a universe reduced to the not-yet-installed packages. Depopts would be less predictable, but we can't realistically test all possible combinations of those anyway.
+</I>&gt;<i>  
+</I>&gt;<i> Would be nice to find a common place to aggregate such results.
+</I>&gt;<i>  
+</I>&gt;<i> Best,
+</I>&gt;<i> Louis
+</I>&gt;<i>  
+</I>&gt;<i>  
+</I>&gt;<i> Le mardi 20 mai 2014, 17:40:04 Anil Madhavapeddy a &#233;crit :
+</I>&gt;<i> &gt; Hi,
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; I've written some scripts that use Docker and OPAM to run bulk builds across the entire package repository, and the results are logged and pushed to GitHub daily.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; If anyone wants to improve the health of the repository, please look at:
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt;    <A HREF="https://github.com/ocaml/opam-bulk-logs">https://github.com/ocaml/opam-bulk-logs</A> 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; in the err/ directories, and submit pull requests fix the failures.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Source scripts are still in my personal GitHub; I'll move these to the ocaml/ repo.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; cheers,
+</I>&gt;<i> &gt; Anil
+</I>&gt;<i> &gt; _______________________________________________
+</I>&gt;<i> &gt; opam-devel mailing list
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i>  
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> MirageOS-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">MirageOS-devel at lists.xenproject.org</A>
+</I>&gt;<i> <A HREF="http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel">http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel</A>
+</I>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20140606/cf9d2069/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20140606/cf9d2069/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000563.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#562">[ date ]</a>
+              <a href="thread.html#562">[ thread ]</a>
+              <a href="subject.html#562">[ subject ]</a>
+              <a href="author.html#562">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

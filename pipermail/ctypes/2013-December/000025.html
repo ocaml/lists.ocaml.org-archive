@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Bigarray typing problem
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bigarray%20typing%20problem&In-Reply-To=%3C135488FED1734DFAA716632056B33BE7%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000019.html">
+   <LINK REL="Next"  HREF="000029.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Bigarray typing problem</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bigarray%20typing%20problem&In-Reply-To=%3C135488FED1734DFAA716632056B33BE7%40erratique.ch%3E"
+       TITLE="[ocaml-ctypes] Bigarray typing problem">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Sun Dec 15 23:51:15 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000019.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+        <LI>Next message: <A HREF="000029.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#25">[ date ]</a>
+              <a href="thread.html#25">[ thread ]</a>
+              <a href="subject.html#25">[ subject ]</a>
+              <a href="author.html#25">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+Le jeudi, 5 d&#233;cembre 2013 &#224; 12:08, Jeremy Yallop a &#233;crit :
+
+&gt;<i> I've tried changing the interface so that bigarray_start etc. return
+</I>&gt;<i> pointers to storage types rather than to read/write types. You can
+</I>&gt;<i> find it on the bigarray-kinds branch on my repository:
+</I>&gt;<i>  
+</I>&gt;<i> <A HREF="https://github.com/yallop/ocaml-ctypes/commit/0d15800310">https://github.com/yallop/ocaml-ctypes/commit/0d15800310</A>
+</I>&gt;<i>  
+</I>&gt;<i> (It appears to work, but it's only lightly tested and not polished.
+</I>&gt;<i> It may be possible to simplify the types.)
+</I>
+The patch seems rather big and typed-involved for what it brings. So far I was fine simply working with coercions.  
+
+However I now have another problem which is the other way round. I would like to be able to see a chunk of (void *) memory as a Bigarray.Array1.t of a given, client-defined, kind (failing if there are size alignment issue).  
+
+Here's an example:
+
+  val get_pixels : t -&gt; ('a, 'b) kind -&gt; ('a, 'b, Bigarray.c_layout) Bigarray.Array1.t
+
+For that I need to use Ctypes.bigarray_of_ptr, however to remain generic I need to coerce my (void *) pointer to the right type according to the bigarray kind. For that I wrote this function, just in order to match the access types (is that ok or should I match the storage aswell ?):
+
+let access_ptr_typ_of_ba_kind : ('a, 'b) Bigarray.kind -&gt; 'a ptr typ = fun k -&gt;  
+  let open Bigarray in  
+  match Obj.magic k with  
+  | k when k = float32 || k = float64 -&gt; Obj.magic (ptr Ctypes.double)
+  | k when k = complex32 || k = complex64 -&gt; Obj.magic (ptr Ctypes.complex64)
+  | k when k = int8_signed || k = int8_unsigned || k = int16_signed ||  
+           k = int16_unsigned || k = int -&gt; Obj.magic (ptr Ctypes.camlint)
+  | k when k = int32 -&gt; Obj.magic (ptr Ctypes.int32_t)
+  | k when k = int64 -&gt; Obj.magic (ptr Ctypes.int64_t)
+  | k when k = nativeint -&gt; Obj.magic (ptr Ctypes.nativeint)
+  | k when k = char -&gt; Obj.magic (ptr Ctypes.char)
+  | k -&gt; assert false  
+
+
+This allows me to write:  
+
+let get_pixels v kind =  
+  let () = &#8230; (* check num of pixels is aligned on kind type *)  
+  let pixels : unit Ctypes.ptr = ... (* get void pointer on pixels *)
+  let pixels = coerce (ptr void) (access_ptr_type_of_ba_kind kind) ptr in  
+  bigarray_of_ptr array1 size kind pixels
+  
+Is that correct ? If it is and there's no other way I think it would be nice to have the above function in ctypes.  
+
+Best,
+
+Daniel
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000019.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+	<LI>Next message: <A HREF="000029.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#25">[ date ]</a>
+              <a href="thread.html#25">[ thread ]</a>
+              <a href="subject.html#25">[ subject ]</a>
+              <a href="author.html#25">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> How to create the IntSet type with core? [joke]
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20How%20to%20create%20the%20IntSet%20type%20with%20core%3F%20%5Bjoke%5D&In-Reply-To=%3CCACLX4jSEFXjSd_uWduYA0qMmx4aJxoCTxXmxQ6KJoiStveHYug%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000731.html">
+   <LINK REL="Next"  HREF="000739.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>How to create the IntSet type with core? [joke]</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20How%20to%20create%20the%20IntSet%20type%20with%20core%3F%20%5Bjoke%5D&In-Reply-To=%3CCACLX4jSEFXjSd_uWduYA0qMmx4aJxoCTxXmxQ6KJoiStveHYug%40mail.gmail.com%3E"
+       TITLE="How to create the IntSet type with core? [joke]">yminsky at janestreet.com
+       </A><BR>
+    <I>Mon Nov 12 17:43:50 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000731.html">How to create the IntSet type with core? [joke]
+</A></li>
+        <LI>Next message: <A HREF="000739.html">How to create the IntSet type with core? [joke]
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#738">[ date ]</a>
+              <a href="thread.html#738">[ thread ]</a>
+              <a href="subject.html#738">[ subject ]</a>
+              <a href="author.html#738">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+We try to be pretty conservative most of the time, but yeah, there's a
+bit of cleverness here....
+
+y
+
+On Mon, Nov 12, 2012 at 3:51 AM, Francois Berenger
+&lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.berenger.working at gmail.com</A>&gt; wrote:
+&gt;<i> I think this google group should be renamed to: ocaml-type-junkies
+</I>&gt;<i> ;)
+</I>&gt;<i>
+</I>&gt;<i> On Friday, November 9, 2012 6:11:14 PM UTC+9, David House wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> There is already an Int.Set module! :)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Here is a five-minute guide to the set / map / hashtable setup inside
+</I>&gt;&gt;<i> core. I'll use the example of hashtables, but the language readily
+</I>&gt;&gt;<i> translates into sets / maps.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> There are two types of hashtables in core. Ones that use polymorphic
+</I>&gt;&gt;<i> comparison, and ones that use a specific comparision function that is
+</I>&gt;&gt;<i> hopefully more efficient and has non-surprising semantics (we
+</I>&gt;&gt;<i> basically think polymorphic comparison, despite its convenience, is
+</I>&gt;&gt;<i> too surprising to be an overall good thing).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The type of hashtables using polymorphic comparison is ('key, 'value)
+</I>&gt;&gt;<i> Hashtbl.Poly.t. The type of hashtables using, e.g., int comparison for
+</I>&gt;&gt;<i> the keys is 'value Int.Table.t. Given the previous paragraph, you
+</I>&gt;&gt;<i> should always try to use Foo.Table when you can.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> When you create a hashtable (e.g. using [create], [of_alist], or
+</I>&gt;&gt;<i> [t_of_sexp]), you must use the specific module name. I.e. [let table =
+</I>&gt;&gt;<i> Int.Table.create () in]. However, when you already have a hashtable in
+</I>&gt;&gt;<i> your hands, and you want to use accessor functions, you should just
+</I>&gt;&gt;<i> use Hashtbl.foo, regardless of what comparison function it uses.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> To translate into Maps and Sets:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 'value Foo.Table.t  ('key,'value) Hashtbl.Poly.t  Hashtbl.foo
+</I>&gt;&gt;<i> 'value Foo.Map.t    ('key,'value) Map.Poly.t      Map.foo
+</I>&gt;&gt;<i> Foo.Set.t           'element Set.Poly.t           Set.foo
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> If you have your own type and want to make Table, Map and Set
+</I>&gt;&gt;<i> submodules, it's really easy:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> module T = struct
+</I>&gt;&gt;<i>   type t = ... with compare, sexp
+</I>&gt;&gt;<i>   let hash = (* your hash function, maybe Hashtbl.hash *)
+</I>&gt;&gt;<i> end
+</I>&gt;&gt;<i> include Comparable.Make(T)
+</I>&gt;&gt;<i> include Hashable.Make(T)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Saying &quot;with compare&quot; generates you an efficient comparison function
+</I>&gt;&gt;<i> specialised to your type. (Note that all component types need to have
+</I>&gt;&gt;<i> comparison functions defined too, whether through &quot;with compare&quot; or
+</I>&gt;&gt;<i> through primitives.) The Comparable.Make functor adds in modules to
+</I>&gt;&gt;<i> make you satisfy the Comparable.S signature (basically the Set and Map
+</I>&gt;&gt;<i> modules, and a few more). The Hashable.Make functor adds in modules to
+</I>&gt;&gt;<i> make you satisfy Hashable.S (basically Hashtbl, as well as some others
+</I>&gt;&gt;<i> like Hash_set). If you don't want the Hashable stuff, there is no need
+</I>&gt;&gt;<i> to define a hash function. (Although Hashtbl.hash is normally not a
+</I>&gt;&gt;<i> bad choice.)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Here's how this all works under the hood:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The type of maps is &quot;really&quot; ('key, 'value, 'comparator) Map.t. Maps
+</I>&gt;&gt;<i> contain in their values the function that is used for comparing keys,
+</I>&gt;&gt;<i> i.e. a function of type 'key -&gt; 'key -&gt; int. But what is this
+</I>&gt;&gt;<i> &quot;comparator&quot; thing?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> We can first motivate things by saying: it's a pain to have to type
+</I>&gt;&gt;<i> Int.Map.find for int-maps, String.Map.find for string-maps, etc. etc.
+</I>&gt;&gt;<i> It'd be nice to have a single type and use Map.find for everything.
+</I>&gt;&gt;<i> But this presents a problem because of functions like Map.merge, which
+</I>&gt;&gt;<i> takes two maps and combines them. You need to know that the comparison
+</I>&gt;&gt;<i> functions are identical, but how can you do this?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So we have this extra comparator phantom type. Nothing in the actual
+</I>&gt;&gt;<i> representation has a type involving 'comparator: it's just for static
+</I>&gt;&gt;<i> checking. If you want to have a new comparison function, you must mint
+</I>&gt;&gt;<i> a new comparator type. (Including the Comparable signature does this
+</I>&gt;&gt;<i> for you.)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I originally wrote this last section with hashtables in mind, but it
+</I>&gt;&gt;<i> appears that hashtables work slightly differently: they just assert
+</I>&gt;&gt;<i> that the hashing functions are physically equal inside [merge]; you
+</I>&gt;&gt;<i> don't get a compile-time error for something like [Hashtbl.merge
+</I>&gt;&gt;<i> (Int.Table.create ()) (String.Table.create ())].
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Fri, Nov 9, 2012 at 8:14 AM, Francois Berenger
+</I>&gt;&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/core">francois.ber... at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; Hello,
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; I'm converting some standard code to use core.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; How do I do this in core:
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; module IntSet =
+</I>&gt;&gt;<i> &gt;   Set.Make
+</I>&gt;&gt;<i> &gt;     (struct
+</I>&gt;&gt;<i> &gt;       let compare = Pervasives.compare
+</I>&gt;&gt;<i> &gt;       type t = int
+</I>&gt;&gt;<i> &gt;     end)
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; Thanks a lot,
+</I>&gt;&gt;<i> &gt; F.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; PS: yes, I opened Core.Std and did not die from it. ;)
+</I>&gt;&gt;<i> &gt;
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000731.html">How to create the IntSet type with core? [joke]
+</A></li>
+	<LI>Next message: <A HREF="000739.html">How to create the IntSet type with core? [joke]
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#738">[ date ]</a>
+              <a href="thread.html#738">[ thread ]</a>
+              <a href="subject.html#738">[ subject ]</a>
+              <a href="author.html#738">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

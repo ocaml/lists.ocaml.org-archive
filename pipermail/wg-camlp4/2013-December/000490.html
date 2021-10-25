@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Monadic computation in Fan
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Monadic%20computation%20in%20Fan&In-Reply-To=%3CCANcqPu4UsfisaYvpBiiWeNhUhO4YaWAtre5kq3wURVppXGoTPw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Monadic computation in Fan</H1>
+    <B>Bob Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Monadic%20computation%20in%20Fan&In-Reply-To=%3CCANcqPu4UsfisaYvpBiiWeNhUhO4YaWAtre5kq3wURVppXGoTPw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Monadic computation in Fan">bobzhang1988 at gmail.com
+       </A><BR>
+    <I>Sun Dec  1 03:59:33 GMT 2013</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#490">[ date ]</a>
+              <a href="thread.html#490">[ thread ]</a>
+              <a href="subject.html#490">[ subject ]</a>
+              <a href="author.html#490">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear List
+
+     I am very glad to let you know that I have incorporated a very
+cool feature in Fan. a new DDSL l 'local_extend', which mutate the
+parser inside the quotation, but restored all the parser it mutated
+outside the quotation.
+    The use case is when you really need to mutate a tiny part of the
+grammar -- copy alone can not work, since parsers are mutually
+recursive -- now we can limit  the mutation scope, however.
+
+The ten lines below show how we introduce computation expression (F#
+style) in Fan by *local_extend* DDSL, the introduced DDSL is called
+&quot;cexp&quot;
+
+```
+  let f (loc:Locf.t) meta content =
+    let module_name =
+    match meta with
+    | None -&gt; Locf.failf loc &quot;cexp module name must be specified via @&quot;
+    | Some x -&gt; String.capitalize x in
+  %local_extend{
+    exp: 10 RA
+    [&quot;let&quot;; &quot;!&quot; ; bind as bi ; &quot;in&quot;; exp as x %{
+     let pat_exps  =  Ast_basic.list_of_and bi [] in
+     List.fold_right
+       (fun pat_exp acc -&gt;
+         match pat_exp with
+         | %bind{ $p = $e} -&gt;
+             %exp{$uid:module_name.bind $e (fun $p -&gt; $acc)}
+         | _ -&gt; assert false
+                     ) pat_exps x }
+   ]
+    ${Gramlib.parse_string_eoi exp ~loc content}}
+
+ let d = Ns.lang in
+  begin
+    Ast_quotation.add {domain = d; name=&quot;cexp&quot;;} Dyn_tag.exp f;
+  end
+```
+
+Test case
+```
+let v = %<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">cexp at option</A>{
+ let! a = Some 3  in
+ let! b = Some 4 in
+ Some (a + b)
+ }
+```
+--
+Regards
+-- Bob
+
+
+-- 
+Regards
+-- Bob
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#490">[ date ]</a>
+              <a href="thread.html#490">[ thread ]</a>
+              <a href="subject.html#490">[ subject ]</a>
+              <a href="author.html#490">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

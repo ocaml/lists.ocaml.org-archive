@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Negative field report: extension points unsuited for	(matches p when e)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Negative%20field%20report%3A%20extension%20points%20unsuited%20for%0A%09%28matches%20p%20when%20e%29&In-Reply-To=%3CCAPFanBG3iR850B%3DsKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q%3DyA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000412.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Negative field report: extension points unsuited for	(matches p when e)</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Negative%20field%20report%3A%20extension%20points%20unsuited%20for%0A%09%28matches%20p%20when%20e%29&In-Reply-To=%3CCAPFanBG3iR850B%3DsKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q%3DyA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Negative field report: extension points unsuited for	(matches p when e)">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Wed May  1 15:44:48 BST 2013</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000412.html">[wg-camlp4] Negative field report: extension points unsuited for (matches p when e)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#411">[ date ]</a>
+              <a href="thread.html#411">[ thread ]</a>
+              <a href="subject.html#411">[ subject ]</a>
+              <a href="author.html#411">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>The recent caml-list message by rixed (archived below) motivated me to
+get pa_matches in shape (it lacked support for &quot;when ...&quot;), and try to
+see how a similar extension could be implemented with the new
+extension_points branch.
+
+The Camlp4 extension allows a new syntax for expressions, (matches
+&lt;pattern&gt;) or (matches &lt;pattern&gt; when &lt;expr&gt;), that desugars into a
+test function returning a boolean: (function &lt;pattern&gt; when &lt;expr&gt; -&gt;
+true | _ -&gt; false). I have attached to this mail the relevant code,
+called pa_matches.ml (pa_ is a traditional prefix for Camlp4 *parser*
+extensions).
+
+I quickly found out that extension points as currently implemented in
+Alain's branch are ill-suited for this task, because the piece of code
+we want to parse (&lt;patt&gt; when &lt;expr&gt;) is not syntactically an
+expression. [%matches &lt;patt&gt; when &lt;expr&gt;] would be rejected by the
+parser.
+
+Note that this is just an experience report, and not a value judgment
+on the extension_points approach itself. I think the choice to only
+accept syntactically valid expressions (in fact structure items) has a
+lot of merits (notably wrt. toolability). The price to pay is that
+potential extension have to be massaged into syntactically correct
+pieces, with a potential loss of concision when compared to
+domain-specific syntax designs. This indicates, I think, that
+extension_points is not always suited for &quot;syntax changes in the
+small&quot;, where a very concise syntax is given to an otherwise
+expressible expression (and concision is thus essential for the
+purpose of the extension), except when this extension exactly fits the
+syntactic form of the more high-level OCaml syntactic classes.
+
+For the purpose of experimentation, I still decided to do an
+implementation based on a horrible hack, namely using (the new syntax
+for) string literals that had been presented as a way to get &quot;foreign
+language quotations&quot; in this context, with the syntax [%matches {|
+&lt;patt&gt; when &lt;expr&gt; |}]. I believe this course of action should be
+discouraged; in particular, there is no proper error handling. It
+seems that deploying extensions based on this principle would
+constitute a regression from the current Camlp4 situation.
+
+Note that this implementation technique might be made slightly more
+reasonable if the following ingredients were present:
+- a simple and correct way to add location information from a lexing
+buffer obtained from &quot;Lexing.from_string&quot;, to inform the lexer of
+where in the file it's picking up tokens (note that in the above case,
+this is not enough as the quoted string is prefixed with some code to
+make it a valid expression)
+- more entry points in the parser for eg. patterns and match actions
+- maybe support from the ppx wrapper to catch and re-route OCaml errors
+
+I think this is all rather cumbersome and we should rather understand
+and accept the limitations of extension points -- and make unruly
+users respect them!
+
+On Sat, Apr 27, 2013 at 10:04 AM, Gabriel Scherer
+&lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+&gt;<i> This is a subset of Richard Jones' &quot;matches&quot; syntax extension, turning
+</I>&gt;<i> an pattern matching on 'a into a ('a -&gt; bool) function:
+</I>&gt;<i>
+</I>&gt;<i>   if (matches Some x when x &gt; 15) variable then ...
+</I>&gt;<i>
+</I>&gt;<i> (The original extension did not handle &quot;when&quot;, but it would be quite
+</I>&gt;<i> easy to add.)
+</I>&gt;<i>
+</I>&gt;<i> On Sat, Apr 27, 2013 at 9:18 AM,  &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">rixed at happyleptic.org</A>&gt; wrote:
+</I>&gt;&gt;<i> Wouldnt it be nice if, as a special form of the = operator,
+</I>&gt;&gt;<i> &quot;variable = pattern when condition&quot; were equivalent to
+</I>&gt;&gt;<i> &quot;match variable with pattern when condition -&gt; true | _ -&gt; false&quot; ?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So that one could easily check optional values for instance:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> if variable = Some x when x &gt; 15 then blabla
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What do you think?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> Caml-list mailing list.  Subscription management and archives:
+</I>&gt;&gt;<i> <A HREF="https://sympa.inria.fr/sympa/arc/caml-list">https://sympa.inria.fr/sympa/arc/caml-list</A>
+</I>&gt;&gt;<i> Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+</I>&gt;&gt;<i> Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+</I>-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pa_matches.ml
+Type: application/octet-stream
+Size: 1914 bytes
+Desc: not available
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment.obj">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment.obj</A>&gt;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ppx_matches.ml
+Type: application/octet-stream
+Size: 1208 bytes
+Desc: not available
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment-0001.obj">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment-0001.obj</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000412.html">[wg-camlp4] Negative field report: extension points unsuited for (matches p when e)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#411">[ date ]</a>
+              <a href="thread.html#411">[ thread ]</a>
+              <a href="subject.html#411">[ subject ]</a>
+              <a href="author.html#411">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

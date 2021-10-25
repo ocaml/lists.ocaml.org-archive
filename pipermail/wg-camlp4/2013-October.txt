@@ -1,0 +1,595 @@
+From lpw25 at cam.ac.uk  Fri Oct 11 17:39:05 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Fri, 11 Oct 2013 17:39:05 +0100
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <51701746.9010008@lexifi.com> (Alain Frisch's message of "Thu, 18
+ Apr 2013 17:54:46 +0200")
+References: <51701746.9010008@lexifi.com>
+Message-ID: <86hacnrcd2.fsf@cam.ac.uk>
+
+Hi,
+
+I've been looking recently at encoding inline documentation
+(i.e. ocamldoc comments) within attributes, as part of my work on
+opam-doc. Mostly this works fine, but there is an issue with comments
+that are not attached to any item (e.g. section headers).
+
+I had thought that the existing support for "structure/signature
+attributes" would be sufficient. By these I mean attributes like:
+
+  ;;[@@doc "Hello World"]
+
+which are parsed as separate structure/signature items rather than
+attached to an existing structure/signature item.
+
+The problem is that unattached attributes can appear in a number of
+places that structure attributes cannot. Some examples:
+
+  type t = Foo of s
+
+  (** {3 Section} *)
+
+  and s = Bin of t option
+
+  class type foo = object
+    method a : int
+
+    (** Some comment *)
+
+    method b : int
+  end
+
+and so on.
+
+In both these cases it is hard to add support for structure items in
+those locations because that would require supporting ';;' in those
+locations as well.
+
+I have also heard a number of complaints about the ";;[@@ foo]"
+syntax. Firstly, that it is ugly and its meaning is not particularly
+obvious, and secondly that users may be confused when
+
+  type t;;
+  [@@ sexp]
+
+silently does not work.
+
+So my suggestion would be to (reluctantly) add a third form of
+attribute:
+
+  [@@@ foo]
+
+which means basically the same as:
+
+ ;;[@@ foo]
+
+does now. This could be supported in the additional locations that I
+mentioned above, and would allow for a syntax error for the ";;[@@sexp]"
+mistake.
+
+Since this follows the existing pattern of [@...] and [@@...], it should
+not be too much trouble to tell users about [@@@ ...], and certainly no
+worse than explaining ";;[@@...]" to them.
+
+Regards,
+
+Leo
+
+From gabriel.scherer at gmail.com  Fri Oct 11 18:26:14 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Fri, 11 Oct 2013 19:26:14 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <86hacnrcd2.fsf@cam.ac.uk>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+Message-ID: <CAPFanBG=oCO8SUr31QVTcTj0diJo+94aHv9gPhY5-SKPf_4amg@mail.gmail.com>
+
+I would count as one of the people not being fond of ';;'. However, there
+is something I don't understand about your proposal: where in the AST tree
+would you attach those floating attributes?
+
+My understanding of Alain's ";;[@..]" was that he introduced a specific
+"empty item" in the AST of the current structure/signature. Extending this
+technique to the example you've shown would require adding such phony items
+in a few more syntactic positions, which may or may not be a good idea.
+
+
+On Fri, Oct 11, 2013 at 6:39 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+
+> Hi,
+>
+> I've been looking recently at encoding inline documentation
+> (i.e. ocamldoc comments) within attributes, as part of my work on
+> opam-doc. Mostly this works fine, but there is an issue with comments
+> that are not attached to any item (e.g. section headers).
+>
+> I had thought that the existing support for "structure/signature
+> attributes" would be sufficient. By these I mean attributes like:
+>
+>   ;;[@@doc "Hello World"]
+>
+> which are parsed as separate structure/signature items rather than
+> attached to an existing structure/signature item.
+>
+> The problem is that unattached attributes can appear in a number of
+> places that structure attributes cannot. Some examples:
+>
+>   type t = Foo of s
+>
+>   (** {3 Section} *)
+>
+>   and s = Bin of t option
+>
+>   class type foo = object
+>     method a : int
+>
+>     (** Some comment *)
+>
+>     method b : int
+>   end
+>
+> and so on.
+>
+> In both these cases it is hard to add support for structure items in
+> those locations because that would require supporting ';;' in those
+> locations as well.
+>
+> I have also heard a number of complaints about the ";;[@@ foo]"
+> syntax. Firstly, that it is ugly and its meaning is not particularly
+> obvious, and secondly that users may be confused when
+>
+>   type t;;
+>   [@@ sexp]
+>
+> silently does not work.
+>
+> So my suggestion would be to (reluctantly) add a third form of
+> attribute:
+>
+>   [@@@ foo]
+>
+> which means basically the same as:
+>
+>  ;;[@@ foo]
+>
+> does now. This could be supported in the additional locations that I
+> mentioned above, and would allow for a syntax error for the ";;[@@sexp]"
+> mistake.
+>
+> Since this follows the existing pattern of [@...] and [@@...], it should
+> not be too much trouble to tell users about [@@@ ...], and certainly no
+> worse than explaining ";;[@@...]" to them.
+>
+> Regards,
+>
+> Leo
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20131011/775ee0fe/attachment.html>
+
+From lpw25 at cam.ac.uk  Fri Oct 11 19:04:33 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Fri, 11 Oct 2013 19:04:33 +0100
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <CAPFanBG=oCO8SUr31QVTcTj0diJo+94aHv9gPhY5-SKPf_4amg@mail.gmail.com>
+ (Gabriel Scherer's message of "Fri, 11 Oct 2013 19:26:14 +0200")
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <CAPFanBG=oCO8SUr31QVTcTj0diJo+94aHv9gPhY5-SKPf_4amg@mail.gmail.com>
+Message-ID: <86wqlj65vy.fsf@cam.ac.uk>
+
+> My understanding of Alain's ";;[@..]" was that he introduced a specific "empty item" in the AST of the current
+> structure/signature. Extending this technique to the example you've shown would require adding such phony items in a
+> few more syntactic positions, which may or may not be a good idea.
+
+Yes, there would need to be some additional phony items. In some cases,
+like between class items, this is not a large change. For others, like
+recursive type definitions, it means adding an extra layer of variants
+which is a bit annoying.
+
+There may be some alternative methods of attaching these annotations to
+the right part of the AST, but I don't think any of them will be
+particularly nicer than this one.
+
+Regards,
+
+Leo
+
+From alain.frisch at lexifi.com  Fri Oct 11 21:51:07 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Fri, 11 Oct 2013 22:51:07 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <CAPFanBG=oCO8SUr31QVTcTj0diJo+94aHv9gPhY5-SKPf_4amg@mail.gmail.com>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <CAPFanBG=oCO8SUr31QVTcTj0diJo+94aHv9gPhY5-SKPf_4amg@mail.gmail.com>
+Message-ID: <525864BB.6030409@lexifi.com>
+
+On 10/11/2013 7:26 PM, Gabriel Scherer wrote:
+> My understanding of Alain's ";;[@..]" was that he introduced a specific
+> "empty item" in the AST of the current structure/signature.
+
+Attributes attached to signature/structure items are actually attached, 
+in the Parsetree representation, to individual declarations, not items, 
+because a group of mutually recursive type declarations count as a 
+single item in the current definition of the Parsetree but one really 
+wants to be able to attach attributes to each of them.  Floating 
+attributes are just a new kind of structure/signature items in the 
+Parsetree.
+
+
+Concretely, we have today:
+
+
+and signature_item_desc =
+   | Psig_value of value_description
+   | Psig_type of type_declaration list
+   ...
+   | Psig_include of module_type * attributes
+   ...
+   | Psig_attribute of attribute
+
+
+and value_description =
+     {
+      ...
+      pval_attributes: attributes;
+     }
+
+and type_declaration =
+     {
+      ...
+      ptype_attributes: attributes;
+     }
+
+
+Another approach would be to split groups of declarations into 
+successive items, as in the Types representation:
+
+and signature_item =
+     Sig_value of Ident.t * value_description
+   | Sig_type of Ident.t * type_declaration * rec_status
+   ...
+
+(where rec_status indicates if the declaration is in the same group as 
+the previous one)
+
+
+This adds some invariants which are not represented in the data 
+structure (a Trec_next Sig_type must immediately follow another 
+Sig_type), but it allows for a more uniform representation of 
+attributes.  (That said, it's also very useful to have attributes 
+directly represented in the value_description/type_declaration/... 
+records, especially in the Typedtree representation.)
+
+
+Alain
+
+From alain.frisch at lexifi.com  Fri Oct 11 21:51:13 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Fri, 11 Oct 2013 22:51:13 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <86hacnrcd2.fsf@cam.ac.uk>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+Message-ID: <525864C1.80908@lexifi.com>
+
+Hi Leo,
+
+On 10/11/2013 6:39 PM, Leo White wrote:
+> Since this follows the existing pattern of [@...] and [@@...], it should
+> not be too much trouble to tell users about [@@@ ...], and certainly no
+> worse than explaining ";;[@@...]" to them.
+
+I was also reluctant to introduce a different syntax for those 
+"floating" attributes, but you convinced me it's probably the best thing 
+to do.
+
+Beside this syntactic question, you're also interested in supporting 
+those attributes in more places.  Within class signatures and 
+structures, I don't see any problem, but I'm more concerned by floating 
+attributes between declarations in a group.  Are you asking for allowing:
+
+  type t = ...
+
+  [@@@doc.section ....]
+
+  and s = ...
+
+
+?
+
+Honestly, I'm not yet convinced this is really necessary.  Do we really 
+need to split documentation sections in such places?  But if we go this 
+way, I'd be inclined to look again at an early proposal of considering 
+groups of declarations as successive items (similarly to Types), so that 
+attached item attributes can be represented more uniformly (in the 
+signature_item and structure_item records).
+
+
+Alain
+
+From lpw25 at cam.ac.uk  Fri Oct 11 22:19:54 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Fri, 11 Oct 2013 22:19:54 +0100
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <525864C1.80908@lexifi.com> (Alain Frisch's message of "Fri, 11
+ Oct 2013 22:51:13 +0200")
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com>
+Message-ID: <86vc13mrnp.fsf@cam.ac.uk>
+
+> Are you asking for allowing:
+>
+>  type t = ...
+>
+>  [@@@doc.section ....]
+>
+>  and s = ...
+>
+>
+> ?
+
+Yes
+
+> Honestly, I'm not yet convinced this is really necessary.  Do we really need to split documentation sections in such
+> places?  
+
+I think that large files of recursive type definitions, as are quite
+common in OCaml, are quite likely to want section headers. I am also
+hoping to be backwards-compatible with existing OCamldoc, which I think
+supports such comments.
+
+> But if we go this way, I'd be inclined to look again at an early proposal of considering groups of declarations
+> as successive items (similarly to Types), so that attached item attributes can be represented more uniformly (in the
+> signature_item and structure_item records).
+
+I think that will be more work than making type_declaration a variant
+type with a Ptyp_attribute constructor. However it may be a little
+neater.
+
+Regards,
+
+Leo
+
+From alain.frisch at lexifi.com  Sat Oct 12 06:59:40 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Sat, 12 Oct 2013 07:59:40 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <86vc13mrnp.fsf@cam.ac.uk>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com> <86vc13mrnp.fsf@cam.ac.uk>
+Message-ID: <5258E54C.5050701@lexifi.com>
+
+What about using regular item attributes for section headers?  This 
+might be not so nice conceptually, but would there be actual problems 
+with this approach?
+
+-- Alain
+
+On 10/11/2013 11:19 PM, Leo White wrote:
+>> Are you asking for allowing:
+>>
+>>   type t = ...
+>>
+>>   [@@@doc.section ....]
+>>
+>>   and s = ...
+>>
+>>
+>> ?
+>
+> Yes
+>
+>> Honestly, I'm not yet convinced this is really necessary.  Do we really need to split documentation sections in such
+>> places?
+>
+> I think that large files of recursive type definitions, as are quite
+> common in OCaml, are quite likely to want section headers. I am also
+> hoping to be backwards-compatible with existing OCamldoc, which I think
+> supports such comments.
+>
+>> But if we go this way, I'd be inclined to look again at an early proposal of considering groups of declarations
+>> as successive items (similarly to Types), so that attached item attributes can be represented more uniformly (in the
+>> signature_item and structure_item records).
+>
+> I think that will be more work than making type_declaration a variant
+> type with a Ptyp_attribute constructor. However it may be a little
+> neater.
+>
+> Regards,
+>
+> Leo
+>
+
+
+From gabriel.scherer at gmail.com  Sat Oct 12 10:36:07 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Sat, 12 Oct 2013 11:36:07 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <5258E54C.5050701@lexifi.com>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com> <86vc13mrnp.fsf@cam.ac.uk>
+ <5258E54C.5050701@lexifi.com>
+Message-ID: <CAPFanBFQaHS094YgSQJPwJuWDR7E5ZSgyJv-T0AXOzPBnrf0LA@mail.gmail.com>
+
+I think the major benefits of extension-points for documentation, compared
+to ocamldoc comments, is that they are unambiguously attached to an AST
+node. We get in trouble for section headers because they don't fit that
+framework very well; they're not semantically attached to a precise node,
+and even if you would consider them as attached to a set of nods (the ones
+in the section), this set apparently has no reason to respect the AST
+structure. So we get an impedance mismatch here.
+
+I don't think that the use case of putting free-floating section nodes in
+between mutually recursive declarations is important enough to provoke
+large changes to the AST structure. Alain's suggestion to not have any
+special syntax for this seems sensible. Once we take a few step back to
+contemplate the purpose of sections, one may even consider more flexible
+approaches, such as:
+
+();; [@doc.declarations [
+  firstpart, {{First Part of my API}};
+  second, {{The More Specialized Rest}};
+]]
+
+type a = ... [@doc {{...}}][@doc.section firstpart]
+and b = ... [@doc {{...}] (* implicitly it's still in section "firstpart" *)
+and c = .... [@doc {{...}}]
+and d = ... [@doc {{...}}][@doc.section second]
+and e = [@doc {{...}}]
+and f = ... [@doc {{...}}][@doc.section firstpart]
+  (* for some reason I want to display [f] in the first section, but didn't
+want to move the actual  code around *)
+
+
+
+
+
+On Sat, Oct 12, 2013 at 7:59 AM, Alain Frisch <alain.frisch at lexifi.com>wrote:
+
+> What about using regular item attributes for section headers?  This might
+> be not so nice conceptually, but would there be actual problems with this
+> approach?
+>
+> -- Alain
+>
+>
+> On 10/11/2013 11:19 PM, Leo White wrote:
+>
+>> Are you asking for allowing:
+>>>
+>>>   type t = ...
+>>>
+>>>   [@@@doc.section ....]
+>>>
+>>>   and s = ...
+>>>
+>>>
+>>> ?
+>>>
+>>
+>> Yes
+>>
+>>  Honestly, I'm not yet convinced this is really necessary.  Do we really
+>>> need to split documentation sections in such
+>>> places?
+>>>
+>>
+>> I think that large files of recursive type definitions, as are quite
+>> common in OCaml, are quite likely to want section headers. I am also
+>> hoping to be backwards-compatible with existing OCamldoc, which I think
+>> supports such comments.
+>>
+>>  But if we go this way, I'd be inclined to look again at an early
+>>> proposal of considering groups of declarations
+>>> as successive items (similarly to Types), so that attached item
+>>> attributes can be represented more uniformly (in the
+>>> signature_item and structure_item records).
+>>>
+>>
+>> I think that will be more work than making type_declaration a variant
+>> type with a Ptyp_attribute constructor. However it may be a little
+>> neater.
+>>
+>> Regards,
+>>
+>> Leo
+>>
+>>
+> ______________________________**_________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/**listinfo/wg-camlp4<http://lists.ocaml.org/listinfo/wg-camlp4>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20131012/8e773466/attachment-0001.html>
+
+From lpw25 at cam.ac.uk  Sat Oct 12 18:41:56 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Sat, 12 Oct 2013 18:41:56 +0100
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <CAPFanBFQaHS094YgSQJPwJuWDR7E5ZSgyJv-T0AXOzPBnrf0LA@mail.gmail.com>
+ (Gabriel Scherer's message of "Sat, 12 Oct 2013 11:36:07 +0200")
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com> <86vc13mrnp.fsf@cam.ac.uk>
+ <5258E54C.5050701@lexifi.com>
+ <CAPFanBFQaHS094YgSQJPwJuWDR7E5ZSgyJv-T0AXOzPBnrf0LA@mail.gmail.com>
+Message-ID: <874n8mfkt7.fsf@study.localdomain>
+
+> I think the major benefits of extension-points for documentation, compared to ocamldoc comments, is that they are
+> unambiguously attached to an AST node. We get in trouble for section headers because they don't fit that framework very
+> well; they're not semantically attached to a precise node, and even if you would consider them as attached to a set of
+> nods (the ones in the section), this set apparently has no reason to respect the AST structure. So we get an impedance
+> mismatch here.
+
+To be clear, I don't think writing documentation directly as
+extension-points is a good idea. However, I do think that it is a good
+idea to store the documentation (taken from ocamldoc comments) as
+extension-points within the AST.
+
+As a side note, this part of the AST would also need to be rewritten if
+we wanted to support mutually recursive definitions of different
+sorts. For example:
+
+    type t = #foo list
+    and class type foo = object method x : t end
+
+which I know has been previously requested.
+
+From lpw25 at cam.ac.uk  Sat Oct 12 18:44:19 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Sat, 12 Oct 2013 18:44:19 +0100
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <5258E54C.5050701@lexifi.com> (Alain Frisch's message of "Sat, 12
+ Oct 2013 07:59:40 +0200")
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com> <86vc13mrnp.fsf@cam.ac.uk>
+ <5258E54C.5050701@lexifi.com>
+Message-ID: <87zjqee64s.fsf@study.localdomain>
+
+[Sorry for repeat Alain: I accidently dropped wg-camlp4 from the reply]
+
+> What about using regular item attributes for section headers?  This might be not so nice conceptually, but would there
+> be actual problems with this approach?
+
+For my use case it is probably ok, although I would prefer a cleaner
+system. I imagine at some point someone will get a surprising section
+header in the wrong place due to an incorrectly written ppx processor,
+but perhaps that is fine.
+
+From alain.frisch at lexifi.com  Fri Oct 18 15:13:29 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Fri, 18 Oct 2013 16:13:29 +0200
+Subject: [wg-camlp4] Structure/signature attributes suggestion
+In-Reply-To: <CAPFanBFQaHS094YgSQJPwJuWDR7E5ZSgyJv-T0AXOzPBnrf0LA@mail.gmail.com>
+References: <51701746.9010008@lexifi.com> <86hacnrcd2.fsf@cam.ac.uk>
+ <525864C1.80908@lexifi.com> <86vc13mrnp.fsf@cam.ac.uk>
+ <5258E54C.5050701@lexifi.com>
+ <CAPFanBFQaHS094YgSQJPwJuWDR7E5ZSgyJv-T0AXOzPBnrf0LA@mail.gmail.com>
+Message-ID: <52614209.2000006@lexifi.com>
+
+On 10/12/2013 11:36 AM, Gabriel Scherer wrote:
+> I don't think that the use case of putting free-floating section nodes
+> in between mutually recursive declarations is important enough to
+> provoke large changes to the AST structure. Alain's suggestion to not
+> have any special syntax for this seems sensible.
+
+Leo mentioned the risk that by using normal item attributes for sections 
+can yield to suprising results if -ppx rewriter start moving declaration 
+around or inserting new ones.
+
+I think it makes sense to keep floating attributes in general.  They are 
+useful also to turn warnings on/off, for instance.  And it is fine to 
+use them for ocamldoc section as well (and also to specify an initial 
+header, before the first item).   Now if there is really a need to split 
+sections in the middle of a group of mutally recursive declarations, 
+using attributes on each declaration is probably fine.
+
+Do you agree?
+
+
+Alain
+

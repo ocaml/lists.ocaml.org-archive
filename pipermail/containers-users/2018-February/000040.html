@@ -1,0 +1,437 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [containers-users] Possible additions to Containers and Friends
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:containers-users%40lists.ocaml.org?Subject=Re%3A%20%5Bcontainers-users%5D%20Possible%20additions%20to%20Containers%20and%20Friends&In-Reply-To=%3C2be2d373-c3ad-535a-0510-834aa92ae678%40sympatico.ca%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000039.html">
+   <LINK REL="Next"  HREF="000041.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[containers-users] Possible additions to Containers and Friends</H1>
+    <B>peter frey</B> 
+    <A HREF="mailto:containers-users%40lists.ocaml.org?Subject=Re%3A%20%5Bcontainers-users%5D%20Possible%20additions%20to%20Containers%20and%20Friends&In-Reply-To=%3C2be2d373-c3ad-535a-0510-834aa92ae678%40sympatico.ca%3E"
+       TITLE="[containers-users] Possible additions to Containers and Friends">pjfrey at sympatico.ca
+       </A><BR>
+    <I>Sat Feb 10 19:38:13 GMT 2018</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000039.html">[containers-users] Commentaires Containers - questions diverses
+</A></li>
+        <LI>Next message: <A HREF="000041.html">[containers-users] Possible additions to Containers and Friends
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#40">[ date ]</a>
+              <a href="thread.html#40">[ thread ]</a>
+              <a href="subject.html#40">[ subject ]</a>
+              <a href="author.html#40">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>(*
+Reading recent posts on discuss.ocal.org gives me the impression that 
+some tiny
+number of utf related routines should be more easily available.
+Container's Sequence.t and Gen.t, in particular could benefit from a 
+couple of
+simple routines.&#160; The code below fits well into that frame work.
+I am treating it as public domain code but feel free to make it your own 
+and to
+include it where appropriate. (Perhaps some of the tests could go into the
+example directory...)
+The routines here DO NOT verify unless its unavoidable.&#160; In particular they
+accept ALL code points that can be encoded by the original Utf8 definition.
+It is only a matter of language; we could call it utf31 ...
+Restricting the range is trivial; as would be including some 
+verification code.
+
+
+
+*)
+
+open Containers
+
+(* Create a generator from a utf8-string. Each call produces a code point.
+ &#160;* The optional parameter srcIdx specifies then start point in the string.
+ &#160;* srcIdx must point to a valid suffix of a utf8 string.
+ &#160;* *)
+let gen_of_utf8 ?(srcIdx=ref 0) str =
+ &#160;&#160;&#160; let lim = String.length str in
+ &#160;&#160;&#160; let assemble_next () =&#160;&#160;&#160;&#160; (* we come here only for multi-byte 
+characters *)
+ &#160;&#160;&#160;&#160;&#160; let cv jmax accu =&#160;&#160;&#160;&#160;&#160; (* utf8 character length; construction of 
+uchar *)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; let rec cv' j accu' =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* inner loop j = 1..jmax ; each 
+uchar *)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; let ch = Char.code str.[ !srcIdx + j] in
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; let next = ( (accu' lsl 6) lor ( ch land 0x7f )) in
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; if j = jmax then begin&#160;&#160;&#160;&#160; (* except for 1st, each char gives 
+6 bits*)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; srcIdx := !srcIdx + j +1; Some next&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* +1 for 
+1st char *)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; end else cv' (succ j) next
+ &#160;&#160;&#160;&#160;&#160; in cv' 1&#160; (* 1st char is already proccessed! *) accu
+ &#160;&#160;&#160; in if !srcIdx &gt;= lim then None else
+ &#160;&#160;&#160; let n = str.[ !srcIdx ] in match n with
+ &#160;&#160;&#160; (* 0xxxxxxx *) | '\000' .. '\127' -&gt; incr srcIdx; Some (int_of_char n)
+ &#160;&#160;&#160; (* 110yyyyy *) | '\128' .. '\223' -&gt; cv 1 ((Char.code n) land 0b11111 )
+ &#160;&#160;&#160; (* 1110zzzz *) | '\224' .. '\239' -&gt; cv 2 ((Char.code n) land 0b1111 )
+ &#160;&#160;&#160; (* 11110uuu *) | '\240' .. '\247' -&gt; cv 3 ((Char.code n) land 0b111 )
+ &#160;&#160;&#160; (* 111110vv *) | '\248' .. '\251' -&gt; cv 4 ((Char.code n) land 0b11 )
+ &#160;&#160;&#160; (* 1111110w *) | '\252' .. '\253' -&gt; cv 5 ((Char.code n) land 0b1 )
+ &#160;&#160;&#160; (* 1111111X *) | '\254' .. '\255' -&gt; raise (Failure &quot;Bad stream&quot;)
+ &#160; in&#160; assemble_next;;
+
+
+(* The 'natural' stream representation of a utf-string is a generator.
+ &#160;* But Sequences are not far away ... *)
+let makeUtf8Seq ?(srcIdx=ref 0) str = Sequence.of_gen (gen_of_utf8 
+~srcIdx str)
+
+
+
+(* Convert a code point to a string; Hopefully some day this will be in the
+ &#160;* standard library. There are various equally trivial versions of this 
+around.
+ &#160;* The returned string is created (allocated) fresh for each k.
+ &#160;* *)
+
+let code_to_string k =
+ &#160; let mask = 0b111111 in
+ &#160; if k &lt; 0 || k &gt;= 0x4000000 then begin
+ &#160;&#160;&#160; let s = Bytes.create 6 in
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.chr (0xfc + (k lsr 30)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 24) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 18) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 4 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 5 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; s end
+ &#160; else if k &lt;= 0x7f then
+ &#160;&#160;&#160; Bytes.make 1 (Char.unsafe_chr k)
+ &#160; else if k &lt;= 0x7ff then begin
+ &#160;&#160;&#160; let s = Bytes.create 2 in
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xc0 lor (k lsr 6)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; s end
+ &#160; else if k &lt;= 0xffff then begin
+ &#160;&#160;&#160; let s = Bytes.create 3 in
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xe0 lor (k lsr 12)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; s end
+ &#160; else if k &lt;= 0x1fffff then begin
+ &#160;&#160;&#160; let s = Bytes.create 4 in
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xf0 + (k lsr 18)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; s end
+ &#160; else begin
+ &#160;&#160;&#160; let s = Bytes.create 5 in
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xf8 + (k lsr 24)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 18) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 4 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; s end
+
+let string_to_code str =
+ &#160;&#160;&#160; let cv jmax accu =&#160;&#160;&#160;&#160;&#160; (* utf8 character length; construction of 
+uchar *)
+ &#160;&#160;&#160; if jmax &gt;&#160; String.length str then raise (Failure &quot;string_to_code&quot;)
+ &#160;&#160;&#160; else let rec cv' j accu' =&#160;&#160;&#160;&#160;&#160;&#160; (* inner loop j = 1..jmax ; each 
+uchar *)
+ &#160;&#160;&#160;&#160;&#160; let ch = Char.code (String.unsafe_get str j) in
+ &#160;&#160;&#160;&#160;&#160; let next = ( (accu' lsl 6) lor ( ch land 0x7f )) in
+ &#160;&#160;&#160;&#160;&#160; if j = jmax then next else cv' (succ j) next
+ &#160;&#160;&#160;&#160;&#160; in cv' 1&#160; (* 1st char is already proccessed! *) accu
+ &#160;&#160;&#160; in let n = str.[0] in match n with
+ &#160;&#160;&#160; (* 0xxxxxxx *) | '\000' .. '\127' -&gt; int_of_char n
+ &#160;&#160;&#160; (* 110yyyyy *) | '\128' .. '\223' -&gt; cv 1 ((Char.code n) land 0b11111 )
+ &#160;&#160;&#160; (* 1110zzzz *) | '\224' .. '\239' -&gt; cv 2 ((Char.code n) land 0b1111 )
+ &#160;&#160;&#160; (* 11110uuu *) | '\240' .. '\247' -&gt; cv 3 ((Char.code n) land 0b111 )
+ &#160;&#160;&#160; (* 111110vv *) | '\248' .. '\251' -&gt; cv 4 ((Char.code n) land 0b11 )
+ &#160;&#160;&#160; (* 1111110w *) | '\252' .. '\253' -&gt; cv 5 ((Char.code n) land 0b1 )
+ &#160;&#160;&#160; (* 1111111X *) | '\254' .. '\255' -&gt; raise (Failure &quot;Bad stream&quot;)
+
+
+(* code_into_string over-writes string s which must be 7-byte string.
+ &#160;* n-byte String ends with '\000' which is set as needed (in case you 
+feed it
+ &#160;* to a c-program). The last byte of a string contains the # of unused 
+bytes in
+ &#160;* then string. It is set here, for example, by &quot;Bytes.unsafe_set s 6 
+'\000'&quot;
+ &#160;* If the string is longer than 1 word (plus header) all hell breaks loose.
+ &#160;* Use only if the string is copied afterwards. (Buffer.add_string ... etc)
+ &#160;* DUBIOUS (and about twice as fast because allocation is not needed)
+ &#160;* js_of_ocaml might be unhappy with this...
+*)
+let code_into_string s k =
+ &#160; let mask = 0b111111 in
+ &#160; if k &lt; 0 || k &gt;= 0x4000000 then begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.chr (0xfc + (k lsr 30)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 24) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 18) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 4 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 5 (Char.unsafe_chr (0x80 lor ( k land mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 6 '\000';&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* string internals 
+s/b OK *)
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 1 );&#160;&#160; (* string internals 
+DUBIOUS *)
+ &#160;&#160;&#160; () end
+ &#160; else if k &lt;= 0x7f then begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.chr k);
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 '\000';
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 6 );
+ &#160;&#160;&#160; () end
+ &#160; else if k &lt;= 0x7ff then begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xc0 lor (k lsr 6)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 '\000';
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 5 );
+ &#160;&#160;&#160; () end
+ &#160; else if k &lt;= 0xffff then begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xe0 lor (k lsr 12)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 '\000';
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 4 );
+ &#160;&#160;&#160; () end
+ &#160; else if k &lt;= 0x1fffff then begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xf0 + (k lsr 18)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 4 '\000';
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 3 );
+ &#160;&#160;&#160; () end
+ &#160; else begin
+ &#160;&#160;&#160; Bytes.unsafe_set s 0 (Char.unsafe_chr (0xf8 + (k lsr 24)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 1 (Char.unsafe_chr (0x80 lor ((k lsr 18) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 2 (Char.unsafe_chr (0x80 lor ((k lsr 12) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 3 (Char.unsafe_chr (0x80 lor ((k lsr 6) land 
+mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 4 (Char.unsafe_chr (0x80 lor (k land mask)));
+ &#160;&#160;&#160; Bytes.unsafe_set s 5 '\000';
+ &#160;&#160;&#160; Bytes.unsafe_set s 7 (Char.unsafe_chr&#160; 2 );
+ &#160;&#160;&#160; () end
+
+(* Automaton to map a (utf8) char Sequence.t into an int Sequence.t
+ &#160;&#160; Accept up to 6 characters, converting them to an integer to feed to k.
+ &#160;&#160; This code demonstrates that being at the receiving end of a sequence can
+ &#160;&#160; cause hardship ... It needs often a state-machine
+ &#160;&#160; ... and perhaps a better name&#160; *)
+ &#160; let mapUtf8Char2Code (k: int -&gt; unit) =
+ &#160;&#160;&#160; let rec next = ref first
+ &#160;&#160;&#160; and accu = ref 0
+ &#160;&#160;&#160; and first ch = match ch with
+ &#160;&#160;&#160;&#160;&#160; (* 0xxxxxxx *) | '\000' .. '\127' -&gt; k (int_of_char ch); accu := 0
+ &#160;&#160;&#160;&#160;&#160; (* 110yyyyy *) | '\128' .. '\223' -&gt; cv s1 ch 0b11111
+ &#160;&#160;&#160;&#160;&#160; (* 1110zzzz *) | '\224' .. '\239' -&gt; cv s2 ch 0b1111
+ &#160;&#160;&#160;&#160;&#160; (* 11110uuu *) | '\240' .. '\247' -&gt; cv s3 ch 0b111
+ &#160;&#160;&#160;&#160;&#160; (* 111110vv *) | '\248' .. '\251' -&gt; cv s4 ch 0b11
+ &#160;&#160;&#160;&#160;&#160; (* 1111110w *) | '\252' .. '\253' -&gt; cv s5 ch 0b1
+ &#160;&#160;&#160;&#160;&#160; (* 1111111X *) | '\254' .. '\255' -&gt; raise (Failure &quot;Bad stream&quot;)
+ &#160;&#160;&#160; and inline ch = accu := (!accu lsl 6) lor ((Char.code ch) land 0x7f )
+ &#160;&#160;&#160; and s1 ch = inline ch; next := first; k !accu
+ &#160;&#160;&#160; and s2 ch = inline ch; next := s1 and s3 ch = inline ch; next := s2
+ &#160;&#160;&#160; and s4 ch = inline ch; next := s3 and s5 ch = inline ch; next := s4
+ &#160;&#160;&#160; and cv startState initialValue mask =
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; next := startState;
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; accu := (Char.code initialValue) land mask
+ &#160; in (fun c -&gt; !next c) ;;
+
+let code_len k =
+ &#160; if k &lt; 0 || k &gt;= 0x4000000 then 6 else if k &lt;= 0x7f then 1
+ &#160; else if k &lt;= 0x7ff then 2 else if k &lt;= 0xffff then 3
+ &#160; else if k &lt;= 0x1fffff then 4 else 5
+
+
+(*
+(* 
+===========================================================================
+ &#160;*&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; various tests of above
+*)
+
+
+(* measure.ml
+ &#160;* included to avoid dependency on some other (more capable) measuring tool
+ &#160;*&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; *)
+let measure fn arg (units:int)&#160; comment =
+ &#160; (* arg is last argument of fn (or unit not belonging to fn);
+ &#160;&#160;&#160;&#160; argument units is only used for ratio (units /. elapsed) *)
+ &#160; let start = Unix.gettimeofday() in
+ &#160; let res = fn arg in
+ &#160; let endt = Unix.gettimeofday() in let elapsed = endt -. start in
+ &#160; let open Printf in
+ &#160; printf&quot;\n%s\n\tTime:%f Units:%i Units/sec:%s uSecs/Unit:%s\n%!&quot;
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; (sprintf&quot;Measured &lt;&lt;%s&gt;&gt;&quot; comment)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; elapsed units
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; ( if units &lt;= 1 then &quot;N/A&quot; else
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; sprintf&quot;%8.0f&quot; ((float_of_int units) /. elapsed ) )
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160; ( if units &lt;= 1 then &quot;N/A&quot; else
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; sprintf&quot;%2.8f&quot; (elapsed /. (float_of_int units) *. 1000000.0 ) );
+ &#160; res
+
+
+open Printf
+module S = Sequence
+module V = Vector
+
+let code_to_string_test last =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* 
+code_to_string *)
+ &#160; for i = 0 to last do ignore (code_to_string i)&#160; done ;;
+
+let code_into_string_test last =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* 
+code_into_string *)
+ &#160; let str = Bytes.create 6 in
+ &#160; for i = 0 to last do ignore (code_into_string str i)&#160; done ;;
+
+let round_about2 last =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* code_to_string and 
+back *)
+ &#160; for i = 0 to last do
+ &#160;&#160;&#160; let str = code_to_string i in (* convert code point to char string *)
+ &#160;&#160;&#160; let j = string_to_code str in&#160; (* convert the char string back to 
+code *)
+ &#160;&#160;&#160; assert( i = j)
+ &#160; done
+
+let round_about3 last =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* code_into_string and 
+back *)
+ &#160; let len = ref 1 in
+ &#160; let str = Bytes.create 6 in
+ &#160; for i = 0 to last do
+ &#160;&#160;&#160; code_into_string str i; (* convert code point to char string *)
+ &#160;&#160;&#160; let j = string_to_code str in&#160; (* convert the char string back to 
+code *)
+ &#160;&#160;&#160; assert( i = j);
+ &#160;&#160;&#160; if code_len i &lt;&gt; !len then (printf&quot;New len at %x:%s\n&quot; i str;
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; len := code_len i )
+ &#160; done
+
+
+let make_big_string last = (* create a utf8 string of consecutive code 
+points *)
+ &#160; let buf = Buffer.create (16 * 1024 * 1024 ) in (* ocaml tolerates 
+large *)
+ &#160; let str = Bytes.create 6 in
+ &#160; for i = 0 to last do
+ &#160;&#160;&#160; code_into_string str i;
+ &#160;&#160;&#160; Buffer.add_string buf str;
+ &#160; done;
+ &#160; Buffer.contents buf
+ &#160; ;;
+
+let make_big_string last = (* create a utf8 string of consecutive code 
+points *)
+ &#160; let buf = Buffer.create (16 * 1024 * 1024 ) in (* ocaml tolerates 
+large *)
+ &#160; let str = Bytes.create 7 in
+ &#160; for i = 0 to last do
+ &#160;&#160;&#160; code_into_string str i;
+ &#160;&#160;&#160; Buffer.add_string buf str;
+ &#160; done;
+ &#160; let b = Buffer.contents buf in
+ &#160; printf&quot;\n\ncreated %i strings. \nfinal length: %i bytes. \
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; \nAvg len %f\n%!&quot;
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; last
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (String.length b)
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; ((float_of_int (String.length b)) /. (float_of_int last));
+ &#160; b
+
+let decode_big big =&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* create a utf8 string; convert to 
+int S.t *)
+ &#160; let check = ref 0 in&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160;&#160; (* map char S.t to int S.t and test 
+result *)
+ &#160; (String.to_seq big)
+ &#160; (mapUtf8Char2Code (fun j -&gt; assert (j = !check) ; incr check))
+
+
+let last1 = 0x3ffffff;; (*&#160;&#160;&#160; 67_108_863 *)
+let last2 = 0x7fffffff;; (* 1073_741_823 *)
+let last = last2 (* last2 uses ALL code points and takes a while *)
+
+(* Sample: Convert a utf8 char string to a Vector *)
+let utf8_to_vector str = str |&gt; gen_of_utf8 |&gt; V.of_gen
+
+let _ = printf &quot;\&quot;SK&#12469;&#12452;&#12488;&#12522;f\&quot; |&gt; utf8_to_vector \n\t |&gt; Vector.to_seq |&gt; 
+S.map code_to_string |&gt; fun seq -&gt; seq (printf\&quot;%s\t\&quot;)\n!&quot;;;
+
+&quot;SK&#12469;&#12452;&#12488;&#12522;f&quot; |&gt; utf8_to_vector |&gt; Vector.to_seq |&gt; S.map code_to_string |&gt;
+ &#160;fun seq -&gt; seq (printf&quot;%s\t&quot;);;
+
+(* Test below does not work for last 2 because it allocates a to big 
+string *)
+let big = measure make_big_string last1 last1 &quot;make_big_string&quot;;;
+measure decode_big big last1 &quot;decode_big&quot;;;
+
+(* Here last2 encodes/decodes ALL possible code points *)
+measure round_about2 last last &quot;round_about2&quot;;;
+measure round_about3 last last &quot;round_about3&quot;;;
+measure code_into_string_test last last &quot;code_into_string&quot;;;
+measure code_to_string_test last last &quot;code_to_string&quot;;;
+
+let _ = (* One can never have to many samples ... *)
+ &#160;printf&quot;\n\n&#160;&#160;&#160; &quot;; S.( 0 -- 15) (fun i -&gt; printf&quot; %2x&quot; i);
+ &#160;S.( 0 -- 15)
+ &#160; (fun i -&gt; printf&quot;\n%4x&#160; &quot; (i * 16 + 0x2500);
+ &#160;&#160;&#160; S.( (0x2500 + i * 16) -- (0x250F + i * 16))
+ &#160;&#160;&#160; |&gt; S.map code_to_string
+ &#160;&#160;&#160; |&gt; S.to_list |&gt; String.concat &quot;&#160; &quot; |&gt; print_string
+ &#160; );;
+*)
+
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000039.html">[containers-users] Commentaires Containers - questions diverses
+</A></li>
+	<LI>Next message: <A HREF="000041.html">[containers-users] Possible additions to Containers and Friends
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#40">[ date ]</a>
+              <a href="thread.html#40">[ thread ]</a>
+              <a href="subject.html#40">[ subject ]</a>
+              <a href="author.html#40">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/containers-users">More information about the Containers-users
+mailing list</a><br>
+</body></html>

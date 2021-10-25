@@ -1,0 +1,440 @@
+From andre at digirati.com.br  Thu Jul 21 21:40:57 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Thu, 21 Jul 2016 17:40:57 -0300
+Subject: [ocaml-ctypes] Pointer to pointer and null check
+Message-ID: <5b7fd0d1-e820-f406-8624-2827313423c1@digirati.com.br>
+
+Hi
+
+I'm trying to write bindings to an API that in simplified form looks
+like this, for a given opaque type `foo_t`:
+
+  int foo_bar(foo_t **ret, foo_t *foo);
+
+In C it's used like this:
+
+  foo_t *foo = foo_new();
+  foo_t *ret;
+  int r = foo_bar(&ret, foo);
+
+  if (r == 0) {
+    if (ret != NULL) {
+      /* success */
+    } else {
+      /* error */
+    }
+  } else {
+    /* not important */
+  }
+
+So if the return is 0, one has to check whether ret is NULL to determine
+failure or success.
+
+I have defined in the OCaml side:
+
+  type foo = unit ptr
+  let foo : foo typ = ptr void
+
+  let foo_bar = foreign "foo_bar" (ptr foo @-> foo @-> returning int)
+
+  let foo_bar x =
+    let ret = allocate foo x in
+    let r = foo_bar ret x in
+    (r, ret)
+
+Given that `ret` was allocated before the call, it will never be NULL
+after the call, so determining if there was an error becomes impossible.
+
+I also tried defining a structure type instead:
+
+  type foo
+  let foo : foo structure typ = structure "foo_t"
+
+  let foo_bar = foreign "foo_bar"
+    (ptr ptr foo @-> ptr foo @-> returning int)
+
+  let foo_bar x =
+    let ret = from_voidp foo null in
+    let r = foo_bar (addr ret) x in
+    (r, ret)
+
+but of course I can't call `addr` on a `Ctypes_static.pointer`. Also,
+apparently the way to check for NULL is to use `ptr_opt`, but I'm not
+sure how that would fit in a function like this where the result is
+returned via an argument.
+
+Any help would be greatly appreciated.
+
+Best regards,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160721/bf1cc58e/attachment.sig>
+
+From yallop at gmail.com  Thu Jul 21 22:35:02 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 21 Jul 2016 22:35:02 +0100
+Subject: [ocaml-ctypes] Pointer to pointer and null check
+In-Reply-To: <5b7fd0d1-e820-f406-8624-2827313423c1@digirati.com.br>
+References: <5b7fd0d1-e820-f406-8624-2827313423c1@digirati.com.br>
+Message-ID: <CAAxsn=EdugcM=yz9EZJZFeqMm-mL6H3T-_EiArPJz2ASv_vL9w@mail.gmail.com>
+
+Dear Andre,
+
+On 21 July 2016 at 21:40, Andre Nathan <andre at digirati.com.br> wrote:
+> I'm trying to write bindings to an API that in simplified form looks
+> like this, for a given opaque type `foo_t`:
+>
+>   int foo_bar(foo_t **ret, foo_t *foo);
+>
+> In C it's used like this:
+>
+>   foo_t *foo = foo_new();
+>   foo_t *ret;
+>   int r = foo_bar(&ret, foo);
+>
+>   if (r == 0) {
+>     if (ret != NULL) {
+>       /* success */
+>     } else {
+>       /* error */
+>     }
+>   } else {
+>     /* not important */
+>   }
+>
+> So if the return is 0, one has to check whether ret is NULL to determine
+> failure or success.
+>
+> I have defined in the OCaml side:
+>
+>   type foo = unit ptr
+>   let foo : foo typ = ptr void
+>
+>   let foo_bar = foreign "foo_bar" (ptr foo @-> foo @-> returning int)
+>
+>   let foo_bar x =
+>     let ret = allocate foo x in
+>     let r = foo_bar ret x in
+>     (r, ret)
+>
+> Given that `ret` was allocated before the call, it will never be NULL
+> after the call, so determining if there was an error becomes impossible.
+
+Your code above is correct.  I think the apparent difficulty lies in
+the different roles of 'ret' in the C and OCaml fragments.
+
+In C, your ret is a pointer to foo_t:
+
+>   foo_t *ret;
+
+You pass its address to foo_bar, which uses the address to modify ret.
+(You're passing '&ret', so foo_bar modifies '*&ret'.)
+
+In OCaml, your ret is a pointer to pointer to foo:
+
+>   let foo : foo typ = ptr void
+[...]
+>     let ret = allocate foo x in
+
+and so, correctly, you pass ret (rather than its address) to foo_bar,
+which can consequently only modify *ret, not ret.  (You're passing
+'ret', so foo_bar modifies '*ret'.)
+
+So to check for an error you should compare *ret, not ret, with NULL, like this:
+
+   ptr_compare !@ret null = 0
+
+> but of course I can't call `addr` on a `Ctypes_static.pointer`. Also,
+> apparently the way to check for NULL is to use `ptr_opt`,
+
+Indeed, that's an option, and perhaps better than explicit null
+comparisons.  Here's how you adapt your code to use ptr_opt:
+
+  type foo_opt = unit ptr option
+  let foo_opt : foo_opt typ = ptr_opt void
+
+  let foo_bar = foreign "foo_bar" (ptr foo_opt @-> foo_opt @-> returning int)
+
+  let foo_bar x =
+    let ret = allocate foo_opt (Some x) in
+    let r = foo_bar ret (Some x) in
+    (r, !@ret)
+
+Now foo_bar returns a pair
+
+    int * unit ptr option
+
+where the second element is 'None' if *ret was NULL after the call to
+foo_bar and 'Some p' for some p otherwise.
+
+I hope that helps,
+
+Jeremy.
+
+From andre at digirati.com.br  Fri Jul 22 12:32:04 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Fri, 22 Jul 2016 08:32:04 -0300
+Subject: [ocaml-ctypes] Pointer to pointer and null check
+In-Reply-To: <CAAxsn=EdugcM=yz9EZJZFeqMm-mL6H3T-_EiArPJz2ASv_vL9w@mail.gmail.com>
+References: <5b7fd0d1-e820-f406-8624-2827313423c1@digirati.com.br>
+ <CAAxsn=EdugcM=yz9EZJZFeqMm-mL6H3T-_EiArPJz2ASv_vL9w@mail.gmail.com>
+Message-ID: <74921549-30c4-7c49-6713-0e2e83db804a@digirati.com.br>
+
+Thanks a lot Jeremy!
+
+I went with the ptr_opt way, thought I'm a bit surprised it works:
+
+>   let foo_bar x =
+>     let ret = allocate foo_opt (Some x) in
+>     let r = foo_bar ret (Some x) in
+>     (r, !@ret)
+
+Intuitively I thought `ret` could never be null, because calling
+`allocate` would be akin to calling malloc() + memset() in C. I also
+believed that if the C library would set `*ret = NULL`, this would cause
+a leak of the memory allocated in `allocate`.
+
+So I guess my understanding is incorrect :)
+
+In the actual code I used
+
+  let ret = allocate foo_opt None in
+  ...
+
+since there's no meaningful initial value to be set on `ret`. It seems
+to be working fine :)
+
+Thanks again,
+Andre
+
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160722/050d001f/attachment.sig>
+
+From andre at digirati.com.br  Tue Jul 26 18:24:40 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 26 Jul 2016 14:24:40 -0300
+Subject: [ocaml-ctypes] How to memcpy?
+Message-ID: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+
+Hello
+
+Say I have a C struct that looks like this:
+
+  struct thing {
+    void *buffer;
+    unsigned long length;
+  }
+
+This struct is used to pass values of multiple types to a function. For
+example, given
+
+  struct thing *t = malloc(...);
+  unsigned long len;
+
+you do something like
+
+  int x = 42;
+  len = sizeof(int);
+  t->length = len;
+  t->buffer = malloc(len);
+  memcpy(t->buffer, &x, len);
+
+or
+
+  char *s = "foo";
+  len = strlen(s);
+  t->length = len;
+  t->buffer = malloc(len);
+  memcpy(t->buffer, s, len);
+
+In OCaml I'm representing the struct as
+
+  module Thing = struct
+    type t
+    type t = thing structure
+    let t : t typ = structure "thing"
+    let buffer = field t "buffer" (ptr void)
+    let length = field t "length" ulong
+  end
+
+What I couldn't figure out was how do do the equivalent of the memcpy()
+step using Ctypes. I've found Stubs.memcpy but it doesn't seem to be
+exported.
+
+Can this kind of thing be done directly using Ctypes or should I write a
+stub to handle this case?
+
+Thanks in advance,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160726/132be8b4/attachment.sig>
+
+From andre at digirati.com.br  Tue Jul 26 20:18:57 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 26 Jul 2016 16:18:57 -0300
+Subject: [ocaml-ctypes] How to memcpy?
+In-Reply-To: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+References: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+Message-ID: <89fed9b1-896c-02d2-038f-eaa0da924a6d@digirati.com.br>
+
+On 07/26/2016 02:24 PM, Andre Nathan wrote:
+> What I couldn't figure out was how do do the equivalent of the memcpy()
+> step using Ctypes. I've found Stubs.memcpy but it doesn't seem to be
+> exported.
+
+Found this implementation here:
+
+  https://github.com/ocamllabs/ocaml-ctypes/issues/92
+
+Any pointers on how to use it when the source is an OCaml string?
+
+Thanks!
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160726/9d60c0e4/attachment.sig>
+
+From yallop at gmail.com  Tue Jul 26 23:26:50 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 26 Jul 2016 23:26:50 +0100
+Subject: [ocaml-ctypes] How to memcpy?
+In-Reply-To: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+References: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+Message-ID: <CAAxsn=Gb9C7XQaMSATZtnrJAWEuXO=NKdz+PAg-gdpTd+xMJrg@mail.gmail.com>
+
+Dear Andre,
+
+On 26 July 2016 at 18:24, Andre Nathan <andre at digirati.com.br> wrote:
+> Say I have a C struct that looks like this:
+>
+>   struct thing {
+>     void *buffer;
+>     unsigned long length;
+>   }
+>
+> This struct is used to pass values of multiple types to a function. For
+> example, given
+>
+>   struct thing *t = malloc(...);
+>   unsigned long len;
+>
+> you do something like
+>
+>   int x = 42;
+>   len = sizeof(int);
+>   t->length = len;
+>   t->buffer = malloc(len);
+>   memcpy(t->buffer, &x, len);
+>
+> or
+>
+>   char *s = "foo";
+>   len = strlen(s);
+>   t->length = len;
+>   t->buffer = malloc(len);
+>   memcpy(t->buffer, s, len);
+>
+> In OCaml I'm representing the struct as
+>
+>   module Thing = struct
+>     type t
+>     type t = thing structure
+>     let t : t typ = structure "thing"
+>     let buffer = field t "buffer" (ptr void)
+>     let length = field t "length" ulong
+>   end
+>
+> What I couldn't figure out was how do do the equivalent of the memcpy()
+> step using Ctypes. I've found Stubs.memcpy but it doesn't seem to be
+> exported.
+
+In many cases you'll be able to avoid the call to 'memcpy' by using
+'allocate' to create an initialized object, like this:
+
+   let p = allocate int 42 in
+   setf v buffer (coerce (ptr int) (ptr void) p)
+
+But if you encounter a situation where you really need something like
+'memcpy' then you may find the following little library useful:
+
+   https://github.com/yallop/ocaml-memcpy
+
+The library provides several flavours of memcpy, with and without
+bounds checking, and to and from various kinds of objects including
+OCaml bytes buffers, bigarrays, and arbitrary memory addressed by
+ctypes pointers.
+
+For completeness, I should mention that there are tricks to do the
+equivalent of memcpy using just ctypes, without additional libraries,
+by coercing pointers to arrays of char of appropriately sizes, but I
+recommend the library approach as a better starting point.
+
+Kind regards,
+
+Jeremy.
+
+From andre at digirati.com.br  Wed Jul 27 01:30:45 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 26 Jul 2016 21:30:45 -0300
+Subject: [ocaml-ctypes] How to memcpy?
+In-Reply-To: <CAAxsn=Gb9C7XQaMSATZtnrJAWEuXO=NKdz+PAg-gdpTd+xMJrg@mail.gmail.com>
+References: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+ <CAAxsn=Gb9C7XQaMSATZtnrJAWEuXO=NKdz+PAg-gdpTd+xMJrg@mail.gmail.com>
+Message-ID: <F58D57F4-1DF3-48A3-9852-1C738C540349@digirati.com.br>
+
+Hi Jeremy
+
+> Em 26 de jul de 2016, ?s 19:26, Jeremy Yallop <yallop at gmail.com> escreveu:
+> 
+> In many cases you'll be able to avoid the call to 'memcpy' by using
+> 'allocate' to create an initialized object, like this:
+> 
+>   let p = allocate int 42 in
+>   setf v buffer (coerce (ptr int) (ptr void) p)
+
+For strings it seems from the description at [1] that using this method will cause problems if the C object lives longer than the OCaml object.
+
+Is there a way to copy an OCaml string into the buffer with stock a Ctypes or is memcpy the way to go here?
+
+[1] https://github.com/ocamllabs/ocaml-ctypes/issues/159
+
+Best,
+Andre
+
+From yallop at gmail.com  Wed Jul 27 07:28:42 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 27 Jul 2016 07:28:42 +0100
+Subject: [ocaml-ctypes] How to memcpy?
+In-Reply-To: <F58D57F4-1DF3-48A3-9852-1C738C540349@digirati.com.br>
+References: <f9275e8d-0f93-2f42-d8db-8c311fc5976d@digirati.com.br>
+ <CAAxsn=Gb9C7XQaMSATZtnrJAWEuXO=NKdz+PAg-gdpTd+xMJrg@mail.gmail.com>
+ <F58D57F4-1DF3-48A3-9852-1C738C540349@digirati.com.br>
+Message-ID: <CAAxsn=HVKhD+-RUcUDE8YGxcnaRHWk=o_buMRSrneszuBF1mdg@mail.gmail.com>
+
+On 27 July 2016 at 01:30, Andre Nathan <andre at digirati.com.br> wrote:
+> Is there a way to copy an OCaml string into the buffer with stock a Ctypes or is memcpy the way to go here?
+
+I recommend using memcpy here.
+

@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGg%2BUdAxQpqJaqmiDXQmMnDBOjV%3Dxa3vSE872uHVxtnsg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000336.html">
+   <LINK REL="Next"  HREF="000342.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGg%2BUdAxQpqJaqmiDXQmMnDBOjV%3Dxa3vSE872uHVxtnsg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Mar 19 10:49:46 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000336.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000342.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#337">[ date ]</a>
+              <a href="thread.html#337">[ thread ]</a>
+              <a href="subject.html#337">[ subject ]</a>
+              <a href="author.html#337">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I think that to help tooling (and programmers) we could allow explicit
+disambiguation of capitalized names (as mentioned in spec.pdf).
+
+The idea is that while &quot;X&quot; may refer to either an internal module
+defined in the program (or introduced in scope by an &quot;open module&quot;) or
+a compilation unit name, &quot;.X&quot; can only be an internal module, while
+&quot;..X&quot; (I'm reusing Alain's proposed .. notation here) can only be a
+compilation unit name.
+
+So, to reuse Alain's example,
+
+  module X = struct let x = 1 end
+  open namespace Foo
+  let a = X.x
+
+would be ambiguous, but
+
+  module X = struct let x = 1 end
+  open namespace Foo
+  let a = .X.x
+
+or
+
+  module X = struct let x = 1 end
+  open namespace Foo
+  let a = ..X.x
+
+would not.
+
+(I'm again not talking about the concrete syntax here: . or .. would
+create ambiguities, for example &quot;Some .X.bar&quot;. But merely the idea to
+get rid of the syntactic ambiguity between external and internal
+modules, which allows careful users to make &quot;ocamldep&quot; trivially
+correct without any approximation.)
+
+On Tue, Mar 19, 2013 at 11:38 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;<i> Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; writes:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Two more comments on Leo's proposal:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 1. I think we should look for a different notation than Foo # Bar for namespace qualification.  &quot;#&quot; is already used for
+</I>&gt;&gt;<i> the method calls; it should be possible to implement this notation without creating conflicts in the grammar, but it
+</I>&gt;&gt;<i> might create confusion.  Consider the expression:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   Foo#Bar.my_object # f Foo#Bar.e
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> (I've been kind enough to avoid putting whitespaces around '#' when used for namespaces).
+</I>&gt;<i>
+</I>&gt;<i> While I'm certainly not against a different notation, I would point out
+</I>&gt;<i> that this example is no worse than:
+</I>&gt;<i>
+</I>&gt;<i>     Foo.Bar.my_record . f Foo.Bar.e
+</I>&gt;<i>
+</I>&gt;<i> which is currently a valid expression.
+</I>&gt;<i>
+</I>&gt;&gt;<i> I haven't really thought about a good alternative, but what about using &quot;..&quot; instead of &quot;#&quot; ?
+</I>&gt;<i>
+</I>&gt;<i> To me Foo..Bar looks like some kind of range.
+</I>&gt;<i>
+</I>&gt;&gt;<i> 2. I think we should get rid of the aliasing feature in search path files (&quot;Foo#Baz : Foo#Bar&quot;).  I expect that only
+</I>&gt;&gt;<i> advanced users will write search path files, and then can do the
+</I>&gt;&gt;<i> resolution themselves (or this could be automated).
+</I>&gt;<i>
+</I>&gt;<i> This would prevent one package from providing aliases for modules in
+</I>&gt;<i> another package. It is much safer to provide an alias to Core#Mutex than
+</I>&gt;<i> to provide one to core-mutex.cmi and hope that Jane Street doesn't
+</I>&gt;<i> change its file name.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Aliases don't really simplify the life of end-users and they add complexity to the resolution mechanism (which might
+</I>&gt;&gt;<i> need to be re-implemented by build systems).
+</I>&gt;<i>
+</I>&gt;<i> The complexity added is minuscule.
+</I>&gt;<i>
+</I>&gt;<i> As I have previously proposed, ocamldep (or some other tool) would
+</I>&gt;<i> support the following use:
+</I>&gt;<i>
+</I>&gt;<i>     ocamldep -lookup Foo#Baz foo.mlpath
+</I>&gt;<i>
+</I>&gt;<i> This would lookup Foo#Baz within the search path file &quot;foo.mlpath&quot;, if
+</I>&gt;<i> it finds a mapping then it returns that mapping.
+</I>&gt;<i>
+</I>&gt;<i> So the lookup logic is:
+</I>&gt;<i>
+</I>&gt;<i>     name := Foo#Baz
+</I>&gt;<i>     while there are more paths
+</I>&gt;<i>         if !path is a directory then
+</I>&gt;<i>             check for file named !name in !path
+</I>&gt;<i>             if it found a file then
+</I>&gt;<i>                 return the filename
+</I>&gt;<i>         else !path is a file
+</I>&gt;<i>             run &quot;ocamldep -lookup !name !path&quot;
+</I>&gt;<i>             if it found a mapping
+</I>&gt;<i>                 if mapping was a filename then
+</I>&gt;<i>                     return the filename
+</I>&gt;<i>                 else mapping was an alias
+</I>&gt;<i>                     name := !alias
+</I>&gt;<i>
+</I>&gt;<i> So aliases add a single if condition.
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000336.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000342.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#337">[ date ]</a>
+              <a href="thread.html#337">[ thread ]</a>
+              <a href="subject.html#337">[ subject ]</a>
+              <a href="author.html#337">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

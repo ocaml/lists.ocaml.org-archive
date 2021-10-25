@@ -1,0 +1,122 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Binding that works in bytecode,	segfaults in native code
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Binding%20that%20works%20in%20bytecode%2C%0A%09segfaults%20in%20native%20code&In-Reply-To=%3CCAMfPyLBzmU%3DPnN%2B83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000100.html">
+   <LINK REL="Next"  HREF="000102.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Binding that works in bytecode,	segfaults in native code</H1>
+    <B>Hezekiah M. Carty</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Binding%20that%20works%20in%20bytecode%2C%0A%09segfaults%20in%20native%20code&In-Reply-To=%3CCAMfPyLBzmU%3DPnN%2B83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Binding that works in bytecode,	segfaults in native code">hez at 0ok.org
+       </A><BR>
+    <I>Wed Oct  8 14:19:57 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000100.html">[ocaml-ctypes] Inverted stubs
+</A></li>
+        <LI>Next message: <A HREF="000102.html">[ocaml-ctypes] Binding that works in bytecode, segfaults in native code
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#101">[ date ]</a>
+              <a href="thread.html#101">[ thread ]</a>
+              <a href="subject.html#101">[ subject ]</a>
+              <a href="author.html#101">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I have been working on and off on ctypes-based OCaml bindings for the
+GDAL library (<A HREF="http://gdal.org">http://gdal.org</A>).  The process has been quite pleasant
+so far.  The bindings are available here:
+<A HREF="https://github.com/hcarty/ocaml-gdal">https://github.com/hcarty/ocaml-gdal</A>
+
+I've run into what I expect is a memory management issue with my
+bindings to GDAL's raster warping API.  This section of GDAL handles
+reshaping an image to fit different physical dimensions and/or
+coordinate systems.  This involves a lot of calls from OCaml to C to
+OCaml to C.  The call to the C library involves building and passing
+in a large struct defined here:
+
+<A HREF="http://www.gdal.org/structGDALWarpOptions.html">http://www.gdal.org/structGDALWarpOptions.html</A>
+
+with the corresponding ctypes binding here:
+
+<A HREF="https://github.com/hcarty/ocaml-gdal/blob/master/src/gdal/warp.ml#L26">https://github.com/hcarty/ocaml-gdal/blob/master/src/gdal/warp.ml#L26</A>
+
+examples/warptut.ml in the ocaml-gdal repository is meant to
+illustrate how to use the Warp module.  When warptut.ml is compiled to
+a bytecode executable on my system I can run it without issue.
+However I get a consistent segfault when trying to run the same
+program compiled to native code.  Running both under gdb shows that
+the correct/expected code path within GDAL is taken in the bytecode
+case while an incorrect path involving callbacks to unexpected
+functions is taken in the native code case.
+
+warptut.ml is sprinkled with Gc.full_major calls to try to locate the
+source of the problem.  The actual segfault happens here:
+
+<A HREF="https://github.com/hcarty/ocaml-gdal/blob/master/examples/warptut.ml#L97">https://github.com/hcarty/ocaml-gdal/blob/master/examples/warptut.ml#L97</A>
+
+A sample input file to test the warptut.{byte, native} is available here:
+
+<A HREF="http://0ok.org/ocaml/rtma2p5.t06z.2dvaranl_ndfd.grb2">http://0ok.org/ocaml/rtma2p5.t06z.2dvaranl_ndfd.grb2</A>
+
+You can test warptut with:
+
+./warptut.native rtma2p5.t06z.2dvaranl_ndfd.grb2 out.tif
+
+Running
+
+ocamlbuild warptut.byte
+
+will give the equivalent bytecode executable which can be run the same way.
+
+If anyone is interested in helping debug this issue I'm happy to
+provide more information on how the bindings are structured.  In the
+mean time are there any suggestions or techniques you can recommend to
+help track down the cause of this segfault?  I've tried to ensure that
+I am keeping references to data passed to C on the OCaml end to avoid
+data disappearing but I must have missed something.
+
+The system I've been testing this on is running 64bit Ubuntu 12.04,
+OCaml 4.01.0 and 4.02.0, and the latest ctypes from opam.
+
+Thank you,
+
+Hez
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000100.html">[ocaml-ctypes] Inverted stubs
+</A></li>
+	<LI>Next message: <A HREF="000102.html">[ocaml-ctypes] Binding that works in bytecode, segfaults in native code
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#101">[ date ]</a>
+              <a href="thread.html#101">[ thread ]</a>
+              <a href="subject.html#101">[ subject ]</a>
+              <a href="author.html#101">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On the new mixed mode pins
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3C50B69F36C78E455099E95C3FAE2636C9%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001078.html">
+   <LINK REL="Next"  HREF="001095.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On the new mixed mode pins</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3C50B69F36C78E455099E95C3FAE2636C9%40erratique.ch%3E"
+       TITLE="[opam-devel] On the new mixed mode pins">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Mon May 18 14:00:42 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001078.html">[opam-devel] On the new mixed mode pins
+</A></li>
+        <LI>Next message: <A HREF="001095.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1079">[ date ]</a>
+              <a href="thread.html#1079">[ thread ]</a>
+              <a href="subject.html#1079">[ subject ]</a>
+              <a href="author.html#1079">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le lundi, 18 mai 2015 &#224; 04:27, Louis Gesbert a &#233;crit :
+&gt;<i> Now what we wanted to support with mixed pins is more or less this:
+</I>&gt;<i> - Quickly trying a change on the trunk in an existing package (opam source --dev --pin)
+</I>&gt;<i> - Creating a new package with an easy round-trip for test and update (<A HREF="http://opam.ocaml.org/doc/Packaging.html">http://opam.ocaml.org/doc/Packaging.html</A>) -- this requires a working dir pin.
+</I>
+I think these two cases are quite well supported by VCS pin + -w. The added benefit of -w is that once you are done with the task, the pin will automatically operate in a safe way (by which I mean not sensitive to working directory changes). This seems especially important for the first usage scenario since existing packages may have a lot of dependencies and thus the potential to ruin your opam install in case of problems.
+  
+&gt;<i> - It seems fair to expect that if I have some working directory and ask OPAM to pin to it, it will take its current state by default (having this not work only if the dir is VCed is a bit weird).
+</I>
+What I understand here is that `opam pin add PATH` should default to some form of path pinning. I have no problem with this (being constrained by the &quot;no magic rule&quot;).  
+  
+
+
+&gt;<i> &gt; &gt; For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+</I>&gt;<i> &gt;  
+</I>&gt;<i>  
+</I>&gt;<i> Indeed, currently the default is to sync with `HEAD`; we could detect the checked out branch at pinning time and automatically pin to `<A HREF="git://xxx#branch`">git://xxx#branch`</A> as was later suggested (for local pins only ?). Setting explicitely to `#HEAD` would remain available anyway -- existing pins without branch should be converted ?
+</I>
+My mental operational model of `opam -kgit add pin REPO` has always been (apparently wrong&#8230;):
+
+1. opam makes its own private `git clone REPO`  
+2. opam runs `git pull` on this clone on opam `update`
+
+regardless of whether R is a path or an url. If we agree on this model then yes the branch should be set to the branch seen at pin time since this is the way `git clone` works.
+
+Regarding converting existing non-mixed mode pins (if that still exists ?) I would say they should be converted to #HEAD so that they retain the previous semantics for existing installations.
+
+&gt;<i> &gt; &gt; As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `&#8212;dirty` or `&#8212;working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall &#8212;dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall &#8212;dirty PKG` which will force a reinstall.
+</I>&gt;<i> It can be useful, but saves the need to commit without saving the need to _remember_ to commit (or use -w instead) ; as such it only half solves the problem IMHO...
+</I>
+I still don't get this idea of forgetting to remember to commit. If you forget to commit the pin simply does not update and you see it immediately, so its cost is negligible and I don't think there is a real problem to solve here.  
+
+For me the problem to solve is *to have* (vs *to forget*) to commit  when you are working on a fix. In these situation, the fact that you have to commit, implies the sequence stage&#183;commit&#183;update&#183;upgrade&#183;(amend&#183;update&#183;upgrade)+ until satisfaction which involves a lot of painful VCS operations and is very costly.
+
+Here again if you forget the `-w` the pin will not update and you will quickly realize you forgot the `-w`. If you are a heavy user of working dir updates it will become a second nature to issue that `-w` when you update your pin (as it became a second nature to me to do a -kgit on my pin adds to avoid path pinning).
+
+&gt;<i> Yes, branch in mixed-mode pin doesn't make sense, that's a reason why it's currently turned on when there is no explicit branch set. I can't see a case where you would want to take the list of tracked files from something else than HEAD.
+</I>&gt;<i>  
+</I>&gt;<i> Here is another idea to explore -- we suppose ./ is git-controlled:
+</I>&gt;<i> ```
+</I>&gt;<i> $ opam pin add -k git foo ./ # or
+</I>&gt;<i> $ opam pin add -k auto foo ./
+</I>&gt;<i> git pinned to currently checked out branch
+</I>
+I don't think there's the need to have an option for this, it can simply be mentioned in the docs that if you want this you need to pin on REPO#HEAD. I'm pretty sure that in practice what you want most of the time from a VCS pin is to have opam being decoupled from your working directory altogether.
+
+&gt;<i> $ opam pin add foo ./
+</I>&gt;<i> [NOTE] ./ is git-controlled, but this will pin to the working directory directly. Use `--kind git` if you want OPAM to track the current git branch instead.
+</I>&gt;<i> Do you want to synchronise only the git-tracked files ? [Y/n]  
+</I>&gt;<i> ```
+</I>
+I think you should add `and the .git dir` aswell to be precise. But then I would still claim that had we the `-w` this mode wouldn't be needed. What I don't like with the above is that the system encourages users to use unsafe pin modes and create brittle opam install for themselves. I would rather see the above invocation as simply path-pinning with the NOTE mentioning `-kgit`.
+
+&gt;<i> Daniel: see what happens when you're not using OPAM's dev branch ? ;)
+</I>Aaah but it's because I trust you&#8230; I could have taken the beta though, but OTOH it's the kind of problems that you only see on longer term usage.   
+
+Best,
+
+Daniel
+
+
+
+
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001078.html">[opam-devel] On the new mixed mode pins
+</A></li>
+	<LI>Next message: <A HREF="001095.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1079">[ date ]</a>
+              <a href="thread.html#1079">[ thread ]</a>
+              <a href="subject.html#1079">[ subject ]</a>
+              <a href="author.html#1079">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

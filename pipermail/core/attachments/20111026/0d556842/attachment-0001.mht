@@ -1,0 +1,81 @@
+[From nobody Fri Feb  8 17:18:40 2013
+MIME-Version: 1.0
+Received: by 10.101.209.12 with SMTP id l12mr2226024anq.32.1319650623700; Wed,
+ 26 Oct 2011 10:37:03 -0700 (PDT)
+Received: by s32g2000prj.googlegroups.com with HTTP; Wed, 26 Oct 2011 10:37:03
+ -0700 (PDT)
+Date: Wed, 26 Oct 2011 10:37:03 -0700 (PDT)
+In-Reply-To: &lt;3441b417-23da-46f6-adc1-89d5f20052d6@p11g2000yqe.googlegroups.com&gt;
+References: &lt;aa0160b9-0cc0-4810-ac50-e85d1019a472@i28g2000yqn.googlegroups.com&gt;
+ &lt;CADKNfh+fxq=pxVJEE0es7WMvYXheSXj8NL6fTgpr0O8Nmz_PWQ@mail.gmail.com&gt;
+ &lt;f33bfa0a-819b-4842-b740-a0c8e4d659ae@t11g2000yqk.googlegroups.com&gt;
+ &lt;15fd00cb-b38d-4e48-9c2f-ed7bf6bf4263@f6g2000vbm.googlegroups.com&gt;
+ &lt;83467c57-438c-4e2b-a87a-ef33166a94f1@h10g2000yqd.googlegroups.com&gt;
+ &lt;3441b417-23da-46f6-adc1-89d5f20052d6@p11g2000yqe.googlegroups.com&gt;
+User-Agent: G2/1.0
+X-Google-Token: EL-KofUEi8VBxZEPAU40
+X-Google-Web-Client: true
+X-Google-Header-Order: HNKUARELSC
+X-HTTP-UserAgent: Mozilla/5.0 (X11; FreeBSD amd64) AppleWebKit/535.1 (KHTML,
+ like Gecko) Chrome/14.0.835.163 Safari/535.1,gzip(gfe)
+X-Google-IP: 8.25.195.28
+Message-ID: &lt;9355f230-136d-4287-85b1-a16cda25fc1e@s32g2000prj.googlegroups.com&gt;
+Subject: Re: Is core compilable on FreeBSD?
+&gt;From: Brandon Mitchell &lt;brandon@twitter.com&gt;
+To: ocaml-core &lt;ocaml-core@googlegroups.com&gt;
+Content-Type: text/plain; charset=ISO-8859-1
+Content-Transfer-Encoding: quoted-printable
+
+I did the following to compile core on FreeBSD 8.2-RELEASE:
+
+* for the ifru_addr issue:
+#if defined(__FreeBSD__)
+#   include &lt;sys/socket.h&gt;
+#endif
+
+* for stat support:
+#if defined(__FreeBSD__)
+#   define stat64 stat
+#   define lstat64 lstat
+#   define fstat64 fstat64
+    typedef struct stat stat_wrapper_t
+#else
+    typedef struct stat64 stat_wrapper_t
+#endif
+
+Change all &quot;struct stat&quot; in unix_stubs.c to &quot;stat_wrapper_t&quot;
+
+* for clock cputime support:
+#if defined(CLOCK_PROCESS_CPUTIME_ID) &amp;&amp; defined(__linux__)
+#   define CLOCK CLOCK_PROCESS_CPUTIME_ID
+#elif defined(CLOCK_PROF) &amp;&amp; defined(__FreeBSD__)
+#   define CLOCK CLOCK_PROF
+#else
+#   define CLOCK CLOCK_REALTIME
+#endif
+
+Change the CLOCK_PROCESS_CPUTIME_ID to CLOCK
+
+* Change #warn to #warning
+
+On Oct 11, 2:10=A0am, Dmitry Astapov &lt;dasta...@gmail.com&gt; wrote:
+&gt; So, after all those changes, what is the final list of errors that
+&gt; still need fixing?
+&gt;
+&gt; On Oct 10, 1:26=A0pm, Kakadu &lt;kakadu.hafan...@gmail.com&gt; wrote:
+&gt;
+&gt;
+&gt;
+&gt;
+&gt;
+&gt;
+&gt;
+&gt; &gt; New info from my friend:
+&gt; &gt; We should add #include &lt;sys/socket.h&gt; to fix problem with ifru_addr
+&gt;
+&gt; &gt; On Oct 10, 11:07=A0am, Dmitry Astapov &lt;dasta...@gmail.com&gt; wrote:
+&gt;
+&gt; &gt; &gt; There is obviously some extra include needed to make 'ifru_addr' erro=
+r
+&gt; &gt; &gt; go away, but I have no idea which one. However, a 'grep -r' for
+&gt; &gt; &gt; ifru_addr in /usr/include might give some hints.]

@@ -1,0 +1,88 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] Improving the state of OCaml on Windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9BE77B0%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000019.html">
+   <LINK REL="Next"  HREF="000024.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] Improving the state of OCaml on Windows</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9E9BE77B0%40Remus.metastack.local%3E"
+       TITLE="[wg-windows] Improving the state of OCaml on Windows">dra-news at metastack.com
+       </A><BR>
+    <I>Tue Jun  2 10:00:51 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000019.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+        <LI>Next message: <A HREF="000024.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I also add my thanks for this list's being started!
+
+My one-man-band has worked on OCaml software on Windows since 2003 (though I compile some projects on Linux and BSD as well). I develop using a host of Windows-compiled UNIX utilities run from cmd (unusual, I know - I simply find it more stable and considerably faster than using Cygwin's bash, which crashes a lot, and worrying about the shell seems to me to be micro-optimising - I spend most of my time actually writing or looking at code, not sitting in a shell). I edit code using Vim with Merlin.
+
+Largely owing to laziness, I'm still on OCaml 4.01 mingw32 (though I have been using 4.02 when working on porting OPAM) with findlib, extlib, ocaml-calendar, pcre-ocaml, ocaml-csv, batteries, pgocaml, camlzip, ocaml-ssl, cryptokit, ocamlnet, json-wheel/json-static, spidercaml, ocaml-sha, ocamldap, cppo, camlmix, caml2html, easy-format, biniou, yojson, menhir, merlin, type_conv, odn, ocamlmod, ocamlify, fileutils, expect, ounit, oasis, cmdliner, cudf, dose3, jsonm, ocamlgraph, re &amp; uutf
+
+My installation scripts have morphed over the years - I typically upgrade all libraries with a new compiler release and it's all maintained in a shell script which installs Cygwin (for new installations), and manages dependencies, documentation generation and parallel compiles all the packages. It's a while since I last did it, but all I have to do is invoke &quot;build.cmd&quot; and go and have a quick lunch as it takes about 30 mins on my slightly aged laptop to set-up. It is of course a pain if I have to upgrade one single library.
+
+I'd been planning on getting it all put online in order to share patches (though I try as far as possible to submit patches back upstream), but decided at the end of last year that the effort would be better into porting OPAM (cemented by GODI being shutdown). I did some work on OPAM last November and December (completing the work required for opam init and getting to the stage of installing compiler switches). I've had to pause so far this year to work on another project, but the two things will shortly converge as I want to use opam pins as a way of configuring the compiler and library versions used to build releases in git (I got severely stung by a change in standard library behaviour between 3.12.x and 4.x). But perhaps OPAM 1.3 will arrive before I finish porting it :o)
+
+I'm strongly of the opinion that the way forward for Windows is to get a comprehensive infrastructure in place, without changing anything about how OCaml on Windows works at the moment. So eliminating bash from ocamlbuild, trying to get rid of the need for Cygwin for building libraries, etc. are irrelevant to me - all they do is make the barrier to getting a complete system impossibly bogged down in very difficult features. In my view, the target should be to have a single installer (or simple set of instructions) which gets a fully working compiler suite and package manager installed which should be usable for *all* of the scenarios described so far. So that means source-based package management and installing (or integrating with an existing) Cygwin for now.
+
+My own porting of OPAM, for general interest, has the following goals:
+1. All four Windows ports[1] available in the same installation (so you can say opam switch 4.02.1+msvc or opam switch 4.01.0+mingw)
+2. Full installation of OCaml 4.02+ possible for the mingw ports simply by downloading the opam binary[2] - opam init capable of downloading and installing Cygwin into .opam if a local installation isn't found). For the MSVC ports, the only requirement be that an appropriate Windows SDK must be pre-installed (licensing prevents that being bundled or automated, I think)
+3. Required C libraries (zlib, etc.) available in an opam repository - probably a separate one automatically enabled for Windows installations, but with the ability to use a &quot;system&quot; copy of each library, if found.
+
+Once it's got to the stage that my own script is entirely replaced with opam init &amp;&amp; opam switch 4.02.1+mingw &amp;&amp; opam install &lt;my list of packages&gt; then I'll push it up for others to criticise :o)
+
+
+David
+
+[1] Cygwin is a flavour of UNIX, requiring tweaking for OCaml more along the lines of supporting, say, Solaris or *BSD vs Linux (it even uses the main configure system, which the native ports don't [yet]). I personally think discussions about Windows support would much simpler if the Cygwin ports weren't mentioned, so that &quot;Windows ports&quot; referred only to the native ones - mingw32, mingw64, msvc and msvc64.
+[2] 4.01 and earlier requiring the manual installation of ActiveTcl
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000019.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+	<LI>Next message: <A HREF="000024.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,291 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] Improving the state of OCaml on Windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3C556C2666.6050505%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000009.html">
+   <LINK REL="Next"  HREF="000011.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] Improving the state of OCaml on Windows</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Improving%20the%20state%20of%20OCaml%20on%20Windows&In-Reply-To=%3C556C2666.6050505%40lexifi.com%3E"
+       TITLE="[wg-windows] Improving the state of OCaml on Windows">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Mon Jun  1 10:31:18 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000009.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+        <LI>Next message: <A HREF="000011.html">[wg-windows]  Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#10">[ date ]</a>
+              <a href="thread.html#10">[ thread ]</a>
+              <a href="subject.html#10">[ subject ]</a>
+              <a href="author.html#10">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi all,
+
+Setting up this list is a great initiative!
+
+
+1. A few words about the use of OCaml under Windows at LexiFi
+
+Windows is one of the most important platform we need to support, and we 
+deliver GUI applications in both 32 and 64-bit, using the two MSVC 
+ports.  We also ensure compatibility of our code base with the two mingw 
+ports &quot;just in case&quot;  (technically, these ports allow to produce 
+standalone applications that run even on a plain WinXP box, whereas the 
+MSVC ports require msvcrtXX.dll, which might not be available).  We 
+don't have any use for the two Cygwin ports.
+
+We are not a &quot;Windows pure player&quot;: Linux is also an important platform 
+for some of our customers and projects, and most our code base is also 
+supported there.
+
+All our code lives in a single tree whose build is managed mainly by 
+omake, assuming a Cygwin environment under Windows.  Our tree also has 
+code in other languages (C, Fortran, C#, etc).  We integrate a very 
+small number of third-party OCaml libraries, simply by injecting their 
+source code into our tree and adding tiny OMakefiles to integrate them 
+in our global build system.  This is often easier than fighting with 
+upstream Makefiles, etc.
+
+For now, we don't use (nor install) ocamlfind, camlp4 or ocamlbuild. 
+Our developers work typically in emacs or vim, and ocp-indent is available.
+
+We interact with Windows and Windows libraries (in addition to what 
+OCaml provides in Sys and Unix) mostly through .Net.  To this end, we 
+have developped CSML, a bridge between .Net and OCaml ( 
+<A HREF="https://www.lexifi.com/csml">https://www.lexifi.com/csml</A> ).  We use .Net for the UI (Windows Forms), 
+for simple bindings e.g. with Oracle, Outlook, MS Excel, etc.
+
+Our Windows application comes with a built-in small IDE that allows end 
+users to edit and compile OCaml addins (which are dynlinked in the 
+application upon startup).  This means that our application is shipped 
+with a minimal  toolchain required to support generation of .cmxs files 
+from source code: ocamlopt, flexdll and some .cmi/.cmx files.  Note that 
+we don't need any external assembler or linker (our users don't need to 
+install any &quot;native toolchain&quot;):
+
+    - flexdll has a mode where it can build simple dll (cmxs) without 
+relying on an external linker.  This wouldn't support linking arbitrary 
+.obj files (with resources, debug information, etc), but we only need to 
+support code produced by OCaml.
+
+    - We use a modified OCaml backend that replaces emit.mlp with a 
+direct x86 (32 or 64-bit) machine code emitter and a COFF object file 
+output  (this was developped with the help of OCamlPro; the code is 
+owned jointly by OCamlPro and LexiFi).  In OCaml's trunk, we have 
+unified emit.mlp/emit_mt.mlp (for both i386 and amd64) to produce an AST 
+of the generated assembly code, so our binary backend is now just an 
+extra backend on this AST (in addition to the Intel and AT&amp;T textual 
+emitters), which simplifies maintenance of this part quite a bit (this 
+also benefits to all Windows users, since this avoids the duplication 
+between emit.mlp/emit_nt.mlp, which sometimes resulted in emit_nt.mlp 
+lagging behind).
+
+
+Note that this couldn't be used directly to produce main programs 
+without a native toolchain (with use startup objects, c lib, etc).  This 
+isn't a big theoretical limitation: we could always ship an ocamlrunopt 
+program that would simply dynlink a main.cmxs file appended to it -- in 
+the same spirit as ocamlrun.
+
+We also modified OCaml a little bit to make it easier to relocate the 
+toolchain (which is important when you ship binary code that can be 
+installed anywhere).  For instance, we changed the default path for 
+looking up the standard library to make it relative to the path of the 
+compiler executable (e.g. we use ../lib, starting from the directory of 
+Sys.executable_name).
+
+
+
+2. Ideas about how to improve OCaml under Windows
+
+
+Globally, we find that the current state of OCaml itself is not too bad 
+under Windows.  Some tiny touches would make the life easier to people 
+hacking on the OCaml toolchain itself under Windows, or just building it 
+from sources: for instance, adapting ./configure (or providing another 
+script) instead of telling users to copy three files and edit one.  Some 
+internal cleanup would also be a good idea, e.g. merging various 
+Makefile and Makefile.nt, or at least sharing common parts, to avoid 
+duplication and divergence, although the Continuous Integration system 
+which is now in place catches many Windows build failures early, so this 
+is less critical these days.  There are also deeper projects to address 
+embarrassing parts, such as supporting Unicode when interacting with the 
+filesystem ( <A HREF="https://github.com/ocaml/ocaml/pull/153">https://github.com/ocaml/ocaml/pull/153</A> ); and the 
+Unix.select emulation still has problems (see the &quot;OCaml windows&quot; 
+category on OCaml's Mantis).
+
+The story seems to be less nice with external tools and libraries, 
+although LexiFi is not overly affected by that.  This is mostly a 
+consequence of the composition of the OCaml community, which is largely 
+Unix oriented.  Windows is considered as a second-class citizen by most 
+OCaml core developers and package maintainers.
+
+Excellent support of OCaml (and its ecosystem) under Windows can only be 
+achieved if we manage to attract people who are primarily Windows 
+developers, not Unix developers who are somehow forced to support 
+Windows, or -- even worse -- who are mainly interested in porting 
+existing projects from Unix to Windows.  Those people would typically be 
+reluctant to use Cygwin or emacs/vim/etc.  It's not clear to me how to 
+attract such people, though, since F# is a strong competitor for OCaml 
+under Windows.  At least, one would need to think about how to 
+articulate the benefits of OCaml, to remove technical obstacles and 
+facilitate first steps with OCaml under Windows.  My intuition is that 
+our goal should be to attract (enlightened) hobbyists developers under 
+Windows for now (as opposed to, say, trying to make OCaml directly the 
+natural choice for pure Windows companies), in order to bootstrap the 
+process.
+
+Good support for existing OCaml libraries (at least those which are 
+relevant under Windows) is certainly an important goal.  Even if we 
+never reach a state where OCaml is considered as a natural choice for a 
+pure Windows developer or company, this will already give more 
+visibility to OCaml, reinforce its already excellent cross-platform 
+reputation, and help people who are forced to use Windows (or just port 
+from Unix to Windows).
+
+An important step to improve support of existing libraries under Windows
+is to have good Windows support for OPAM.  This will make it easier for 
+people to test libraries under Windows and so give incentive to upstream 
+developers to fix them (and themselves set up a working OCaml Windows 
+dev environment more easily).   Something like the OPAM Weather Service 
+could be a great help here.  From what I understand, OPAM is not very 
+far from supporting Windows, and I think that it's already possible to 
+compile OPAM with a Cygwin port of OCaml (and have it manage native 
+switches?).
+
+I believe Cygwin will remain an important part of the story for OCaml 
+under Windows for some time.  OCaml itself and many existing packages 
+require a Unix-like environment in their build system, and it doesn't 
+seem realistic trying to fix that soon.  Since I don't believe in binary 
+distributions of OCaml packages in general (because updating a library 
+forces to update all other packages that depend on it), this means that 
+users would need a Cygwin environment.  Except perhaps for 
+well-controlled dev environments (e.g. for LexiFi's built-in IDE, we 
+don't expect users to install their own extra libraries; something 
+similar could make sense for Ocsigen addins, etc).  I don't know if we 
+should try to hide it as much as possible (e.g. by creating bundled 
+installers) or not.  If/when OPAM supports installing native switches, 
+even if itself built with Cygwin, then it could make sense to contribute 
+a Cygwin package for OPAM.  At least for people using the mingw port, 
+this would mean that setting up their environment could be as simple as 
+installing Cygwin with a well-documented list of packages (the mingw 
+compilers, flexdll, OPAM, and required extra tools such as make, etc), 
+and then using OPAM to compile/install OCaml and other packages from 
+sources.  (People wanting to use the MSVC ports would  need to install 
+MSVC themselves.)
+
+Making sure OPAM and existing libraries work under Windows is only the 
+beginning.  Hopefully, this could be enough to attract &quot;native&quot; Windows 
+developers, who could then contribute to a richer Windows experience, 
+such as:
+
+   - Binding a larger subset of the Win32 API.
+   - Tools and bindings to interact with Windows applications (e.g. to 
+support writing easily an OCaml addin for Excel).
+   - Some GUI frontend for OPAM and a decent graphical toplevel for OCaml.
+   - Better support for .Net (CSML is enough for LexiFi needs, but would 
+deserve some polishing).
+   - Support for popular IDEs.
+
+
+
+Alain
+
+
+
+
+
+On 05/29/2015 05:10 PM, Thomas Braibant wrote:
+&gt;<i> Hi,
+</I>&gt;<i>
+</I>&gt;<i> Thanks for joining this working group. Its goal is to find out how to
+</I>&gt;<i> improve the state of OCaml and its ecosystem on Windows.
+</I>&gt;<i>
+</I>&gt;<i> Some of the tasks that we might address (this list is by no mean meant
+</I>&gt;<i> to be exhaustive nor normative):
+</I>&gt;<i>
+</I>&gt;<i> - Gather information from the community  about the use of the various
+</I>&gt;<i> versions of OCaml available on Windows, and understand what kind of
+</I>&gt;<i> environment people are working with. (BTW, I think a good way to get the
+</I>&gt;<i> discussion rolling might be to describe each other's setup to use OCaml
+</I>&gt;<i> on Windows.)
+</I>&gt;<i>
+</I>&gt;<i> - Finalize OPAM support for Windows (this is listed on the OPAM 1.3
+</I>&gt;<i> roadmap). When this support is in place, many OCaml packages should work
+</I>&gt;<i> out of the box (with the proviso that many packages assume a unix-ish
+</I>&gt;<i> environment for their build system).
+</I>&gt;<i>
+</I>&gt;<i> - Discuss how to help package developers improve Windows support. One
+</I>&gt;<i> way to do that could be to provide know-how about how to setup
+</I>&gt;<i> continuous integration on services like Appveyor to check that packages
+</I>&gt;<i> build on typical Windows setups.
+</I>&gt;<i>
+</I>&gt;<i> - Find a solution for users of WODI, the GODI based OCaml distribution
+</I>&gt;<i> for Windows, which has been shutdown. WODI was able to compile OCaml
+</I>&gt;<i> related software (using Cygwin as an environment), but was also able to
+</I>&gt;<i> install binary packages. (In some cases, some non-trivial patches  were
+</I>&gt;<i> applied to make package usable on Windows.) Some of the sources needed
+</I>&gt;<i> to use WODI are still available, but the system does not work out of the
+</I>&gt;<i> box now that the server has gone offline. With a little work, we might
+</I>&gt;<i> be able to bring it back, to smooth the transition.
+</I>&gt;<i>
+</I>&gt;<i> - Discuss the state of cross compilation to Windows.
+</I>&gt;<i>
+</I>&gt;<i> - Advertise OCamlPro's OCPWin commercial effort. (I will leave Fabrice
+</I>&gt;<i> tell a bit more about that.)
+</I>&gt;<i>
+</I>&gt;<i> - Discuss how to pool resources (if needed) to work toward these goals.
+</I>&gt;<i> Many thanks to Anil and OcamlLabs for hosting this mailing list.
+</I>&gt;<i>
+</I>&gt;<i> Thomas
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-windows mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-windows">wg-windows at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-windows">http://lists.ocaml.org/listinfo/wg-windows</A>
+</I>&gt;<i>
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000009.html">[wg-windows] Improving the state of OCaml on Windows
+</A></li>
+	<LI>Next message: <A HREF="000011.html">[wg-windows]  Improving the state of OCaml on Windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#10">[ date ]</a>
+              <a href="thread.html#10">[ thread ]</a>
+              <a href="subject.html#10">[ subject ]</a>
+              <a href="author.html#10">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Defines,	and Structs with platform-specific fields
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAAxsn%3DHp5ZB8dE%2BwJi1ZMfbPJ_wbL_vFN%2B-%3DVXJRs8NhKU3N9g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000113.html">
+   <LINK REL="Next"  HREF="000115.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Defines,	and Structs with platform-specific fields</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAAxsn%3DHp5ZB8dE%2BwJi1ZMfbPJ_wbL_vFN%2B-%3DVXJRs8NhKU3N9g%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Defines,	and Structs with platform-specific fields">yallop at gmail.com
+       </A><BR>
+    <I>Mon Oct 20 15:10:42 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000113.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+        <LI>Next message: <A HREF="000115.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#114">[ date ]</a>
+              <a href="thread.html#114">[ thread ]</a>
+              <a href="subject.html#114">[ subject ]</a>
+              <a href="author.html#114">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 20 October 2014 09:25, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+&gt;<i> On 18 October 2014 12:49, Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">trevorsummerssmith at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> Your suggestion makes sense. If I were to do that -- any suggestions of how
+</I>&gt;&gt;<i> to deal with freeing that memory? Ideally, without adding a lifecycle &quot;free&quot;
+</I>&gt;&gt;<i> call to the user library. My thoughts would be to store the cstruct
+</I>&gt;&gt;<i> reference (malloced by C) in a ref in OCaml, then attach a finalizer to the
+</I>&gt;&gt;<i> OCaml ref that would call the corresponding C free.
+</I>&gt;<i>
+</I>&gt;<i> That approach should work, I think.
+</I>&gt;<i>
+</I>&gt;<i> Another possibility to allocate the struct using Ctypes.allocate or
+</I>&gt;<i> Ctypes.allocate_n
+</I>
+Yet another possibility: you can avoid the need to write C altogether
+by defining the public interface as a module type, defining the
+platform-specific struct definitions as implementations, and using
+first-class modules (or the build system, if you prefer) to pick an
+appropriate definition for the platform.
+
+For example, you might define the public interface of the uv_loop_s
+structure as follows:
+
+  module type UV_LOOP =
+  sig
+    type t
+    val t : t structure typ
+
+    (* Define the public fields of the struct here *)
+    val data : (unit ptr, t structure) field
+    val active_handles : (uint, t structure) field
+    (* ... other public fields ... *)
+  end
+
+This exposes the fact that the underlying type is a structure, and
+that data, active_handles etc. are fields, so you can use the various
+ctypes functions that deal with structs (make, getf, setf, etc.).
+
+You can then give a platform-specific definition of the struct that
+matches the UV_LOOP interface, and includes (but does not expose) the
+private fields:
+
+  module Uv_loop_windows : Uv_loop =
+  struct
+    type t
+    let t = structure &quot;uv_loop_s&quot;
+    let data = field t &quot;data&quot; (ptr void)
+    let active_handles = field t &quot;active_handles&quot; uint
+    (* ... other public and private fields ... *)
+    let time = field t &quot;time&quot; uint64_t
+    let () = seal t
+  end
+
+Finally, first-class modules make it possible to pick an appropriate
+implementation for the platform:
+
+  module Uv_loop =
+   (val if Sys.os_type = &quot;win32&quot;
+         then (module Uv_loop_windows : UV_LOOP)
+        else if Sys.os_type = &quot;unix&quot;
+         then (module Uv_loop_unix : UV_LOOP)
+        ...
+        else failwith &quot;Unsupported platform&quot;)
+
+If you're not keen on first-class modules, an alternative approach is
+to simply use an interface file uv.mli and an implementation file
+uv.ml which is selected from various platform-specific alternatives
+(uv_windows.ml, uv_unix.ml etc.) by the build system.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000113.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+	<LI>Next message: <A HREF="000115.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#114">[ date ]</a>
+              <a href="thread.html#114">[ thread ]</a>
+              <a href="subject.html#114">[ subject ]</a>
+              <a href="author.html#114">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

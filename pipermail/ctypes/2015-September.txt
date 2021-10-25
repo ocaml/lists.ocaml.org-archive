@@ -1,0 +1,174 @@
+From eturetsky at wisc.edu  Fri Sep 11 18:03:30 2015
+From: eturetsky at wisc.edu (EMMA R TURETSKY)
+Date: Fri, 11 Sep 2015 17:03:30 +0000
+Subject: [ocaml-ctypes] Creating a C wrapper for an OCaml value
+Message-ID: <CY1PR06MB1883995060B42C918FDB4D86C8500@CY1PR06MB1883.namprd06.prod.outlook.com>
+
+
+This may be a question with an obvious answer, but I'm having trouble understanding the manual.
+
+
+I have two code bases, one in OCaml and one in C (c++, actually, but I'll just be using "extern 'C'" when needed), that I need to pass information to and from.
+
+
+I have a Module in the OCaml code and all I want to do is to pass it to a C constructor that will just wrap around it.  I don't ever need to touch the data in C.
+
+
+What will happen is that eventually the C code will get to a point where it needs to perform some operation on two of these data types.  That operation is all ready written in the OCaml code so I then want to be able to pass  the stored values back into OCaml which will perform the operation needed and create a new module of the same type that will again be returned and wrapped in C.  I'm pretty sure I understand how to call an OCaml function from C, so that isn't an issue.
+
+
+So I guess the meat of my question is how do I pass a value in OCaml to C and just create a wrapper around it in a way that I can pass the same value back when I call OCaml from C using ctypes?  I feel like this should be simple and obvious from the manual, but my OCaml understanding is very weak.
+
+
+Any help is appreciated,
+
+Emma
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150911/648a9f11/attachment.html>
+
+From yallop at gmail.com  Fri Sep 11 18:46:48 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 11 Sep 2015 18:46:48 +0100
+Subject: [ocaml-ctypes] Creating a C wrapper for an OCaml value
+In-Reply-To: <CY1PR06MB1883995060B42C918FDB4D86C8500@CY1PR06MB1883.namprd06.prod.outlook.com>
+References: <CY1PR06MB1883995060B42C918FDB4D86C8500@CY1PR06MB1883.namprd06.prod.outlook.com>
+Message-ID: <CAAxsn=F89Ys8WYGpGLiqS5t1xFiu4+C+4trXAz=092YJZYxcjw@mail.gmail.com>
+
+On 11/09/2015, EMMA R TURETSKY <eturetsky at wisc.edu> wrote:
+> So I guess the meat of my question is how do I pass a value in OCaml to C
+> and just create a wrapper around it in a way that I can pass the same value
+> back when I call OCaml from C using ctypes?  I feel like this should be
+> simple and obvious from the manual, but my OCaml understanding is very
+> weak.
+
+Passing OCaml values to C is actually a slightly unusual use case,
+since most uses of ctypes involve passing C values to OCaml, so it's
+probably not especially well documented.  It is possible, though, at
+least with the master (unreleased) version of ctypes, which you can
+install as follows:
+
+    opam pin add ctypes git at github.com:ocamllabs/ocaml-ctypes.git
+
+The main thing to be aware of is that the OCaml garbage collector can
+run in between the time that you pass the OCaml value to C and the
+time that you pass it back to OCaml.  The GC can move values around,
+changing their addresses, so simply passing the address of a value
+directly to C isn't safe.  The way to avoid problems is to register
+values as roots, then pass the addresses of those roots to C, rather
+than the values themseles.  Ctypes provides a module Ctypes.Root with
+a few functions for root management:
+
+    https://github.com/ocamllabs/ocaml-ctypes/blob/758e620d/src/ctypes/ctypes.mli#L417-L432
+    https://github.com/ocamllabs/ocaml-ctypes/pull/318
+
+The Root API is rather low-level, so I recommend wrapping calls to it
+using signatures with stronger typing.  Here's a full example of
+passing an OCaml module value to C, retrieving it via a separate C
+call and invoking some of the module functions.  First, some C
+functions which store and retrieve OCaml values using 'void *':
+
+    /* c_bit.c */
+    #include <stddef.h>
+    #include <assert.h>
+
+    static void *ocaml_modules[] = {NULL, NULL};
+
+    void store_module(int i, void *m)
+    {
+      assert (i == 0 || i == 1);
+      ocaml_modules[i] = m;
+    }
+
+    void *retrieve_module(int i)
+    {
+      assert(i == 0 || i == 1);
+      assert(ocaml_modules[i] != NULL);
+      return ocaml_modules[i];
+    }
+
+Next, an OCaml module with low-level interfaces to 'store_module' and
+'retrieve_module' and a higher-level wrapper module 'HL' which
+enforces the use of roots and the correct types:
+
+    (* ocaml_bit.ml *)
+    module LL =
+    struct
+      (* Low-level functions for passing OCaml values to and from C *)
+      let store_module = Foreign.foreign "store_module"
+          Ctypes.(int @-> ptr void @-> returning void)
+      and retrieve_module = Foreign.foreign "retrieve_module"
+          Ctypes.(int @-> returning (ptr void))
+    end
+
+    module type S =
+    sig
+      val say_hello : unit -> unit
+      val add : int -> int -> int
+    end
+
+    module HL :
+    sig
+      type t = (module S)
+      type handle
+      val register : t -> handle
+      val release  : handle -> unit
+      val store    : int -> handle -> unit
+      val retrieve : int -> t
+    end =
+    struct
+      type t = (module S) and handle = unit Ctypes.ptr
+      let register = Ctypes.Root.create
+      and release  = Ctypes.Root.release
+      and store    = LL.store_module
+      and retrieve i = Ctypes.Root.get (LL.retrieve_module i)
+    end
+
+Findlib provides a convenient way to build the example:
+
+    ocamlfind c c_bit.c
+    ocamlfind mklib -o example -package ctypes.foreign c_bit.o ocaml_bit.ml
+
+Finally, here's everything working in the top level:
+
+    # #use "topfind";;
+    - : unit = ()
+    (* ... *)
+    # #require "ctypes.foreign";;
+    (* ... *)
+    # #load "example.cma";;
+    # open Ocaml_bit;;
+    # let handle = HL.register
+         (module struct
+           let say_hello () = print_endline "hello"
+           and add = (+)
+         end);;
+    val handle : Ocaml_bit.HL.handle = <abstr>
+    # HL.store 0 handle;;
+    - : unit = ()
+    # let handle2 = HL.register
+         (module struct
+           let say_hello () = print_endline "hi"
+           and add = (-)
+         end);;
+    val handle2 : Ocaml_bit.HL.handle = <abstr>
+    # HL.store 1 handle2;;
+    - : unit = ()
+    # module M1 = (val HL.retrieve 0);;
+    module M1 : Ocaml_bit.S
+    # module M2 = (val HL.retrieve 1);;
+    module M2 : Ocaml_bit.S
+    # M1.say_hello ();;
+    hello
+    - : unit = ()
+    # M2.say_hello ();;
+    hi
+    - : unit = ()
+
+I hope that helps a bit!  Feel free to follow-up, of course, if
+anything's not clear (e.g. how to call back into OCaml from C).
+
+Kind regards,
+
+Jeremy.
+

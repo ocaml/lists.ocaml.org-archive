@@ -1,0 +1,427 @@
+From alain at frisch.fr  Tue May  6 05:29:08 2014
+From: alain at frisch.fr (Alain Frisch)
+Date: Tue, 06 May 2014 06:29:08 +0200
+Subject: [wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+In-Reply-To: <6232dace806569a16f7fbfaa1689ef42@whitequark.org>
+References: <6232dace806569a16f7fbfaa1689ef42@whitequark.org>
+Message-ID: <53686514.8070200@frisch.fr>
+
+On 5/2/2014 4:29 PM, Peter Zotov wrote:
+> I have just released the first version of ppx_protobuf, a complete
+> Protocol Buffers implementation.
+
+This is a very cool project, and a good first public use of extension 
+points!
+
+An aspect of attributes that is not fully settled is how to use 
+namespacing in order to ensure that multiple tools interact nicely.
+This topic will hopefully be explored by the community to reach a good 
+consensus.
+
+For instance, ppx_protobuf relies on attributes with quite generic names 
+such as @default or @key, that might also be useful to other tools.  It 
+might very well be the case that the same @default attribute (with the 
+same value) would actually be useful to both ppx_protobuf and another 
+deriving-like extension.  This is good, since attributes are not 
+designed to be necessarily targeted to only one specific tool.  But in 
+some cases, one might want to use a different @default attribute for 
+different tools.  What about supporting both a short form @default and a 
+more qualified one @protobuf.default?  This should support both situations.
+
+Another point: for record fields, you interpret attributes at the 
+toplevel of their type. I did not look precisely at the semantics of 
+ppx_protobuf, but it seems that it might be more logical to attach them 
+to the field directly (do you confirm?):
+
+   type defaults = {
+      results [@key 1] [@default 10]: int;
+   } [@@protobuf]
+
+I understand that this form is syntactically "more intrusive" in the 
+non-decorated type definition.  Is it the reason to use:
+
+   type defaults = {
+      results : int [@key 1] [@default 10];
+   } [@@protobuf]
+
+?
+
+I don't see anything wrong with doing so, although it might be worth 
+supporting both forms.
+
+
+-- Alain
+
+From alain at frisch.fr  Tue May  6 05:52:03 2014
+From: alain at frisch.fr (Alain Frisch)
+Date: Tue, 06 May 2014 06:52:03 +0200
+Subject: [wg-camlp4] [Caml-devel]   Built-in attributes
+In-Reply-To: <1397580874.77042.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+References: <534BFC5F.9030509@lexifi.com>
+ <CAPFanBG0nQMU+aFusmUPnvxiiLonOrn2f0aqy0LiTQk=-QzhZg@mail.gmail.com>
+ <1397580874.77042.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+Message-ID: <53686A73.3070403@frisch.fr>
+
+On 4/15/2014 6:54 PM, Dario Teixeira wrote:
+> As I see it, there are three broad approaches to namespacing:
+>
+>    1) Namespace nothing.  Use social norms to avoid name clashes between different projects.
+>
+>    2) Namespace everything, including compiler extensions.  Compiler can even enforce this
+>       usage by requiring extension points to be of the form "ns.name".
+>
+>    3) No namespacing for generic and builtin attributes, such as "default", "warning",
+>       or "author", but socially-enforced namespacing for extension-specific attributes.
+>
+> Here's my problem with solution 2: how do we deal with generic attributes that could be
+> used by more than one extension?  (For instance, attribute "default" used by Sexplib
+> or Bin-prot, or documentation attributes such as "author" used by tools such as Ocamldoc).
+> This is why I'm leaning more towards solution 3.  This approach would require a centrally
+> maintained list of non-namespaced attributes (a disadvantage, I admit), but this list
+> would be small and fairly static (we could require broad community approval before
+> adding another attribute).  All other attributes would be namespaced, though I imagine
+> that the namespacing could itself be a social convention (eg. "proj.attr") instead
+> of being enforced by the compiler.
+
+A variant of solution 2 is to have each tool accept both qualified and 
+unqualified attributes, as I propose in my email about ppx_protobuf.
+
+This gives some flexibility regarding the list of non-namespaced 
+attributes, since there is always a way for users to resolve conflicts 
+by switching to the qualified form.  It's hard to know in advance if the 
+same @default attribute, even if it is recognized by multiple tools, 
+would also have the same payload for all of them if used on the same 
+code base.
+
+If we apply this to OCaml, we would support both @@ocaml.deprecated and 
+@@deprecated.
+
+Opinions?
+
+
+-- Alain
+
+From whitequark at whitequark.org  Tue May  6 05:59:48 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Tue, 06 May 2014 08:59:48 +0400
+Subject: [wg-camlp4] =?utf-8?q?=5BCaml-list=5D_=5BANN=5D_ppx=5Fprotobuf?=
+In-Reply-To: <53686514.8070200@frisch.fr>
+References: <6232dace806569a16f7fbfaa1689ef42@whitequark.org>
+ <53686514.8070200@frisch.fr>
+Message-ID: <5c5c8af234151e7fdc529a63ce305dab@whitequark.org>
+
+On 2014-05-06 08:29, Alain Frisch wrote:
+> On 5/2/2014 4:29 PM, Peter Zotov wrote:
+>> I have just released the first version of ppx_protobuf, a complete
+>> Protocol Buffers implementation.
+> 
+> This is a very cool project, and a good first public use of extension 
+> points!
+
+Thanks!
+
+> 
+> An aspect of attributes that is not fully settled is how to use
+> namespacing in order to ensure that multiple tools interact nicely.
+> This topic will hopefully be explored by the community to reach a good
+> consensus.
+> 
+> (a suggestion to recognize both [@x] and [@protobuf.x])
+
+I have designed ppx_protobuf's usage of attributes with exactly this in 
+mind;
+[@default] especially would be useful for a wide range of type-driven 
+code
+generators.
+
+I actually intended to release it with the support for namespaced 
+attribute
+variants ([@protobuf.key]), it has simply been forgotten. I'll include 
+it
+in the next release.
+
+> 
+> Another point: for record fields, you interpret attributes at the
+> toplevel of their type. I did not look precisely at the semantics of
+> ppx_protobuf, but it seems that it might be more logical to attach
+> them to the field directly (do you confirm?):
+> 
+>   type defaults = {
+>      results [@key 1] [@default 10]: int;
+>   } [@@protobuf]
+> 
+> I understand that this form is syntactically "more intrusive" in the
+> non-decorated type definition.  Is it the reason to use:
+> 
+>   type defaults = {
+>      results : int [@key 1] [@default 10];
+>   } [@@protobuf]
+> 
+> ?
+> 
+> I don't see anything wrong with doing so, although it might be worth
+> supporting both forms.
+
+The issue here is that I want to support "immediate tuples" (i.e.
+"field : int * int", or, more importantly, "A of int * int", which
+are semantically equivalent to and represented as a Protobuf message.
+As such, I felt it would be only consistent to have the same syntax
+for specifying options on an immediate tuple of several elements:
+
+   results : int [@encoding zigzag] * int [@encoding bits32]
+
+and for specifying options on a "tuple of one element":
+
+   results : int [@encoding zigzag]
+
+I'm not entirely happy with this scheme; the way it gives rise to the 
+message
+structure is at best confusing, as adding or removing a tuple element 
+can
+add or remove nesting and thus break protocol compatibility. In 
+addition,
+the [@key] attribute on, for example, a field itself would currently be 
+ignored.
+While this behavior can be fixed for the most common misplacements, I 
+feel like
+it's a drawback intrinsic to the extension points mechanism: misplaced 
+or misnamed
+attributes are going to be silently ignored.
+
+Do you have any ideas for a solution? I have toyed with an idea of
+a "verifier extension" which would ascertain the lack of attributes 
+after
+all the rewriter passes have presumably removed the attributes known
+to them, but it wouldn't work  with generic attributes like [@default] 
+that
+must be shared between extensions.
+
+> 
+> 
+> -- Alain
+
+-- 
+Peter Zotov
+sip:whitequark at sipnet.ru
+
+
+From alain at frisch.fr  Tue May  6 08:33:43 2014
+From: alain at frisch.fr (Alain Frisch)
+Date: Tue, 06 May 2014 09:33:43 +0200
+Subject: [wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+In-Reply-To: <5c5c8af234151e7fdc529a63ce305dab@whitequark.org>
+References: <6232dace806569a16f7fbfaa1689ef42@whitequark.org>
+ <53686514.8070200@frisch.fr>
+ <5c5c8af234151e7fdc529a63ce305dab@whitequark.org>
+Message-ID: <53689057.5010802@frisch.fr>
+
+On 05/06/2014 06:59 AM, Peter Zotov wrote:
+> While this behavior can be fixed for the most common misplacements, I
+> feel like
+> it's a drawback intrinsic to the extension points mechanism: misplaced
+> or misnamed
+> attributes are going to be silently ignored.
+
+Indeed.
+
+> Do you have any ideas for a solution? I have toyed with an idea of
+> a "verifier extension" which would ascertain the lack of attributes after
+> all the rewriter passes have presumably removed the attributes known
+> to them, but it wouldn't work  with generic attributes like [@default] that
+> must be shared between extensions.
+
+I'm not convinced by the idea of checking the absence of attributes 
+after -ppx rewriters are applied.  You mention one reason (generic 
+attributes, which shouldn't be discarded by any specific -ppx), but 
+there are others:
+
+  - Even non-generic attributes might be better left in the Parsetree 
+sent to OCaml, so that they appear in particular in the dumped typedtree 
+(.cmt/.cmti), which could be useful for further processing (e.g. a 
+version of ocamldoc based on .cmti files).
+
+  - Attributes are not only designed to support -ppx rewriters.  They 
+can also be used by tools which inspect compiled .cmt/.cmti/.cmi files, 
+or stand-alone tools which work on source files but are not used as 
+preprocessors.
+
+  - There is also the case of "optional" -ppx rewriters (e.g. a code 
+instrumentation tool which could be applied or not).
+
+
+An "attribute checker" (either integrated in a generic style-checking 
+tool such as Mascot or as a stand-alone tool,  or maybe even as an 
+"identity" -ppx so that it is always included in the compilation chain) 
+would need some way to know which attributes are allowed and in which 
+context (it's fair to let each tool check the advanced conditions on the 
+payload and constraints such as nesting conditions).  For instance, each 
+tool could come with a small text file describing the attributes it 
+recognizes (and in which contexts), maybe also with a rough description 
+of admissible payloads and -- why not -- some succinct documentation 
+about the attribute.  This information could be useful not only for the 
+attribute checker, but potentially by other tools as well (e.g. an IDE).
+
+
+-- Alain
+
+From mmatalka at gmail.com  Tue May  6 11:42:05 2014
+From: mmatalka at gmail.com (Malcolm Matalka)
+Date: Tue, 6 May 2014 12:42:05 +0200
+Subject: [wg-camlp4] [Caml-list] [ANN] ppx_protobuf
+In-Reply-To: <53686514.8070200@frisch.fr>
+References: <6232dace806569a16f7fbfaa1689ef42@whitequark.org>
+ <53686514.8070200@frisch.fr>
+Message-ID: <CAKziXDWNkdrQ_9H+LvyOzBVeVR526idMR6eYK+rAgubFBaYVcQ@mail.gmail.com>
+
+I think making the application of a ppx look more like a functor
+application solves the name spacing issue for the most part.
+Den 6 maj 2014 06:29 skrev "Alain Frisch" <alain at frisch.fr>:
+
+> On 5/2/2014 4:29 PM, Peter Zotov wrote:
+>
+>> I have just released the first version of ppx_protobuf, a complete
+>> Protocol Buffers implementation.
+>>
+>
+> This is a very cool project, and a good first public use of extension
+> points!
+>
+> An aspect of attributes that is not fully settled is how to use
+> namespacing in order to ensure that multiple tools interact nicely.
+> This topic will hopefully be explored by the community to reach a good
+> consensus.
+>
+> For instance, ppx_protobuf relies on attributes with quite generic names
+> such as @default or @key, that might also be useful to other tools.  It
+> might very well be the case that the same @default attribute (with the same
+> value) would actually be useful to both ppx_protobuf and another
+> deriving-like extension.  This is good, since attributes are not designed
+> to be necessarily targeted to only one specific tool.  But in some cases,
+> one might want to use a different @default attribute for different tools.
+>  What about supporting both a short form @default and a more qualified one
+> @protobuf.default?  This should support both situations.
+>
+> Another point: for record fields, you interpret attributes at the toplevel
+> of their type. I did not look precisely at the semantics of ppx_protobuf,
+> but it seems that it might be more logical to attach them to the field
+> directly (do you confirm?):
+>
+>   type defaults = {
+>      results [@key 1] [@default 10]: int;
+>   } [@@protobuf]
+>
+> I understand that this form is syntactically "more intrusive" in the
+> non-decorated type definition.  Is it the reason to use:
+>
+>   type defaults = {
+>      results : int [@key 1] [@default 10];
+>   } [@@protobuf]
+>
+> ?
+>
+> I don't see anything wrong with doing so, although it might be worth
+> supporting both forms.
+>
+>
+> -- Alain
+>
+> --
+> Caml-list mailing list.  Subscription management and archives:
+> https://sympa.inria.fr/sympa/arc/caml-list
+> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+> Bug reports: http://caml.inria.fr/bin/caml-bugs
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20140506/65b40475/attachment.html>
+
+From lpw25 at cam.ac.uk  Tue May  6 13:47:43 2014
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Tue, 06 May 2014 13:47:43 +0100
+Subject: [wg-camlp4] [Caml-devel]   Built-in attributes
+In-Reply-To: <53686A73.3070403@frisch.fr> (Alain Frisch's message of "Tue, 06
+ May 2014 06:52:03 +0200")
+References: <534BFC5F.9030509@lexifi.com>
+ <CAPFanBG0nQMU+aFusmUPnvxiiLonOrn2f0aqy0LiTQk=-QzhZg@mail.gmail.com>
+ <1397580874.77042.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+ <53686A73.3070403@frisch.fr>
+Message-ID: <86a9av13bk.fsf@cam.ac.uk>
+
+> If we apply this to OCaml, we would support both @@ocaml.deprecated and @@deprecated.
+>
+> Opinions?
+>
+
+Very good idea.
+
+Regards,
+
+Leo
+
+From whitequark at whitequark.org  Thu May 15 14:44:01 2014
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Thu, 15 May 2014 17:44:01 +0400
+Subject: [wg-camlp4] ocamlfind and -ppx option
+In-Reply-To: <1399919898.3512.24.camel@e130>
+References: <655b5045f95df522f800feccdc5e5a2c@whitequark.org>
+ <1399919898.3512.24.camel@e130>
+Message-ID: <e453a94676f28b1ae543c2df07da2bba@whitequark.org>
+
+On 2014-05-12 22:38, Gerd Stolpmann wrote:
+> I think the user should simply invoke a ppx with
+> 
+> ocamlfind ... -syntax ppx_tools ...
+> 
+> (maybe with a subpackage ppx_tools.ppx_metaquot if there are several
+> commands in the same package), just in the same way as it is currently
+> possible with camlp4. findlib would have to figure out what to do. For
+> constructing the -pp switch findlib is looking for a
+> 
+> preprocessor = ...
+> 
+> setting in the package or some ancestor. Similarly, it could look for a
+> 
+> ppx = ...
+> 
+> setting to construct the -ppx switch.
+
+There is a valid point against that solution. Currently, the idiom for
+invoking camlp4 extensions is to pass "-package foo.syntax", which
+would internally specify the correct options to the camlp4 invocation.
+
+As such, both the users and the tooling expect that it is possible to
+fully activate an extension by passing a single -package option, which
+would then require all the necessary components and pass all the flags.
+
+In particular, OASIS makes it very convenient to pass -package options
+(the BuildDepends: field), but not -syntax ones (you have to use both
+ByteOpt: and NativeOpt: fields).
+
+In addition, it's much more user-friendly if you consider the toplevel:
+a single #require "package.syntax";; is much better than a disparate 
+combo
+of #require and #syntax.
+
+This also avoids the need to disambiguate -syntax for camlp4 and ppx
+extensions, and is simpler conceptually.
+
+I have implemented this solution in a patchset:
+
+1. Do not install safe_camlp4 if configured without it
+https://github.com/whitequark/ocaml-findlib/commit/26d24392738c0232893115977b0c6b165dd89acb.diff
+2. Interpret ppx directive in META files
+https://github.com/whitequark/ocaml-findlib/commit/7862f3c7047376d6fa8cebfecadf71adc8b3d8e7.diff
+3. Topfind support for ppx directive
+https://github.com/whitequark/ocaml-findlib/commit/e45dd0a19b15d4697f15addae44a0f37802004b3.diff
+
+Additionally, I have implemented a -ppxopt option, whose job is similar
+to -ppopt: it passes additional arguments to ppx preprocessors. The 
+syntax
+is -ppxopt pkg,opt1,opt2,...:
+https://github.com/whitequark/ocaml-findlib/commit/a24d53c04610efe204c7e9461d3b60e63b2d65de.diff
+
+-- 
+Peter Zotov
+sip:whitequark at sipnet.ru
+
+

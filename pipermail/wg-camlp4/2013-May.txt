@@ -1,0 +1,2101 @@
+From gabriel.scherer at gmail.com  Wed May  1 15:44:48 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 1 May 2013 16:44:48 +0200
+Subject: [wg-camlp4] Negative field report: extension points unsuited for
+	(matches p when e)
+Message-ID: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+
+The recent caml-list message by rixed (archived below) motivated me to
+get pa_matches in shape (it lacked support for "when ..."), and try to
+see how a similar extension could be implemented with the new
+extension_points branch.
+
+The Camlp4 extension allows a new syntax for expressions, (matches
+<pattern>) or (matches <pattern> when <expr>), that desugars into a
+test function returning a boolean: (function <pattern> when <expr> ->
+true | _ -> false). I have attached to this mail the relevant code,
+called pa_matches.ml (pa_ is a traditional prefix for Camlp4 *parser*
+extensions).
+
+I quickly found out that extension points as currently implemented in
+Alain's branch are ill-suited for this task, because the piece of code
+we want to parse (<patt> when <expr>) is not syntactically an
+expression. [%matches <patt> when <expr>] would be rejected by the
+parser.
+
+Note that this is just an experience report, and not a value judgment
+on the extension_points approach itself. I think the choice to only
+accept syntactically valid expressions (in fact structure items) has a
+lot of merits (notably wrt. toolability). The price to pay is that
+potential extension have to be massaged into syntactically correct
+pieces, with a potential loss of concision when compared to
+domain-specific syntax designs. This indicates, I think, that
+extension_points is not always suited for "syntax changes in the
+small", where a very concise syntax is given to an otherwise
+expressible expression (and concision is thus essential for the
+purpose of the extension), except when this extension exactly fits the
+syntactic form of the more high-level OCaml syntactic classes.
+
+For the purpose of experimentation, I still decided to do an
+implementation based on a horrible hack, namely using (the new syntax
+for) string literals that had been presented as a way to get "foreign
+language quotations" in this context, with the syntax [%matches {|
+<patt> when <expr> |}]. I believe this course of action should be
+discouraged; in particular, there is no proper error handling. It
+seems that deploying extensions based on this principle would
+constitute a regression from the current Camlp4 situation.
+
+Note that this implementation technique might be made slightly more
+reasonable if the following ingredients were present:
+- a simple and correct way to add location information from a lexing
+buffer obtained from "Lexing.from_string", to inform the lexer of
+where in the file it's picking up tokens (note that in the above case,
+this is not enough as the quoted string is prefixed with some code to
+make it a valid expression)
+- more entry points in the parser for eg. patterns and match actions
+- maybe support from the ppx wrapper to catch and re-route OCaml errors
+
+I think this is all rather cumbersome and we should rather understand
+and accept the limitations of extension points -- and make unruly
+users respect them!
+
+On Sat, Apr 27, 2013 at 10:04 AM, Gabriel Scherer
+<gabriel.scherer at gmail.com> wrote:
+> This is a subset of Richard Jones' "matches" syntax extension, turning
+> an pattern matching on 'a into a ('a -> bool) function:
+>
+>   if (matches Some x when x > 15) variable then ...
+>
+> (The original extension did not handle "when", but it would be quite
+> easy to add.)
+>
+> On Sat, Apr 27, 2013 at 9:18 AM,  <rixed at happyleptic.org> wrote:
+>> Wouldnt it be nice if, as a special form of the = operator,
+>> "variable = pattern when condition" were equivalent to
+>> "match variable with pattern when condition -> true | _ -> false" ?
+>>
+>> So that one could easily check optional values for instance:
+>>
+>> if variable = Some x when x > 15 then blabla
+>>
+>> What do you think?
+>>
+>>
+>> --
+>> Caml-list mailing list.  Subscription management and archives:
+>> https://sympa.inria.fr/sympa/arc/caml-list
+>> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+>> Bug reports: http://caml.inria.fr/bin/caml-bugs
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: pa_matches.ml
+Type: application/octet-stream
+Size: 1914 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: ppx_matches.ml
+Type: application/octet-stream
+Size: 1208 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/66c3b30b/attachment-0001.obj>
+
+From hongboz at seas.upenn.edu  Wed May  1 16:13:17 2013
+From: hongboz at seas.upenn.edu (Hongbo Zhang)
+Date: Wed, 1 May 2013 11:13:17 -0400
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+Message-ID: <CANcqPu65O+Z8oQWKJTQqKEg9MKjcdXMSnXy-7sUa3oSvQhNQ_Q@mail.gmail.com>
+
+I just wrote a similar extension in fan
+
+open Syntax;
+{:create|Gram pred|};;
+{:extend|
+pred:
+  [pat{p};"when"; exp{e} -> {:exp| function | $pat:p when $e -> true |_ ->
+false |}
+  |pat{p} -> {:exp| function | $pat:p -> true | _ -> false |} ]
+|};;
+
+---- test----
+let a = {:pred|('a'|'b' as x) when x='a'|} 'a';;
+
+if a then print_string "true" else print_string "false";;
+(*true *)
+------------------------------------
+
+Compared with Camlp4, it's guaranteed to be functional and you could see
+some work is put into make Fan's syntax a subset of OCaml's original syntax.
+
+
+
+
+
+On Wed, May 1, 2013 at 10:44 AM, Gabriel Scherer
+<gabriel.scherer at gmail.com>wrote:
+
+> The recent caml-list message by rixed (archived below) motivated me to
+> get pa_matches in shape (it lacked support for "when ..."), and try to
+> see how a similar extension could be implemented with the new
+> extension_points branch.
+>
+> The Camlp4 extension allows a new syntax for expressions, (matches
+> <pattern>) or (matches <pattern> when <expr>), that desugars into a
+> test function returning a boolean: (function <pattern> when <expr> ->
+> true | _ -> false). I have attached to this mail the relevant code,
+> called pa_matches.ml (pa_ is a traditional prefix for Camlp4 *parser*
+> extensions).
+>
+> I quickly found out that extension points as currently implemented in
+> Alain's branch are ill-suited for this task, because the piece of code
+> we want to parse (<patt> when <expr>) is not syntactically an
+> expression. [%matches <patt> when <expr>] would be rejected by the
+> parser.
+>
+> Note that this is just an experience report, and not a value judgment
+> on the extension_points approach itself. I think the choice to only
+> accept syntactically valid expressions (in fact structure items) has a
+> lot of merits (notably wrt. toolability). The price to pay is that
+> potential extension have to be massaged into syntactically correct
+> pieces, with a potential loss of concision when compared to
+> domain-specific syntax designs. This indicates, I think, that
+> extension_points is not always suited for "syntax changes in the
+> small", where a very concise syntax is given to an otherwise
+> expressible expression (and concision is thus essential for the
+> purpose of the extension), except when this extension exactly fits the
+> syntactic form of the more high-level OCaml syntactic classes.
+>
+> For the purpose of experimentation, I still decided to do an
+> implementation based on a horrible hack, namely using (the new syntax
+> for) string literals that had been presented as a way to get "foreign
+> language quotations" in this context, with the syntax [%matches {|
+> <patt> when <expr> |}]. I believe this course of action should be
+> discouraged; in particular, there is no proper error handling. It
+> seems that deploying extensions based on this principle would
+> constitute a regression from the current Camlp4 situation.
+>
+> Note that this implementation technique might be made slightly more
+> reasonable if the following ingredients were present:
+> - a simple and correct way to add location information from a lexing
+> buffer obtained from "Lexing.from_string", to inform the lexer of
+> where in the file it's picking up tokens (note that in the above case,
+> this is not enough as the quoted string is prefixed with some code to
+> make it a valid expression)
+> - more entry points in the parser for eg. patterns and match actions
+> - maybe support from the ppx wrapper to catch and re-route OCaml errors
+>
+> I think this is all rather cumbersome and we should rather understand
+> and accept the limitations of extension points -- and make unruly
+> users respect them!
+>
+> On Sat, Apr 27, 2013 at 10:04 AM, Gabriel Scherer
+> <gabriel.scherer at gmail.com> wrote:
+> > This is a subset of Richard Jones' "matches" syntax extension, turning
+> > an pattern matching on 'a into a ('a -> bool) function:
+> >
+> >   if (matches Some x when x > 15) variable then ...
+> >
+> > (The original extension did not handle "when", but it would be quite
+> > easy to add.)
+> >
+> > On Sat, Apr 27, 2013 at 9:18 AM,  <rixed at happyleptic.org> wrote:
+> >> Wouldnt it be nice if, as a special form of the = operator,
+> >> "variable = pattern when condition" were equivalent to
+> >> "match variable with pattern when condition -> true | _ -> false" ?
+> >>
+> >> So that one could easily check optional values for instance:
+> >>
+> >> if variable = Some x when x > 15 then blabla
+> >>
+> >> What do you think?
+> >>
+> >>
+> >> --
+> >> Caml-list mailing list.  Subscription management and archives:
+> >> https://sympa.inria.fr/sympa/arc/caml-list
+> >> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+> >> Bug reports: http://caml.inria.fr/bin/caml-bugs
+>
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130501/c2eeadea/attachment.html>
+
+From alain.frisch at lexifi.com  Thu May  2 08:33:52 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 02 May 2013 09:33:52 +0200
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+Message-ID: <518216E0.1080007@lexifi.com>
+
+Hi Gabriel,
+
+Thanks for the feedback.
+
+I think it is to be understood that -ppx and extension_point do not 
+target "syntax extension in the small", as you say.  I'd go as far as to 
+say that they are not really about "syntax extension", since the whole 
+idea is not to touch the concrete syntax.  Compared to Camlp4, Camlp5 or 
+Fan, indeed, we loose the ability to provide nice little convenient 
+syntactic shortcuts, and for this reason, there will still be some space 
+for those tools, for people actually interested in changing the concrete 
+syntax (and accepting the price to pay for it, in particular having to 
+adapt their editor mode).  Luckily, I believe that most of the 
+wide-spread current uses of Camlp4 don't fall in this category where the 
+syntactic compactness is the ultimate goal:
+
+   - code generation driven by type declaration;
+
+   - code instrumentation (? la Bisect);
+
+   - macro/conditional compilation;
+
+   - monadic syntax (--> e.g. suggested syntax for lwt: let%W p = ...)
+
+   - custom pattern matching (bitstring, ulex).
+
+
+As a side note, I've recently changed the syntactic category accepted as 
+arguments of attributes/extensions from expressions to structures, which 
+are strictly more general (an expression is also syntactically a valid 
+structure item, and thus a structure, in itself).
+
+It was also discussed, some time ago, to merge the syntactic categories 
+of expressions and patterns (patterns are already "almost" a 
+sub-category of expressions).  This could have helped in your case (not 
+for the "when" part, though).
+
+On 05/01/2013 04:44 PM, Gabriel Scherer wrote:
+> For the purpose of experimentation, I still decided to do an
+> implementation based on a horrible hack, namely using (the new syntax
+> for) string literals that had been presented as a way to get "foreign
+> language quotations" in this context, with the syntax [%matches {|
+> <patt> when <expr> |}]. I believe this course of action should be
+> discouraged; in particular, there is no proper error handling. It
+> seems that deploying extensions based on this principle would
+> constitute a regression from the current Camlp4 situation.
+
+
+I know that you're allergic to this approach, but you could also have 
+adopted the following syntax:
+
+{matches|<patt>|}
+{matches|<patt> when <expr>|}
+
+i.e. reusing syntax for an otherwise valid expression (a string 
+literal).  Indeed, the "marker" for new string literals is kept in the 
+Parsetree.  And those string literals have the nice property that a 
+position within the string literal can be mapped to a location in the 
+source code (just shift by N+2 characters, where N is the length of the 
+string market, 7 in that case).  Indeed, no character within the string 
+literal is interpreted in a special way (no escaping or special 
+character) and whitespaces are not allowed around the marker.  This 
+would support exact error reporting.
+
+Leo has proposed to provide a combined syntax for extension node + 
+quotation. This would give a cleaner way, of course, compared to 
+piggy-backing valid syntax.
+
+
+
+Alain
+
+From jdimino at janestreet.com  Thu May  2 12:35:11 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Thu, 2 May 2013 12:35:11 +0100
+Subject: [wg-camlp4] Raw representation of literals in the parsetree
+Message-ID: <CANhEzE6iCKy55i1ysRJYibcCwhcpoF6q3JFj7J4QjtkYkzRTTw@mail.gmail.com>
+
+Hi,
+
+We recently felt the need to write a new extension that would check
+integer literals.  The goal is to verify that ones containing
+underscores match a specific regular expression.  Namely digits are
+grouped by 3.
+
+We can do that for instance with a camlp4 token filter, but we wanted
+to try with ppx.  It is currently not possible to do it by looking at
+the parsetree since constants are already evaluated (integers are
+represented by an OCaml int) and the raw form is lost.
+
+One solution would be to add the raw representation of constants in
+the parsetree. For instance by changing Asttypes.constant to:
+
+,----
+| type constant_value =
+|     Const_int of int
+|   | Const_char of char
+|   | Const_string of string
+|   | Const_float of string
+|   | Const_int32 of int32
+|   | Const_int64 of int64
+|   | Const_nativeint of nativeint
+|
+| type constant = constant_value * string
+`----
+
+I believe it could also be useful for other rewriters, especially ones
+dealing with strings since they would be able to compute the correct
+location inside a string. And maybe also for printing: Pprintast could
+use the representation choosed by the programmer instead of a
+standardized one.
+
+Do people thinks that this a reasonable thing to add to the OCaml
+parsetree? If yes I can do the modification.
+
+Jeremie
+
+From gabriel.scherer at gmail.com  Thu May  2 14:00:06 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Thu, 2 May 2013 15:00:06 +0200
+Subject: [wg-camlp4] Raw representation of literals in the parsetree
+In-Reply-To: <CANhEzE6iCKy55i1ysRJYibcCwhcpoF6q3JFj7J4QjtkYkzRTTw@mail.gmail.com>
+References: <CANhEzE6iCKy55i1ysRJYibcCwhcpoF6q3JFj7J4QjtkYkzRTTw@mail.gmail.com>
+Message-ID: <CAPFanBF-S2o_wLDMWMsHyQjViD4T-1M6r4RSEnH3uZQmAQafqQ@mail.gmail.com>
+
+I think it is very reasonable, and would be a good fit for Alain's branch.
+
+On Thu, May 2, 2013 at 1:35 PM, Jeremie Dimino <jdimino at janestreet.com> wrote:
+> Hi,
+>
+> We recently felt the need to write a new extension that would check
+> integer literals.  The goal is to verify that ones containing
+> underscores match a specific regular expression.  Namely digits are
+> grouped by 3.
+>
+> We can do that for instance with a camlp4 token filter, but we wanted
+> to try with ppx.  It is currently not possible to do it by looking at
+> the parsetree since constants are already evaluated (integers are
+> represented by an OCaml int) and the raw form is lost.
+>
+> One solution would be to add the raw representation of constants in
+> the parsetree. For instance by changing Asttypes.constant to:
+>
+> ,----
+> | type constant_value =
+> |     Const_int of int
+> |   | Const_char of char
+> |   | Const_string of string
+> |   | Const_float of string
+> |   | Const_int32 of int32
+> |   | Const_int64 of int64
+> |   | Const_nativeint of nativeint
+> |
+> | type constant = constant_value * string
+> `----
+>
+> I believe it could also be useful for other rewriters, especially ones
+> dealing with strings since they would be able to compute the correct
+> location inside a string. And maybe also for printing: Pprintast could
+> use the representation choosed by the programmer instead of a
+> standardized one.
+>
+> Do people thinks that this a reasonable thing to add to the OCaml
+> parsetree? If yes I can do the modification.
+>
+> Jeremie
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From hongboz at seas.upenn.edu  Thu May  2 14:40:12 2013
+From: hongboz at seas.upenn.edu (Hongbo Zhang)
+Date: Thu, 2 May 2013 09:40:12 -0400
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <518216E0.1080007@lexifi.com>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+ <518216E0.1080007@lexifi.com>
+Message-ID: <CANcqPu5nTiOyDjPmFn6za3m8og+9sBufamJN-jZmFYrYWP+yTA@mail.gmail.com>
+
+I would be very happy to see some killer applications written using
+extension_point to be convinced that extension_point is awesome for
+metaprogramming.
+
+Currently, I am building a c code generation framework and continuing
+jaked's work on ocamljs on top of Fan. I really learned a lot during the
+development and did fix some bad designs of Fan, such a way of learning may
+also benefit the design of extension_point.
+
+
+
+On Thu, May 2, 2013 at 3:33 AM, Alain Frisch <alain.frisch at lexifi.com>wrote:
+
+> Hi Gabriel,
+>
+> Thanks for the feedback.
+>
+> I think it is to be understood that -ppx and extension_point do not target
+> "syntax extension in the small", as you say.  I'd go as far as to say that
+> they are not really about "syntax extension", since the whole idea is not
+> to touch the concrete syntax.  Compared to Camlp4, Camlp5 or Fan, indeed,
+> we loose the ability to provide nice little convenient syntactic shortcuts,
+> and for this reason, there will still be some space for those tools, for
+> people actually interested in changing the concrete syntax (and accepting
+> the price to pay for it, in particular having to adapt their editor mode).
+>  Luckily, I believe that most of the wide-spread current uses of Camlp4
+> don't fall in this category where the syntactic compactness is the ultimate
+> goal:
+>
+>   - code generation driven by type declaration;
+>
+>   - code instrumentation (? la Bisect);
+>
+>   - macro/conditional compilation;
+>
+>   - monadic syntax (--> e.g. suggested syntax for lwt: let%W p = ...)
+>
+>   - custom pattern matching (bitstring, ulex).
+>
+>
+> As a side note, I've recently changed the syntactic category accepted as
+> arguments of attributes/extensions from expressions to structures, which
+> are strictly more general (an expression is also syntactically a valid
+> structure item, and thus a structure, in itself).
+>
+> It was also discussed, some time ago, to merge the syntactic categories of
+> expressions and patterns (patterns are already "almost" a sub-category of
+> expressions).  This could have helped in your case (not for the "when"
+> part, though).
+>
+>
+> On 05/01/2013 04:44 PM, Gabriel Scherer wrote:
+>
+>> For the purpose of experimentation, I still decided to do an
+>> implementation based on a horrible hack, namely using (the new syntax
+>> for) string literals that had been presented as a way to get "foreign
+>> language quotations" in this context, with the syntax [%matches {|
+>> <patt> when <expr> |}]. I believe this course of action should be
+>> discouraged; in particular, there is no proper error handling. It
+>> seems that deploying extensions based on this principle would
+>> constitute a regression from the current Camlp4 situation.
+>>
+>
+>
+> I know that you're allergic to this approach, but you could also have
+> adopted the following syntax:
+>
+> {matches|<patt>|}
+> {matches|<patt> when <expr>|}
+>
+> i.e. reusing syntax for an otherwise valid expression (a string literal).
+>  Indeed, the "marker" for new string literals is kept in the Parsetree.
+>  And those string literals have the nice property that a position within
+> the string literal can be mapped to a location in the source code (just
+> shift by N+2 characters, where N is the length of the string market, 7 in
+> that case).  Indeed, no character within the string literal is interpreted
+> in a special way (no escaping or special character) and whitespaces are not
+> allowed around the marker.  This would support exact error reporting.
+>
+> Leo has proposed to provide a combined syntax for extension node +
+> quotation. This would give a cleaner way, of course, compared to
+> piggy-backing valid syntax.
+>
+>
+>
+> Alain
+>
+> ______________________________**_________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/**listinfo/wg-camlp4<http://lists.ocaml.org/listinfo/wg-camlp4>
+>
+
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130502/0c3ec5d1/attachment.html>
+
+From alain at frisch.fr  Fri May  3 10:03:18 2013
+From: alain at frisch.fr (Alain Frisch)
+Date: Fri, 03 May 2013 11:03:18 +0200
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <518216E0.1080007@lexifi.com>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+ <518216E0.1080007@lexifi.com>
+Message-ID: <51837D56.80506@frisch.fr>
+
+On 05/02/2013 09:33 AM, Alain Frisch wrote:
+> {matches|<patt>|}
+> {matches|<patt> when <expr>|}
+
+Sorry, this would be:
+
+{matches|<patt>|matches}
+{matches|<patt> when <expr>|matches}
+
+
+-- Alain
+
+From lpw25 at cam.ac.uk  Sat May  4 14:27:31 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Sat, 04 May 2013 14:27:31 +0100
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+	for (matches p when e)
+In-Reply-To: <518216E0.1080007@lexifi.com> (Alain Frisch's message of "Thu, 02
+ May 2013 09:33:52 +0200")
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+ <518216E0.1080007@lexifi.com>
+Message-ID: <86li7udge4.fsf@cam.ac.uk>
+
+> As a side note, I've recently changed the syntactic category accepted as arguments of attributes/extensions from
+> expressions to structures, which are strictly more general (an expression is also syntactically a valid structure item,
+> and thus a structure, in itself).
+
+I've been going through the uses of camlp4 in opam and recording how
+each of their syntaxes could be adjusted to fit ppx. (I've been doing it
+on and off for a few weeks, and am about half-way through them). One
+group of extensions that would currently need quotations are those that
+create types from other types. For example, the following quotation from
+shcaml:
+
+  <| seq: Line.present; source: Line.present >
+
+this quotation is supposed to be a type expression, where the body of
+the quotation is essentially an object type.
+
+For cases like these, I thought it would be a good idea to change from
+having expressions as bodies, to having the bodies be like a
+simple type constraint:
+
+  [%id expr : core_type]
+
+where both the expression and the "constraint" are optional. This would
+allow the example above to be represented as:
+
+  [%line: < seq: Line.present; source: Line.present >]
+
+Do you think that we could support this form as well as structures? If
+not, did you have any specific cases that you wanted to use structures
+for? I could imagine structures being useful for top-level extensions,
+maybe we could have:
+
+  [%%id struture]
+
+and
+
+  [%id expr : core_type]
+
+From bobzhang1988 at gmail.com  Sat May 11 15:03:10 2013
+From: bobzhang1988 at gmail.com (Bob Zhang)
+Date: Sat, 11 May 2013 10:03:10 -0400
+Subject: [wg-camlp4] nested quotation lexing problem?
+Message-ID: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+
+Hi all,
+   I have came across a nasty bug when lexing the nested quotations. I
+would like to have your opinions about this problem.
+
+   Sample 1:
+   {:q|  "|}" |}
+       Shall we accept this or reject it? the intuition is that this is a
+legal quotation, however, if we treat the contents inside the quotation in
+a verbatim way, this is illegal...
+  Sample 2:
+  {:q| '"' |}
+     If we treat " inside the quotation specially, the quotation above
+seems to be illegal (a non-terminated string).
+
+   If we treat both ' and " inside quotation in a special way, which is
+good in most cases, then we lose some use cases, for example, the contents
+inside the quotation have to follow the same string char lexical convention
+as OCaml.. what do you think?
+-- 
+Regards
+-- Bob
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130511/01656fcd/attachment.html>
+
+From bobzhang1988 at gmail.com  Sat May 11 15:06:43 2013
+From: bobzhang1988 at gmail.com (Bob Zhang)
+Date: Sat, 11 May 2013 10:06:43 -0400
+Subject: [wg-camlp4] nested quotation lexing problem?
+In-Reply-To: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+References: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+Message-ID: <CANcqPu61nnGG9fkCuXdjZr=Wzra2Xtn1NRNRRHKhDOPY4Y5vXw@mail.gmail.com>
+
+Sorry, the outlook of second sample is a bit ambiguous, its a char `"'
+between`''  and `''
+
+
+On Sat, May 11, 2013 at 10:03 AM, Bob Zhang <bobzhang1988 at gmail.com> wrote:
+
+>
+> Hi all,
+>    I have came across a nasty bug when lexing the nested quotations. I
+> would like to have your opinions about this problem.
+>
+>    Sample 1:
+>    {:q|  "|}" |}
+>        Shall we accept this or reject it? the intuition is that this is a
+> legal quotation, however, if we treat the contents inside the quotation in
+> a verbatim way, this is illegal...
+>   Sample 2:
+>   {:q| '"' |}
+>      If we treat " inside the quotation specially, the quotation above
+> seems to be illegal (a non-terminated string).
+>
+>    If we treat both ' and " inside quotation in a special way, which is
+> good in most cases, then we lose some use cases, for example, the contents
+> inside the quotation have to follow the same string char lexical convention
+> as OCaml.. what do you think?
+> --
+> Regards
+> -- Bob
+>
+
+
+
+-- 
+Regards
+-- Bob
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130511/89ee3d04/attachment.html>
+
+From wojciech.meyer at gmail.com  Sat May 11 15:42:34 2013
+From: wojciech.meyer at gmail.com (Wojciech Meyer)
+Date: Sat, 11 May 2013 15:42:34 +0100
+Subject: [wg-camlp4] nested quotation lexing problem?
+In-Reply-To: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+ (Bob Zhang's message of "Sat, 11 May 2013 10:03:10 -0400")
+References: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+Message-ID: <wfhai9zig5.fsf@gmail.com>
+
+Hi,
+
+Bob Zhang <bobzhang1988 at gmail.com> writes:
+
+> ? ?Sample 1:
+> ? ?{:q| ?"|}" |}
+> ? ? ? ?Shall we accept this or reject it? the intuition is that this
+> is a legal quotation, however, if we treat the contents inside the
+> quotation in a verbatim way, this is illegal...
+
+I think quotation engine should lex something in between quotes as a
+string, therefore I believe it ought to be accepted. From what I can
+think, " pair is already so special that it makes sense to lex it always
+as string. It might be a bit more difficult to do, but I think it's
+worth.
+
+> ? Sample 2:
+> ? {:q| '"' |} ? ?
+> ? ? ?If we treat " inside the quotation specially, the quotation above
+> seems to be illegal (a non-terminated string).
+
+Again pair of ' is also special, and the lexer should be aware always
+about this.
+
+> ? ?If we treat both ' and " inside quotation in a special way, which
+> is good in most cases, then we lose some use cases, for example, the
+> contents inside the quotation have to follow the same string char
+> lexical convention as OCaml.. what do you think?
+
+I'd make it following OCaml convention, but also make it plugable so the
+user can choose how to lex the contents, because string can contain
+arbitrary text, and I've never seen a computer language that had
+different delimiters (apart from Python ''') so it all makes sense. On
+other hand allowing strings between other delimiters would be good to.
+
+Now it's time to say, you would love how the PEG packrat parses, because
+it does not have lexing pass so you would not have this problem. (but
+has some slightly different).
+
+Wojciech
+
+From bobzhang1988 at gmail.com  Sat May 11 16:08:50 2013
+From: bobzhang1988 at gmail.com (Bob Zhang)
+Date: Sat, 11 May 2013 11:08:50 -0400
+Subject: [wg-camlp4] nested quotation lexing problem?
+In-Reply-To: <wfhai9zig5.fsf@gmail.com>
+References: <CANcqPu7A-_0AqpPa2Em2JLAwQXTwNUd8H=m8EhP3bj+N_dprZw@mail.gmail.com>
+ <wfhai9zig5.fsf@gmail.com>
+Message-ID: <CANcqPu60nHQ7YOxpaTTa=5gqFjf+1xQiU3597yjgOD_SwwSVLg@mail.gmail.com>
+
+Hi,
+
+
+On Sat, May 11, 2013 at 10:42 AM, Wojciech Meyer
+<wojciech.meyer at gmail.com>wrote:
+
+> Hi,
+>
+> I'd make it following OCaml convention, but also make it plugable so the
+> user can choose how to lex the contents, because string can contain
+> arbitrary text, and I've never seen a computer language that had
+> different delimiters (apart from Python ''') so it all makes sense. On
+> other hand allowing strings between other delimiters would be good to.
+>
+> Yes, I think the requirement  for the string convention is reasonable, but
+the requirement for char convention is a bit loose. So,
+   {:q| "|}" |} (* accepted*)
+   {:q| '"' |}  (* accepted *)
+   {:q| '     '  |} (* accepted as well, the char check is intended to be
+loose *)
+
+Now even the lexer generator is embedded in Fan and bootstrapped by Fan
+itself,
+check out :
+ https://github.com/bobzhang/Fan/blob/master/src/FLexer.ml
+
+The advantaged compared with ocamllex is that it works in toplevel :-)
+
+
+> Now it's time to say, you would love how the PEG packrat parses, because
+> it does not have lexing pass so you would not have this problem. (but
+> has some slightly different).
+>
+> Wojciech
+>
+
+
+
+-- 
+Regards
+-- Bob
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130511/213ecaac/attachment.html>
+
+From alain.frisch at lexifi.com  Mon May 13 12:45:49 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 13 May 2013 13:45:49 +0200
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <86li7udge4.fsf@cam.ac.uk>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>	<518216E0.1080007@lexifi.com>
+ <86li7udge4.fsf@cam.ac.uk>
+Message-ID: <5190D26D.30000@lexifi.com>
+
+On 05/04/2013 03:27 PM, Leo White wrote:
+> I've been going through the uses of camlp4 in opam and recording how
+> each of their syntaxes could be adjusted to fit ppx. (I've been doing it
+> on and off for a few weeks, and am about half-way through them). One
+> group of extensions that would currently need quotations are those that
+> create types from other types. For example, the following quotation from
+> shcaml:
+>
+>    <| seq: Line.present; source: Line.present >
+>
+> this quotation is supposed to be a type expression, where the body of
+> the quotation is essentially an object type.
+
+Possible syntaxes:
+
+  [%sh (seq: Line.present); (source: Line.present)]
+
+  < seq: Line.present; source: Line.present > [@sh]
+
+  [%sh] * < seq: Line.present; source: Line.present >
+
+But, in that specific case, is the syntactic sugar worthwhile at all? 
+Reading the shcaml documentation 
+(http://www.eecs.harvard.edu/~tov/code/shcaml/doc/),  I can see this 
+syntax used only in inferred types, and not documented.  Do the users 
+really need to write those types?
+
+Can you give other examples of these extensions which would benefit from 
+the ability to use type expressions as arguments of extensions or 
+attributes?
+
+> For cases like these, I thought it would be a good idea to change from
+> having expressions as bodies, to having the bodies be like a
+> simple type constraint:
+>
+>    [%id expr : core_type]
+>
+> where both the expression and the "constraint" are optional.
+
+Just to be sure that I understand your proposal correctly, you would 
+support:
+
+   expr
+   expr : core_type
+   : core_type
+
+Do you have concrete examples where the second form would be nice? 
+(Adding parentheses makes it a valid expression anyway.)
+
+Gabriel reported a case (pa_matches) where allowing patterns (and also 
+patterns with a "when" guard) would be useful as well.  Would you 
+suggest to allow patterns (with a dedicated syntax) as well?
+
+> Do you think that we could support this form as well as structures?  If
+> not, did you have any specific cases that you wanted to use structures
+> for?
+
+In addition to top-level extensions and a more natural support for empty 
+arguments (the empty structure), I can imagine a general form
+of "local structure items":
+
+   let [%local STR] = () in e
+====>
+   let module LOCAL001 = struct STR let res = e end in
+   LOCAL001.res
+
+to allow, for instance:
+
+  let [%local exception M] = () in
+  ....
+
+  let [%local type t = {x: int; y: string}] = () in
+  ....
+
+
+
+
+Alain
+
+From lpw25 at cam.ac.uk  Tue May 14 11:49:36 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Tue, 14 May 2013 11:49:36 +0100
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+	for (matches p when e)
+In-Reply-To: <5190D26D.30000@lexifi.com> (Alain Frisch's message of "Mon, 13
+ May 2013 13:45:49 +0200")
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+ <518216E0.1080007@lexifi.com> <86li7udge4.fsf@cam.ac.uk>
+ <5190D26D.30000@lexifi.com>
+Message-ID: <87vc6ln8e7.fsf@kingston.cl.cam.ac.uk>
+
+> Possible syntaxes:
+>
+>  [%sh (seq: Line.present); (source: Line.present)]
+
+This won't work, because you need to be able to replace Line.present
+with an arbitrary type expression.
+
+>  < seq: Line.present; source: Line.present > [@sh]
+
+This isn't an extension node, so may be silently ignored.
+
+>  [%sh] * < seq: Line.present; source: Line.present >
+
+This doesn't make it clear that "< seq: Line.present; source:
+Line.present >" is not actually an object type, but an argument to the
+sh extension.
+
+> But, in that specific case, is the syntactic sugar worthwhile at all? Reading the shcaml documentation
+> (http://www.eecs.harvard.edu/~tov/code/shcaml/doc/),  I can see this syntax used only in inferred types, and not
+> documented.  Do the users really need to write those types?
+
+I don't really know about that specific example. It looks a bit like the
+syntax extension was never really deployed for users.
+
+> Can you give other examples of these extensions which would benefit from the ability to use type expressions as
+> arguments of extensions or attributes?
+
+Not off the top of my head, but I would have thought that extension
+nodes in type expressions would often want to be built from other type
+expressions, and there is no easy way to do that at the moment.
+
+> Just to be sure that I understand your proposal correctly, you would support:
+>
+>   expr
+>   expr : core_type
+>   : core_type
+>
+> Do you have concrete examples where the second form would be nice? (Adding parentheses makes it a valid expression
+> anyway.)
+
+I see two uses:
+
+i) Type extensions that take some arguments that are not types:
+
+  [%foo true: 'a list] list
+
+ii) Extensions that define values (although in this case the extra
+brackets are fine):
+
+  [%def foo : int list]
+
+> Gabriel reported a case (pa_matches) where allowing patterns (and also patterns with a "when" guard) would be useful as
+> well.  Would you suggest to allow patterns (with a dedicated syntax) as well?
+
+So far, I've found that (with the exception of Gabriel's extension)
+pattern extensions can be easily changed into "match" and "let"
+extensions:
+
+  match%ext foo with
+    Pattern _ [@ext transform] -> ...
+  | ...
+
+>> Do you think that we could support this form as well as structures?  If
+>> not, did you have any specific cases that you wanted to use structures
+>> for?
+>
+> In addition to top-level extensions and a more natural support for empty arguments (the empty structure), I can imagine
+> a general form
+> of "local structure items":
+>
+>   let [%local STR] = () in e
+> ====>
+>   let module LOCAL001 = struct STR let res = e end in
+>   LOCAL001.res
+>
+> to allow, for instance:
+>
+>  let [%local exception M] = () in
+>  ....
+>
+>  let [%local type t = {x: int; y: string}] = () in
+>  ....
+>
+
+I suspect that this specific extension is a very unusual case, and it
+would be better integrated into the language proper.
+
+From alain.frisch at lexifi.com  Tue May 14 13:05:23 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Tue, 14 May 2013 14:05:23 +0200
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+ for (matches p when e)
+In-Reply-To: <87vc6ln8e7.fsf@kingston.cl.cam.ac.uk>
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>	<518216E0.1080007@lexifi.com>
+ <86li7udge4.fsf@cam.ac.uk>	<5190D26D.30000@lexifi.com>
+ <87vc6ln8e7.fsf@kingston.cl.cam.ac.uk>
+Message-ID: <51922883.7030009@lexifi.com>
+
+On 05/14/2013 12:49 PM, Leo White wrote:
+>> Possible syntaxes:
+>>
+>>   [%sh (seq: Line.present); (source: Line.present)]
+>
+> This won't work, because you need to be able to replace Line.present
+> with an arbitrary type expression.
+
+Well, it would work with this syntax, wouldn't it?
+
+>>   < seq: Line.present; source: Line.present > [@sh]
+>
+> This isn't an extension node, so may be silently ignored.
+>
+>>   [%sh] * < seq: Line.present; source: Line.present >
+>
+> This doesn't make it clear that "< seq: Line.present; source:
+> Line.present >" is not actually an object type, but an argument to the
+> sh extension.
+
+ From a superficial reading, it seems that this is really an object 
+type, where some fields are implicit.
+
+>> But, in that specific case, is the syntactic sugar worthwhile at all? Reading the shcaml documentation
+>> (http://www.eecs.harvard.edu/~tov/code/shcaml/doc/),  I can see this syntax used only in inferred types, and not
+>> documented.  Do the users really need to write those types?
+>
+> I don't really know about that specific example. It looks a bit like the
+> syntax extension was never really deployed for users.
+>
+>> Can you give other examples of these extensions which would benefit from the ability to use type expressions as
+>> arguments of extensions or attributes?
+>
+> Not off the top of my head, but I would have thought that extension
+> nodes in type expressions would often want to be built from other type
+> expressions, and there is no easy way to do that at the moment.
+
+We should probably wait for more widely used examples of extensions 
+which would benefit from "type expressions" as arguments.  Of course, 
+it's always possible to write:
+
+   [%sh ((): type_expr)]
+
+>
+>> Just to be sure that I understand your proposal correctly, you would support:
+>>
+>>    expr
+>>    expr : core_type
+>>    : core_type
+>>
+>> Do you have concrete examples where the second form would be nice? (Adding parentheses makes it a valid expression
+>> anyway.)
+>
+> I see two uses:
+>
+> i) Type extensions that take some arguments that are not types:
+>
+>    [%foo true: 'a list] list
+
+Do you know any actual such extensions?   One can also imagine 
+extensions expecting several types are arguments, or a combination of 
+types, patterns, etc.  All can be encoded, with more or less syntactic 
+overhead inside expressions.  Hard-coding better support for some 
+specific cases should be motivated by real examples.
+
+>> of "local structure items":
+>>
+>>    let [%local STR] = () in e
+>> ====>
+>>    let module LOCAL001 = struct STR let res = e end in
+>>    LOCAL001.res
+>>
+>> to allow, for instance:
+>>
+>>   let [%local exception M] = () in
+>>   ....
+>>
+>>   let [%local type t = {x: int; y: string}] = () in
+>>   ....
+>>
+>
+> I suspect that this specific extension is a very unusual case, and it
+> would be better integrated into the language proper.
+
+( http://caml.inria.fr/mantis/view.php?id=5955 )
+
+
+-- Alain
+
+From lpw25 at cam.ac.uk  Tue May 14 17:35:32 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Tue, 14 May 2013 17:35:32 +0100
+Subject: [wg-camlp4] Negative field report: extension points unsuited
+	for (matches p when e)
+In-Reply-To: <51922883.7030009@lexifi.com> (Alain Frisch's message of "Tue, 14
+ May 2013 14:05:23 +0200")
+References: <CAPFanBG3iR850B=sKRzbcJ2j1mphQM2Xo5ipEbvbvrqco7q=yA@mail.gmail.com>
+ <518216E0.1080007@lexifi.com> <86li7udge4.fsf@cam.ac.uk>
+ <5190D26D.30000@lexifi.com> <87vc6ln8e7.fsf@kingston.cl.cam.ac.uk>
+ <51922883.7030009@lexifi.com>
+Message-ID: <878v3hmsdn.fsf@kingston.cl.cam.ac.uk>
+
+>>> Possible syntaxes:
+>>>
+>>>   [%sh (seq: Line.present); (source: Line.present)]
+>>
+>> This won't work, because you need to be able to replace Line.present
+>> with an arbitrary type expression.
+>
+> Well, it would work with this syntax, wouldn't it?
+
+You're right. I did not read the example closely enough.
+
+>> This doesn't make it clear that "< seq: Line.present; source:
+>> Line.present >" is not actually an object type, but an argument to the
+>> sh extension.
+>
+> From a superficial reading, it seems that this is really an object type, where some fields are implicit.
+
+Probably, I haven't looked at it too closely, but my point was that 
+
+  < seq: Line.present; source: Line.present > 
+
+was not being used as the object type 
+
+  < seq: Line.present; source: Line.present >
+
+but as an argument to an extension (which happens to produce a
+*different* object type).
+
+>
+> We should probably wait for more widely used examples of extensions which would benefit from "type expressions" as
+> arguments.  Of course, it's always possible to write:
+>
+>   [%sh ((): type_expr)]
+>
+
+Fair enough, although there is an argument that such extensions will not be
+written if the syntax doesn't support them well.
+
+From jdimino at janestreet.com  Thu May 23 16:26:16 2013
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Thu, 23 May 2013 16:26:16 +0100
+Subject: [wg-camlp4] Raw representation of literals in the parsetree
+In-Reply-To: <CAPFanBF-S2o_wLDMWMsHyQjViD4T-1M6r4RSEnH3uZQmAQafqQ@mail.gmail.com>
+References: <CANhEzE6iCKy55i1ysRJYibcCwhcpoF6q3JFj7J4QjtkYkzRTTw@mail.gmail.com>
+ <CAPFanBF-S2o_wLDMWMsHyQjViD4T-1M6r4RSEnH3uZQmAQafqQ@mail.gmail.com>
+Message-ID: <CANhEzE669gfDxfFwaJ+x-1rNhU3qy6wAqsxqP7L0SAjS-RezLw@mail.gmail.com>
+
+We discussed it further with Alain but it turns out it doesn't work
+very well.  A constant may be composed of several tokens so it is not
+possible to have the exact raw representation.  And for strings one
+can use the new quoted strings which are already treated as raw
+strings.
+
+Another possibility would be to modify the lexer so that it doesn't
+'evaluate' tokens immediately and let the parser do it.  At least it
+would avoid this kind of thing:
+
+  # max_int;;
+  - : int = 4611686018427387903
+  # 4611686018427387904;;
+  - : int = -4611686018427387904
+
+On Thu, May 2, 2013 at 2:00 PM, Gabriel Scherer
+<gabriel.scherer at gmail.com> wrote:
+> I think it is very reasonable, and would be a good fit for Alain's branch.
+>
+> On Thu, May 2, 2013 at 1:35 PM, Jeremie Dimino <jdimino at janestreet.com> wrote:
+>> Hi,
+>>
+>> We recently felt the need to write a new extension that would check
+>> integer literals.  The goal is to verify that ones containing
+>> underscores match a specific regular expression.  Namely digits are
+>> grouped by 3.
+>>
+>> We can do that for instance with a camlp4 token filter, but we wanted
+>> to try with ppx.  It is currently not possible to do it by looking at
+>> the parsetree since constants are already evaluated (integers are
+>> represented by an OCaml int) and the raw form is lost.
+>>
+>> One solution would be to add the raw representation of constants in
+>> the parsetree. For instance by changing Asttypes.constant to:
+>>
+>> ,----
+>> | type constant_value =
+>> |     Const_int of int
+>> |   | Const_char of char
+>> |   | Const_string of string
+>> |   | Const_float of string
+>> |   | Const_int32 of int32
+>> |   | Const_int64 of int64
+>> |   | Const_nativeint of nativeint
+>> |
+>> | type constant = constant_value * string
+>> `----
+>>
+>> I believe it could also be useful for other rewriters, especially ones
+>> dealing with strings since they would be able to compute the correct
+>> location inside a string. And maybe also for printing: Pprintast could
+>> use the representation choosed by the programmer instead of a
+>> standardized one.
+>>
+>> Do people thinks that this a reasonable thing to add to the OCaml
+>> parsetree? If yes I can do the modification.
+>>
+>> Jeremie
+>> _______________________________________________
+>> wg-camlp4 mailing list
+>> wg-camlp4 at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/wg-camlp4
+
+-- 
+Jeremie
+
+From hongboz at seas.upenn.edu  Thu May 23 17:15:11 2013
+From: hongboz at seas.upenn.edu (Hongbo Zhang)
+Date: Thu, 23 May 2013 12:15:11 -0400
+Subject: [wg-camlp4] Raw representation of literals in the parsetree
+In-Reply-To: <CANhEzE669gfDxfFwaJ+x-1rNhU3qy6wAqsxqP7L0SAjS-RezLw@mail.gmail.com>
+References: <CANhEzE6iCKy55i1ysRJYibcCwhcpoF6q3JFj7J4QjtkYkzRTTw@mail.gmail.com>
+ <CAPFanBF-S2o_wLDMWMsHyQjViD4T-1M6r4RSEnH3uZQmAQafqQ@mail.gmail.com>
+ <CANhEzE669gfDxfFwaJ+x-1rNhU3qy6wAqsxqP7L0SAjS-RezLw@mail.gmail.com>
+Message-ID: <CANcqPu4EqvbcLZtaWoU8iT_LOcmN27hEtzSHOKejyfy5i9-LmQ@mail.gmail.com>
+
+Hi, Jeremie, I think it's reasonable to change the lexer.
+FYI, camlp4's lexer works this way
+
+
+On Thu, May 23, 2013 at 11:26 AM, Jeremie Dimino <jdimino at janestreet.com>wrote:
+
+> We discussed it further with Alain but it turns out it doesn't work
+> very well.  A constant may be composed of several tokens so it is not
+> possible to have the exact raw representation.  And for strings one
+> can use the new quoted strings which are already treated as raw
+> strings.
+>
+> Another possibility would be to modify the lexer so that it doesn't
+> 'evaluate' tokens immediately and let the parser do it.  At least it
+> would avoid this kind of thing:
+>
+>   # max_int;;
+>   - : int = 4611686018427387903
+>   # 4611686018427387904;;
+>   - : int = -4611686018427387904
+>
+> On Thu, May 2, 2013 at 2:00 PM, Gabriel Scherer
+> <gabriel.scherer at gmail.com> wrote:
+> > I think it is very reasonable, and would be a good fit for Alain's
+> branch.
+> >
+> > On Thu, May 2, 2013 at 1:35 PM, Jeremie Dimino <jdimino at janestreet.com>
+> wrote:
+> >> Hi,
+> >>
+> >> We recently felt the need to write a new extension that would check
+> >> integer literals.  The goal is to verify that ones containing
+> >> underscores match a specific regular expression.  Namely digits are
+> >> grouped by 3.
+> >>
+> >> We can do that for instance with a camlp4 token filter, but we wanted
+> >> to try with ppx.  It is currently not possible to do it by looking at
+> >> the parsetree since constants are already evaluated (integers are
+> >> represented by an OCaml int) and the raw form is lost.
+> >>
+> >> One solution would be to add the raw representation of constants in
+> >> the parsetree. For instance by changing Asttypes.constant to:
+> >>
+> >> ,----
+> >> | type constant_value =
+> >> |     Const_int of int
+> >> |   | Const_char of char
+> >> |   | Const_string of string
+> >> |   | Const_float of string
+> >> |   | Const_int32 of int32
+> >> |   | Const_int64 of int64
+> >> |   | Const_nativeint of nativeint
+> >> |
+> >> | type constant = constant_value * string
+> >> `----
+> >>
+> >> I believe it could also be useful for other rewriters, especially ones
+> >> dealing with strings since they would be able to compute the correct
+> >> location inside a string. And maybe also for printing: Pprintast could
+> >> use the representation choosed by the programmer instead of a
+> >> standardized one.
+> >>
+> >> Do people thinks that this a reasonable thing to add to the OCaml
+> >> parsetree? If yes I can do the modification.
+> >>
+> >> Jeremie
+> >> _______________________________________________
+> >> wg-camlp4 mailing list
+> >> wg-camlp4 at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+> --
+> Jeremie
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130523/5577b50b/attachment.html>
+
+From anil at recoil.org  Mon May 27 11:47:27 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 27 May 2013 11:47:27 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+Message-ID: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+
+Core currently hides two functions needed by the Bitstring syntax extension: Char.code and String.unsafe_get.  I'm not sure what the best way to work around this is. Possibilities are:
+
+- Core.Std.Caml has the original namespace from OCaml, so add a camlp4 flag to pa_bitstring to locally open Caml if the flag is specified.
+
+- Add Char.code and String.unsafe_get to Core -- but there will be more similar incompatibilities lurking.
+
+- Do nothing, and wait for the more explicit extension_points to show up.
+
+- The below hack to get it to compile. Ugh.
+
+--
+open Core.Std
+
+module Char = struct
+  include Char
+  let code = to_int
+end
+
+module String = struct
+  include String
+  let unsafe_get = Caml.String.unsafe_get
+end
+
+let show_gif_info filename () =
+  let bits = Bitstring.bitstring_of_file filename in
+
+  bitmatch bits with
+  | { ("GIF87a"|"GIF89a") : 6*8 : string; (* GIF magic. *)
+      width : 16 : littleendian;
+      height : 16 : littleendian;
+      colormap : 1;                     (* Has colormap? *)
+      colorbits : 3;                    (* Color res = colorbits+1 *)
+      sortflag : 1;
+      bps : 3;                          (* Bits/pixel = bps+1 *)
+      bg : 8;                           (* Background colour. *)
+      aspectratio : 8 } ->
+      printf "%s: GIF image:\n" filename;
+      printf "  size %d %d\n" width height;
+      printf "  has global colormap? %b\n" colormap;
+      printf "  colorbits %d\n" (colorbits+1);
+      printf "  global colormap is sorted? %b\n" sortflag;
+      printf "  bits/pixel %d\n" (bps+1);
+      printf "  background color index %d\n" bg;
+      printf "  aspect ratio %d\n" aspectratio
+
+  | { _ } ->
+      eprintf "%s: Not a GIF image\n" filename
+
+let () =
+  Command.basic ~summary:"Display information about GIF file"
+    Command.Spec.(
+      empty +>
+      anon ("filename" %: file)
+    )
+    show_gif_info
+  |> Command.run
+
+
+From dhouse at janestreet.com  Mon May 27 12:00:33 2013
+From: dhouse at janestreet.com (David House)
+Date: Mon, 27 May 2013 12:00:33 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+Message-ID: <CAK=fH+gS7FHCwj50+Dfe+cQ3BSgzBDVvSB=vN0QaYHq8b_uWaw@mail.gmail.com>
+
+I think it's totally reasonable to expose String.unsafe_get.
+
+Char.code is a bit uglier, since we already have Core.to_int. But, we
+could probably put up with it, particularly if it were a temporary
+measure.
+
+On 27 May 2013 11:47, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Core currently hides two functions needed by the Bitstring syntax extension: Char.code and String.unsafe_get.  I'm not sure what the best way to work around this is. Possibilities are:
+>
+> - Core.Std.Caml has the original namespace from OCaml, so add a camlp4 flag to pa_bitstring to locally open Caml if the flag is specified.
+>
+> - Add Char.code and String.unsafe_get to Core -- but there will be more similar incompatibilities lurking.
+>
+> - Do nothing, and wait for the more explicit extension_points to show up.
+>
+> - The below hack to get it to compile. Ugh.
+>
+> --
+> open Core.Std
+>
+> module Char = struct
+>   include Char
+>   let code = to_int
+> end
+>
+> module String = struct
+>   include String
+>   let unsafe_get = Caml.String.unsafe_get
+> end
+>
+> let show_gif_info filename () =
+>   let bits = Bitstring.bitstring_of_file filename in
+>
+>   bitmatch bits with
+>   | { ("GIF87a"|"GIF89a") : 6*8 : string; (* GIF magic. *)
+>       width : 16 : littleendian;
+>       height : 16 : littleendian;
+>       colormap : 1;                     (* Has colormap? *)
+>       colorbits : 3;                    (* Color res = colorbits+1 *)
+>       sortflag : 1;
+>       bps : 3;                          (* Bits/pixel = bps+1 *)
+>       bg : 8;                           (* Background colour. *)
+>       aspectratio : 8 } ->
+>       printf "%s: GIF image:\n" filename;
+>       printf "  size %d %d\n" width height;
+>       printf "  has global colormap? %b\n" colormap;
+>       printf "  colorbits %d\n" (colorbits+1);
+>       printf "  global colormap is sorted? %b\n" sortflag;
+>       printf "  bits/pixel %d\n" (bps+1);
+>       printf "  background color index %d\n" bg;
+>       printf "  aspect ratio %d\n" aspectratio
+>
+>   | { _ } ->
+>       eprintf "%s: Not a GIF image\n" filename
+>
+> let () =
+>   Command.basic ~summary:"Display information about GIF file"
+>     Command.Spec.(
+>       empty +>
+>       anon ("filename" %: file)
+>     )
+>     show_gif_info
+>   |> Command.run
+>
+> --
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+>
+>
+
+From gabriel.scherer at gmail.com  Mon May 27 14:04:00 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 27 May 2013 15:04:00 +0200
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+Message-ID: <CAPFanBF1wQ9ehYeHqyD5N42CnhPLNCX7Wv95Mu0sXmpuxirWTA@mail.gmail.com>
+
+Regarding your name-rebinding workaround, wouldn't it be enough to ask
+that any use of bitmatch..with be protected by an "let open Caml in"?
+
+On Mon, May 27, 2013 at 12:47 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Core currently hides two functions needed by the Bitstring syntax extension: Char.code and String.unsafe_get.  I'm not sure what the best way to work around this is. Possibilities are:
+>
+> - Core.Std.Caml has the original namespace from OCaml, so add a camlp4 flag to pa_bitstring to locally open Caml if the flag is specified.
+>
+> - Add Char.code and String.unsafe_get to Core -- but there will be more similar incompatibilities lurking.
+>
+> - Do nothing, and wait for the more explicit extension_points to show up.
+>
+> - The below hack to get it to compile. Ugh.
+>
+> --
+> open Core.Std
+>
+> module Char = struct
+>   include Char
+>   let code = to_int
+> end
+>
+> module String = struct
+>   include String
+>   let unsafe_get = Caml.String.unsafe_get
+> end
+>
+> let show_gif_info filename () =
+>   let bits = Bitstring.bitstring_of_file filename in
+>
+>   bitmatch bits with
+>   | { ("GIF87a"|"GIF89a") : 6*8 : string; (* GIF magic. *)
+>       width : 16 : littleendian;
+>       height : 16 : littleendian;
+>       colormap : 1;                     (* Has colormap? *)
+>       colorbits : 3;                    (* Color res = colorbits+1 *)
+>       sortflag : 1;
+>       bps : 3;                          (* Bits/pixel = bps+1 *)
+>       bg : 8;                           (* Background colour. *)
+>       aspectratio : 8 } ->
+>       printf "%s: GIF image:\n" filename;
+>       printf "  size %d %d\n" width height;
+>       printf "  has global colormap? %b\n" colormap;
+>       printf "  colorbits %d\n" (colorbits+1);
+>       printf "  global colormap is sorted? %b\n" sortflag;
+>       printf "  bits/pixel %d\n" (bps+1);
+>       printf "  background color index %d\n" bg;
+>       printf "  aspect ratio %d\n" aspectratio
+>
+>   | { _ } ->
+>       eprintf "%s: Not a GIF image\n" filename
+>
+> let () =
+>   Command.basic ~summary:"Display information about GIF file"
+>     Command.Spec.(
+>       empty +>
+>       anon ("filename" %: file)
+>     )
+>     show_gif_info
+>   |> Command.run
+>
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From anil at recoil.org  Mon May 27 14:10:22 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 27 May 2013 14:10:22 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CAPFanBF1wQ9ehYeHqyD5N42CnhPLNCX7Wv95Mu0sXmpuxirWTA@mail.gmail.com>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <CAPFanBF1wQ9ehYeHqyD5N42CnhPLNCX7Wv95Mu0sXmpuxirWTA@mail.gmail.com>
+Message-ID: <0C775EE4-5CC3-40C1-B82F-A0585ADEBFC2@recoil.org>
+
+No, as you would have to re-open Core.Std in each of the pattern applications if you do it around the bitmatch.
+
+-anil
+
+On 27 May 2013, at 14:04, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+
+> Regarding your name-rebinding workaround, wouldn't it be enough to ask
+> that any use of bitmatch..with be protected by an "let open Caml in"?
+> 
+> On Mon, May 27, 2013 at 12:47 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> Core currently hides two functions needed by the Bitstring syntax extension: Char.code and String.unsafe_get.  I'm not sure what the best way to work around this is. Possibilities are:
+>> 
+>> - Core.Std.Caml has the original namespace from OCaml, so add a camlp4 flag to pa_bitstring to locally open Caml if the flag is specified.
+>> 
+>> - Add Char.code and String.unsafe_get to Core -- but there will be more similar incompatibilities lurking.
+>> 
+>> - Do nothing, and wait for the more explicit extension_points to show up.
+>> 
+>> - The below hack to get it to compile. Ugh.
+>> 
+>> --
+>> open Core.Std
+>> 
+>> module Char = struct
+>>  include Char
+>>  let code = to_int
+>> end
+>> 
+>> module String = struct
+>>  include String
+>>  let unsafe_get = Caml.String.unsafe_get
+>> end
+>> 
+>> let show_gif_info filename () =
+>>  let bits = Bitstring.bitstring_of_file filename in
+>> 
+>>  bitmatch bits with
+>>  | { ("GIF87a"|"GIF89a") : 6*8 : string; (* GIF magic. *)
+>>      width : 16 : littleendian;
+>>      height : 16 : littleendian;
+>>      colormap : 1;                     (* Has colormap? *)
+>>      colorbits : 3;                    (* Color res = colorbits+1 *)
+>>      sortflag : 1;
+>>      bps : 3;                          (* Bits/pixel = bps+1 *)
+>>      bg : 8;                           (* Background colour. *)
+>>      aspectratio : 8 } ->
+>>      printf "%s: GIF image:\n" filename;
+>>      printf "  size %d %d\n" width height;
+>>      printf "  has global colormap? %b\n" colormap;
+>>      printf "  colorbits %d\n" (colorbits+1);
+>>      printf "  global colormap is sorted? %b\n" sortflag;
+>>      printf "  bits/pixel %d\n" (bps+1);
+>>      printf "  background color index %d\n" bg;
+>>      printf "  aspect ratio %d\n" aspectratio
+>> 
+>>  | { _ } ->
+>>      eprintf "%s: Not a GIF image\n" filename
+>> 
+>> let () =
+>>  Command.basic ~summary:"Display information about GIF file"
+>>    Command.Spec.(
+>>      empty +>
+>>      anon ("filename" %: file)
+>>    )
+>>    show_gif_info
+>>  |> Command.run
+>> 
+>> _______________________________________________
+>> wg-camlp4 mailing list
+>> wg-camlp4 at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/wg-camlp4
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+> 
+> 
+
+
+From rich at annexia.org  Mon May 27 14:53:55 2013
+From: rich at annexia.org (Richard W.M. Jones)
+Date: Mon, 27 May 2013 14:53:55 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+Message-ID: <20130527135355.GT19868@annexia.org>
+
+On Mon, May 27, 2013 at 11:47:27AM +0100, Anil Madhavapeddy wrote:
+> Core currently hides two functions needed by the Bitstring syntax
+> extension: Char.code and String.unsafe_get.  I'm not sure what the
+> best way to work around this is. Possibilities are:
+
+I guess, *why* are they hidden?  Bitstring should use both functions
+in a safe way.
+
+Rich.
+
+-- 
+Richard Jones
+Red Hat
+
+From alain.frisch at lexifi.com  Mon May 27 18:23:26 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 27 May 2013 19:23:26 +0200
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+Message-ID: <51A3968E.40109@lexifi.com>
+
+On 05/27/2013 12:47 PM, Anil Madhavapeddy wrote:
+> - Do nothing, and wait for the more explicit extension_points to show up.
+
+I believe the situation would be very similar with a version of 
+bitstring based on extension_points.  A system of namespaces allowing to 
+access components from the stdlib explicitly (even if shadowed by Core) 
+would solve the issue, but this is not directly related to extension_points.
+
+Btw, bitstring would be an interesting use case for extension_points, 
+and looking at pa_bitstring.ml, it seems porting should not be too 
+difficult. Any volunteer?
+
+
+-- Alain
+
+From xavier.clerc at inria.fr  Mon May 27 19:05:51 2013
+From: xavier.clerc at inria.fr (Xavier Clerc)
+Date: Mon, 27 May 2013 20:05:51 +0200 (CEST)
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <51A3968E.40109@lexifi.com>
+Message-ID: <1072644905.5044229.1369677951274.JavaMail.root@inria.fr>
+
+----- Mail original -----
+> On 05/27/2013 12:47 PM, Anil Madhavapeddy wrote:
+> > - Do nothing, and wait for the more explicit extension_points to
+> > show up.
+> 
+> I believe the situation would be very similar with a version of
+> bitstring based on extension_points.  A system of namespaces allowing
+> to
+> access components from the stdlib explicitly (even if shadowed by
+> Core)
+> would solve the issue, but this is not directly related to
+> extension_points.
+
+I concur.
+
+However, in this particular case, there seems to be a workaround
+as the two functions to be accessed are indeed externals. As a
+consequence, bitstring could "access them explicitly" in module
+"Bitstring" through:
+  external string_unsafe_get : string -> int -> char = "%string_unsafe_get"
+  external char_code : char -> int = "%identity"
+and then emit code where "String.unsafe_get" (respectively "Char.code")
+is replaced by "Bitstring.string_unsafe_get" (respectively "Bitstring.char_code).
+
+I acknowledge that it not very elegant, though.
+
+
+My two cents,
+
+Xavier
+
+From yminsky at janestreet.com  Mon May 27 19:23:18 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Mon, 27 May 2013 14:23:18 -0400
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <20130527135355.GT19868@annexia.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <20130527135355.GT19868@annexia.org>
+Message-ID: <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+
+The basic issue is that Core is a new library, not an overlay on the
+stdlib.  As such, it has its own interface conventions, and so we have
+Char.to_int and Char.of_int rather than Char.code and Char.chr.
+
+Hiding unsafe_set and unsafe_get is another issue, and I agree those
+can just be shown.  And I don't even mind adding Char.code as a
+temporary measure.  But in the end, there should be a way for syntax
+extensions to refer to the standard library without confusion.
+Namespaces I believe should help here.
+
+y
+
+On Mon, May 27, 2013 at 9:53 AM, Richard W.M. Jones <rich at annexia.org> wrote:
+> On Mon, May 27, 2013 at 11:47:27AM +0100, Anil Madhavapeddy wrote:
+>> Core currently hides two functions needed by the Bitstring syntax
+>> extension: Char.code and String.unsafe_get.  I'm not sure what the
+>> best way to work around this is. Possibilities are:
+>
+> I guess, *why* are they hidden?  Bitstring should use both functions
+> in a safe way.
+>
+> Rich.
+>
+> --
+> Richard Jones
+> Red Hat
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From sweeks at janestreet.com  Tue May 28 17:03:09 2013
+From: sweeks at janestreet.com (Stephen Weeks)
+Date: Tue, 28 May 2013 12:03:09 -0400
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <20130527135355.GT19868@annexia.org>
+ <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+Message-ID: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+
+We'll add [String.unsafe_{get,set}] to Core.  We'll also add
+[Char.code] as a temporary measure.  Please speak up if there's
+anything else.
+
+It seems to me that it should be easy for someone to tweak the
+bitstring preprocessor to accept a -core switch so that all references
+to variables in OCaml's standard library are of the form
+[Core.Std.Caml.x].  I don't see a need to wait for namespaces.
+
+On Mon, May 27, 2013 at 2:23 PM, Yaron Minsky  wrote:
+> The basic issue is that Core is a new library, not an overlay on the
+> stdlib.  As such, it has its own interface conventions, and so we have
+> Char.to_int and Char.of_int rather than Char.code and Char.chr.
+>
+> Hiding unsafe_set and unsafe_get is another issue, and I agree those
+> can just be shown.  And I don't even mind adding Char.code as a
+> temporary measure.  But in the end, there should be a way for syntax
+> extensions to refer to the standard library without confusion.
+> Namespaces I believe should help here.
+>
+> y
+>
+> On Mon, May 27, 2013 at 9:53 AM, Richard W.M. Jones  wrote:
+>> On Mon, May 27, 2013 at 11:47:27AM +0100, Anil Madhavapeddy wrote:
+>>> Core currently hides two functions needed by the Bitstring syntax
+>>> extension: Char.code and String.unsafe_get.  I'm not sure what the
+>>> best way to work around this is. Possibilities are:
+>>
+>> I guess, *why* are they hidden?  Bitstring should use both functions
+>> in a safe way.
+>>
+>> Rich.
+>>
+>> --
+>> Richard Jones
+>> Red Hat
+>> _______________________________________________
+>> wg-camlp4 mailing list
+>> wg-camlp4 at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+> --
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+>
+>
+
+From anil at recoil.org  Tue May 28 17:15:58 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 28 May 2013 17:15:58 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <20130527135355.GT19868@annexia.org>
+ <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+ <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+Message-ID: <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+
+
+On 28 May 2013, at 17:03, Stephen Weeks <sweeks at janestreet.com> wrote:
+
+> We'll add [String.unsafe_{get,set}] to Core.  We'll also add
+> [Char.code] as a temporary measure.  Please speak up if there's
+> anything else.
+> 
+> It seems to me that it should be easy for someone to tweak the
+> bitstring preprocessor to accept a -core switch so that all references
+> to variables in OCaml's standard library are of the form
+> [Core.Std.Caml.x].  I don't see a need to wait for namespaces.
+
+It's the build system integration that fills me with dread (figuring
+out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+OASIS and OMake, and activate it only for files that use Core).
+
+Not insurmountable, but not my highest priority to figure out right
+now.  If anyone else does know the ocamlfind META format off-hand,
+I'd be happy to patch Cow in a similar way.
+
+-anil
+
+From sweeks at janestreet.com  Tue May 28 17:40:33 2013
+From: sweeks at janestreet.com (Stephen Weeks)
+Date: Tue, 28 May 2013 12:40:33 -0400
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <20130527135355.GT19868@annexia.org>
+ <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+ <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+Message-ID: <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+
+> It's the build system integration that fills me with dread (figuring
+> out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+> OASIS and OMake, and activate it only for files that use Core).
+
+I see.  Waiting for namespaces might be the way to go then.
+
+One way that might simplify the build-system nightmare a bit would be
+to always have the Caml module in scope and to have bitstring always
+generate references to it, whether or not one is compiling against
+Core.
+
+From mmatalka at gmail.com  Tue May 28 17:46:14 2013
+From: mmatalka at gmail.com (Malcolm Matalka)
+Date: Tue, 28 May 2013 18:46:14 +0200
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+References: <0B92F09D-D94B-4DCF-8E07-ED278A27B058@recoil.org>
+ <20130527135355.GT19868@annexia.org>
+ <CACLX4jQQDWvVgvzDnDYEAU_fD-iWjuS8tPmD1kzOV_c8N_1VcA@mail.gmail.com>
+ <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+ <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+Message-ID: <CAKziXDWB71Exxh1bDf9V78i6Et82qbFQSWG8e0x0-2BfgMke+w@mail.gmail.com>
+
+I solved this for myself may by limiting the bitstring specific stuff to
+their own function "let module Char = ...".
+IMO the bigger issue is the error messages not making any sense than the
+actual problem.
+
+/Malcolm
+ On May 28, 2013 6:40 PM, "Stephen Weeks" <sweeks at janestreet.com> wrote:
+
+> > It's the build system integration that fills me with dread (figuring
+> > out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+> > OASIS and OMake, and activate it only for files that use Core).
+>
+> I see.  Waiting for namespaces might be the way to go then.
+>
+> One way that might simplify the build-system nightmare a bit would be
+> to always have the Caml module in scope and to have bitstring always
+> generate references to it, whether or not one is compiling against
+> Core.
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/groups/opt_out.
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130528/ce6ca342/attachment.html>
+
+From Christophe.Troestler at umons.ac.be  Tue May 28 18:08:51 2013
+From: Christophe.Troestler at umons.ac.be (Christophe TROESTLER)
+Date: Tue, 28 May 2013 19:08:51 +0200
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+References: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+ <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+Message-ID: <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+
+On Tue, 28 May 2013 12:40:33 -0400, Stephen Weeks wrote:
+> 
+> > It's the build system integration that fills me with dread (figuring
+> > out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+> > OASIS and OMake, and activate it only for files that use Core).
+> 
+> I see.  Waiting for namespaces might be the way to go then.
+> 
+> One way that might simplify the build-system nightmare a bit would be
+> to always have the Caml module in scope and to have bitstring always
+> generate references to it, whether or not one is compiling against
+> Core.
+
+How about that bitstring (automatically) inserts aliases of the
+Prevasive modules it needs at the beginning of the file (thus, before
+Core is opened) and refers to these?  It will then work regardless of
+the modules that are shadowed.
+
+My 0.02?,
+C.
+
+From rich at annexia.org  Tue May 28 18:58:54 2013
+From: rich at annexia.org (Richard W.M. Jones)
+Date: Tue, 28 May 2013 18:58:54 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+References: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+ <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+ <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+Message-ID: <20130528175854.GX19868@annexia.org>
+
+On Tue, May 28, 2013 at 07:08:51PM +0200, Christophe TROESTLER wrote:
+> On Tue, 28 May 2013 12:40:33 -0400, Stephen Weeks wrote:
+> > 
+> > > It's the build system integration that fills me with dread (figuring
+> > > out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+> > > OASIS and OMake, and activate it only for files that use Core).
+> > 
+> > I see.  Waiting for namespaces might be the way to go then.
+> > 
+> > One way that might simplify the build-system nightmare a bit would be
+> > to always have the Caml module in scope and to have bitstring always
+> > generate references to it, whether or not one is compiling against
+> > Core.
+> 
+> How about that bitstring (automatically) inserts aliases of the
+> Prevasive modules it needs at the beginning of the file (thus, before
+> Core is opened) and refers to these?  It will then work regardless of
+> the modules that are shadowed.
+
+I think I tried to have a camlp4 extension insert something at
+the beginning of the output, and concluded it wasn't possible.
+
+Or perhaps I'm mis-remembering ...?
+
+Rich.
+
+-- 
+Richard Jones
+Red Hat
+
+From sebastien.mondet at gmail.com  Tue May 28 19:10:26 2013
+From: sebastien.mondet at gmail.com (Sebastien Mondet)
+Date: Tue, 28 May 2013 14:10:26 -0400
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <20130528175854.GX19868@annexia.org>
+References: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+ <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+ <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+ <20130528175854.GX19868@annexia.org>
+Message-ID: <CALScVYk13=e7JY-1vOgxkCQ3YoPeZLFR4ScXs6DovTw1h+Ep=g@mail.gmail.com>
+
+Hi
+
+What would be wrong with Xavier's solution?
+(having Bitstring ??call only functions Bitstring.something)
+
+It looks the most hygienic and future-proof to me, and could work for all
+syntax extensions ? or code generators ? that have a library to work with
+ (BTW, we had the same problem with PG'OCaml generating code with
+String.concat which is different in Core).
+
+
+cheers
+seb
+
+
+
+
+On Tue, May 28, 2013 at 1:58 PM, Richard W.M. Jones <rich at annexia.org>wrote:
+
+> On Tue, May 28, 2013 at 07:08:51PM +0200, Christophe TROESTLER wrote:
+> > On Tue, 28 May 2013 12:40:33 -0400, Stephen Weeks wrote:
+> > >
+> > > > It's the build system integration that fills me with dread (figuring
+> > > > out the ocamlfind META runes, how to plumb this through to
+> ocamlbuild,
+> > > > OASIS and OMake, and activate it only for files that use Core).
+> > >
+> > > I see.  Waiting for namespaces might be the way to go then.
+> > >
+> > > One way that might simplify the build-system nightmare a bit would be
+> > > to always have the Caml module in scope and to have bitstring always
+> > > generate references to it, whether or not one is compiling against
+> > > Core.
+> >
+> > How about that bitstring (automatically) inserts aliases of the
+> > Prevasive modules it needs at the beginning of the file (thus, before
+> > Core is opened) and refers to these?  It will then work regardless of
+> > the modules that are shadowed.
+>
+> I think I tried to have a camlp4 extension insert something at
+> the beginning of the output, and concluded it wasn't possible.
+>
+> Or perhaps I'm mis-remembering ...?
+>
+> Rich.
+>
+> --
+> Richard Jones
+> Red Hat
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130528/d7f02617/attachment-0001.html>
+
+From rich at annexia.org  Tue May 28 20:13:29 2013
+From: rich at annexia.org (Richard W.M. Jones)
+Date: Tue, 28 May 2013 20:13:29 +0100
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CALScVYk13=e7JY-1vOgxkCQ3YoPeZLFR4ScXs6DovTw1h+Ep=g@mail.gmail.com>
+References: <CAPYVAiK5eBTygqb=g6pXAv7n4QeMrjchr=_Hj0mpT9aObzptZw@mail.gmail.com>
+ <EB3332B0-1EC2-49B2-9606-4DBC487F962B@recoil.org>
+ <CAPYVAiKnvHL2D0mka6oA=1regBy-mpLV5oh0_8YJYnEMkdMq9g@mail.gmail.com>
+ <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+ <20130528175854.GX19868@annexia.org>
+ <CALScVYk13=e7JY-1vOgxkCQ3YoPeZLFR4ScXs6DovTw1h+Ep=g@mail.gmail.com>
+Message-ID: <20130528191329.GY19868@annexia.org>
+
+On Tue, May 28, 2013 at 02:10:26PM -0400, Sebastien Mondet wrote:
+> Hi
+> 
+> What would be wrong with Xavier's solution?
+> (having Bitstring ??call only functions Bitstring.something)
+
+This seems like a good solution to me.
+
+As ever, patches are welcome ...
+
+Rich.
+
+-- 
+Richard Jones
+Red Hat
+
+From Christophe.Troestler at umons.ac.be  Tue May 28 20:45:08 2013
+From: Christophe.Troestler at umons.ac.be (Christophe TROESTLER)
+Date: Tue, 28 May 2013 21:45:08 +0200
+Subject: [wg-camlp4] getting bitstring to work with Core
+In-Reply-To: <CALScVYk13=e7JY-1vOgxkCQ3YoPeZLFR4ScXs6DovTw1h+Ep=g@mail.gmail.com>
+References: <20130528.190851.152544037903305590.Christophe.Troestler@umons.ac.be>
+ <20130528175854.GX19868@annexia.org>
+ <CALScVYk13=e7JY-1vOgxkCQ3YoPeZLFR4ScXs6DovTw1h+Ep=g@mail.gmail.com>
+Message-ID: <20130528.214508.1024658094749643084.Christophe.Troestler@umons.ac.be>
+
+On Tue, 28 May 2013 14:10:26 -0400, Sebastien Mondet wrote:
+> 
+> What would be wrong with Xavier's solution?
+> (having Bitstring ??call only functions Bitstring.something)
+
+Yes, aliasing the needed functions in Bitstring is also a good
+solution.  I think it is even better than my suggestion.
+
+> On Tue, May 28, 2013 at 1:58 PM, Richard W.M. Jones <rich at annexia.org> wrote:
+> 
+> > 
+> On Tue, May 28, 2013 at 07:08:51PM +0200, Christophe TROESTLER wrote:
+> > > On Tue, 28 May 2013 12:40:33 -0400, Stephen Weeks wrote:
+> > > >
+> > > > > It's the build system integration that fills me with dread (figuring
+> > > > > out the ocamlfind META runes, how to plumb this through to ocamlbuild,
+> > > > > OASIS and OMake, and activate it only for files that use Core).
+> > > >
+> > > > I see.  Waiting for namespaces might be the way to go then.
+> > > >
+> > > > One way that might simplify the build-system nightmare a bit would be
+> > > > to always have the Caml module in scope and to have bitstring always
+> > > > generate references to it, whether or not one is compiling against
+> > > > Core.
+> > >
+> > > How about that bitstring (automatically) inserts aliases of the
+> > > Prevasive modules it needs at the beginning of the file (thus, before
+> > > Core is opened) and refers to these?  It will then work regardless of
+> > > the modules that are shadowed.
+> > 
+> > 
+> I think I tried to have a camlp4 extension insert something at
+> > the beginning of the output, and concluded it wasn't possible.
+> > 
+> > Or perhaps I'm mis-remembering ...?
+
+It is possible.
+
+Best,
+C.
+

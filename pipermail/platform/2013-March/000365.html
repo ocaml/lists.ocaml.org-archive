@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBEF1F39BLA4C5LMU9xbYEZjj8RMttkqT0crN8Pt0OdWHA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000364.html">
+   <LINK REL="Next"  HREF="000369.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBEF1F39BLA4C5LMU9xbYEZjj8RMttkqT0crN8Pt0OdWHA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Wed Mar 20 14:21:30 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000364.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000369.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#365">[ date ]</a>
+              <a href="thread.html#365">[ thread ]</a>
+              <a href="subject.html#365">[ subject ]</a>
+              <a href="author.html#365">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>There are some aspects of Alain's proposal I like:
+
+- I'm not particular fond of the foo-bar.cmi trick (yes, it extends
+the current OCaml semantics, but I'm not fond of the OCaml semantics
+either). I would tend to agree with Alain that having &quot;open namespace
+Foo&quot; search through all foo-*.cmi in the search path is a bit of a
+mess. On the other hand, I included a &quot;scan&quot; primitive in my original
+namespace description language that does exactly that. I think it
+could be a reasonable default for installed packages (picking
+namespaces from the filesystem's /usr/lib organization), but it's a
+dubious choice inside the currently-being-compiled project. So Alain's
+point of view of asking that auto-discovery features ultimately
+produce a namespace file, that is then used by the compiler, is maybe
+a reasonable compromise. Finally, I don't think the foo-bar.cmi
+solution adequately handles the semantic status of empty namespaces
+vs. non-existing namespaces (that's why I think a tree model is better
+than a wide mapping from paths to compunits: there is a notion of
+existing but empty subnamespace)
+
+- I also like the idea of strengthening the conflict-handling policy,
+complaining by default if merging the namespace descriptions
+introduces shadowing. That's was the idea of having a &quot;strict merge&quot;
+in the namespace description language (and also a &quot;shallow merge&quot; when
+people want quick&amp;dirty convenience). Note that an expressive
+signature language (eg. filtering some mappings out of a given
+namespace description) could profitably replace cases where shadowing
+is currently used. Again, if namespace are to be used in-the-large, I
+think &quot;explicit and robust&quot; is to be preferred over &quot;convenient but
+maybe fragile&quot;.
+
+The rest of the proposal is along the lines of &quot;I want namespace
+description to be as low-level as possible to be handled easily by any
+sort of tools&quot;. I am rather pushing for the expressive side. I think
+there are a lot of reasonable ways we could help arbitrary tools to
+handle namespaces:
+- code sharing (or linking of compiler-libs): if the namespace
+description &quot;compiler&quot; is distributed as OCaml code under a liberal
+license, not only in-the-distribution tools such that ocamldep and
+ocamldoc would be encouraged to use it, bisect and what not would be
+encouraged to reuse the library. Of course that may not be ideal for
+tools not implemented in OCaml
+- tool distribution: Leo suggested something along the names of
+&quot;ocamlns &lt;namespace information&gt; -resolve Foo..Bar&quot;. That's indeed an
+obvious idea that would solve the issue of non-OCaml tools quite
+easily. You are free to call &quot;ocamlns &lt;namespace information&gt; -list&quot;
+to get the whole mapping (in the format that Alain was presenting for
+his low-level, essentially compiled, description files), and cache it
+just as you want
+
+(I'm not too convinced by the efficiency argument (&quot;calling an
+external program ...&quot;): mapping files are also not a terribly
+efficient way to provide information for lookups. In the OCaml-land, a
+marshalled hashtable or Map could be fairly more efficient for
+example.)
+
+On Wed, Mar 20, 2013 at 2:43 PM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;&gt;<i> I don't see how they can resolve aliases manually without knowing, on
+</I>&gt;&gt;&gt;<i> the end user's machine, the location of all packages relative to the
+</I>&gt;&gt;&gt;<i> location of their package. This also hard codes the aliases, what if the
+</I>&gt;&gt;&gt;<i> other package moves?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> First, I think it's a bad idea for a package to re-export module from another package.  This is just calling for trouble
+</I>&gt;&gt;<i> when user read the documentation of the respective libraries, or try to make sense of the error messages.  Providing
+</I>&gt;&gt;<i> several names for a module in a single package (e.g. Core..List and Core_std..List) can be useful, but I don't see any
+</I>&gt;&gt;<i> use for more complex operations.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Second, if this is really required, this can be done by generating the &quot;search path file&quot; during installation.
+</I>&gt;<i>
+</I>&gt;<i> While I think that it is useful for one package to be able to provide an
+</I>&gt;<i> alias to a module from another package, I certainly don't consider it a
+</I>&gt;<i> critical use case. So I could be persuaded that aliases weren't worth
+</I>&gt;<i> the effort in the short term. On the other hand, I also don't see
+</I>&gt;<i> supporting them causing any real problems.
+</I>&gt;<i>
+</I>&gt;<i> However, I do think that it would be useful for users to be able to
+</I>&gt;<i> create their own aliases for modules from packages, and aliases in
+</I>&gt;<i> search path files provide a mechanism for these. Do you have any
+</I>&gt;<i> suggestions for alternative mechanisms for supporting such aliases?
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000364.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000369.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#365">[ date ]</a>
+              <a href="thread.html#365">[ thread ]</a>
+              <a href="subject.html#365">[ subject ]</a>
+              <a href="author.html#365">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

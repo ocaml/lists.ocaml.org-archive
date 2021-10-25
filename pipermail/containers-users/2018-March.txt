@@ -1,0 +1,242 @@
+From pjfrey at sympatico.ca  Thu Mar  1 18:44:45 2018
+From: pjfrey at sympatico.ca (peter frey)
+Date: Thu, 1 Mar 2018 13:44:45 -0500
+Subject: [containers-users] Possible additions to Containers and Friends
+In-Reply-To: <20180227001131.GU29073@church>
+References: <2be2d373-c3ad-535a-0510-834aa92ae678@sympatico.ca>
+ <20180210195351.GE1388@carty> <c48eeb40-1529-5e14-57fa-ff4102807040@zoho.com>
+ <20180224182152.GA1858@carty> <20180225101255.56q7gebfamvrrgz4@darkstar>
+ <46bcd6d5-35cf-c84c-a4c1-94774eeb9580@sympatico.ca>
+ <20180227001131.GU29073@church>
+Message-ID: <fadd3ae7-904d-7ded-0ed3-e4b69fafc691@sympatico.ca>
+
+
+I'm not sure I understand, what is the point of supporting "more" than
+> utf8?
+In the original utf8 standard the encoding is:
+The code is encoded as a string of length 1 + additional length.
+The additional length is a 0-ary encoding of the length '10' to 
+'1111110'? (i.e.: 1.. 6)
+The first char supplies 1 to 7 bits; the following chars supply 6 bits each.
+The maximal # bits is 31 bits. (5 * 6 + low bit from 0-byte).
+I am using this encoding but it is no longer 'standard'.? Instead the range
+ ? 0xD7FF .. 0xE000 is excluded from the TOTAL range 0 .. 0x10FFFF
+In Uutf8 only this range is accepted.
+
+
+All I tried to say is: My code does not encode the current standard; in 
+fact it does
+little checking. (Encodes more - checks less).
+
+Calling it utf31 would be an informal way of signaling this;
+we can call anything what we want to call it.
+
+I will write a filter that does verification; especially :
+A code that has length 1 + n must have n bytes following with format 
+10xxxxxx;? if the decoder encounters 0xxxxxxx or x1xxxxxxx or end of 
+string; that is an error.
+Uutf8 replaces such sequences with an error code.
+
+peter
+
+
+
+From pjfrey at sympatico.ca  Thu Mar  1 19:40:34 2018
+From: pjfrey at sympatico.ca (peter frey)
+Date: Thu, 1 Mar 2018 14:40:34 -0500
+Subject: [containers-users] Vector.slice_seq
+Message-ID: <8429414f-8a7f-01f7-5ed1-b90d7c24444d@sympatico.ca>
+
+Pasted from source code:
+
+utop # Vector.slice_seq (Vector.of_list [0;1;2;3;4]) 1 3 |> CCList.of_seq;;
+- : int list = [1; 2; 3]
+?( 14:27:21 )?< command 41 >?????????????????????????????????????{ 
+counter: 0 }?
+
+Same thing with length 5:
+
+utop # Vector.slice_seq (Vector.of_list [0;1;2;3;4]) 1 5 |> CCList.of_seq;;
+Exception: Assert_failure ("src/core/CCVector.ml", 656, 4).
+
+Source:
+
+let slice_seq v start len =
+ ? assert (start >= 0 && len >= 0);
+ ? fun k ->
+ ??? assert (start+len < v.size);???????????????? should be <= v.size ???
+ ??? for i = start to start+len-1 do
+ ????? let x = Array.unsafe_get v.vec i in
+ ????? k x
+ ??? done
+
+with length 5 the slice is not a proper slice; but as with strings, a 
+string is a (not proper) sub_string of itself; so a slice of the whole 
+vector would also be expected to be a slice?
+
+Peter
+
+
+
+From simon.cruanes.2007 at m4x.org  Thu Mar  1 20:32:36 2018
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Thu, 1 Mar 2018 14:32:36 -0600
+Subject: [containers-users] Vector.slice_seq
+In-Reply-To: <8429414f-8a7f-01f7-5ed1-b90d7c24444d@sympatico.ca>
+References: <8429414f-8a7f-01f7-5ed1-b90d7c24444d@sympatico.ca>
+Message-ID: <20180301203236.GW29073@church>
+
+Le Thu, 01 Mar 2018, peter frey wrote:
+> utop # Vector.slice_seq (Vector.of_list [0;1;2;3;4]) 1 3 |> CCList.of_seq;;
+> - : int list = [1; 2; 3]
+> ?( 14:27:21 )?< command 41 >?????????????????????????????????????{ counter:
+> 0 }?
+
+This is correct.
+
+> Same thing with length 5:
+> 
+> utop # Vector.slice_seq (Vector.of_list [0;1;2;3;4]) 1 5 |> CCList.of_seq;;
+> Exception: Assert_failure ("src/core/CCVector.ml", 656, 4).
+
+This should fail (with a better error), because indexing starts at 0.
+Can you open an issue so I can track this better? :)
+
+(on github: go to c-cube/ocaml-containers, click "issues" then "open".
+Then add a title and, roughly, this message).
+
+If you prefer I can open an issue myself.
+
+
+> Source:
+> 
+> let slice_seq v start len =
+> ? assert (start >= 0 && len >= 0);
+> ? fun k ->
+> ??? assert (start+len < v.size);???????????????? should be <= v.size ???
+> ??? for i = start to start+len-1 do
+> ????? let x = Array.unsafe_get v.vec i in
+> ????? k x
+> ??? done
+> 
+> with length 5 the slice is not a proper slice; but as with strings, a string
+> is a (not proper) sub_string of itself; so a slice of the whole vector would
+> also be expected to be a slice?
+
+Right, should be <= v.size indeed. An not an assertion, a check +
+invalid_arg.
+
+-- 
+Simon Cruanes
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/containers-users/attachments/20180301/a28a6f94/attachment.sig>
+
+From simon.cruanes.2007 at m4x.org  Wed Mar  7 04:20:26 2018
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Tue, 6 Mar 2018 22:20:26 -0600
+Subject: [containers-users] Possible additions to Containers and Friends
+In-Reply-To: <20180227001131.GU29073@church>
+References: <2be2d373-c3ad-535a-0510-834aa92ae678@sympatico.ca>
+ <20180210195351.GE1388@carty>
+ <c48eeb40-1529-5e14-57fa-ff4102807040@zoho.com>
+ <20180224182152.GA1858@carty>
+ <20180225101255.56q7gebfamvrrgz4@darkstar>
+ <46bcd6d5-35cf-c84c-a4c1-94774eeb9580@sympatico.ca>
+ <20180227001131.GU29073@church>
+Message-ID: <20180307042025.GB2084@carty>
+
+I merged and adapted the code from Peter:
+
+https://github.com/c-cube/ocaml-containers/blob/master/src/core/CCUtf8_string.mli
+https://github.com/c-cube/ocaml-containers/blob/master/src/core/CCUtf8_string.ml
+
+it's stricter (only accepts valid UTF8) and the random tests should
+ensure that it agrees with Uutf on what is valid utf8, and on the list
+of codepoints of a valid UTF8 string.
+
+The code is not that complicated: encoding is 25 lines, decoding is 67
+lines. I had to rewrite part of it to make it strictly UTF8 compliant.
+
+Comments very welcome! And thanks again to Peter, without whom I'd never
+have had the courage to do it.
+
+-- 
+Simon Cruanes
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/containers-users/attachments/20180306/bb75a497/attachment.sig>
+
+From simon.cruanes.2007 at m4x.org  Wed Mar  7 05:55:00 2018
+From: simon.cruanes.2007 at m4x.org (Simon Cruanes)
+Date: Tue, 6 Mar 2018 23:55:00 -0600
+Subject: [containers-users] Possible additions to Containers and Friends
+In-Reply-To: <20180307042025.GB2084@carty>
+References: <2be2d373-c3ad-535a-0510-834aa92ae678@sympatico.ca>
+ <20180210195351.GE1388@carty>
+ <c48eeb40-1529-5e14-57fa-ff4102807040@zoho.com>
+ <20180224182152.GA1858@carty>
+ <20180225101255.56q7gebfamvrrgz4@darkstar>
+ <46bcd6d5-35cf-c84c-a4c1-94774eeb9580@sympatico.ca>
+ <20180227001131.GU29073@church> <20180307042025.GB2084@carty>
+Message-ID: <20180307055459.GC2084@carty>
+
+Of course I spoke too soon, and missed so validation cases (that would
+have been accepted by Peter's code).
+
+In particular, I just learnt about some interesting corner cases of UTF8,
+namely overlong encodings.
+
+If anyone is knowledgeable about UTF8, reviewing the code would be
+greatly appreciated!
+
+Cheers! :)
+
+
+-- 
+Simon Cruanes
+
+http://weusepgp.info/
+key 49AA62B6, fingerprint 949F EB87 8F06 59C6 D7D3  7D8D 4AC0 1D08 49AA 62B6
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/containers-users/attachments/20180306/b2bfba37/attachment.sig>
+
+From sp at orbitalfox.eu  Wed Mar  7 07:17:53 2018
+From: sp at orbitalfox.eu (SP)
+Date: Wed, 7 Mar 2018 07:17:53 +0000
+Subject: [containers-users] Possible additions to Containers and Friends
+In-Reply-To: <20180307055459.GC2084@carty>
+References: <2be2d373-c3ad-535a-0510-834aa92ae678@sympatico.ca>
+ <20180210195351.GE1388@carty>
+ <c48eeb40-1529-5e14-57fa-ff4102807040@zoho.com>
+ <20180224182152.GA1858@carty>
+ <20180225101255.56q7gebfamvrrgz4@darkstar>
+ <46bcd6d5-35cf-c84c-a4c1-94774eeb9580@sympatico.ca>
+ <20180227001131.GU29073@church> <20180307042025.GB2084@carty>
+ <20180307055459.GC2084@carty>
+Message-ID: <20180307071753.2jjvth55gabw47bx@darkstar>
+
+Speaking-too-soon is a valid and powerful code verification technique; it exploits tempting the bugs to make their move.
+
+-- 
+	SP
+

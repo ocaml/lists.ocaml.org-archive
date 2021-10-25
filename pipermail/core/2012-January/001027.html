@@ -1,0 +1,100 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> hope to see some blog posts about Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20hope%20to%20see%20some%20blog%20posts%20about%20Async&In-Reply-To=%3CCAPtk8tv97sxgeRd91iK%2BHHnofowwmugpJZBeg5Y5pCtwnZ88Hg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001029.html">
+   <LINK REL="Next"  HREF="000143.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>hope to see some blog posts about Async</H1>
+    <B>marius a. eriksen</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20hope%20to%20see%20some%20blog%20posts%20about%20Async&In-Reply-To=%3CCAPtk8tv97sxgeRd91iK%2BHHnofowwmugpJZBeg5Y5pCtwnZ88Hg%40mail.gmail.com%3E"
+       TITLE="hope to see some blog posts about Async">marius at monkey.org
+       </A><BR>
+    <I>Fri Jan 20 19:21:53 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001029.html">hope to see some blog posts about Async
+</A></li>
+        <LI>Next message: <A HREF="000143.html">hope to see some blog posts about Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1027">[ date ]</a>
+              <a href="thread.html#1027">[ thread ]</a>
+              <a href="subject.html#1027">[ subject ]</a>
+              <a href="author.html#1027">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Cancellation is really tricky to get right. I think the correct choice
+in many circumstances is to not support it at all, and instead use
+some other mechanism when needed.
+
+Concurrent ML presents a very nice solution to threads that require
+cancellation: event synchronization is atomic. However, they don't
+compose as well as futures do: For example, synchronization isn't
+transitive across multiple processes.
+
+What we ended up doing in Finagle[1], which I think worked out very
+well, was to not support cancellation, but rather a cancellation
+*signal* that flows in the opposite direction from value propagation. The
+signal is level triggered, and any interested party can listen to it.
+The propagation composes in the expected way (opposite in direction
+from the value).
+
+In other words:
+
+  let composed = foo &gt;&gt;= (fun _ -&gt; bar)
+
+propagates cancellation signals on `composed' to `bar', just like values
+are propagated from `bar' to `composed'.
+
+You can then listen to the signal (in scala:
+
+  on_cancellation bar (fun () -&gt; (* whatever you like *))
+
+The nice thing about this approach is that only the updater of the
+value need worry about cancellation, and we can use this to guarantee
+that there's *only one update path*. This actually solves all of the
+try &#8230; catch problems, because if there is cancellation, the signal
+makes it all the way to the updater of the future, and *it* can decide
+what to do. We introduced cancellation in this way about 6 months ago,
+and there have yet to be any bugs surfaced from it.
+
+btw: if Pipes weren't buffered, they'd essentially be CML's channels
+
+[1] <A HREF="https://github.com/twitter/finagle">https://github.com/twitter/finagle</A>
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001029.html">hope to see some blog posts about Async
+</A></li>
+	<LI>Next message: <A HREF="000143.html">hope to see some blog posts about Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1027">[ date ]</a>
+              <a href="thread.html#1027">[ thread ]</a>
+              <a href="subject.html#1027">[ subject ]</a>
+              <a href="author.html#1027">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,988 @@
+From roberto at dicosmo.org  Fri May  2 22:36:40 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Fri, 2 May 2014 23:36:40 +0200
+Subject: [opam-devel] Preparing for cudf+dose upgrade
+Message-ID: <20140502213640.GA13997@voyager>
+
+Dear all,
+     just a few lines to let you know that an update of the CUDF and DOSE
+libraries that lie at the heart of Opam is ongoing: cudf.0.7 is already in
+the repository, and dose.3.2 is coming (preceded by some rc candidates).
+
+These updates add new features to both libraries and fix quite a few open issues
+with Dose.  While most of these are essentially relevant for Debian (multiarch
+support and bootsrap calculations), the new release also integrate many of the
+patches originally independently maintained inside Opam w.r.t. the old 3.1
+branch, and solve several issues with preferences and external solvers found
+over the last months.
+
+Over the next days, these packages will be taken up and used by the first test
+case in Travis, and despite the many and long tests performed on a separate Opam
+branch, some issues may come up.
+
+If you notice something strange that can be traced to the new versions of cudf
+and/or dose, please let me know.
+
+Have a nice week-end
+
+-- 
+Roberto
+
+From anil at recoil.org  Sat May  3 11:40:25 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 3 May 2014 11:40:25 +0100
+Subject: [opam-devel] more depopts fun: joolog/lwt/react
+Message-ID: <6F63596B-21D0-4EDF-B309-28862D05F5FB@recoil.org>
+
+Here's an interesting failure:
+- joolog.0.4 depends on react <1.0 and Lwt.react.
+- lwt-2.4.5 has a depopt on react >= 1.0, and anything less will result in Lwt.react not getting compiledin.
+
+Installing joolog causes react.0.9.4 and lwt.2.4.5 to get selected, which in turn causes lwt.react to not be installed and joolog.0.4 to error out.
+
+A better selection would be for joolog's react conflict to select lwt.2.4.4 (which works with react<1.00).
+
+For now I'm working around it via a joolog dependency on <lwt.2.4.5, but I thought I'd highlight this case for the ongoing depopt design work in OPAM 1.2.
+
+-anil
+
+From roberto at dicosmo.org  Sat May  3 19:24:02 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Sat, 3 May 2014 20:24:02 +0200
+Subject: [opam-devel] more depopts fun: joolog/lwt/react
+In-Reply-To: <6F63596B-21D0-4EDF-B309-28862D05F5FB@recoil.org>
+References: <6F63596B-21D0-4EDF-B309-28862D05F5FB@recoil.org>
+Message-ID: <20140503182402.GA1349@voyager>
+
+Thanks for reporting this... at first sight, it seems the
+metadata you ended up choosing for joolog are the best
+solution for this particular situation.
+
+On Sat, May 03, 2014 at 11:40:25AM +0100, Anil Madhavapeddy wrote:
+> Here's an interesting failure:
+> - joolog.0.4 depends on react <1.0 and Lwt.react.
+> - lwt-2.4.5 has a depopt on react >= 1.0, and anything less will result in Lwt.react not getting compiledin.
+> Installing joolog causes react.0.9.4 and lwt.2.4.5 to get selected, which in
+> turn causes lwt.react to not be installed and joolog.0.4 to error out.
+> 
+> A better selection would be for joolog's react conflict to select lwt.2.4.4 (which works with react<1.00).
+> 
+> For now I'm working around it via a joolog dependency on <lwt.2.4.5, but I thought I'd highlight this case for the ongoing depopt design work in OPAM 1.2.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From anil at recoil.org  Sat May  3 21:15:23 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 3 May 2014 21:15:23 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+Message-ID: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+
+I have refreshed my OCaml 4.02.0 PPA to the latest snapshot as of today, but we can't use it yet since there's no version of OPAM that easily compiles with it.  OPAM 1.1 has the binary blob problem, and OPAM 1.2dev is currently broken (no base-* installed).
+
+For now, we just `opam switch 4.02.0dev+trunk` which works fine, and 4.02 is listed as an "allowed failure" so it doesn't hold up the other merges.
+
+See https://travis-ci.org/ocaml/opam-repository/builds/24352557 for an example build using ppx_protobuf.
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Mon May  5 11:46:16 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 05 May 2014 12:46:16 +0200
+Subject: [opam-devel] more depopts fun: joolog/lwt/react
+In-Reply-To: <6F63596B-21D0-4EDF-B309-28862D05F5FB@recoil.org>
+References: <6F63596B-21D0-4EDF-B309-28862D05F5FB@recoil.org>
+Message-ID: <2189079.xs2oCVFQdB@agaric>
+
+Le samedi 3 mai 2014, 11:40:25 Anil Madhavapeddy a ?crit :
+> Here's an interesting failure:
+> - joolog.0.4 depends on react <1.0 and Lwt.react.
+> - lwt-2.4.5 has a depopt on react >= 1.0, and anything less will result in Lwt.react not getting compiledin.
+> 
+> Installing joolog causes react.0.9.4 and lwt.2.4.5 to get selected, which in turn causes lwt.react to not be installed and joolog.0.4 to error out.
+> 
+> A better selection would be for joolog's react conflict to select lwt.2.4.4 (which works with react<1.00).
+
+This is a good example of the limitations of the current handling of version constraints in depopts !
+The rewrite [1] would have lwt.2.4.5 conflict explicitely with react < 1, which would prevent it from being installed at the same time as joolog.
+
+
+[1] https://github.com/ocaml/opam-repository/pull/1923/files#diff-44
+
+> 
+> For now I'm working around it via a joolog dependency on <lwt.2.4.5, but I thought I'd highlight this case for the ongoing depopt design work in OPAM 1.2.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From thomas at gazagnaire.org  Mon May  5 12:32:03 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Mon, 5 May 2014 12:32:03 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+In-Reply-To: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+References: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+Message-ID: <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+
+Any reason why we use 4.02dev+trunk instead of 4.02+trunk ? (same for beta version ?) 
+
+
+On 3 May 2014, at 21:15, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> I have refreshed my OCaml 4.02.0 PPA to the latest snapshot as of today, but we can't use it yet since there's no version of OPAM that easily compiles with it.  OPAM 1.1 has the binary blob problem, and OPAM 1.2dev is currently broken (no base-* installed).
+> 
+> For now, we just `opam switch 4.02.0dev+trunk` which works fine, and 4.02 is listed as an "allowed failure" so it doesn't hold up the other merges.
+> 
+> See https://travis-ci.org/ocaml/opam-repository/builds/24352557 for an example build using ppx_protobuf.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Mon May  5 12:57:11 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 5 May 2014 12:57:11 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+In-Reply-To: <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+References: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+ <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+Message-ID: <71FDEFB9-1D66-4360-BAC9-C19C35FC70A6@recoil.org>
+
+Only because the abi-version of the trunk OCaml has a dev in it.  Does this break something?
+
+-a
+
+On 5 May 2014, at 12:32, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+
+> Any reason why we use 4.02dev+trunk instead of 4.02+trunk ? (same for beta version ?) 
+> 
+> 
+> On 3 May 2014, at 21:15, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+>> I have refreshed my OCaml 4.02.0 PPA to the latest snapshot as of today, but we can't use it yet since there's no version of OPAM that easily compiles with it.  OPAM 1.1 has the binary blob problem, and OPAM 1.2dev is currently broken (no base-* installed).
+>> 
+>> For now, we just `opam switch 4.02.0dev+trunk` which works fine, and 4.02 is listed as an "allowed failure" so it doesn't hold up the other merges.
+>> 
+>> See https://travis-ci.org/ocaml/opam-repository/builds/24352557 for an example build using ppx_protobuf.
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From thomas at gazagnaire.org  Mon May  5 13:15:16 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Mon, 5 May 2014 13:15:16 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+In-Reply-To: <71FDEFB9-1D66-4360-BAC9-C19C35FC70A6@recoil.org>
+References: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+ <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+ <71FDEFB9-1D66-4360-BAC9-C19C35FC70A6@recoil.org>
+Message-ID: <1230E016-86CF-4126-91BE-8B61635E2F4A@gazagnaire.org>
+
+> Only because the abi-version of the trunk OCaml has a dev in it.  Does this break something?
+
+It only breaks strict version constraints on compiler versions:
+
+ocaml-version: [= "4.02" ]
+
+Not sure that happens really often, though.
+
+
+> 
+> -a
+> 
+> On 5 May 2014, at 12:32, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> Any reason why we use 4.02dev+trunk instead of 4.02+trunk ? (same for beta version ?) 
+>> 
+>> 
+>> On 3 May 2014, at 21:15, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> 
+>>> I have refreshed my OCaml 4.02.0 PPA to the latest snapshot as of today, but we can't use it yet since there's no version of OPAM that easily compiles with it.  OPAM 1.1 has the binary blob problem, and OPAM 1.2dev is currently broken (no base-* installed).
+>>> 
+>>> For now, we just `opam switch 4.02.0dev+trunk` which works fine, and 4.02 is listed as an "allowed failure" so it doesn't hold up the other merges.
+>>> 
+>>> See https://travis-ci.org/ocaml/opam-repository/builds/24352557 for an example build using ppx_protobuf.
+>>> 
+>>> -anil
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+
+
+From anil at recoil.org  Tue May  6 11:16:57 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 6 May 2014 11:16:57 +0100
+Subject: [opam-devel] having an iocamljs for every pull request
+Message-ID: <D5EEC383-6841-4AA6-90F8-DB3BD536FE42@recoil.org>
+
+Jeremy enquired about what is required to have an iocamljs toplevel available for every new package pull request into OPAM repository.  I believe we actually have many of the mechanics already:
+
+- Set up an `i.ocaml.org` virtual machine to serve the Cohttp static site for IOCamlJS.  This never runs native code, but does all the URL remapping for the JavaScript frontend to work.  We would need to add virtual hosting support for it, which should be fairly easy.
+
+- Detect if there's a new ocamlfind package in the pull request, which could be done using Thomas' ocamlfind-detection patch.
+
+- Alter the OPAM-repository Travis scripts to POST to i.ocaml.org with the OPAM repository merge point and the name of the new package(s), and have the VM build the new libraries and make the cmo available.
+
+- Have the Travis script comment on the original pull request with the URL of the toplevel.
+
+- Sit back and listen to the awed gasps.
+
+Does this sound about right?
+
+-anil
+
+From anil at recoil.org  Tue May  6 11:51:14 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 6 May 2014 11:51:14 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+In-Reply-To: <1230E016-86CF-4126-91BE-8B61635E2F4A@gazagnaire.org>
+References: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+ <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+ <71FDEFB9-1D66-4360-BAC9-C19C35FC70A6@recoil.org>
+ <1230E016-86CF-4126-91BE-8B61635E2F4A@gazagnaire.org>
+Message-ID: <671A53AE-68D1-46BE-B1AA-A68955E3A782@recoil.org>
+
+On 5 May 2014, at 13:15, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+
+>> Only because the abi-version of the trunk OCaml has a dev in it.  Does this break something?
+> 
+> It only breaks strict version constraints on compiler versions:
+> 
+> ocaml-version: [= "4.02" ]
+> 
+> Not sure that happens really often, though.
+
+We ought to fix it just for consistency then.  The easiest way would be to duplicate the compiler spec with the right version, and then deprecate and delete the dev variant.  Does that sound right to you?
+
+-anil
+
+From andy.ray at ujamjar.com  Tue May  6 11:43:47 2014
+From: andy.ray at ujamjar.com (Andy Ray)
+Date: Tue, 6 May 2014 11:43:47 +0100
+Subject: [opam-devel] having an iocamljs for every pull request
+In-Reply-To: <D5EEC383-6841-4AA6-90F8-DB3BD536FE42@recoil.org>
+References: <D5EEC383-6841-4AA6-90F8-DB3BD536FE42@recoil.org>
+Message-ID: <CAHYOizGx_G1QCN_s4sepgOQD0BR27gw0dpNWZGGGTiXwBxV+XA@mail.gmail.com>
+
+On Tue, May 6, 2014 at 11:16 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Jeremy enquired about what is required to have an iocamljs toplevel available for every new package pull request into OPAM repository.  I believe we actually have many of the mechanics already:
+>
+> - Set up an `i.ocaml.org` virtual machine to serve the Cohttp static site for IOCamlJS.  This never runs native code, but does all the URL remapping for the JavaScript frontend to work.  We would need to add virtual hosting support for it, which should be fairly easy.
+
+
+As discussed previously there are one or two things to 'harden' in the
+server to make this safe but nothing difficult or time consuming.
+
+
+> - Detect if there's a new ocamlfind package in the pull request, which could be done using Thomas' ocamlfind-detection patch.
+>
+> - Alter the OPAM-repository Travis scripts to POST to i.ocaml.org with the OPAM repository merge point and the name of the new package(s), and have the VM build the new libraries and make the cmo available.
+
+
+Yeah, the only trick is keeping the opam/ocamlfind installation
+working correctly as new packages are installed/updated to the
+universe.
+
+
+> - Have the Travis script comment on the original pull request with the URL of the toplevel.
+
+
+Using the dynamic loading approach there would only be one generic
+iocamljs kernel (/url) and the packages would be loaded by the user.
+You could I suppose auto generate a notebook with the appropriate
+#require directives though.
+
+
+> - Sit back and listen to the awed gasps.
+>
+> Does this sound about right?
+
+
+The alternative approach is to build a custom toplevel (think
+ocamlmktop) with the library built in.
+
+You need much the same machinery as above, then use the iocamljs
+makefile to build a new iocaml kernel.
+
+pros;
+
+* much less likely to blow the js stack than dynamic loading (although
+its possible, if inconvenient, to run the browser with a bigger stack)
+* much quicker for the user to get the page running than dynamic loading
+* its possible the opam/ocamlfind configuration would be easier - you
+would just need *this* package to be compiled then it could be wiped.
+
+cons;
+
+* you need some way of controlling the expunge stage - specifically,
+you want to know the name of all toplevel exported modules from a
+package
+* undoubtedly the makefile would need to be revised to support the
+multitude of libraries out there.
+
+If there could be a special opam package file (or target) to help
+configuring a package for iocamljs compilation (exported modules,
+extra js primitives, syntax extensions required etc) I would say there
+are big advantages to this approach.
+
+-Andy
+
+From thomas at gazagnaire.org  Tue May  6 13:50:48 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 6 May 2014 13:50:48 +0100
+Subject: [opam-devel] travis opam now tests 4.02.0 as well
+In-Reply-To: <671A53AE-68D1-46BE-B1AA-A68955E3A782@recoil.org>
+References: <961BA54D-06E4-4E59-8D29-7ED72EA4F765@recoil.org>
+ <5892E2C2-1858-4ACB-B052-CC62576A8BD9@gazagnaire.org>
+ <71FDEFB9-1D66-4360-BAC9-C19C35FC70A6@recoil.org>
+ <1230E016-86CF-4126-91BE-8B61635E2F4A@gazagnaire.org>
+ <671A53AE-68D1-46BE-B1AA-A68955E3A782@recoil.org>
+Message-ID: <8563D268-23BA-4243-9524-8CA6AECCB23D@gazagnaire.org>
+
+>>> Only because the abi-version of the trunk OCaml has a dev in it.  Does this break something?
+>> 
+>> It only breaks strict version constraints on compiler versions:
+>> 
+>> ocaml-version: [= "4.02" ]
+>> 
+>> Not sure that happens really often, though.
+> 
+> We ought to fix it just for consistency then.  The easiest way would be to duplicate the compiler spec with the right version, and then deprecate and delete the dev variant.  Does that sound right to you?
+
+not sure the deprecated step is worth. There is no automatic upgrade or compiler anyway, so renaming won't break anything.
+
+
+
+From anil at recoil.org  Tue May 20 17:40:04 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 20 May 2014 17:40:04 +0100
+Subject: [opam-devel] experimental opam bulk build logs on GitHub
+Message-ID: <463F65D7-9C75-458B-A046-99DBE57ACFBD@recoil.org>
+
+Hi,
+
+I've written some scripts that use Docker and OPAM to run bulk builds across the entire package repository, and the results are logged and pushed to GitHub daily.
+
+If anyone wants to improve the health of the repository, please look at:
+
+   https://github.com/ocaml/opam-bulk-logs 
+
+in the err/ directories, and submit pull requests fix the failures.
+
+Source scripts are still in my personal GitHub; I'll move these to the ocaml/ repo.
+
+cheers,
+Anil
+
+From darioteixeira at yahoo.com  Tue May 20 18:21:25 2014
+From: darioteixeira at yahoo.com (Dario Teixeira)
+Date: Tue, 20 May 2014 10:21:25 -0700 (PDT)
+Subject: [opam-devel] Packaging guidelines
+Message-ID: <1400606485.15254.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+
+Hi,
+
+Just a couple of quick questions regarding packaging guidelines:
+
+1) Is there a standard way to specify that a package depends on version 3.x
+?? of another package, besides the obvious {>= "3" & < "4"}?
+
+2) To avoid uncontrolled growth of the repository, is there a policy regarding
+?? the deletion of older packages?? If, for instance, I am about to release
+?? version 1.2 of application package Foo, and versions 1.0 and 1.1 already
+?? exist, then the oldest (version 1.0) could be kicked out of the repo.
+?? In the case of libraries, extra care would be needed to make sure no
+?? broken dependencies would arise, of course.
+
+Thanks in advance for your time!
+Best regards,
+Dario Teixeira
+
+From anil at recoil.org  Thu May 22 10:40:51 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 22 May 2014 10:40:51 +0100
+Subject: [opam-devel] ocaml on centos 6.5
+Message-ID: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+
+I noticed on Paolo's blog that OCaml ships with an ancient version of OCaml (3.11.x)
+http://www.donadeo.net/post/2014/installing-opam-1-1-1-on-a-cenos-6-5
+
+Jon, Dave, I believe that the CentOS Xen uses a newer version -- are there RPMs available somewhere for CentOS 6.5 that could be used to get OPAM into the distribution there?
+
+-anil
+
+From p.donadeo at gmail.com  Thu May 22 10:49:05 2014
+From: p.donadeo at gmail.com (Paolo Donadeo)
+Date: Thu, 22 May 2014 11:49:05 +0200
+Subject: [opam-devel] ocaml on centos 6.5
+In-Reply-To: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+References: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+Message-ID: <CAPzAKVDL208-CY1M0HpQDBOKup6F+qpCbVGuuSCWE=Sgvm+U_Q@mail.gmail.com>
+
+FYI, I'm trying out the advice of T?r?k Edwin: compiling OPAM on a recent
+Ubuntu box (14.04 LTS) with musl-gcc. I'll let you know if the opam
+executable runs on CentOS 6.5, it's a matter of minutes.
+
+
+-- 
+*Paolo*
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140522/4ef47913/attachment.html>
+
+From Dave.Scott at citrix.com  Thu May 22 11:05:36 2014
+From: Dave.Scott at citrix.com (Dave Scott)
+Date: Thu, 22 May 2014 10:05:36 +0000
+Subject: [opam-devel] ocaml on centos 6.5
+In-Reply-To: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+References: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+Message-ID: <CCC67386-66F1-4D4E-92C3-2E4C7D8CC32B@citrix.com>
+
+Hi,
+
+On 22 May 2014, at 10:40, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> I noticed on Paolo's blog that OCaml ships with an ancient version of OCaml (3.11.x)
+> http://www.donadeo.net/post/2014/installing-opam-1-1-1-on-a-cenos-6-5
+> 
+> Jon, Dave, I believe that the CentOS Xen uses a newer version -- are there RPMs available somewhere for CentOS 6.5 that could be used to get OPAM into the distribution there?
+
+We?re using unofficial newer RPMs for our stuff; CentOS itself is still using the old RHEL6 versions.
+
+I think it would make sense to propose an ?OCaml software collection?[1] which would contain at least a newer compiler and opam, which could be installed alongside the old version. They?ve already done this for python I notice.
+
+Dave
+
+[1] http://wiki.centos.org/AdditionalResources/Repositories/SCL
+
+
+
+From talex5 at gmail.com  Thu May 22 11:37:36 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 22 May 2014 11:37:36 +0100
+Subject: [opam-devel] ocaml on centos 6.5
+In-Reply-To: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+References: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+Message-ID: <CAG4opy8CSJJQFMvk9+96pRF1=c0vffA4mRJ1wvCKpt=h0v2uqA@mail.gmail.com>
+
+On 22 May 2014 10:40, Anil Madhavapeddy <anil at recoil.org> wrote:
+> I noticed on Paolo's blog that OCaml ships with an ancient version of OCaml (3.11.x)
+> http://www.donadeo.net/post/2014/installing-opam-1-1-1-on-a-cenos-6-5
+
+It would be good to compile the opam binaries against an older glibc
+to prevent these problems. I guess it's fairly easy to pick an old
+docker image to use for this.
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From p.donadeo at gmail.com  Thu May 22 12:08:56 2014
+From: p.donadeo at gmail.com (Paolo Donadeo)
+Date: Thu, 22 May 2014 13:08:56 +0200
+Subject: [opam-devel] ocaml on centos 6.5
+In-Reply-To: <CAG4opy8CSJJQFMvk9+96pRF1=c0vffA4mRJ1wvCKpt=h0v2uqA@mail.gmail.com>
+References: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+ <CAG4opy8CSJJQFMvk9+96pRF1=c0vffA4mRJ1wvCKpt=h0v2uqA@mail.gmail.com>
+Message-ID: <CAPzAKVAqpEazSYFVnFSBKU4ib8vM6QG2tZq02qs6RGkg_836TQ@mail.gmail.com>
+
+Meanwhile, this "recipe" works:
+
+   1. on an Ubuntu 14.04 LTS, with a working OPAM/OCaml, I switched
+   to 4.01.0+musl+static, cloned OPAM repo, configure && make
+
+   2. the opam binary runs on the CentOS 6.5 without modifications, just
+   copy ( https://db.tt/mdrkvrPL );
+
+   3. yum install ocaml ocaml-camlp4 (Red Hat stock repository, OCaml
+   3.11.2)
+
+   4. opam switch 4.01.0 (compiles the new compiler without problems);
+
+   5. opam switch remove system
+
+   6. yum remove ocaml ocaml-camlp4 ocaml-runtime
+
+   7. et voil?!
+
+
+
+-- 
+*Paolo*
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140522/4c9c8ef6/attachment.html>
+
+From thomas at gazagnaire.org  Thu May 22 12:27:00 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 22 May 2014 12:27:00 +0100
+Subject: [opam-devel] ocaml on centos 6.5
+In-Reply-To: <CAPzAKVAqpEazSYFVnFSBKU4ib8vM6QG2tZq02qs6RGkg_836TQ@mail.gmail.com>
+References: <83D60941-3387-4234-B944-16C88555BDB8@recoil.org>
+ <CAG4opy8CSJJQFMvk9+96pRF1=c0vffA4mRJ1wvCKpt=h0v2uqA@mail.gmail.com>
+ <CAPzAKVAqpEazSYFVnFSBKU4ib8vM6QG2tZq02qs6RGkg_836TQ@mail.gmail.com>
+Message-ID: <39DACA43-2518-44CC-BE32-D9C0FDC2AE2B@gazagnaire.org>
+
+
+> Meanwhile, this "recipe" works:
+> on an Ubuntu 14.04 LTS, with a working OPAM/OCaml, I switched to 4.01.0+musl+static, cloned OPAM repo, configure && make
+> 
+> the opam binary runs on the CentOS 6.5 without modifications, just copy ( https://db.tt/mdrkvrPL );
+> 
+> yum install ocaml ocaml-camlp4 (Red Hat stock repository, OCaml 3.11.2)
+> 
+> opam switch 4.01.0 (compiles the new compiler without problems);
+
+Normally, you should be able to skip steps 3, 5 and 6 by doing: 
+
+$ opam init --comp=4.01.0
+
+--
+Thomas
+
+
+
+> 
+> opam switch remove system
+> 
+> yum remove ocaml ocaml-camlp4 ocaml-runtime
+> 
+> et voil?!
+> 
+> 
+> -- 
+> Paolo
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140522/61063c1a/attachment.html>
+
+From anil at recoil.org  Fri May 23 00:39:59 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 23 May 2014 00:39:59 +0100
+Subject: [opam-devel] OS X pull request testing now active
+Message-ID: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+
+I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+
+Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+
+Example:
+https://github.com/ocaml/opam-repository/pull/2137
+https://travis-ci.org/ocaml/opam-repository/builds/25831552
+
+-anil
+
+From roberto at dicosmo.org  Fri May 23 07:35:45 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Fri, 23 May 2014 08:35:45 +0200
+Subject: [opam-devel] OS X pull request testing now active
+In-Reply-To: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+References: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+Message-ID: <20140523063545.GA23101@voyager>
+
+Great, thanks!
+Does it also work for opam itself?
+
+On Fri, May 23, 2014 at 12:39:59AM +0100, Anil Madhavapeddy wrote:
+> I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+> 
+> Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+> 
+> Example:
+> https://github.com/ocaml/opam-repository/pull/2137
+> https://travis-ci.org/ocaml/opam-repository/builds/25831552
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From louis.gesbert at ocamlpro.com  Fri May 23 09:50:55 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 23 May 2014 10:50:55 +0200
+Subject: [opam-devel] experimental opam bulk build logs on GitHub
+In-Reply-To: <463F65D7-9C75-458B-A046-99DBE57ACFBD@recoil.org>
+References: <463F65D7-9C75-458B-A046-99DBE57ACFBD@recoil.org>
+Message-ID: <2298736.WurJKiYHeE@agaric>
+
+Very nice !
+
+I am wondering, do you 'opam install' every package individually ? We may play some clever tricks with the solver here, like `opam upgrade --criteria=-notuptodate,+new` which will attempt to install as many packages as possible, after which we could iterate on a universe reduced to the not-yet-installed packages. Depopts would be less predictable, but we can't realistically test all possible combinations of those anyway.
+
+Would be nice to find a common place to aggregate such results.
+
+Best,
+Louis
+
+
+Le mardi 20 mai 2014, 17:40:04 Anil Madhavapeddy a ?crit :
+> Hi,
+> 
+> I've written some scripts that use Docker and OPAM to run bulk builds across the entire package repository, and the results are logged and pushed to GitHub daily.
+> 
+> If anyone wants to improve the health of the repository, please look at:
+> 
+>    https://github.com/ocaml/opam-bulk-logs 
+> 
+> in the err/ directories, and submit pull requests fix the failures.
+> 
+> Source scripts are still in my personal GitHub; I'll move these to the ocaml/ repo.
+> 
+> cheers,
+> Anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140523/ae44949e/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Fri May 23 10:59:28 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 23 May 2014 11:59:28 +0200
+Subject: [opam-devel] OS X pull request testing now active
+In-Reply-To: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+References: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+Message-ID: <3161087.PQDzD29a7C@agaric>
+
+Thanks ! That will be _very_ useful
+
+Le vendredi 23 mai 2014, 00:39:59 Anil Madhavapeddy a ?crit :
+> I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+> 
+> Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+> 
+> Example:
+> https://github.com/ocaml/opam-repository/pull/2137
+> https://travis-ci.org/ocaml/opam-repository/builds/25831552
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140523/8f12a70c/attachment.html>
+
+From thomas at gazagnaire.org  Fri May 23 11:03:57 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Fri, 23 May 2014 11:03:57 +0100
+Subject: [opam-devel] OS X pull request testing now active
+In-Reply-To: <20140523063545.GA23101@voyager>
+References: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+ <20140523063545.GA23101@voyager>
+Message-ID: <9BDC13E1-28F8-4D19-922A-61547C1DA89D@gazagnaire.org>
+
+The installation of depext is not automatic, but you can query the external dependencies by adding `-e` to your install command.
+
+$ opam install conf-libpcre -e osx,homebrew
+pcre
+
+There are some quirks which can be fixed though (I'm opening https://github.com/ocaml/opam/issues/1418 to track it)
+
+Thomas
+
+
+On 23 May 2014, at 07:35, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+
+> Great, thanks!
+> Does it also work for opam itself?
+> 
+> On Fri, May 23, 2014 at 12:39:59AM +0100, Anil Madhavapeddy wrote:
+>> I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+>> 
+>> Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+>> 
+>> Example:
+>> https://github.com/ocaml/opam-repository/pull/2137
+>> https://travis-ci.org/ocaml/opam-repository/builds/25831552
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> -- 
+> Roberto Di Cosmo
+> 
+> ------------------------------------------------------------------
+> Professeur               En delegation a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann       
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>      http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+> 
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> Avenue de France
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Fri May 23 13:56:26 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 23 May 2014 13:56:26 +0100
+Subject: [opam-devel] OS X pull request testing now active
+In-Reply-To: <20140523063545.GA23101@voyager>
+References: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+ <20140523063545.GA23101@voyager>
+Message-ID: <8C9BF083-5878-4186-A8FA-B0495608F006@recoil.org>
+
+It will indeed, just as soon as I exercise the feature a little more.
+
+It's experimental in Travis right now, so I requested them to activate
+it for ocaml/opam and ocaml/opam-repository specifically.  So far it's
+working well, except that I'm trying to figure out how to convert the
+Ubuntu/Debian depexts into the Homebrew equivalent in a semi-automated
+way.  Anyone happen to know about a database that lists packages and
+their OS-specific packages in a convenient way?
+
+More on the feature here:
+http://blog.travis-ci.com/2014-05-13-multi-os-feature-available/
+
+-anil
+
+On 23 May 2014, at 07:35, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+
+> Great, thanks!
+> Does it also work for opam itself?
+> 
+> On Fri, May 23, 2014 at 12:39:59AM +0100, Anil Madhavapeddy wrote:
+>> I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+>> 
+>> Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+>> 
+>> Example:
+>> https://github.com/ocaml/opam-repository/pull/2137
+>> https://travis-ci.org/ocaml/opam-repository/builds/25831552
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> -- 
+> Roberto Di Cosmo
+> 
+> ------------------------------------------------------------------
+> Professeur               En delegation a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann       
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>      http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+> 
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> Avenue de France
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> 
+
+
+From fabien.dagnat at telecom-bretagne.eu  Fri May 23 15:19:40 2014
+From: fabien.dagnat at telecom-bretagne.eu (Dagnat Fabien)
+Date: Fri, 23 May 2014 16:19:40 +0200
+Subject: [opam-devel] OS X pull request testing now active
+In-Reply-To: <8C9BF083-5878-4186-A8FA-B0495608F006@recoil.org>
+References: <8EF388C2-B291-4D25-A16E-F5EF6786FDBC@recoil.org>
+ <20140523063545.GA23101@voyager>
+ <8C9BF083-5878-4186-A8FA-B0495608F006@recoil.org>
+Message-ID: <A645EF11-706B-48AC-9147-79B54D691A13@telecom-bretagne.eu>
+
+http://oswatershed.org/ does not completely meet your needs but the script used to build the web pages may be a good start. We interacted with their author sometimes ago and he was open to discussions and collaborations at the time.
+
+Fabien
+Le 23 mai 2014 ? 14:56, Anil Madhavapeddy <anil at recoil.org> a ?crit :
+
+> It will indeed, just as soon as I exercise the feature a little more.
+> 
+> It's experimental in Travis right now, so I requested them to activate
+> it for ocaml/opam and ocaml/opam-repository specifically.  So far it's
+> working well, except that I'm trying to figure out how to convert the
+> Ubuntu/Debian depexts into the Homebrew equivalent in a semi-automated
+> way.  Anyone happen to know about a database that lists packages and
+> their OS-specific packages in a convenient way?
+> 
+> More on the feature here:
+> http://blog.travis-ci.com/2014-05-13-multi-os-feature-available/
+> 
+> -anil
+> 
+> On 23 May 2014, at 07:35, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> 
+>> Great, thanks!
+>> Does it also work for opam itself?
+>> 
+>> On Fri, May 23, 2014 at 12:39:59AM +0100, Anil Madhavapeddy wrote:
+>>> I've added support to our Travis scripts for testing on OSX too, so all new packages will go through Ubuntu and OSX from now on.  Since it's experimental, an OSX failure doesn't mark the whole test as failed.
+>>> 
+>>> Depexts for OSX are ["osx" "homebrew"] to permit a future MacPorts depext.
+>>> 
+>>> Example:
+>>> https://github.com/ocaml/opam-repository/pull/2137
+>>> https://travis-ci.org/ocaml/opam-repository/builds/25831552
+>>> 
+>>> -anil
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+>> -- 
+>> Roberto Di Cosmo
+>> 
+>> ------------------------------------------------------------------
+>> Professeur               En delegation a l'INRIA
+>> PPS                      E-mail: roberto at dicosmo.org
+>> Universite Paris Diderot WWW  : http://www.dicosmo.org
+>> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+>> 5, Rue Thomas Mann       
+>> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+>> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+>> ------------------------------------------------------------------
+>> Attachments:
+>> MIME accepted, Word deprecated
+>>     http://www.gnu.org/philosophy/no-word-attachments.html
+>> ------------------------------------------------------------------
+>> Office location:
+>> 
+>> Bureau 3020 (3rd floor)
+>> Batiment Sophie Germain
+>> Avenue de France
+>> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+>> -----------------------------------------------------------------
+>> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+>> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+	Fabien DAGNAT
+Ma?tre de conf?rences au d?partement informatique
+Responsable de la fili?re Syst?mes Logiciels et R?seaux
+T?l. : (0 | 33) 2 29 00 14 09 Technop?le Brest-Iroise, CS 83818
+29238 Brest Cedex 3, France 
+
+Une ?cole de l'Institut Mines-T?l?com     
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140523/7f424512/attachment.html>
+
+From anil at recoil.org  Sat May 24 12:51:33 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 24 May 2014 12:51:33 +0100
+Subject: [opam-devel] Packaging guidelines
+In-Reply-To: <1400606485.15254.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+References: <1400606485.15254.YahooMailNeo@web121701.mail.ne1.yahoo.com>
+Message-ID: <5930464A-53A1-4BEA-9AB7-1648DB5D5CE2@recoil.org>
+
+On 20 May 2014, at 18:21, Dario Teixeira <darioteixeira at yahoo.com> wrote:
+
+> Hi,
+> 
+> Just a couple of quick questions regarding packaging guidelines:
+> 
+> 1) Is there a standard way to specify that a package depends on version 3.x
+>    of another package, besides the obvious {>= "3" & < "4"}?
+
+That's pretty much it.
+
+> 
+> 2) To avoid uncontrolled growth of the repository, is there a policy regarding
+>    the deletion of older packages?  If, for instance, I am about to release
+>    version 1.2 of application package Foo, and versions 1.0 and 1.1 already
+>    exist, then the oldest (version 1.0) could be kicked out of the repo.
+>    In the case of libraries, extra care would be needed to make sure no
+>    broken dependencies would arise, of course.
+
+Right now, it's more convenient to keep older versions in the repository
+since they can all be bulk-built more easily.  I estimate it'll be a year
+or so before it begins to be worth splitting out the repository.
+
+Note that you can always keep a custom remote with just the cut of
+libraries that you need -- you just need to take care to ensure you
+don't have broken constraints. (but `opam-admin make` can help)
+
+-anil
+

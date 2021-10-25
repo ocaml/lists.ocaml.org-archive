@@ -1,0 +1,1172 @@
+From anil at recoil.org  Mon Jun  1 10:13:00 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 1 Jun 2015 10:13:00 +0100
+Subject: [opam-devel] regular bulk builds: now with HTML output!
+In-Reply-To: <772F00A5-E161-4ECF-9805-01AE4FBF70F6@gazagnaire.org>
+References: <243EC830-6304-46FB-BEC7-117FD33D9E67@recoil.org>
+ <5566D65A.8010800@ocamlpro.com>
+ <772F00A5-E161-4ECF-9805-01AE4FBF70F6@gazagnaire.org>
+Message-ID: <7FB36143-7784-4EF6-9758-3379B4D9722E@recoil.org>
+
+On 30 May 2015, at 19:19, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> On 01/08/2015 07:52 PM, Anil Madhavapeddy wrote:
+>>> http://www.recoil.org/~avsm/opam-bulk/  (temporary URL)
+>> 
+>> This is very nice and useful ! How can we contribute to opam-bulk project ?
+> 
+> This is now live at http://opam.ocaml.org/builds/ (click on the SHA1s to get the build table).
+> 
+> The source code is there: https://github.com/avsm/ocaml-docker-scripts
+
+Hi ?agdas,
+
+The scripts are still very experimental and need some manual handholding quite regularly (mainly because running 4000 simultaneous Docker containers still triggers some data corruption in the filesystem backends in use and destroys the humble SSDs with all the disk I/O).  That's why the /builds URL is not linked from the main opam.ocaml.org page yet.
+
+In the meanwhile though, you can in theory recreate the builds (albeit slowly) by running this on a host with a recent Docker installed:
+
+    opam install -y cmdliner cow git core_kernel
+    git clone git://github.com/avsm/ocaml-docker-scripts
+    cd ocaml-docker-scripts/bulk-builds
+    <edit cron.sh to set JOBS to a reasonable parallel build value>
+    ./cron.sh
+
+This will do a single bulk build of all the OS variants and output HTML into logs/
+
+Even more useful would be to keep an eye on https://opam.ocaml.org/builds and submit pull requests to fix the failing packages :-)
+
+cheers,
+Anil
+
+From Pietro.Abate at pps.univ-paris-diderot.fr  Fri Jun  5 09:26:05 2015
+From: Pietro.Abate at pps.univ-paris-diderot.fr (Pietro Abate)
+Date: Fri, 5 Jun 2015 10:26:05 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150507143835.GA9624@traveler>
+References: <20150507143835.GA9624@traveler>
+Message-ID: <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+
+Hi all,
+
+On 07/05/15 16:38, Roberto Di Cosmo wrote:
+> Dear fellow Opam developers, 
+> 
+>      We are proud to announce the first public release of a new and fully
+> refactored version of OWS, the Opam Weather Service, and we are now reaching out
+> to everybody on opam-devel for feedback and contribution to its evolution.
+
+I've added a couple of new features following the feedback we received in the
+last 10 days.
+
+- JSON export: For each commit we also generate a json representation
+  of the ows results. The format is self explanatory and contains, for
+  each version of each package its status (ok, broken) and if it is
+  broken, a flag that is true if the package is directly responsible for
+  the dependency problem or not. 
+  http://ows.irill.org/json/weather.json (last daily run for the
+  moment, but this should updated for each new commit...)
+
+- Compare api. For each two commits or one commit and a patch, ows
+  compute the difference between these two states, providing the list
+  of all new, removed, fixed and broken packages. The api can be
+  easily queries using the simple script attached. This should allow
+  easily integration with travis. The script takes two arguments, a
+  git ref in the opam package repository and a patch relative to this
+  reference and send back the differences between these two states in
+  json format.
+
+- RSS Feeds. For each maintainer (as declared in the maintainer
+  field of the opam package), ows provides a RSS feed with the result
+  of the OWS analysis.
+  http://ows.irill.org/rss/
+  Shortly I'll also add a maintainer dashboard with the status of all
+  his/her packages and a link to the rss feed
+
+TODO:
+- docker image to run ows locally without thinking about dependencies at
+  all.
+- rss feeds displaying only when the status of a package changes.
+- maintainer dashboard
+- plain (no modal) pages for each package
+- distcheck work to make explanations more readable and useful
+  (basically backport the work done in opam down to dose3)
+
+If you feel like helping, You know where to send your patches.
+
+p
+-------------- next part --------------
+#!/bin/bash
+
+#set -x 
+
+#d817d9dbcde11466a23ac52ff7846744d6a48777
+commit=$1
+patchfile=$2
+patch64=$(base64 -w 0 ${patchfile})
+
+tempfile=$(mktemp)
+cat<<EOF > ${tempfile}
+{"commit1": "${commit}",
+ "patch": "${patch64}"}
+EOF
+
+curl -H "Content-Type: application/json" --data @${tempfile} http://ows.irill.org/compare/api
+
+rm ${tempfile}
+
+From agarwal1975 at gmail.com  Fri Jun  5 18:55:31 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Fri, 5 Jun 2015 13:55:31 -0400
+Subject: [opam-devel] glob patterns and variables in opam files
+Message-ID: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+
+Two minor questions about opam files:
+
+In my install command, I'd like to do something like "cp _build/*
+%{foo:lib}%". However, AFAICT there is no way to make opam interpret the
+glob pattern. For now, I'm putting the command in a shell script and having
+opam call that shell script. That's slightly roundabout, and I'm wondering
+if I can avoid it.
+
+Also in the above I'm using the package name "foo" explicitly. Is there any
+way to combine with %{name}%? I effectively want %{%{name}%:lib}%, but
+nested variables don't work.
+
+Thanks.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150605/65fd217f/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Mon Jun  8 03:33:45 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 08 Jun 2015 11:33:45 +0900
+Subject: [opam-devel] glob patterns and variables in opam files
+In-Reply-To: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+References: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+Message-ID: <1919914.ykum8h0izF@agaric>
+
+These are good remarks, there is room for improvement here.
+
+> In my install command, I'd like to do something like "cp _build/*
+> %{foo:lib}%". However, AFAICT there is no way to make opam interpret the
+> glob pattern. For now, I'm putting the command in a shell script and having
+> opam call that shell script. That's slightly roundabout, and I'm wondering
+> if I can avoid it.
+
+I'm quite wary of adding more interpretation to the handling of scripts, it's good to keep them as simple as possible, avoiding another layer or make-like tools. We could, however, provide a nicer way to provide shell interpretation, or running the script from a sub-directory though (the only way for that is `["sh "cd subdir/ && cmd"]`).
+
+So currently, if you want to do it directly from the opam file, you're limited to:
+
+    [ "sh" "-c" "cp _build/* %{foo:lib}%" ]
+
+> Also in the above I'm using the package name "foo" explicitly. Is there any
+> way to combine with %{name}%? I effectively want %{%{name}%:lib}%, but
+> nested variables don't work.
+
+Unqualified variables default to the current package (e.g. "name", "installed" are short for "foo:name", "foo:installed"), unless that clashes with a global variable. This is unfortunately the case for the "lib" variable; I'd be open to a better design (allow ":lib" ? "_:lib" ? Make it mandatory for all vars to avoid ambiguity ?)
+
+I'm afraid you're stuck with 'foo:name' at the moment, but I agree it's not ideal.
+
+Ideas to improve on these welcome!
+
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150608/e796bc0a/attachment.sig>
+
+From agarwal1975 at gmail.com  Mon Jun  8 18:38:58 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 8 Jun 2015 13:38:58 -0400
+Subject: [opam-devel] glob patterns and variables in opam files
+In-Reply-To: <1919914.ykum8h0izF@agaric>
+References: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+ <1919914.ykum8h0izF@agaric>
+Message-ID: <CAMu2m2K8xj-m6-Z4V5kUTTjnrGFEntz9aN4DSqrw1diaMKZ=mA@mail.gmail.com>
+
+On Sun, Jun 7, 2015 at 10:33 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+wrote:
+
+    [ "sh" "-c" "cp _build/* %{foo:lib}%" ]
+>
+
+This is good enough for me.
+
+
+I'm afraid you're stuck with 'foo:name' at the moment, but I agree it's not
+> ideal.
+>
+> Ideas to improve on these welcome!
+>
+
+We basically need a "this" variable, which is what %{name}% is. Maybe
+interpolating nested variables would work, so we could really do
+%{%{name}%:lib}%.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150608/44252edb/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Tue Jun  9 03:16:23 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 09 Jun 2015 11:16:23 +0900
+Subject: [opam-devel] glob patterns and variables in opam files
+In-Reply-To: <CAMu2m2K8xj-m6-Z4V5kUTTjnrGFEntz9aN4DSqrw1diaMKZ=mA@mail.gmail.com>
+References: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+ <1919914.ykum8h0izF@agaric>
+ <CAMu2m2K8xj-m6-Z4V5kUTTjnrGFEntz9aN4DSqrw1diaMKZ=mA@mail.gmail.com>
+Message-ID: <7031646.KN0JyT22bU@agaric>
+
+> I'm afraid you're stuck with 'foo:name' at the moment, but I agree it's not
+> > ideal.
+> >
+> > Ideas to improve on these welcome!
+> >
+> 
+> We basically need a "this" variable, which is what %{name}% is. Maybe
+> interpolating nested variables would work, so we could really do
+> %{%{name}%:lib}%.
+
+I'd rather not allow them, because there is value in being able to statically check e.g. what other packages a package is referring to ; and the large amount of added expressiveness isn't really needed for this simple case. Would e.g. %{-:lib}% be clear enough ?
+
+Best,
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150609/1420e782/attachment.sig>
+
+From Pietro.Abate at pps.univ-paris-diderot.fr  Tue Jun  9 13:27:39 2015
+From: Pietro.Abate at pps.univ-paris-diderot.fr (Pietro Abate)
+Date: Tue, 9 Jun 2015 14:27:39 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+Message-ID: <20150609122739.GA19573@pps.univ-paris-diderot.fr>
+
+On 05/06/15 10:26, Pietro Abate wrote:
+> TODO:
+> - maintainer dashboard
+
+All opam maintainers, can check out the status of all their packages
+from here :
+
+http://ows.irill.org/latest/today/dashboard.html
+
+As always patches, comments, bugs and compliments in the BTS on github.
+
+pietro
+
+ps:
+I'm not the maintainer of ocaml-buddy ... Just the upstream author
+http://ows.irill.org/latest/today/dashboard/pietro.abate at pps.jussieu.fr.html
+
+
+
+From agarwal1975 at gmail.com  Tue Jun  9 13:40:36 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Tue, 9 Jun 2015 08:40:36 -0400
+Subject: [opam-devel] glob patterns and variables in opam files
+In-Reply-To: <7031646.KN0JyT22bU@agaric>
+References: <CAMu2m2LaByYmUh-rZrj-tFzMuamYM_3iAB7pT-6QcGiX_c3Hog@mail.gmail.com>
+ <1919914.ykum8h0izF@agaric>
+ <CAMu2m2K8xj-m6-Z4V5kUTTjnrGFEntz9aN4DSqrw1diaMKZ=mA@mail.gmail.com>
+ <7031646.KN0JyT22bU@agaric>
+Message-ID: <CAMu2m2KSNcyPfa7LczefrZ2GAMC39YCAactpRoZ=8N9zsRYcYA@mail.gmail.com>
+
+On Mon, Jun 8, 2015 at 10:16 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+wrote:
+
+Would e.g. %{-:lib}% be clear enough ?
+>
+
+Sure, or I'd be okay without any support for this. The benefit is quite
+small.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150609/61bde0f4/attachment.html>
+
+From ygrek at autistici.org  Tue Jun  9 19:11:28 2015
+From: ygrek at autistici.org (ygrek)
+Date: Tue, 9 Jun 2015 11:11:28 -0700
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+Message-ID: <20150609111128.7624ff9b@kiwi.local.tld>
+
+On Fri, 5 Jun 2015 10:26:05 +0200
+Pietro Abate <Pietro.Abate at pps.univ-paris-diderot.fr> wrote:
+
+> - RSS Feeds. For each maintainer (as declared in the maintainer
+>   field of the opam package), ows provides a RSS feed with the result
+>   of the OWS analysis.
+>   http://ows.irill.org/rss/
+>   Shortly I'll also add a maintainer dashboard with the status of all
+>   his/her packages and a link to the rss feed
+
+Cool!
+To make it more useful it would be nice to receive only difference between states, not the dump of the whole state each day.
+
+-- 
+
+
+From vb at luminar.eu.org  Wed Jun 10 06:58:42 2015
+From: vb at luminar.eu.org (Vincent Bernardoff)
+Date: Wed, 10 Jun 2015 07:58:42 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+Message-ID: <5577D212.6060205@luminar.eu.org>
+
+On 05/06/2015 10:26, Pietro Abate wrote:
+> - RSS Feeds. For each maintainer (as declared in the maintainer
+>   field of the opam package), ows provides a RSS feed with the result
+>   of the OWS analysis.
+>   http://ows.irill.org/rss/
+>   Shortly I'll also add a maintainer dashboard with the status of all
+>   his/her packages and a link to the rss feed
+
+Hi,
+
+Thanks for this!
+
+It doesn't work for me though, I've subscribed to the RSS feeds and they
+all redirect me on the main OWS page (I'm using Firefox).
+
+Is anybody else experiencing the same issue ?
+
+Cheers,
+
+-- 
+Vincent
+
+From roberto at dicosmo.org  Wed Jun 10 07:48:51 2015
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Wed, 10 Jun 2015 08:48:51 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <5577D212.6060205@luminar.eu.org>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+ <5577D212.6060205@luminar.eu.org>
+Message-ID: <20150610064851.GA29455@traveler>
+
+Hi Vincent,
+   each developer needs to subscribe to his/her own feed, for
+example yours is http://ows.irill.org/rss/vb%40luminar.eu.org.rss
+
+On Wed, Jun 10, 2015 at 07:58:42AM +0200, Vincent Bernardoff wrote:
+> On 05/06/2015 10:26, Pietro Abate wrote:
+> > - RSS Feeds. For each maintainer (as declared in the maintainer
+> >   field of the opam package), ows provides a RSS feed with the result
+> >   of the OWS analysis.
+> >   http://ows.irill.org/rss/
+> >   Shortly I'll also add a maintainer dashboard with the status of all
+> >   his/her packages and a link to the rss feed
+> 
+> Hi,
+> 
+> Thanks for this!
+> 
+> It doesn't work for me though, I've subscribed to the RSS feeds and they
+> all redirect me on the main OWS page (I'm using Firefox).
+> 
+> Is anybody else experiencing the same issue ?
+> 
+> Cheers,
+> 
+> -- 
+> Vincent
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+8 place Aur?lie Nemours
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From vb at luminar.eu.org  Wed Jun 10 08:00:19 2015
+From: vb at luminar.eu.org (Vincent Bernardoff)
+Date: Wed, 10 Jun 2015 09:00:19 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150610064851.GA29455@traveler>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+ <5577D212.6060205@luminar.eu.org> <20150610064851.GA29455@traveler>
+Message-ID: <5577E083.6070402@luminar.eu.org>
+
+On 10/06/2015 08:48, Roberto Di Cosmo wrote:
+> Hi Vincent,
+>    each developer needs to subscribe to his/her own feed, for
+> example yours is http://ows.irill.org/rss/vb%40luminar.eu.org.rss
+
+That's what I did, and the resulting "Live feed" in Firefox give me
+links that all redirect to the main OWS page?
+
+I'll have a deeper look at this later.
+
+-- 
+Vincent
+
+From ygrek at autistici.org  Wed Jun 10 22:58:53 2015
+From: ygrek at autistici.org (ygrek)
+Date: Wed, 10 Jun 2015 14:58:53 -0700
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150609111128.7624ff9b@kiwi.local.tld>
+References: <20150507143835.GA9624@traveler>
+ <20150605082605.GA23664@pps.univ-paris-diderot.fr>
+ <20150609111128.7624ff9b@kiwi.local.tld>
+Message-ID: <20150610145853.0b903afd@kiwi.local.tld>
+
+Hi,
+
+Another small thing is that all links are duplicated several times, see e.g.
+http://ows.irill.org/rss/ygrek%40autistici.org.rss
+
+<![CDATA[ 
+                <h3>4.00.1</h3>
+        <ol>
+                    <li>
+            <a href="http://ows.irill.org/2015-06-10/e06d6b0dce079ff7e2738d50babc9a20cb879172/packages/objsize-page.html" >objsize</a> 
+            0.16 : ok
+          </li>
+                    <li>
+            <a href="http://ows.irill.org/2015-06-10/e06d6b0dce079ff7e2738d50babc9a20cb879172/packages/objsize-page.html" >objsize</a> 
+            0.16 : ok
+          </li>
+                    <li>
+            <a href="http://ows.irill.org/2015-06-10/e06d6b0dce079ff7e2738d50babc9a20cb879172/packages/objsize-page.html" >objsize</a> 
+            0.16 : ok
+          </li>
+
+-- 
+
+From thomas at gazagnaire.org  Thu Jun 11 14:25:22 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 11 Jun 2015 14:25:22 +0100
+Subject: [opam-devel] release scripts
+Message-ID: <12DFF40B-BD37-457F-BC1E-C9FE548359F0@gazagnaire.org>
+
+I've tried to "clean-up" some of my release scripts, that I published on GitHub. It is a mix between opam-publish and my own conventions, so I'm not sure it very useful to someone else than me. Feel free to clone and to adapt to your need. Feel free to rewrite the shell scripts using a proper language and submit a pull-request :-)
+
+With these scripts, using `opam release` at the root of my project will: 
+1/ tag the project by greping the version number in _oasis or in opam;
+2/ push the tag to upstream repository on GitHub; and 
+3/ call opam-publish with the new archive.
+
+My convention are:
+- to name the tag as the raw version, not `vVERSION` (ie. not adding a `v` prefix)
+- to have an `upstream` git remote pointing at the upstream repository
+- to have `opam-publish` installed in a switch called `publish`
+
+Best,
+Thomas
+
+[1]: https://github.com/samoht/opam-release
+
+
+
+From anil at recoil.org  Thu Jun 11 14:52:38 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 11 Jun 2015 09:52:38 -0400
+Subject: [opam-devel] release scripts
+In-Reply-To: <12DFF40B-BD37-457F-BC1E-C9FE548359F0@gazagnaire.org>
+References: <12DFF40B-BD37-457F-BC1E-C9FE548359F0@gazagnaire.org>
+Message-ID: <A8B5DF11-BD5D-4453-84CD-BEF7D9F10A24@recoil.org>
+
+On 11 Jun 2015, at 09:25, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+> I've tried to "clean-up" some of my release scripts, that I published on GitHub. It is a mix between opam-publish and my own conventions, so I'm not sure it very useful to someone else than me. Feel free to clone and to adapt to your need. Feel free to rewrite the shell scripts using a proper language and submit a pull-request :-)
+> 
+> With these scripts, using `opam release` at the root of my project will: 
+> 1/ tag the project by greping the version number in _oasis or in opam;
+> 2/ push the tag to upstream repository on GitHub; and 
+> 3/ call opam-publish with the new archive.
+> 
+> My convention are:
+> - to name the tag as the raw version, not `vVERSION` (ie. not adding a `v` prefix)
+> - to have an `upstream` git remote pointing at the upstream repository
+> - to have `opam-publish` installed in a switch called `publish`
+
+Does this also do a GitHub release, or just create the tag upstream?
+
+-anil
+
+From thomas at gazagnaire.org  Thu Jun 11 17:44:24 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 11 Jun 2015 17:44:24 +0100
+Subject: [opam-devel] release scripts
+In-Reply-To: <A8B5DF11-BD5D-4453-84CD-BEF7D9F10A24@recoil.org>
+References: <12DFF40B-BD37-457F-BC1E-C9FE548359F0@gazagnaire.org>
+ <A8B5DF11-BD5D-4453-84CD-BEF7D9F10A24@recoil.org>
+Message-ID: <08A5A190-4F45-4FEA-B54D-7772F5545F36@gazagnaire.org>
+
+> Does this also do a GitHub release, or just create the tag upstream?
+
+It just create the tag. Creating the GitHub release would imply dealing with diffs in CHANGES files and will require talking to the GitHub API, which is not totally trivial (at least for me :p)
+
+Best,
+Thomas
+
+From anil at recoil.org  Mon Jun 15 09:45:47 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 15 Jun 2015 09:45:47 +0100
+Subject: [opam-devel] release scripts
+In-Reply-To: <08A5A190-4F45-4FEA-B54D-7772F5545F36@gazagnaire.org>
+References: <12DFF40B-BD37-457F-BC1E-C9FE548359F0@gazagnaire.org>
+ <A8B5DF11-BD5D-4453-84CD-BEF7D9F10A24@recoil.org>
+ <08A5A190-4F45-4FEA-B54D-7772F5545F36@gazagnaire.org>
+Message-ID: <F063BDBA-F37B-4F18-AB84-92020EA5E9C4@recoil.org>
+
+On 11 Jun 2015, at 17:44, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> Does this also do a GitHub release, or just create the tag upstream?
+> 
+> It just create the tag. Creating the GitHub release would imply dealing with diffs in CHANGES files and will require talking to the GitHub API, which is not totally trivial (at least for me :p)
+
+There's a tool to create GitHub releases in ocaml-github:
+
+https://github.com/mirage/ocaml-github/blob/master/jar/create_release.ml
+
+I'd definitely recommend adding this into the release workflow, as otherwise it creates a divergence with current practises, and leads to releases being missing from automated scripts (such as the MirageOS ones) that gather this information from the GitHub API.
+
+The ChangeLog is indeed a problem.  I have an extremely fledgling version here:
+https://github.com/avsm/opam-repo-tools
+but it needs significant work to lint and deal with quirks in existing changelogs.
+
+cheers
+Anil
+
+
+From daniel.buenzli at erratique.ch  Thu Jun 18 00:10:59 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 18 Jun 2015 00:10:59 +0100
+Subject: [opam-devel] pin and constraints
+Message-ID: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+
+Hello,  
+
+I thought that a pin would satisfy any constraint. This doesn't seem to be the case for example here I have: 
+> opam pin list | grep "uucp\|uuseg"
+uucp.0.9.1 git /Users/dbuenzli/sync/repos/uucp#HEAD 
+uuseg.0.8.0 git /Users/dbuenzli/sync/repos/uuseg
+
+Now in my uuseg pin's opam file I have the constraint "uucp" {>= "1.0.0"} if I do a `opam reinstall uuseg` I get: 
+
+The following dependencies couldn't be met:
+- uuseg -> uucp >= 1.0.0
+Your request can't be satisfied:
+
+- uucp>=1.0.0 is not available because the package is pinned to /Users/dbuenzli/sync/repos/uucp#HEAD, version 0.9.1.
+
+which is somehow annoying. Is there any way out from that situation ? 
+
+Best,
+
+Daniel 
+
+   
+
+
+
+From louis.gesbert at ocamlpro.com  Thu Jun 18 10:09:07 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 18 Jun 2015 18:09:07 +0900
+Subject: [opam-devel] pin and constraints
+In-Reply-To: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+References: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+Message-ID: <2507103.OFu037AphB@agaric>
+
+Not sure exactly if that's what you are after, but using `opam pin edit`, you can tweak either uucp's version, or uuseg's constraint. It will propose to save back to the source, but you don't have to; if there are further changes in the upstream opam file (from the git), it will ask you what you want to do on the next update.
+
+Will that do ?
+Best,
+Louis
+
+> - Daniel B?nzli, 18/06/2015 00:10 -
+> Hello,  
+> 
+> I thought that a pin would satisfy any constraint. This doesn't seem to be the case for example here I have: 
+> > opam pin list | grep "uucp\|uuseg"
+> uucp.0.9.1 git /Users/dbuenzli/sync/repos/uucp#HEAD 
+> uuseg.0.8.0 git /Users/dbuenzli/sync/repos/uuseg
+> 
+> Now in my uuseg pin's opam file I have the constraint "uucp" {>= "1.0.0"} if I do a `opam reinstall uuseg` I get: 
+> 
+> The following dependencies couldn't be met:
+> - uuseg -> uucp >= 1.0.0
+> Your request can't be satisfied:
+> 
+> - uucp>=1.0.0 is not available because the package is pinned to /Users/dbuenzli/sync/repos/uucp#HEAD, version 0.9.1.
+> 
+> which is somehow annoying. Is there any way out from that situation ? 
+> 
+> Best,
+> 
+> Daniel 
+> 
+>    
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150618/d0efeb9e/attachment.sig>
+
+From talex5 at gmail.com  Thu Jun 18 10:10:37 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 18 Jun 2015 10:10:37 +0100
+Subject: [opam-devel] pin and constraints
+In-Reply-To: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+References: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+Message-ID: <CAG4opy99LmXXbMnGYBS3U7KvkW=K4ZsTGOQxuOged3UtWDf04w@mail.gmail.com>
+
+On 18 June 2015 at 00:10, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Hello,
+>
+> I thought that a pin would satisfy any constraint. This doesn't seem to be the case for example here I have:
+>> opam pin list | grep "uucp\|uuseg"
+> uucp.0.9.1 git /Users/dbuenzli/sync/repos/uucp#HEAD
+> uuseg.0.8.0 git /Users/dbuenzli/sync/repos/uuseg
+>
+> Now in my uuseg pin's opam file I have the constraint "uucp" {>= "1.0.0"} if I do a `opam reinstall uuseg` I get:
+>
+> The following dependencies couldn't be met:
+> - uuseg -> uucp >= 1.0.0
+> Your request can't be satisfied:
+>
+> - uucp>=1.0.0 is not available because the package is pinned to /Users/dbuenzli/sync/repos/uucp#HEAD, version 0.9.1.
+>
+> which is somehow annoying. Is there any way out from that situation ?
+
+You can add whatever version you want to the pin, e.g.
+
+  opam pin add foo.1.2.3 ...
+
+or
+
+  opam pin add foo.dev ...
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From daniel.buenzli at erratique.ch  Thu Jun 18 11:01:02 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 18 Jun 2015 11:01:02 +0100
+Subject: [opam-devel] pin and constraints
+In-Reply-To: <2507103.OFu037AphB@agaric>
+References: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+ <2507103.OFu037AphB@agaric>
+Message-ID: <F2256588B4234305AC21A69661D3E213@erratique.ch>
+
+Le jeudi, 18 juin 2015 ? 10:09, Louis Gesbert a ?crit :
+> Will that do ?
+
+No.  
+
+Le jeudi, 18 juin 2015 ? 10:10, Thomas Leonard a ?crit :
+> You can add whatever version you want to the pin, e.g.
+
+
+Yes. Thanks.  
+
+Apparently I didn't get that pins were associated to a package version, I thought they were somehow a version for themselves, one which was greater than any other. So if I gather things correctly `opam pin PKG ?` is actually a synonym for `opam pin PKG.$VERSION` where $VERSION is the latest known version of PKG.  
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Thu Jun 18 11:17:01 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 18 Jun 2015 11:17:01 +0100
+Subject: [opam-devel] Refining an opam published PR
+Message-ID: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+
+Hello, 
+
+When you do a release you may have to modifiy the constraints of other packages. How are you suppose to handle this with opam-publish ? 
+
+Best,
+
+Daniel 
+
+
+
+From sheets at alum.mit.edu  Thu Jun 18 11:20:26 2015
+From: sheets at alum.mit.edu (David Sheets)
+Date: Thu, 18 Jun 2015 11:20:26 +0100
+Subject: [opam-devel] Refining an opam published PR
+In-Reply-To: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+References: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+Message-ID: <CAAWM5TzyUzk18PDH4FUSargZboV-1XZU6q6zxDZwazHoqpZdLQ@mail.gmail.com>
+
+On Thu, Jun 18, 2015 at 11:17 AM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Hello,
+>
+> When you do a release you may have to modifiy the constraints of other packages. How are you suppose to handle this with opam-publish ?
+
+My understanding of best practice is that maintainers should push new
+constraints to third-party packages or dependents before beginning
+publication of the new package.
+
+David
+
+> Best,
+>
+> Daniel
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From daniel.buenzli at erratique.ch  Thu Jun 18 11:31:53 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 18 Jun 2015 11:31:53 +0100
+Subject: [opam-devel] Refining an opam published PR
+In-Reply-To: <CAAWM5TzyUzk18PDH4FUSargZboV-1XZU6q6zxDZwazHoqpZdLQ@mail.gmail.com>
+References: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+ <CAAWM5TzyUzk18PDH4FUSargZboV-1XZU6q6zxDZwazHoqpZdLQ@mail.gmail.com>
+Message-ID: <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+
+Le jeudi, 18 juin 2015 ? 11:20, David Sheets a ?crit :
+> My understanding of best practice is that maintainers should push new
+> constraints to third-party packages or dependents before beginning
+> publication of the new package.
+
+Right, thanks.  
+
+Daniel
+
+
+
+From sheets at alum.mit.edu  Thu Jun 18 11:42:25 2015
+From: sheets at alum.mit.edu (David Sheets)
+Date: Thu, 18 Jun 2015 11:42:25 +0100
+Subject: [opam-devel] Refining an opam published PR
+In-Reply-To: <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+References: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+ <CAAWM5TzyUzk18PDH4FUSargZboV-1XZU6q6zxDZwazHoqpZdLQ@mail.gmail.com>
+ <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+Message-ID: <CAAWM5TwZaY61_LpGVYix6EXyPgiZOq3V1R2hUU3uK0Nvoj126g@mail.gmail.com>
+
+https://github.com/OCamlPro/opam-publish/issues/29 now tracks the
+feature wish for checking of dependents and orchestration of
+constraint roll-out.
+
+On Thu, Jun 18, 2015 at 11:31 AM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le jeudi, 18 juin 2015 ? 11:20, David Sheets a ?crit :
+>> My understanding of best practice is that maintainers should push new
+>> constraints to third-party packages or dependents before beginning
+>> publication of the new package.
+>
+> Right, thanks.
+>
+> Daniel
+>
+>
+
+From daniel.buenzli at erratique.ch  Thu Jun 18 11:43:19 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 18 Jun 2015 11:43:19 +0100
+Subject: [opam-devel] Refining an opam published PR
+In-Reply-To: <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+References: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+ <CAAWM5TzyUzk18PDH4FUSargZboV-1XZU6q6zxDZwazHoqpZdLQ@mail.gmail.com>
+ <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+Message-ID: <3A06D4A7AB0841D6B0D5292BF2AB1CA4@erratique.ch>
+
+Le jeudi, 18 juin 2015 ? 11:31, Daniel B?nzli a ?crit :
+> Le jeudi, 18 juin 2015 ? 11:20, David Sheets a ?crit :
+> > My understanding of best practice is that maintainers should push new
+> > constraints to third-party packages or dependents before beginning
+> > publication of the new package.
+>  
+> Right, thanks.
+
+But then maybe could we get a nice UI to do that ?  
+
+e.g. opam publish constraints uuseg.0.8.0 ?depends 'uucp,{>= "0.9.1" & < "1.0.0" }'
+
+The better the tooling, the lazier I become.
+
+Best,
+
+Daniel
+
+
+
+
+From louis.gesbert at ocamlpro.com  Fri Jun 19 01:41:49 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 19 Jun 2015 09:41:49 +0900
+Subject: [opam-devel] pin and constraints
+In-Reply-To: <F2256588B4234305AC21A69661D3E213@erratique.ch>
+References: <5BB391005EA946DAA7A50A273A7D3878@erratique.ch>
+ <2507103.OFu037AphB@agaric> <F2256588B4234305AC21A69661D3E213@erratique.ch>
+Message-ID: <2150581.zgmNVltxUY@agaric>
+
+> Apparently I didn't get that pins were associated to a package version, I thought they were somehow a version for themselves, one which was greater than any other. So if I gather things correctly `opam pin PKG ?` is actually a synonym for `opam pin PKG.$VERSION` where $VERSION is the latest known version of PKG.  
+
+Not necessarily, if the package declares a version in its opam file, that will be used. Indeed, `pinned` was a version by itself in opam 1.1, but that had some quirks (in particular, version pins, or upper version constraints). It seemed more flexible and consistent to always have a version connected to the pinned package, but allow to customise that.
+
+> You can add whatever version you want to the pin, e.g.
+> 
+>   opam pin add foo.1.2.3 ...
+
+Oh yes I remember adding that now, because indeed having to use `opam pin edit` to customise the version wasn't very convenient. Thanks for reminding :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150619/ad3a14f6/attachment.sig>
+
+From louis.gesbert at ocamlpro.com  Fri Jun 19 01:50:03 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 19 Jun 2015 09:50:03 +0900
+Subject: [opam-devel] Refining an opam published PR
+In-Reply-To: <3A06D4A7AB0841D6B0D5292BF2AB1CA4@erratique.ch>
+References: <FC88D86578EA40DB997AFE8E6A37DEA0@erratique.ch>
+ <CF74C004961F48F287187B8CB564EDB4@erratique.ch>
+ <3A06D4A7AB0841D6B0D5292BF2AB1CA4@erratique.ch>
+Message-ID: <2985557.T6N6KWDBZy@agaric>
+
+Note that with the current signed repo proposal, you won't be able to change other package's constraints directly anymore (since they are signed by their authors). You can still PR the changes, of course, but they will need to be signed by the respective package maintainers, or, more likely, by two of the repository maintainers (we shall provide the tooling so that it's quick and easy for them to do so).
+
+For a way to quickly, semantically patch constraints and PR, that shouldn't be too difficult (if you accept that the file is pretty-printed, e.g. format and comments are lost)
+
+
+Best,
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150619/f8638930/attachment.sig>
+
+From anil at recoil.org  Fri Jun 19 16:43:02 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 19 Jun 2015 16:43:02 +0100
+Subject: [opam-devel] opam.ocaml.org
+Message-ID: <351BAC21-25E3-45D3-BAB7-A3F53DBFDC00@recoil.org>
+
+Any objections if I upgrade the opam.ocaml.org VM to Debian Jessie from Wheezy?  I've taken a snapshot of the current setup in Rackspace.
+
+We need a newer Nginx to support gzip_static, which in turn is needed since we've already hit the 256GB limit for the /builds logs.
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Sat Jun 20 01:27:18 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 20 Jun 2015 09:27:18 +0900
+Subject: [opam-devel] opam.ocaml.org
+In-Reply-To: <351BAC21-25E3-45D3-BAB7-A3F53DBFDC00@recoil.org>
+References: <351BAC21-25E3-45D3-BAB7-A3F53DBFDC00@recoil.org>
+Message-ID: <1812284.Kz7BZqnZ3m@agaric>
+
+No issue that I can think of on my part!
+
+Thanks!
+
+> - Anil Madhavapeddy, 19/06/2015 16:43 -
+> Any objections if I upgrade the opam.ocaml.org VM to Debian Jessie from Wheezy?  I've taken a snapshot of the current setup in Rackspace.
+> 
+> We need a newer Nginx to support gzip_static, which in turn is needed since we've already hit the 256GB limit for the /builds logs.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From anil at recoil.org  Tue Jun 23 10:43:32 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 23 Jun 2015 10:43:32 +0100
+Subject: [opam-devel] opam.ocaml.org
+In-Reply-To: <1812284.Kz7BZqnZ3m@agaric>
+References: <351BAC21-25E3-45D3-BAB7-A3F53DBFDC00@recoil.org>
+ <1812284.Kz7BZqnZ3m@agaric>
+Message-ID: <EB687ACF-99DF-440A-8E39-42774070B3B5@recoil.org>
+
+I had to roll back the upgrade due to some issues with Grub2, Xen and Rackspace Cloud all conspiring to make a Debian Wheezy->Jessie upgrade very difficult.
+
+This seems like a good time to look at how to containerise the opam.ocaml.org services a bit better.  Is the existing setup on the VM documented somewhere?  I'd like to take a shot at recreating the VM in a more automated way (and ensuring that logs are rsync'ed off host).
+
+This way we can also have multiple VMs serving the HTTP remote over DNS load balancing if we ever want more redundancy.
+
+thanks
+Anil
+
+> On 20 Jun 2015, at 01:27, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> No issue that I can think of on my part!
+> 
+> Thanks!
+> 
+>> - Anil Madhavapeddy, 19/06/2015 16:43 -
+>> Any objections if I upgrade the opam.ocaml.org VM to Debian Jessie from Wheezy?  I've taken a snapshot of the current setup in Rackspace.
+>> 
+>> We need a newer Nginx to support gzip_static, which in turn is needed since we've already hit the 256GB limit for the /builds logs.
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From louis.gesbert at ocamlpro.com  Tue Jun 23 10:59:47 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 23 Jun 2015 18:59:47 +0900
+Subject: [opam-devel] opam.ocaml.org
+In-Reply-To: <EB687ACF-99DF-440A-8E39-42774070B3B5@recoil.org>
+References: <351BAC21-25E3-45D3-BAB7-A3F53DBFDC00@recoil.org>
+ <1812284.Kz7BZqnZ3m@agaric> <EB687ACF-99DF-440A-8E39-42774070B3B5@recoil.org>
+Message-ID: <2516280.6h2Eu4i7PV@agaric>
+
+The part I am in charge of is documented at https://github.com/ocaml/opam.ocaml.org
+
+I'll check that everything is up-to-date, but it should be
+
+> - Anil Madhavapeddy, 23/06/2015 10:43 -
+> I had to roll back the upgrade due to some issues with Grub2, Xen and Rackspace Cloud all conspiring to make a Debian Wheezy->Jessie upgrade very difficult.
+> 
+> This seems like a good time to look at how to containerise the opam.ocaml.org services a bit better.  Is the existing setup on the VM documented somewhere?  I'd like to take a shot at recreating the VM in a more automated way (and ensuring that logs are rsync'ed off host).
+> 
+> This way we can also have multiple VMs serving the HTTP remote over DNS load balancing if we ever want more redundancy.
+> 
+> thanks
+> Anil
+> 
+> > On 20 Jun 2015, at 01:27, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> > 
+> > No issue that I can think of on my part!
+> > 
+> > Thanks!
+> > 
+> >> - Anil Madhavapeddy, 19/06/2015 16:43 -
+> >> Any objections if I upgrade the opam.ocaml.org VM to Debian Jessie from Wheezy?  I've taken a snapshot of the current setup in Rackspace.
+> >> 
+> >> We need a newer Nginx to support gzip_static, which in turn is needed since we've already hit the 256GB limit for the /builds logs.
+> >> 
+> >> -anil
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> > 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150623/7f9f351b/attachment.sig>
+
+From daniel.buenzli at erratique.ch  Tue Jun 30 17:58:21 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 30 Jun 2015 17:58:21 +0100
+Subject: [opam-devel] Identifying windows ports for build systems & cross
+ compiling distinctions
+Message-ID: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+
+Hello,  
+
+In the context of building things, one apparently needs to be able precisely identify the windows ports in order to produce build artefacts with correct extensions (see [1]). It seems that: 
+
+1) Using the OCaml MSVC ports, windows specific extensions are used
+2) Using the OCaml mingw ports, unix extensions are used
+3) Using the OCaml cygwin port, unix extensions are used
+
+The problem is that at the moment various detection bits e.g. [2] conflate 1) + 2) under a single variable, namely win32. Something is needed to distinguish them in build systems in general.
+
+Here are a few ideas:
+
+a) Introduce a new toolchain variable, that specifies the toolchain used, whatever that means. 
+b) Distinguish an OS for the mingw ports 
+c) Distinguish these 3 cases through a distribution variable [3]
+
+I have the impression that a) is going to introduce again more noise, names and branches in the eco-system which already has plenty enough. Regarding c) I think it would be bending the semantics of the variable. Given that cygwin is already treated as an OS I would suggest that we rather use b) and introduce a "win32-mingw" or "mingw" (or whichever name windows users would find accurate) value for OS like variables. 
+
+Besides for cross compilation of packages we need to distinguish between `build-os` and `host-os` (os on which the build products are run). It would be nice if opam could somehow provide variables for these values for build systems to use in order to configure packages properly. IIRC opam currently only has an `os` variable which has the value of `build-os` but is currently being used for `host-os` semantics. 
+
+Note that some other variables pertaining to the capabilities of the installed OCaml compilers see [4] will also need {build,host}-os distinction (e.g. `ocaml-native` and `ocaml-native-dynlink`). In order to remain backward compatible with the current repository, I guess that the simplest is to deem all current variables as having host semantics and introduce only new variables for build semantics i.e. `build-os-ocaml-native`, `build-os-ocaml-native-dynlink`, `build-os-ocaml-version`, etc.
+
+Best,
+
+Daniel
+
+P.S. To windows users. I would also be interested in knowing if there is a tool invocation that is actually able to distinguish between 1) and 2).
+
+[1] https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094
+[2] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+[3] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L76-L109
+[4] https://opam.ocaml.org/doc/manual/dev-manual.html#sec37
+
+
+
+From daniel.buenzli at erratique.ch  Tue Jun 30 18:52:16 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 30 Jun 2015 18:52:16 +0100
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+Message-ID: <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+
+Le mardi, 30 juin 2015 ? 18:13, David Allsopp a ?crit :
+> $OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc.  
+
+Ok thanks, so it can at least be discovered. On my osx machine I have cc in there, so I guess this means the C toolchain ?  
+
+> (or with more recent OCamls by using the Config module of compiler-libs.common)
+Assuming we are accessing this from a build system implemented in OCaml, I guess this fails in cross-compilation settings since you will get the values of the build-os OCaml compilers in there.
+
+
+> The mingw compiler already use the form w64 for the host, so that the compilers "fake" a cross-compiling triple (e.g. i686-w64-mingw32-gcc and x86_64-w64-mingw32-gcc). Perhaps that would be better?
+I don't understand what you are proposing here. Did you say we should use "mingw32" as an OS value to denote the mingw ports ?  
+
+Best,
+
+Daniel
+
+From david at allsopps.net  Tue Jun 30 18:13:12 2015
+From: david at allsopps.net (David Allsopp)
+Date: Tue, 30 Jun 2015 17:13:12 +0000
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+
+Daniel B?nzli wrote:
+> Hello,
+> 
+> In the context of building things, one apparently needs to be able
+> precisely identify the windows ports in order to produce build artefacts
+> with correct extensions (see [1]). It seems that:
+> 
+> 1) Using the OCaml MSVC ports, windows specific extensions are used
+> 2) Using the OCaml mingw ports, unix extensions are used
+
+Not quite: shared libraries are .dll rather than .so
+
+> 3) Using the OCaml cygwin port, unix extensions are used
+
+I can't remember if Cygwin uses .so.dll or just .so, but I expect whatever it does that it fakes everything to work with just .so (just as it fakes things to work without .exe) - tricks which *do not work* when dealing with mingw-compiled programs which obviously don't have the Cygwin layer.
+
+> The problem is that at the moment various detection bits e.g. [2] conflate
+> 1) + 2) under a single variable, namely win32. Something is needed to
+> distinguish them in build systems in general.
+> 
+> Here are a few ideas:
+> 
+> a) Introduce a new toolchain variable, that specifies the toolchain used,
+> whatever that means.
+
+$OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc. Equally, all of the required extensions can be determined by grep'ing the output of ocamlopt -config (or with more recent OCamls by using the Config module of compiler-libs.common)
+
+> b) Distinguish an OS for the mingw ports
+> c) Distinguish these 3 cases through a distribution variable [3]
+> 
+> I have the impression that a) is going to introduce again more noise,
+> names and branches in the eco-system which already has plenty enough.
+> Regarding c) I think it would be bending the semantics of the variable.
+> Given that cygwin is already treated as an OS I would suggest that we
+> rather use b) and introduce a "win32-mingw" or "mingw" (or whichever name
+> windows users would find accurate) value for OS like variables.
+> 
+> Besides for cross compilation of packages we need to distinguish between
+> `build-os` and `host-os` (os on which the build products are run). It
+> would be nice if opam could somehow provide variables for these values for
+> build systems to use in order to configure packages properly. IIRC opam
+> currently only has an `os` variable which has the value of `build-os` but
+> is currently being used for `host-os` semantics.
+
+The mingw compiler already use the form w64 for the host, so that the compilers "fake" a cross-compiling triple (e.g. i686-w64-mingw32-gcc and x86_64-w64-mingw32-gcc). Perhaps that would be better?
+
+> Note that some other variables pertaining to the capabilities of the
+> installed OCaml compilers see [4] will also need {build,host}-os
+> distinction (e.g. `ocaml-native` and `ocaml-native-dynlink`). In order to
+> remain backward compatible with the current repository, I guess that the
+> simplest is to deem all current variables as having host semantics and
+> introduce only new variables for build semantics i.e. `build-os-ocaml-
+> native`, `build-os-ocaml-native-dynlink`, `build-os-ocaml-version`, etc.
+> 
+> Best,
+> 
+> Daniel
+> 
+> P.S. To windows users. I would also be interested in knowing if there is a
+> tool invocation that is actually able to distinguish between 1) and 2).
+> 
+> [1] https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094
+> [2] https://github.com/ocaml/opam-
+> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+> [3] https://github.com/ocaml/opam-
+> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L76-L109
+> [4] https://opam.ocaml.org/doc/manual/dev-manual.html#sec37
+> 
+> 
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+

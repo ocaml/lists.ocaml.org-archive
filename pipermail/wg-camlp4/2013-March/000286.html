@@ -1,0 +1,192 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] A new branch to experiment with extension points
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3CCAPFanBE-i0KDTmUAsSyD4eUhRYx7bZT6bxoWO5X9FmNzRFCUzA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000285.html">
+   <LINK REL="Next"  HREF="000287.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] A new branch to experiment with extension points</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3CCAPFanBE-i0KDTmUAsSyD4eUhRYx7bZT6bxoWO5X9FmNzRFCUzA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] A new branch to experiment with extension points">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Mar  1 20:01:05 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000285.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+        <LI>Next message: <A HREF="000287.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#286">[ date ]</a>
+              <a href="thread.html#286">[ thread ]</a>
+              <a href="subject.html#286">[ subject ]</a>
+              <a href="author.html#286">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I'm sorry if my remarks set you in this way, but I'm not sure the
+recent changes go in the right direction.
+
+1. I have bad feelings about the idea to split &quot;type foo = bar and baz
+= foobar&quot; in two structure items. I'm not sure how that affect the
+parsing rules (is &quot;type foo = bar;; and baz = foobar&quot; legal now?), and
+more importantly it doesn't fit my mental model of structure items as
+being self-contained unit of meaning that can, say, be sent separately
+to a toplevel (and this is actually a very important use case). If
+&quot;foo&quot; and &quot;baz&quot; are mutually recursive type in my example about, it
+makes no sense to consider &quot;type foo = bar&quot; in isolation.
+
+This remark is in direct conflict with my previous remark that &quot;with&quot;
+could be replaced by the generic annotation on structure_items. This
+previous remark was a mistake, as I had not thought of mutually
+recursive definitions, and I now believe that you indeed need to
+attach attributes to the grammar element named &quot;typedef&quot; in the manual
+grammar description (
+<A HREF="http://caml.inria.fr/pub/docs/manual-ocaml/manual016.html">http://caml.inria.fr/pub/docs/manual-ocaml/manual016.html</A> ).
+
+(Orthogonal anecdote: Damien Doligez has been looking closely at the
+BNF described in the manual recently, and committed some fixes to it.
+Contrary to what intuition suggests, it is reasonably safe to assume
+that it is correctly describes the grammar of the language as we
+understand it.)
+
+2. I have mixed feelings about the idea that detaching struct_item
+attributes from the corresponding struct_item is the right way to
+handle the OCamldoc setting. I'd rather keep a more semantic model
+that makes it explicit what an annotation scopes over, and more
+convenient to write consumers/extensions to handle attributes (no need
+to peek at the next structure items to collect all annotations for the
+current one). Maybe ocamldoc sections could simply be modeled as
+annotations on &quot;();;&quot;, if we don't discover that we really want
+ignored-by-default annotations in the general case (I wouldn't be
+surprised).
+
+
+On Fri, Mar 1, 2013 at 7:51 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 03/01/2013 06:52 PM, Leo White wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The standard way to define a delimiter like &quot;(:&quot;, in keeping with how
+</I>&gt;&gt;<i> the rest of OCaml is parsed, is to make it a single token from the lexer.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Agreed!
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 1. Extensions:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      (: ident expr_opt )
+</I>&gt;&gt;<i>    Used as a structure item, signature item, expression or type
+</I>&gt;&gt;<i> expression.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 2. Attributes:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      [: ident expr_opt ]
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    Attached postfix to structure items, signature items, expressions or
+</I>&gt;&gt;<i>    type expressions.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 3. With Attributes
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>      with ident ( expr), ident, ident (expr)
+</I>&gt;&gt;<i>    Attached postfix to structure items or signature items.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This looks good to me.
+</I>&gt;<i>
+</I>&gt;<i> We also need attributes on individual types in a type declaration.
+</I>&gt;<i>
+</I>&gt;<i> Also, I think it make sense for structure/signature items, to consider that
+</I>&gt;<i> attributes are &quot;between&quot; items, to support things like ocamldoc section
+</I>&gt;<i> headers.
+</I>&gt;<i>
+</I>&gt;<i> I've started to work on a change to the Parsetree (unfinished, not committed
+</I>&gt;<i> yet):
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="http://alain.frisch.fr/split_type_decls.txt">http://alain.frisch.fr/split_type_decls.txt</A>
+</I>&gt;<i>
+</I>&gt;<i> where each declared type in a type declaration become a full
+</I>&gt;<i> structure/signature item with a marker telling if this is the first type in
+</I>&gt;<i> the declaration or not (similar to the representation of signatures in the
+</I>&gt;<i> Types module).  This puts some extra invariants in the Parsetree (a
+</I>&gt;<i> Pstr_type Prec_nextmust follow another Pstr_type ..., maybe with attributes
+</I>&gt;<i> in between), but then we don't need to distinguish syntactically attributes
+</I>&gt;<i> on a declared type and attributes on the whole declarations, which would be
+</I>&gt;<i> hard to explain to users.
+</I>&gt;<i>
+</I>&gt;<i> The goal is to be able to write (keeping my original syntax for attributes
+</I>&gt;<i> in structure items):
+</I>&gt;<i>
+</I>&gt;<i> ===============================================
+</I>&gt;<i> ..(:doc 2 &quot;My section header&quot;)
+</I>&gt;<i>
+</I>&gt;<i> type t = {...} ..(:id expr) ..(:id expr)
+</I>&gt;<i> and  s = {...} ..(:id expr)
+</I>&gt;<i>
+</I>&gt;<i> ..(:doc 2 &quot;Another section header&quot;)
+</I>&gt;<i> ===============================================
+</I>&gt;<i>
+</I>&gt;<i> Here we have the following sequence of structure items:
+</I>&gt;<i>
+</I>&gt;<i>  Pstr_attribute &quot;doc&quot;
+</I>&gt;<i>  Pstr_type (Prec_first, ...)
+</I>&gt;<i>  Pstr_attributes &quot;id&quot;
+</I>&gt;<i>  Pstr_attributes &quot;id&quot;
+</I>&gt;<i>  Pstr_type (Prec_next, ...)
+</I>&gt;<i>  Pstr_attributes &quot;id&quot;
+</I>&gt;<i>  Pstr_attributes &quot;doc&quot;
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Independently of the syntax, I'd be interested to get feedback on these two
+</I>&gt;<i> proposals:
+</I>&gt;<i>
+</I>&gt;<i>  -  splitting declarations of mutually recursive types into single
+</I>&gt;<i> declarations in the Parsetree, and
+</I>&gt;<i>
+</I>&gt;<i>  -  having attributes as standalone items within signatures and structures
+</I>&gt;<i> (so also between types in a single recursive declaration) instead of having
+</I>&gt;<i> them attached to other items.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000285.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+	<LI>Next message: <A HREF="000287.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#286">[ date ]</a>
+              <a href="thread.html#286">[ thread ]</a>
+              <a href="subject.html#286">[ subject ]</a>
+              <a href="author.html#286">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

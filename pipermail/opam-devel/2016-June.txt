@@ -1,0 +1,1248 @@
+From dra-news at metastack.com  Wed Jun  1 15:29:45 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 1 Jun 2016 14:29:45 +0000
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <25701235.zDHpBeXBVl@maitake>
+ <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+
+Anil Madhavapeddy wrote:
+> > On 31 May 2016, at 14:36, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> wrote:
+
+<snip>
+
+> > The issue with `make lib-ext` may be that `opam-admin.top` can't find
+> > the proper opam libraries installed. The Makefile in `admin-scripts/`
+> > has a quick hack to build bytecode versions, but that reiles on
+> > `ocamlfind` to locate the installed versions of the dependencies; it
+> > wouldn't be difficult to improve it to work with `lib-ext` though.
+> 
+> It would be very useful if they could work with lib-ext and the toplevel
+> be built by default.  Right now there is some oddness where the extlib
+> interactive installer is run if I build `opam-admin.top` manually, so I
+> gave up around there.
+
+lib-ext isn't very well-conceived/constructed, IMNRHO! See https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e97. Part of my reason for spending time last year implementing lib-pkg in the build system ...
+
+I then hacked admin-scripts/compilers-to-packages.ml and changed the #directory entries to include src/{core,repository,format,tools} and src_ext and can run that script which I used to replicate the next branch on opam-repository and so rebased to create https://github.com/dra27/opam-repository/tree/next-windows (I've been doing a lot of work locally, which is why it's lagging behind master at the moment). 
+
+> > Now, for scripts that get generally useful and somewhat stable, it's
+> > perfectly fine to migrate them to be part of opam-admin. Moving the
+> > scripts to their own repo would also be fine if they reach a critical
+> weight.
+> >
+> > Should we improve compat of the Makefile and/or move the 1.2->2.0
+> > functionality to opam-admin ?
+> 
+> For the purposes of container-based testing, it would be great if we could
+> move the essential functionality into `opam admin` directly.  This will
+> let me insert in the right `git clone / opam admin upgrade` runs into the
+> CI scripts so that OPAM 2 is easy to test for end users.
+
+compilers-to-packages.ml will be a one-time thing, though, surely? Once OPAM 2 goes live, surely the main repository will need to work in reverse, back-porting an OPAM 1.x.y repository?
+
+
+David
+
+From anil at recoil.org  Wed Jun  1 15:32:18 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 1 Jun 2016 15:32:18 +0100
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <25701235.zDHpBeXBVl@maitake>
+ <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+ <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+Message-ID: <AAC48483-6274-4AA9-BC2A-FC6B8962A9BF@recoil.org>
+
+
+> On 1 Jun 2016, at 15:29, David Allsopp <dra-news at metastack.com> wrote:
+> 
+> Anil Madhavapeddy wrote:
+>>> On 31 May 2016, at 14:36, Louis Gesbert <louis.gesbert at ocamlpro.com>
+>> wrote:
+> 
+> <snip>
+> 
+>>> The issue with `make lib-ext` may be that `opam-admin.top` can't find
+>>> the proper opam libraries installed. The Makefile in `admin-scripts/`
+>>> has a quick hack to build bytecode versions, but that reiles on
+>>> `ocamlfind` to locate the installed versions of the dependencies; it
+>>> wouldn't be difficult to improve it to work with `lib-ext` though.
+>> 
+>> It would be very useful if they could work with lib-ext and the toplevel
+>> be built by default.  Right now there is some oddness where the extlib
+>> interactive installer is run if I build `opam-admin.top` manually, so I
+>> gave up around there.
+> 
+> lib-ext isn't very well-conceived/constructed, IMNRHO! See https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e97. Part of my reason for spending time last year implementing lib-pkg in the build system ...
+> 
+> I then hacked admin-scripts/compilers-to-packages.ml and changed the #directory entries to include src/{core,repository,format,tools} and src_ext and can run that script which I used to replicate the next branch on opam-repository and so rebased to create https://github.com/dra27/opam-repository/tree/next-windows (I've been doing a lot of work locally, which is why it's lagging behind master at the moment). 
+
+This does sound like the right approach indeed!
+
+> 
+>>> Now, for scripts that get generally useful and somewhat stable, it's
+>>> perfectly fine to migrate them to be part of opam-admin. Moving the
+>>> scripts to their own repo would also be fine if they reach a critical
+>> weight.
+>>> 
+>>> Should we improve compat of the Makefile and/or move the 1.2->2.0
+>>> functionality to opam-admin ?
+>> 
+>> For the purposes of container-based testing, it would be great if we could
+>> move the essential functionality into `opam admin` directly.  This will
+>> let me insert in the right `git clone / opam admin upgrade` runs into the
+>> CI scripts so that OPAM 2 is easy to test for end users.
+> 
+> compilers-to-packages.ml will be a one-time thing, though, surely? Once OPAM 2 goes live, surely the main repository will need to work in reverse, back-porting an OPAM 1.x.y repository?
+
+Yes but the functionality still needs to be in opam-admin for other local repositories to be upgraded by their admins.  For instance, we maintain several remotes internally at Docker with pinned versions that we use for reproducible binary builds, and those would need to be upgraded when we migrate to OPAM2. 
+
+Anil
+
+From louis.gesbert at ocamlpro.com  Wed Jun  1 15:58:36 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 01 Jun 2016 16:58:36 +0200
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+ <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+Message-ID: <2470694.SWJiqHELxS@maitake>
+
+Le mercredi 1 juin 2016, 14:29:45 David Allsopp a ?crit :
+> Anil Madhavapeddy wrote:
+> > > On 31 May 2016, at 14:36, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> > 
+> > wrote:
+> <snip>
+> 
+> > > The issue with `make lib-ext` may be that `opam-admin.top` can't find
+> > > the proper opam libraries installed. The Makefile in `admin-scripts/`
+> > > has a quick hack to build bytecode versions, but that reiles on
+> > > `ocamlfind` to locate the installed versions of the dependencies; it
+> > > wouldn't be difficult to improve it to work with `lib-ext` though.
+> > 
+> > It would be very useful if they could work with lib-ext and the toplevel
+> > be built by default.  Right now there is some oddness where the extlib
+> > interactive installer is run if I build `opam-admin.top` manually, so I
+> > gave up around there.
+> 
+> lib-ext isn't very well-conceived/constructed, IMNRHO! See
+> https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e
+> 97. Part of my reason for spending time last year implementing lib-pkg in
+> the build system ...
+
+Nice fix,  I'd gladly merge the PR
+
+For lib-ext... well, we needed a build system:
+- for OCaml
+- with no dependencies
+
+and it's just to bootstrap. Yes obviously, lib-ext is an ugly hack, and I am 
+not proud of it; the doc+Makefiles makes sure you only use it for building the 
+opam binary and not for usable libraries though
+
+The previous solution was cleaner, but relied on ocp-build. Migrating to 
+OCamlMakefile was a painful experience, but I can't see a better option 
+around. Also, it manages to not be too much trouble to maintain.
+
+It could actually make sense to have a real bootstrap and use a local opam 
+repo; but this has big downsides as well.
+
+> I then hacked admin-scripts/compilers-to-packages.ml and changed the
+> #directory entries to include src/{core,repository,format,tools} and
+> src_ext and can run that script which I used to replicate the next branch
+> on opam-repository and so rebased to create
+> https://github.com/dra27/opam-repository/tree/next-windows (I've been doing
+> a lot of work locally, which is why it's lagging behind master at the
+> moment).
+
+Yes, not very friendly, but that's how I do that kind of thing at the moment
+
+> > > Now, for scripts that get generally useful and somewhat stable, it's
+> > > perfectly fine to migrate them to be part of opam-admin. Moving the
+> > > scripts to their own repo would also be fine if they reach a critical
+> > 
+> > weight.
+> > 
+> > > Should we improve compat of the Makefile and/or move the 1.2->2.0
+> > > functionality to opam-admin ?
+> > 
+> > For the purposes of container-based testing, it would be great if we could
+> > move the essential functionality into `opam admin` directly.  This will
+> > let me insert in the right `git clone / opam admin upgrade` runs into the
+> > CI scripts so that OPAM 2 is easy to test for end users.
+> 
+> compilers-to-packages.ml will be a one-time thing, though, surely? Once OPAM
+> 2 goes live, surely the main repository will need to work in reverse,
+> back-porting an OPAM 1.x.y repository?
+
+Yes, at some point will have to switch the version of submissions to opam-
+repository.
+
+From dra-news at metastack.com  Wed Jun  1 16:05:40 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 1 Jun 2016 15:05:40 +0000
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <2470694.SWJiqHELxS@maitake>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <D55201B6-F3D7-450C-8E3E-D2286A9D8495@recoil.org>
+ <E51C5B015DBD1348A1D85763337FB6D9F058C3E9@Remus.metastack.local>
+ <2470694.SWJiqHELxS@maitake>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9F058C88C@Remus.metastack.local>
+
+Louis Gesbert wrote:
+> Le mercredi 1 juin 2016, 14:29:45 David Allsopp a ?crit :
+> > Anil Madhavapeddy wrote:
+> > > > On 31 May 2016, at 14:36, Louis Gesbert
+> > > > <louis.gesbert at ocamlpro.com>
+> > >
+> > > wrote:
+> > <snip>
+> >
+> > > > The issue with `make lib-ext` may be that `opam-admin.top` can't
+> > > > find the proper opam libraries installed. The Makefile in
+> > > > `admin-scripts/` has a quick hack to build bytecode versions, but
+> > > > that reiles on `ocamlfind` to locate the installed versions of the
+> > > > dependencies; it wouldn't be difficult to improve it to work with
+> `lib-ext` though.
+> > >
+> > > It would be very useful if they could work with lib-ext and the
+> > > toplevel be built by default.  Right now there is some oddness where
+> > > the extlib interactive installer is run if I build `opam-admin.top`
+> > > manually, so I gave up around there.
+> >
+> > lib-ext isn't very well-conceived/constructed, IMNRHO! See
+> > https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a0174
+> > 7239e 97. Part of my reason for spending time last year implementing
+> > lib-pkg in the build system ...
+> 
+> Nice fix,  I'd gladly merge the PR
+
+Feel free to cherry-pick it (it's on https://github.com/dra27/opam/commits/windows-build) - while Git is wonderful, I found working on OCaml earlier in the year that it's not wonderful when you're trying to maintain a large number of pull requests and a rebasing branch of all of those PRs in one! So for now, I'd prefer to keep my contributions in one branch only, until the darned thing's actually finished, just for my own sanity! :o) The rebase does a good job of noticing when fixes like that have been superseded.
+
+> For lib-ext... well, we needed a build system:
+> - for OCaml
+> - with no dependencies
+> 
+> and it's just to bootstrap. Yes obviously, lib-ext is an ugly hack, and I
+> am not proud of it; the doc+Makefiles makes sure you only use it for
+> building the opam binary and not for usable libraries though
+> 
+> The previous solution was cleaner, but relied on ocp-build. Migrating to
+> OCamlMakefile was a painful experience, but I can't see a better option
+> around. Also, it manages to not be too much trouble to maintain.
+
+https://github.com/dra27/opam/commit/8ccda84b17ffd57543a15e4a09072ba9a237fefe :o)
+
+
+David
+
+From louis.gesbert at ocamlpro.com  Wed Jun  1 16:14:58 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 01 Jun 2016 17:14:58 +0200
+Subject: [opam-devel] opam 2 containers/building toplevel
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9F058C88C@Remus.metastack.local>
+References: <548010D9-8FA8-4C77-B886-EB6C6F58D4E6@recoil.org>
+ <2470694.SWJiqHELxS@maitake>
+ <E51C5B015DBD1348A1D85763337FB6D9F058C88C@Remus.metastack.local>
+Message-ID: <1663596.uLico4Jg6L@maitake>
+
+> > > lib-ext isn't very well-conceived/constructed, IMNRHO! See
+> > > https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a0174
+> > > 7239e 97. Part of my reason for spending time last year implementing
+> > > lib-pkg in the build system ...
+> > 
+> > Nice fix,  I'd gladly merge the PR
+> 
+> Feel free to cherry-pick it (it's on
+> https://github.com/dra27/opam/commits/windows-build) - while Git is
+> wonderful, I found working on OCaml earlier in the year that it's not
+> wonderful when you're trying to maintain a large number of pull requests
+> and a rebasing branch of all of those PRs in one! So for now, I'd prefer to
+> keep my contributions in one branch only, until the darned thing's actually
+> finished, just for my own sanity! :o) The rebase does a good job of
+> noticing when fixes like that have been superseded.
+
+Ok, thanks. Completely agree on git, it can drive you crazy when confronted 
+with huge sets of conflicting changes...
+
+From dra-news at metastack.com  Wed Jun  1 15:57:54 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 1 Jun 2016 14:57:54 +0000
+Subject: [opam-devel] OPAM 2.0 features
+In-Reply-To: <13079077.OnIuBWAEKm@maitake>
+References: <002e01d1b732$20915be0$61b413a0$@metastack.com>
+ <13079077.OnIuBWAEKm@maitake>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9F058C698@Remus.metastack.local>
+
+Louis Gesbert wrote:
+
+> Le jeudi 26 mai 2016, 10:36:48 David Allsopp a ?crit :
+
+> > Hi (Louis mainly, I expect!),
+
+> >
+
+> >   I've rebased work I've been very slowly doing onto the OPAM 2.0
+
+> alpha
+
+> > release and have been starting to get opam switch to work. There are a
+
+> > few things which I need to be able to do for this, and I'm wondering
+
+> > if there any opinions (or even existing features I've missed) as to
+
+> > mechanisms...
+
+>
+
+> Great! All feedback is very welcome at this stage.
+
+
+
+Biggest feedback at the moment is that compilers-as-a-package is a fabulous innovation ? I had originally expected to need to add lots of horrid Windows (and OCaml, therefore)-specific stuff to the OPAM program, but in fact all I've had to do is add generic features to OPAM and then handle the rest in the package itself, which is great!
+
+
+
+> > 1. Downloading a package from several tarballs
+
+> >   I've not finished delving into the full details, but I think I'm
+
+> > correct that the url file / section can only specify a single archive,
+
+> > even if it can be made available by multiple transports? Bootstrapping
+
+> > OCaml on Windows requires two tarballs, so I was going to extend the
+
+> > url system to allow multiple tarballs to be specified (with control
+
+> > over where in the overall tree they are extracted), rather than
+
+> > hackily including the second one in files and extracting it using a
+
+> build command.
+
+>
+
+> Some other compilers, e.g. metaOCaml, have the same requirement, since
+
+> they consist of the official OCaml tarball plus a huge patch, so I have
+
+> added a way to handle this.
+
+>
+
+> The `url` section or file still is a single source, and the commands are
+
+> executed from its root (after extraction if necessary). But there is now
+
+> also an opam field `extra-sources:` that you can use to download more
+
+> files, unextracted, to the build directory. The format is:
+
+>
+
+>     extra-sources: [ [ "URL" { "target-filename" } "MD5" ] ... ]
+
+>
+
+> The "target-filename" part being optional. See for example
+
+> http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam
+
+
+
+Ta, I came across it subsequently too! I've extended it (or rather, will shortly extend it), to allow it to refer to the URL of another package, as the ocaml package needs to pick up the sources of the flexdll package installed just before it in order to bootstrap correctly.
+
+
+
+> > 2. Specifying package variables at opam switch install
+
+> >   I've extended the ocaml package variables to include three new ones:
+
+> > ocaml-arch (which is exactly the architecture determined by OCaml's
+
+> > configure script), ocaml-cc (which is "cl" for a Microsoft C compiler
+
+> > based OCaml or "cc" for the rest of the world), and ocaml-libc (which is
+
+> "msvc"
+
+> > for the four native Windows OCaml ports and "libc" for the rest of the
+
+> > world).
+
+> >
+
+> >   At OPAM switch time, one selects which Windows port you get by
+
+> > specifying these three variables. So, for example, mingw64 is
+
+> > ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is
+
+> > ocaml-arch=i386, ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is
+
+> > ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=libc.
+
+> >
+
+> >   My question is how to specify these - the concept of "architecture",
+
+> > "C compiler type" and "C runtime library" is generic enough that it
+
+> > doesn't feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0
+
+> > and have the package initialise ocaml-arch, etc. based on those
+
+> > globally available variables. However, is there any plan (or existing
+
+> > feature) for a more generic way of specifying package input variables?
+
+> > (discussed in https://github.com/ocaml/opam/issues/2247).
+
+>
+
+> a) for the _output_ variables, you can define them in your `PKG.config`
+
+> variable (automatically installed by opam if present in your build dir).
+
+> Note that, at the moment, variables defined by the compiler package get
+
+> exported as global variables (so you can access e.g. `ocaml-version`
+
+> anywhere), but there are limitations due to this and it is likely to
+
+> disappear from the final release (see
+
+> https://github.com/ocaml/opam/issues/2537 for details). You can always
+
+> access them through `ocaml:VAR` inside the script parts though.
+
+>
+
+> b) nothing yet for _input_ variables, but #2247 is still something I need
+
+> to work on. You can define global variables through `opam config set`,
+
+> though, so an option in the meantime could be to use `opam switch install
+
+> --empty`, set the variables, then install the compiler (the option to
+
+> install and mark as compiler is missing at the moment, though, for that
+
+> you'll have to edit
+
+> `SWITCH/.opam-switch/switch-state`)
+
+
+
+I've gone with the command line options for now (with an error check to ensure that they're only given when installing a switch). At the moment, they define three global variables switch-cc, switch-libc and switch-arch which are only available during the switch installation, so if they want to be kept, the compiler package has to capture them in its own .config file. ocaml.system remains a horrible hack under this mechanism (the script identifies that it's in a switch named "system" and uses that fact to probe switch-cc, switch-libc, and switch-arch...)
+
+
+
+It's not particularly pretty, but it does seem to work in the absence of something more general for now. In particular, I've restructured the base packages and added a package called compiler whose purpose is to store variables (in particular, compiler:o, compiler:so and compiler:a giving important file extensions for object files, etc., which are necessary for writing generic package specifications). The only bug I had to fix with that so far is to thread the config files correctly through parallel_apply (before they were only re-loaded at the end of the installation), but there is a comment in the code that you already aware of problems there!
+
+
+
+> > 3. Upgrading dependent packages for the root
+
+> >   Any Windows OCaml installation will depend upon FlexDLL objects
+
+> > compiled with the specific C compiler combination. Although in
+
+> > principle these could be shared between multiple switches (the object
+
+> > files vary according ocaml-cc, ocaml-libc and ocaml-arch; not
+
+> > ocaml-version), it makes sense to compile these two object files
+
+> > per-switch, rather than introduce yet another installation layer.
+
+> >
+
+> >   This means that in addition to the base packages, the Windows OCaml
+
+> > package depends on a flexdll package. Is there any philosophical
+
+> > reason for that not to be part of opam upgrade? Obviously, one doesn't
+
+> > want to be trying to upgrade the ocaml package, but why lock its
+
+> > dependencies at a given version? It would be quite nice if a new
+
+> > version of flexdll is released to be able to have opam upgrade notice
+
+> > that flexdll can be upgraded, determine that the root package must
+
+> > therefore be recompiled and so automatically recompile the entire
+
+> switch.
+
+> >
+
+> >   Is it just for philosophical reasons that the dependencies of the
+
+> > root package are not considered for upgrade or is there a technical
+
+> > consideration?
+
+>
+
+> Yes, just philosophical, there is no constraint here besides the arbitrary
+
+> "I don't want to recompile the compiler, ever".
+
+
+
+I've spent the last couple of days working through this, and I think it's definitely worth relaxing that restriction. I've altered opam switch so that only the root package is the compiler package ? so only ocaml.version is in the compiler section of switch-state. Have a look at this transcript:
+
+
+[opam:system] [git:windows] C:\DRA\opam>opam switch 4.02.0 --arch=x64
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexdll.0.31] http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz downloaded
+[flexlink.0.31] http://alain.frisch.fr/flexdll/flexdll-0.31.tar.gz downloaded
+[ocaml.4.02.0] http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  installed base-bigarray.base
+?  installed base-threads.base
+?  installed base-unix.base
+?  installed compiler.base
+?  installed flexdll.0.31
+?  installed ocaml.4.02.0
+?  installed flexlink.0.31
+Done.
+
+At this stage, that's a mingw64 native Windows port installed with flexlink 0.31 (several versions behind, but the current version when 4.02.0 was released). Now opam upgrade correctly offers to recompile everything (I'm going to tweak it so that it will only do it explicitly ? i.e. opam upgrade flexdll):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam>opam upgrade
+The following actions will be performed:
+  ?  upgrade   flexdll  0.31 to 0.34
+  ?  recompile ocaml    4.02.0                [uses flexdll]
+  ?  upgrade   flexlink 0.31 to 0.34
+===== ?  1   ?  2 =====
+Do you want to continue ? [Y/n] n
+
+The really cool thing ? principally for Alain Frisch (!) - is that it means you can pin the packages. So first I can pin the linker (the flexlink package depends on ocaml, not the other way around):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam>opam pin add C:\DRA\flexlink --kind=path --yes
+[flexlink.0.31] file://C:\DRA\flexlink/ synchronized
+flexlink is now pinned to file://C:\DRA\flexlink (version 0.35)
+
+The following actions will be performed:
+  ?  upgrade flexlink 0.31 to 0.35*
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexlink.0.35] file://C:\DRA\flexlink/ already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  removed   flexlink.0.31
+?  installed flexlink.0.35
+Done.
+
+but then I can also pin flexdll:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam>opam pin add C:\DRA\flexdll --kind=path --yes
+[flexdll.0.31] file://C:\DRA\flexdll/ synchronized
+flexdll is now pinned to file://C:\DRA\flexdll (version 0.35)
+
+The following actions will be performed:
+  ?  upgrade   flexdll  0.31 to 0.35*
+  ?  recompile ocaml    4.02.0                [uses flexdll]
+  ?  recompile flexlink 0.35*                 [uses flexdll]
+===== ?  2   ?  1 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[ocaml.4.02.0] http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz downloaded
+[flexdll.0.35] file://C:\DRA\flexdll/ already up-to-date
+[flexlink.0.35] file://C:\DRA\flexlink/ already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  removed   flexlink.0.35
+[WARNING] Directory C:\Users\DRA\Documents\.opam\4.02.0\lib\ocaml is not empty, not removing
+?  removed   ocaml.4.02.0
+?  removed   flexdll.0.31
+?  installed flexdll.0.35
+?  installed ocaml.4.02.0
+?  installed flexlink.0.35
+Done.
+
+then add ocamlfind (tweaked slightly as at present it doesn't explicitly depend on the ocaml package ? that presumably will be part of a big repository conversion when OPAM 2 is actually released):
+
+[opam:4.02.0] [git:windows] C:\DRA\opam>opam install ocamlfind --yes
+The following actions will be performed:
+  ?  install conf-pkg-config 1.0              [required by conf-ncurses]
+  ?  install conf-m4         1                [required by ocamlfind]
+  ?  install conf-ncurses    1                [required by ocamlfind]
+  ?  install ocamlfind       1.6.2
+===== ?  4 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[ocamlfind.1.6.2] http://download.camlcity.org/download/findlib-1.6.2.tar.gz downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  installed conf-m4.1
+?  installed conf-pkg-config.1.0
+?  installed conf-ncurses.1
+[WARNING] C:\Users\DRA\Documents\.opam\4.02.0\bin\safe_camlp4 is a script; the command won't be available
+?  installed ocamlfind.1.6.2
+Done.
+
+and then I can unpin flexdll (aspcud of course identifies the upgrade from 0.31->0.34) and watch the entire switch recompile itself again:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src>opam pin remove flexdll --yes
+flexdll is no longer pinned to file://C:\DRA\flexdll (version 0.35)
+The following actions will be performed:
+  ?  downgrade flexdll   0.35 to 0.34
+  ?  recompile ocaml     4.02.0               [uses flexdll]
+  ?  recompile ocamlfind 1.6.2                [uses ocaml]
+  ?  recompile flexlink  0.35*                [uses flexdll]
+===== ?  3   ?  1 =====
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexdll.0.34] http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz downloaded
+[ocaml.4.02.0] http://caml.inria.fr/pub/distrib/ocaml-4.02/ocaml-4.02.0.tar.gz downloaded
+[flexdll.0.35] file://C:\DRA\flexdll/ already up-to-date
+[flexlink.0.35] file://C:\DRA\flexlink/ already up-to-date
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  removed   flexlink.0.35
+?  removed   ocamlfind.1.6.2
+[WARNING] Directory C:\Users\DRA\Documents\.opam\4.02.0\lib\ocaml is not empty, not removing
+?  removed   ocaml.4.02.0
+?  removed   flexdll.0.35
+?  installed flexdll.0.34
+?  installed ocaml.4.02.0
+?  installed flexlink.0.35
+[WARNING] C:\Users\DRA\Documents\.opam\4.02.0\bin\safe_camlp4 is a script; the command won't be available
+?  installed ocamlfind.1.6.2
+Done.
+
+then, finally, I can remove the flexlink pin:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src>opam pin remove flexlink --yes
+flexlink is no longer pinned to file://C:\DRA\flexlink (version 0.35)
+The following actions will be performed:
+  ?  downgrade flexlink 0.35 to 0.34
+
+=-=- Gathering sources =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[flexlink.0.34] http://alain.frisch.fr/flexdll/flexdll-0.34.tar.gz downloaded
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+?  removed   flexlink.0.35
+?  installed flexlink.0.34
+Done.
+
+That seems a potentially very useful thing to be able to do ? and you don't lose the safety of the "compiler" packages ? opam remove flexdll (or base-unix, etc.) will still complain that this would involve removing the compiler:
+
+[opam:4.02.0] [git:windows] C:\DRA\opam\src>opam remove flexdll
+Your request can't be satisfied:
+  - Package ocaml is part of the base for this compiler and can't be changed
+
+No solution found, exiting
+
+
+David
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160601/2850e78f/attachment-0001.html>
+
+From louis.gesbert at ocamlpro.com  Fri Jun  3 08:52:52 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 03 Jun 2016 09:52:52 +0200
+Subject: [opam-devel] OPAM 2.0 features
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9F058C698@Remus.metastack.local>
+References: <002e01d1b732$20915be0$61b413a0$@metastack.com>
+ <13079077.OnIuBWAEKm@maitake>
+ <E51C5B015DBD1348A1D85763337FB6D9F058C698@Remus.metastack.local>
+Message-ID: <3121607.FQDh2oZuuF@maitake>
+
+> Biggest feedback at the moment is that compilers-as-a-package is a fabulous
+> innovation ? I had originally expected to need to add lots of horrid
+> Windows (and OCaml, therefore)-specific stuff to the OPAM program, but in
+> fact all I've had to do is add generic features to OPAM and then handle the
+> rest in the package itself, which is great!
+
+That's good to hear :)
+ 
+> > The "target-filename" part being optional. See for example
+> > http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam
+> 
+> Ta, I came across it subsequently too! I've extended it (or rather, will
+> shortly extend it), to allow it to refer to the URL of another package, as
+> the ocaml package needs to pick up the sources of the flexdll package
+> installed just before it in order to bootstrap correctly.
+ 
+Hm, that seems a bit ad-hoc and introduces metadata dependencies of a new 
+kind. What if flexdll has a git url or is pinned locally ?
+
+> I've gone with the command line options for now (with an error check to
+> ensure that they're only given when installing a switch). At the moment,
+> they define three global variables switch-cc, switch-libc and switch-arch
+> which are only available during the switch installation, so if they want to
+> be kept, the compiler package has to capture them in its own .config file.
+> ocaml.system remains a horrible hack under this mechanism (the script
+> identifies that it's in a switch named "system" and uses that fact to probe
+> switch-cc, switch-libc, and switch-arch...)
+
+That would likely break `opam switch foo --alias-of system`. Adding `--set-
+variables <bindings>` to `opam switch install` would be a good first step, and 
+if we find suitable sugar later on we may add it.
+ 
+> It's not particularly pretty, but it does seem to work in the absence of
+> something more general for now. In particular, I've restructured the base
+> packages and added a package called compiler whose purpose is to store
+> variables (in particular, compiler:o, compiler:so and compiler:a giving
+> important file extensions for object files, etc., which are necessary for
+> writing generic package specifications). The only bug I had to fix with
+> that so far is to thread the config files correctly through parallel_apply
+> (before they were only re-loaded at the end of the installation), but there
+> is a comment in the code that you already aware of problems there!
+
+hm, forgot about that TBH, I'll need to check :) 
+
+> > Yes, just philosophical, there is no constraint here besides the
+> > arbitrary
+> > "I don't want to recompile the compiler, ever".
+> 
+> 
+> I've spent the last couple of days working through this, and I think it's
+> definitely worth relaxing that restriction. I've altered opam switch so
+> that only the root package is the compiler package ? so only ocaml.version
+> is in the compiler section of switch-state. Have a look at this
+> transcript:
+> [snip]
+> 
+> That seems a potentially very useful thing to be able to do ? and you don't
+> lose the safety of the "compiler" packages ? opam remove flexdll (or
+> base-unix, etc.) will still complain that this would involve removing the
+> compiler:
+ 
+> [opam:4.02.0] [git:windows] C:\DRA\opam\src>opam remove flexdll
+> Your request can't be satisfied:
+>   - Package ocaml is part of the base for this compiler and can't be
+> changed
+ 
+> No solution found, exiting
+
+Note, though that even with the current system, the restriction that compiler 
+packages are immutable is somewhat lifted if you pin the package: so the above 
+should work without changes (I haven't tested pinning one package of the 
+"compiler packages" set and recompiling its compiler dependents though)
+
+From gabriel.scherer at gmail.com  Thu Jun  9 15:57:05 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Thu, 9 Jun 2016 10:57:05 -0400
+Subject: [opam-devel] "Typosquatting programming language package managers";
+ how to protect opam-repository from typo-squatting?
+Message-ID: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+
+Hi opam-devel,
+
+Here is a rather cool bachelor thesis that seems relevant to OPAM
+repository management:
+
+  Typosquatting in Programming Language Package Managers
+  Nikolai Philipp Tschacher, March 2016
+  http://incolumitas.com/2016/06/08/typosquatting-package-managers/
+
+The described attack is to propose packages whose names are typo-close to
+very popular packages. Instead of "opam install omake" I run "opam install
+omaek", but "omaek" exists and is attacker-controlled, and its install
+script wreaks havoc on my machine.
+
+This is interesting because it is a way to subvert a specific package that
+is immune to the common defenses against impersonation -- signing a package
+with its maintainers keys, etc. The author of the thesis suggests three
+defense methods:
+
+1. Make package installation sandboxed in such a way that just installing a
+package is harmless as long as its code is not linked and run. (Of course
+this code may be linked and run if a developer also makes a typo in its
+software.)
+
+2. Alert repository administrators when a typo-candidate is proposed for
+integration. (This is especially relevant for repositories with no human
+oversight on package addition, but even for OPAM one may consider that the
+maintainers themselves may be fooled by the typo or not think of the
+security consequences.)
+
+3. Keep a log of the non-existing packages that users commonly try to
+install (good candidates for typos) and alert administrators when a
+matching package is proposed.
+
+I'm sure that the systems expert in the room have plans for (1) already. I
+suspect that opam's architecture does not let us do (3), but I was
+interesting in quickly hacking (2) this morning -- I suppose I like
+typo-detection stuff.
+
+My plan was: in `opam lint`, emit a warning if the linted package name is
+at edit distance 2 or less (but not 0) of an existing package in the
+repository. But this does not quite work; I quickly looked at the code and
+it seems that "opam lint" is meant to be run purely locally, it does not
+have access to a base of packages available in the repository.
+
+So my question: where in the opam-repository QA process should I add a
+script (preferably written in OCaml rather than shell) that gets the name
+of the packages proposed for inclusion, also has access to the name of
+existing packages in the repository, and can fail or warn if the proposed
+one is typo-close to an existing one?
+
+(This test can have false positives, eg. installing lablgtk2 when lablgtk
+exists. It should still fail in a visible way in the UI, but not in a way
+that prevent other, more advanced tests, such as package installability.)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/9ea91bd0/attachment.html>
+
+From daniel.buenzli at erratique.ch  Thu Jun  9 16:16:30 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 9 Jun 2016 16:16:30 +0100
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+Message-ID: <1CE7F40B104641DC8257104A3EE44F3F@erratique.ch>
+
+
+
+Le jeudi, 9 juin 2016 ? 15:57, Gabriel Scherer a ?crit :
+
+> My plan was: in `opam lint`, emit a warning if the linted package name is at edit distance 2 or less (but not 0) of an existing package in the repository. But this does not quite work; I quickly looked at the code and it seems that "opam lint" is meant to be run purely locally, it does not have access to a base of packages available in the repository.
+
+
+opam lint is automatically run by camelus when you do a PR to the OCaml OPAM repository so it would be useful for the maintainers (and to the package submitter aswell).
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Thu Jun  9 16:17:22 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 9 Jun 2016 16:17:22 +0100
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <1CE7F40B104641DC8257104A3EE44F3F@erratique.ch>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+ <1CE7F40B104641DC8257104A3EE44F3F@erratique.ch>
+Message-ID: <D3ED2CA4FA004857833C0914967ABCB8@erratique.ch>
+
+
+
+Le jeudi, 9 juin 2016 ? 16:16, Daniel B?nzli a ?crit :
+
+>  
+>  
+> Le jeudi, 9 juin 2016 ? 15:57, Gabriel Scherer a ?crit :
+>  
+> > My plan was: in `opam lint`, emit a warning if the linted package name is at edit distance 2 or less (but not 0) of an existing package in the repository. But this does not quite work; I quickly looked at the code and it seems that "opam lint" is meant to be run purely locally, it does not have access to a base of packages available in the repository.
+>  
+>  
+> opam lint is automatically run by camelus when you do a PR to the OCaml OPAM repository so it would be useful for the maintainers (and to the package submitter aswell).
+Ah sorry I think I misunderstood what you meant by "locally".  
+
+Daniel
+
+
+
+From thomas at gazagnaire.org  Thu Jun  9 16:24:40 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 9 Jun 2016 16:24:40 +0100
+Subject: [opam-devel] "Typosquatting programming language package
+	managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+Message-ID: <7F9AF4C5-2FCF-45AF-8FEB-C12CE070778A@gazagnaire.org>
+
+We don?t have yet a repository linter, but you are very welcome to add `opam install opam-repo-lint && opam repo-lint` there https://github.com/ocaml/opam-repository/blob/master/.travis-ci.sh#L145 I can think on other interesting checks to add, so I?ll be happy to contribute.
+
+Ideally that linter will have very few dependencies and called only if a global variable is set (and maybe just exit instead of testing more stuff)
+
+Thomas
+
+> On 9 Jun 2016, at 15:57, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> 
+> Hi opam-devel,
+> 
+> Here is a rather cool bachelor thesis that seems relevant to OPAM repository management:
+> 
+>   Typosquatting in Programming Language Package Managers
+>   Nikolai Philipp Tschacher, March 2016
+>   http://incolumitas.com/2016/06/08/typosquatting-package-managers/
+> 
+> The described attack is to propose packages whose names are typo-close to very popular packages. Instead of "opam install omake" I run "opam install omaek", but "omaek" exists and is attacker-controlled, and its install script wreaks havoc on my machine.
+> 
+> This is interesting because it is a way to subvert a specific package that is immune to the common defenses against impersonation -- signing a package with its maintainers keys, etc. The author of the thesis suggests three defense methods:
+> 
+> 1. Make package installation sandboxed in such a way that just installing a package is harmless as long as its code is not linked and run. (Of course this code may be linked and run if a developer also makes a typo in its software.)
+> 
+> 2. Alert repository administrators when a typo-candidate is proposed for integration. (This is especially relevant for repositories with no human oversight on package addition, but even for OPAM one may consider that the maintainers themselves may be fooled by the typo or not think of the security consequences.)
+> 
+> 3. Keep a log of the non-existing packages that users commonly try to install (good candidates for typos) and alert administrators when a matching package is proposed.
+> 
+> I'm sure that the systems expert in the room have plans for (1) already. I suspect that opam's architecture does not let us do (3), but I was interesting in quickly hacking (2) this morning -- I suppose I like typo-detection stuff.
+> 
+> My plan was: in `opam lint`, emit a warning if the linted package name is at edit distance 2 or less (but not 0) of an existing package in the repository. But this does not quite work; I quickly looked at the code and it seems that "opam lint" is meant to be run purely locally, it does not have access to a base of packages available in the repository.
+> 
+> So my question: where in the opam-repository QA process should I add a script (preferably written in OCaml rather than shell) that gets the name of the packages proposed for inclusion, also has access to the name of existing packages in the repository, and can fail or warn if the proposed one is typo-close to an existing one?
+> 
+> (This test can have false positives, eg. installing lablgtk2 when lablgtk exists. It should still fail in a visible way in the UI, but not in a way that prevent other, more advanced tests, such as package installability.)
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From gabriel.scherer at gmail.com  Thu Jun  9 16:29:42 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Thu, 9 Jun 2016 11:29:42 -0400
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <D3ED2CA4FA004857833C0914967ABCB8@erratique.ch>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+ <1CE7F40B104641DC8257104A3EE44F3F@erratique.ch>
+ <D3ED2CA4FA004857833C0914967ABCB8@erratique.ch>
+Message-ID: <CAPFanBGJqp_+N9TJN2kj2bMoN3BeRRYH66jiDwPCWgyApAV_Fg@mail.gmail.com>
+
+Let's clarify: the design of "opam lint" seems that result of its QA tests
+depend on the only input of the checkers, namely the opam file fed to it.
+It does not take into account repository information (so I cannot easily
+implement the check I had in mind), nor eg. url files (while it would seem
+interesting to have a tool to give feedback on a wrong checksum).
+
+I think this design choice has advantages. For example we know that the
+"opam lint" output is going to be the same on a user machine and on the
+repository CI, or is going to be stable across opam repositories.
+
+Note that there is another part of the OPAM codebase with the name "lint",
+namely admin-scripts/lint.ml, that does repository-global linting (for now
+it just seems to aggregate individual package lint outputs for the whole
+repo). If we added a mode to check a (set of) new proposed package(s)
+against the current repo, it could be an interesting basis.
+
+Thomas: thanks, that seems to suggest there is indeed a missing step and we
+would need to make it happen. (Which means more work than adding to an
+existing infrastructure, but such is life.) Note that I think the
+invocation in this case should be
+
+  opam repo-lint --new-packages `cat tobuild.txt`
+
+because this check must rely on knowledge of what already exists in the
+repository, and (separately) what is new and proposed for inclusion.
+Otherwise, if we just warned about all pairs of packages within typo
+distance, old false positives would keep coming up over and over.
+
+On Thu, Jun 9, 2016 at 11:17 AM, Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+
+>
+>
+> Le jeudi, 9 juin 2016 ? 16:16, Daniel B?nzli a ?crit :
+>
+> >
+> >
+> > Le jeudi, 9 juin 2016 ? 15:57, Gabriel Scherer a ?crit :
+> >
+> > > My plan was: in `opam lint`, emit a warning if the linted package name
+> is at edit distance 2 or less (but not 0) of an existing package in the
+> repository. But this does not quite work; I quickly looked at the code and
+> it seems that "opam lint" is meant to be run purely locally, it does not
+> have access to a base of packages available in the repository.
+> >
+> >
+> > opam lint is automatically run by camelus when you do a PR to the OCaml
+> OPAM repository so it would be useful for the maintainers (and to the
+> package submitter aswell).
+> Ah sorry I think I misunderstood what you meant by "locally".
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/375ed800/attachment-0001.html>
+
+From louis.gesbert at ocamlpro.com  Thu Jun  9 16:38:27 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 09 Jun 2016 17:38:27 +0200
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <7F9AF4C5-2FCF-45AF-8FEB-C12CE070778A@gazagnaire.org>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+ <7F9AF4C5-2FCF-45AF-8FEB-C12CE070778A@gazagnaire.org>
+Message-ID: <1659915.U0S9ir7FxZ@maitake>
+
+Le Thursday 09 June 2016, 16:24:40 Thomas Gazagnaire a ?crit :
+> We don?t have yet a repository linter, but you are very welcome to add `opam
+> install opam-repo-lint && opam repo-lint` there
+> https://github.com/ocaml/opam-repository/blob/master/.travis-ci.sh#L145 I
+> can think on other interesting checks to add, so I?ll be happy to
+> contribute.
+> 
+> Ideally that linter will have very few dependencies and called only if a
+> global variable is set (and maybe just exit instead of testing more stuff)
+
+Just a note, there is no repository linter yet, but while the linting function 
+used to be at a layer where the repository/switch state is not available, I 
+moved it up to state/opamFileTools.ml where the state functions can be 
+accessed. So it just remains to implement :)
+
+> 
+> Thomas
+> 
+> > On 9 Jun 2016, at 15:57, Gabriel Scherer <gabriel.scherer at gmail.com>
+> > wrote:
+> > 
+> > Hi opam-devel,
+> > 
+> > Here is a rather cool bachelor thesis that seems relevant to OPAM 
+repository management:
+> >   Typosquatting in Programming Language Package Managers
+> >   Nikolai Philipp Tschacher, March 2016
+> >   http://incolumitas.com/2016/06/08/typosquatting-package-managers/
+> > 
+> > The described attack is to propose packages whose names are typo-close to
+> > very popular packages. Instead of "opam install omake" I run "opam
+> > install omaek", but "omaek" exists and is attacker-controlled, and its
+> > install script wreaks havoc on my machine.
+> > 
+> > This is interesting because it is a way to subvert a specific package that
+> > is immune to the common defenses against impersonation -- signing a
+> > package with its maintainers keys, etc. The author of the thesis suggests
+> > three defense methods:
+> > 
+> > 1. Make package installation sandboxed in such a way that just installing
+> > a package is harmless as long as its code is not linked and run. (Of
+> > course this code may be linked and run if a developer also makes a typo
+> > in its software.)
+> > 
+> > 2. Alert repository administrators when a typo-candidate is proposed for
+> > integration. (This is especially relevant for repositories with no human
+> > oversight on package addition, but even for OPAM one may consider that
+> > the maintainers themselves may be fooled by the typo or not think of the
+> > security consequences.)
+> > 
+> > 3. Keep a log of the non-existing packages that users commonly try to
+> > install (good candidates for typos) and alert administrators when a
+> > matching package is proposed.
+> > 
+> > I'm sure that the systems expert in the room have plans for (1) already. I
+> > suspect that opam's architecture does not let us do (3), but I was
+> > interesting in quickly hacking (2) this morning -- I suppose I like
+> > typo-detection stuff.
+> > 
+> > My plan was: in `opam lint`, emit a warning if the linted package name is
+> > at edit distance 2 or less (but not 0) of an existing package in the
+> > repository. But this does not quite work; I quickly looked at the code
+> > and it seems that "opam lint" is meant to be run purely locally, it does
+> > not have access to a base of packages available in the repository.
+> > 
+> > So my question: where in the opam-repository QA process should I add a
+> > script (preferably written in OCaml rather than shell) that gets the name
+> > of the packages proposed for inclusion, also has access to the name of
+> > existing packages in the repository, and can fail or warn if the proposed
+> > one is typo-close to an existing one?
+> > 
+> > (This test can have false positives, eg. installing lablgtk2 when lablgtk
+> > exists. It should still fail in a visible way in the UI, but not in a way
+> > that prevent other, more advanced tests, such as package installability.)
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From louis.gesbert at ocamlpro.com  Thu Jun  9 18:02:16 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 09 Jun 2016 19:02:16 +0200
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+Message-ID: <1932276.AAcH1812VX@maitake>
+
+> 1. Make package installation sandboxed in such a way that just installing a
+> package is harmless as long as its code is not linked and run. (Of course
+> this code may be linked and run if a developer also makes a typo in its
+> software.)
+
+This is already possible, but Linux-only, and requires a local setup (opam 
+allows wrappers for package commands, and I wrote some scripts based on Linux 
+namespaces to restrict network and FS access. Not quite secure at the moment 
+but could be made so). I intended this mainly for CI (and paranoid users), and 
+am already using it locally.
+
+> So my question: where in the opam-repository QA process should I add a
+> script (preferably written in OCaml rather than shell) that gets the name
+> of the packages proposed for inclusion, also has access to the name of
+> existing packages in the repository, and can fail or warn if the proposed
+> one is typo-close to an existing one?
+> 
+> (This test can have false positives, eg. installing lablgtk2 when lablgtk
+> exists. It should still fail in a visible way in the UI, but not in a way
+> that prevent other, more advanced tests, such as package installability.)
+
+My intention was to add a function for this kind of package/repo checks in 
+src/state/opamFileTools.ml, taking an additional switch_state as parameter, 
+and returning type as `lint`. Then opamMain can (optionally ?) load a state 
+and aggregate the results before printing.
+
+Thanks !
+Louis
+
+
+Le Thursday 09 June 2016, 10:57:05 Gabriel Scherer a ?crit :
+> Hi opam-devel,
+> 
+> Here is a rather cool bachelor thesis that seems relevant to OPAM
+> repository management:
+> 
+>   Typosquatting in Programming Language Package Managers
+>   Nikolai Philipp Tschacher, March 2016
+>   http://incolumitas.com/2016/06/08/typosquatting-package-managers/
+> 
+> The described attack is to propose packages whose names are typo-close to
+> very popular packages. Instead of "opam install omake" I run "opam install
+> omaek", but "omaek" exists and is attacker-controlled, and its install
+> script wreaks havoc on my machine.
+> 
+> This is interesting because it is a way to subvert a specific package that
+> is immune to the common defenses against impersonation -- signing a package
+> with its maintainers keys, etc. The author of the thesis suggests three
+> defense methods:
+> 
+> 
+> 2. Alert repository administrators when a typo-candidate is proposed for
+> integration. (This is especially relevant for repositories with no human
+> oversight on package addition, but even for OPAM one may consider that the
+> maintainers themselves may be fooled by the typo or not think of the
+> security consequences.)
+> 
+> 3. Keep a log of the non-existing packages that users commonly try to
+> install (good candidates for typos) and alert administrators when a
+> matching package is proposed.
+> 
+> I'm sure that the systems expert in the room have plans for (1) already. I
+> suspect that opam's architecture does not let us do (3), but I was
+> interesting in quickly hacking (2) this morning -- I suppose I like
+> typo-detection stuff.
+> 
+> My plan was: in `opam lint`, emit a warning if the linted package name is
+> at edit distance 2 or less (but not 0) of an existing package in the
+> repository. But this does not quite work; I quickly looked at the code and
+> it seems that "opam lint" is meant to be run purely locally, it does not
+> have access to a base of packages available in the repository.
+> 
+
+From roberto at dicosmo.org  Thu Jun  9 18:39:51 2016
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 9 Jun 2016 19:39:51 +0200
+Subject: [opam-devel] "Typosquatting programming language package
+ managers"; how to protect opam-repository from typo-squatting?
+In-Reply-To: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+References: <CAPFanBEExyHsu=q+wJj4Oe9EHCyTTz0+Sofj+W5QBRByqWTeqA@mail.gmail.com>
+Message-ID: <20160609173951.GA21393@traveler>
+
+Thanks Gabriel,
+       this is another cool related work to add to the long list of
+readings for who is interested in package management.
+
+On Thu, Jun 09, 2016 at 10:57:05AM -0400, Gabriel Scherer wrote:
+> Hi opam-devel,
+> 
+> Here is a rather cool bachelor thesis that seems relevant to OPAM repository
+> management:
+> 
+> ? Typosquatting in Programming Language Package Managers
+> ? Nikolai Philipp Tschacher, March 2016
+> ? http://incolumitas.com/2016/06/08/typosquatting-package-managers/
+> 
+> The described attack is to propose packages whose names are typo-close to very
+> popular packages. Instead of "opam install omake" I run "opam install omaek",
+> but "omaek" exists and is attacker-controlled, and its install script wreaks
+> havoc on my machine.
+> 
+> This is interesting because it is a way to subvert a specific package that is
+> immune to the common defenses against impersonation -- signing a package with
+> its maintainers keys, etc. The author of the thesis suggests three defense
+> methods:
+> 
+> 1. Make package installation sandboxed in such a way that just installing a
+> package is harmless as long as its code is not linked and run. (Of course this
+> code may be linked and run if a developer also makes a typo in its software.)
+> 
+> 2. Alert repository administrators when a typo-candidate is proposed for
+> integration. (This is especially relevant for repositories with no human
+> oversight on package addition, but even for OPAM one may consider that the
+> maintainers themselves may be fooled by the typo or not think of the security
+> consequences.)
+> 
+> 3. Keep a log of the non-existing packages that users commonly try to install
+> (good candidates for typos) and alert administrators when a matching package is
+> proposed.
+> 
+> I'm sure that the systems expert in the room have plans for (1) already. I
+> suspect that opam's architecture does not let us do (3), but I was interesting
+> in quickly hacking (2) this morning -- I suppose I like typo-detection stuff.
+> 
+> My plan was: in `opam lint`, emit a warning if the linted package name is at
+> edit distance 2 or less (but not 0) of an existing package in the repository.
+> But this does not quite work; I quickly looked at the code and it seems that
+> "opam lint" is meant to be run purely locally, it does not have access to a
+> base of packages available in the repository.
+> 
+> So my question: where in the opam-repository QA process should I add a script
+> (preferably written in OCaml rather than shell) that gets the name of the
+> packages proposed for inclusion, also has access to the name of existing
+> packages in the repository, and can fail or warn if the proposed one is
+> typo-close to an existing one?
+> 
+> (This test can have false positives, eg. installing lablgtk2 when lablgtk
+> exists. It should still fail in a visible way in the UI, but not in a way that
+> prevent other, more advanced tests, such as package installability.)
+
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur (on leave at/detache a INRIA Roquencourt)
+IRIF                          E-mail : roberto at dicosmo.org
+Universite Paris Diderot         Web : http://www.dicosmo.org
+Case 7014                    Twitter : http://twitter.com/rdicosmo         
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13 France  
+------------------------------------------------------------------
+Office location:
+
+Paris Diderot	 		    INRIA
+ 
+Bureau 3020 (3rd floor)             Bureau C123
+Batiment Sophie Germain             Batiment C
+8 place Aur?lie Nemours             2, Rue Simone Iff
+Tel: +33 1 57 27 92 20              Tel: +33 1 80 49 44 42 
+
+Metro
+  Bibliotheque F. Mitterrand        Ligne 6: Dugommier
+  ligne 14/RER C                    Ligne 14/RER A: Gare de Lyon
+------------------------------------------------------------------                                                 
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+

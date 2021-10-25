@@ -1,0 +1,1144 @@
+From vincent.berthoux at siemens.com  Mon Jun  1 08:49:39 2015
+From: vincent.berthoux at siemens.com (Vincent Berthoux)
+Date: Mon, 1 Jun 2015 09:49:39 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+Message-ID: <556C0E93.7080400@siemens.com>
+
+Hello,
+
+   Thanks again for this mailing list.
+
+We use OCaml with Linux and Windows, providing two different native 
+builds to our users. The main tool is shipped as a dynamic library used 
+in other parts of our software. We use the MSVC 2010 port of the OCaml 
+compiler on Windows. Right now our setup use the following versions:
+
+  * Ocaml 4.01.0
+  * ocamllex/ocamlyacc
+  * pprint
+  * uutf
+  * xmlm
+
+The biggest pain points for us are:
+
+   * ocamlbuild using bash behind the scenes, "luckily" we are dependent 
+on Cygwin for various reasons, but it would be great if it didn't use it.
+   * ocamlfind slows down compilation considerably under windows, from 
+our tests with Ocaml 4.02.1. The repeated invocation of bash may be the 
+main culprit here.
+   * hard-coded paths in the compiler, this is relatively problematic, 
+we often compiler OCaml once and distribute it among the developers, and 
+environment configuration is touchy.
+   * Trying to compile a library on windows is always a gamble.
+
+We wanted to switch to OCaml 4.02.1 to be able to use ppx_deriving but 
+due to some environment configuration problems we postponed the switch.
+
+   Thanks
+
+     Vincent
+
+From anil at recoil.org  Mon Jun  1 09:30:05 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 1 Jun 2015 09:30:05 +0100
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+References: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+Message-ID: <892CE4C0-3A54-4180-B14A-6C0EAC40A917@recoil.org>
+
+On 29 May 2015, at 16:10, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> 
+> - Finalize OPAM support for Windows (this is listed on the OPAM 1.3 roadmap). When this support is in place, many OCaml packages should work out of the box (with the proviso that many packages assume a unix-ish environment for their build system). 
+> 
+> - Discuss how to help package developers improve Windows support. One way to do that could be to provide know-how about how to setup continuous integration on services like Appveyor to check that packages build on typical Windows setups. 
+
+One thing I would *really* like to do is to hook in the current experimental bulk builds of OPAM into Windows as well.  Right now we use Docker for Linux builds, but the plan is to expand this further (see https://opam.ocaml.org/builds/ <https://opam.ocaml.org/builds/> for the logs).
+
+One way to make the results more useful is to open a brand new opam-repository just for Windows, with the build rules and patches ported over from the old WODI.  This could be the 'native' Windows repository, with the Unix one containing the minimal patches required for Cygwin support.  Unification could then happen over time, particularly as more declarative systems such as Assemblage mature.
+
+We don't have the expertise to do the Windows porting here in Cambridge, but are very happy to set up and operate the build infrastructure on virtual machines if someone can point us at an OPAM remote...
+
+-anil
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20150601/b6fe8cc2/attachment.html>
+
+From alain.frisch at lexifi.com  Mon Jun  1 10:31:18 2015
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 01 Jun 2015 11:31:18 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+References: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+Message-ID: <556C2666.6050505@lexifi.com>
+
+Hi all,
+
+Setting up this list is a great initiative!
+
+
+1. A few words about the use of OCaml under Windows at LexiFi
+
+Windows is one of the most important platform we need to support, and we 
+deliver GUI applications in both 32 and 64-bit, using the two MSVC 
+ports.  We also ensure compatibility of our code base with the two mingw 
+ports "just in case"  (technically, these ports allow to produce 
+standalone applications that run even on a plain WinXP box, whereas the 
+MSVC ports require msvcrtXX.dll, which might not be available).  We 
+don't have any use for the two Cygwin ports.
+
+We are not a "Windows pure player": Linux is also an important platform 
+for some of our customers and projects, and most our code base is also 
+supported there.
+
+All our code lives in a single tree whose build is managed mainly by 
+omake, assuming a Cygwin environment under Windows.  Our tree also has 
+code in other languages (C, Fortran, C#, etc).  We integrate a very 
+small number of third-party OCaml libraries, simply by injecting their 
+source code into our tree and adding tiny OMakefiles to integrate them 
+in our global build system.  This is often easier than fighting with 
+upstream Makefiles, etc.
+
+For now, we don't use (nor install) ocamlfind, camlp4 or ocamlbuild. 
+Our developers work typically in emacs or vim, and ocp-indent is available.
+
+We interact with Windows and Windows libraries (in addition to what 
+OCaml provides in Sys and Unix) mostly through .Net.  To this end, we 
+have developped CSML, a bridge between .Net and OCaml ( 
+https://www.lexifi.com/csml ).  We use .Net for the UI (Windows Forms), 
+for simple bindings e.g. with Oracle, Outlook, MS Excel, etc.
+
+Our Windows application comes with a built-in small IDE that allows end 
+users to edit and compile OCaml addins (which are dynlinked in the 
+application upon startup).  This means that our application is shipped 
+with a minimal  toolchain required to support generation of .cmxs files 
+from source code: ocamlopt, flexdll and some .cmi/.cmx files.  Note that 
+we don't need any external assembler or linker (our users don't need to 
+install any "native toolchain"):
+
+    - flexdll has a mode where it can build simple dll (cmxs) without 
+relying on an external linker.  This wouldn't support linking arbitrary 
+.obj files (with resources, debug information, etc), but we only need to 
+support code produced by OCaml.
+
+    - We use a modified OCaml backend that replaces emit.mlp with a 
+direct x86 (32 or 64-bit) machine code emitter and a COFF object file 
+output  (this was developped with the help of OCamlPro; the code is 
+owned jointly by OCamlPro and LexiFi).  In OCaml's trunk, we have 
+unified emit.mlp/emit_mt.mlp (for both i386 and amd64) to produce an AST 
+of the generated assembly code, so our binary backend is now just an 
+extra backend on this AST (in addition to the Intel and AT&T textual 
+emitters), which simplifies maintenance of this part quite a bit (this 
+also benefits to all Windows users, since this avoids the duplication 
+between emit.mlp/emit_nt.mlp, which sometimes resulted in emit_nt.mlp 
+lagging behind).
+
+
+Note that this couldn't be used directly to produce main programs 
+without a native toolchain (with use startup objects, c lib, etc).  This 
+isn't a big theoretical limitation: we could always ship an ocamlrunopt 
+program that would simply dynlink a main.cmxs file appended to it -- in 
+the same spirit as ocamlrun.
+
+We also modified OCaml a little bit to make it easier to relocate the 
+toolchain (which is important when you ship binary code that can be 
+installed anywhere).  For instance, we changed the default path for 
+looking up the standard library to make it relative to the path of the 
+compiler executable (e.g. we use ../lib, starting from the directory of 
+Sys.executable_name).
+
+
+
+2. Ideas about how to improve OCaml under Windows
+
+
+Globally, we find that the current state of OCaml itself is not too bad 
+under Windows.  Some tiny touches would make the life easier to people 
+hacking on the OCaml toolchain itself under Windows, or just building it 
+from sources: for instance, adapting ./configure (or providing another 
+script) instead of telling users to copy three files and edit one.  Some 
+internal cleanup would also be a good idea, e.g. merging various 
+Makefile and Makefile.nt, or at least sharing common parts, to avoid 
+duplication and divergence, although the Continuous Integration system 
+which is now in place catches many Windows build failures early, so this 
+is less critical these days.  There are also deeper projects to address 
+embarrassing parts, such as supporting Unicode when interacting with the 
+filesystem ( https://github.com/ocaml/ocaml/pull/153 ); and the 
+Unix.select emulation still has problems (see the "OCaml windows" 
+category on OCaml's Mantis).
+
+The story seems to be less nice with external tools and libraries, 
+although LexiFi is not overly affected by that.  This is mostly a 
+consequence of the composition of the OCaml community, which is largely 
+Unix oriented.  Windows is considered as a second-class citizen by most 
+OCaml core developers and package maintainers.
+
+Excellent support of OCaml (and its ecosystem) under Windows can only be 
+achieved if we manage to attract people who are primarily Windows 
+developers, not Unix developers who are somehow forced to support 
+Windows, or -- even worse -- who are mainly interested in porting 
+existing projects from Unix to Windows.  Those people would typically be 
+reluctant to use Cygwin or emacs/vim/etc.  It's not clear to me how to 
+attract such people, though, since F# is a strong competitor for OCaml 
+under Windows.  At least, one would need to think about how to 
+articulate the benefits of OCaml, to remove technical obstacles and 
+facilitate first steps with OCaml under Windows.  My intuition is that 
+our goal should be to attract (enlightened) hobbyists developers under 
+Windows for now (as opposed to, say, trying to make OCaml directly the 
+natural choice for pure Windows companies), in order to bootstrap the 
+process.
+
+Good support for existing OCaml libraries (at least those which are 
+relevant under Windows) is certainly an important goal.  Even if we 
+never reach a state where OCaml is considered as a natural choice for a 
+pure Windows developer or company, this will already give more 
+visibility to OCaml, reinforce its already excellent cross-platform 
+reputation, and help people who are forced to use Windows (or just port 
+from Unix to Windows).
+
+An important step to improve support of existing libraries under Windows
+is to have good Windows support for OPAM.  This will make it easier for 
+people to test libraries under Windows and so give incentive to upstream 
+developers to fix them (and themselves set up a working OCaml Windows 
+dev environment more easily).   Something like the OPAM Weather Service 
+could be a great help here.  From what I understand, OPAM is not very 
+far from supporting Windows, and I think that it's already possible to 
+compile OPAM with a Cygwin port of OCaml (and have it manage native 
+switches?).
+
+I believe Cygwin will remain an important part of the story for OCaml 
+under Windows for some time.  OCaml itself and many existing packages 
+require a Unix-like environment in their build system, and it doesn't 
+seem realistic trying to fix that soon.  Since I don't believe in binary 
+distributions of OCaml packages in general (because updating a library 
+forces to update all other packages that depend on it), this means that 
+users would need a Cygwin environment.  Except perhaps for 
+well-controlled dev environments (e.g. for LexiFi's built-in IDE, we 
+don't expect users to install their own extra libraries; something 
+similar could make sense for Ocsigen addins, etc).  I don't know if we 
+should try to hide it as much as possible (e.g. by creating bundled 
+installers) or not.  If/when OPAM supports installing native switches, 
+even if itself built with Cygwin, then it could make sense to contribute 
+a Cygwin package for OPAM.  At least for people using the mingw port, 
+this would mean that setting up their environment could be as simple as 
+installing Cygwin with a well-documented list of packages (the mingw 
+compilers, flexdll, OPAM, and required extra tools such as make, etc), 
+and then using OPAM to compile/install OCaml and other packages from 
+sources.  (People wanting to use the MSVC ports would  need to install 
+MSVC themselves.)
+
+Making sure OPAM and existing libraries work under Windows is only the 
+beginning.  Hopefully, this could be enough to attract "native" Windows 
+developers, who could then contribute to a richer Windows experience, 
+such as:
+
+   - Binding a larger subset of the Win32 API.
+   - Tools and bindings to interact with Windows applications (e.g. to 
+support writing easily an OCaml addin for Excel).
+   - Some GUI frontend for OPAM and a decent graphical toplevel for OCaml.
+   - Better support for .Net (CSML is enough for LexiFi needs, but would 
+deserve some polishing).
+   - Support for popular IDEs.
+
+
+
+Alain
+
+
+
+
+
+On 05/29/2015 05:10 PM, Thomas Braibant wrote:
+> Hi,
+>
+> Thanks for joining this working group. Its goal is to find out how to
+> improve the state of OCaml and its ecosystem on Windows.
+>
+> Some of the tasks that we might address (this list is by no mean meant
+> to be exhaustive nor normative):
+>
+> - Gather information from the community  about the use of the various
+> versions of OCaml available on Windows, and understand what kind of
+> environment people are working with. (BTW, I think a good way to get the
+> discussion rolling might be to describe each other's setup to use OCaml
+> on Windows.)
+>
+> - Finalize OPAM support for Windows (this is listed on the OPAM 1.3
+> roadmap). When this support is in place, many OCaml packages should work
+> out of the box (with the proviso that many packages assume a unix-ish
+> environment for their build system).
+>
+> - Discuss how to help package developers improve Windows support. One
+> way to do that could be to provide know-how about how to setup
+> continuous integration on services like Appveyor to check that packages
+> build on typical Windows setups.
+>
+> - Find a solution for users of WODI, the GODI based OCaml distribution
+> for Windows, which has been shutdown. WODI was able to compile OCaml
+> related software (using Cygwin as an environment), but was also able to
+> install binary packages. (In some cases, some non-trivial patches  were
+> applied to make package usable on Windows.) Some of the sources needed
+> to use WODI are still available, but the system does not work out of the
+> box now that the server has gone offline. With a little work, we might
+> be able to bring it back, to smooth the transition.
+>
+> - Discuss the state of cross compilation to Windows.
+>
+> - Advertise OCamlPro's OCPWin commercial effort. (I will leave Fabrice
+> tell a bit more about that.)
+>
+> - Discuss how to pool resources (if needed) to work toward these goals.
+> Many thanks to Anil and OcamlLabs for hosting this mailing list.
+>
+> Thomas
+>
+>
+>
+>
+>
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+>
+
+
+From an at satcom1.com  Mon Jun  1 13:27:29 2015
+From: an at satcom1.com (Adrien Nader)
+Date: Mon, 1 Jun 2015 14:27:29 +0200
+Subject: [wg-windows]  Improving the state of OCaml on Windows
+Message-ID: <556C4FB1.2090007@satcom1.com>
+
+Hi,
+
+Sorry for breaking the threading and having a poor formatting: I
+subscribed recently to the mailing-list and had to read the archives.
+
+ From Edwin T?r?k:
+
+> Cygwin64 unreliability
+> ----------------------
+>
+> I don't know if the bug is in Windows, Cygwin64 or my VM configuration
+> but the build system itself crashes a lot and randomly
+> (there seems to be plenty of RAM available).
+> Even things like make.exe or rm.exe crash with: segfault, fork:
+> resource unavailable, exit code -1073741819.
+> Restarting the cygwin shell helps sometimes but the errors are soon
+> back, even when using just make -j1.
+> The situation was bad enough that I had to repeat the build  4-5 times
+> until it finally succeeded as it kept crashing in different places.
+> Someone else tried WODI32 and didn't see such errors there, so that
+> seems like a more reliable build system.
+> Was about to report this as a bug in Cygwin64, but next week WODI was
+> shutdown so that ended my Windows testing as well.
+
+I just opened a bug on mantis after trying to build under Cygwin64 for
+cygwin64. I actually got two major issues.
+First, the simple one: lots of Cygwin-specific C code doesn't work
+because it is behind #ifdef __CYGWIN32__ and that define is only for 32
+bits.
+The more annoying one: no flexlink binaries for Cygwin64. My
+understanding is that there should be a flexlink_cygwin64.o file or
+similar but currently it tries to use the 32bits .o and fails (it says
+"undefined references" but that's expected for such a case).
+
+You mention you used Cygwin64 quite some time ago. It is fairly young so
+you probably tried it at a fairly early stage. With a recent
+installation, I also got weird stuff: I couldn't pipe code to 'ocaml
+-stdin', make wouldn't always redo .PHONY rules and not all toplevel
+expressions in OCaml were always evaluated it /seems/ (that's something
+I got when cross-compiling but never really understood).
+
+Overall I would say the port is not in a good-enough shape to announce
+as supported, even with limitations. That doesn't imply anything about
+the Windows 64 port a priori.
+
+Nevertheless it is important to have cygwin ports. For a sane system, we
+need to avoid having a cygwin shell than spawns an non-cygwin executable
+(build tool) which then spawns a cygwin bash which spawns a non-cygwin
+executable (ocamlopt for instance). It's better to remain in the same
+realm (no matter which one) for as many consecutive steps as possible
+and at least some builds will definitely continue to require a unix
+environment.
+
+> Is there a way to have the build system and ocamlfind/ocamlopt/ocamlc
+> agree on the format of paths?
+> (i.e. either both of them are Cygwin or both of them native Win32 apps
+> but not a mix)
+
+I believe we should focus on cross-compilation to solve that. Currently
+we need a mutant approach because OCaml's build on Cygwin for use
+outside of Cygwin is itself a mutant.
+If we had cross-compilation, we would have one ocamlbuild.exe (for
+instance) that runs as a cygwin executable and one that runs as a native
+windows executable; the former would use POSIX-style paths while the
+latter would use Windows-style paths. There would be a clear distinction
+and no need to have both usable at the same time.
+
+By the way, C:/foo/bar is a perfectly valid Windows paths and avoids
+many troubles with backslashes. Don't fear using forward slashes in paths.
+
+> > - Discuss the state of cross compilation to Windows.
+>
+> This seems similar to the Android cross-compilation repository:
+> https://github.com/vouillon/opam-windows-repository
+
+It's also quite different: Makefile vs. Makefile.nt is a big issue in
+practice. I've worked on reducing the differences but there are still many.
+I believe it is a top priority to merge the two because otherwise it
+means working on something that will have to be undone and re-done when
+we finally merge the two set of makefiles. Merge conflicts have been a
+huge pain for me when I last actively worked on the compiler build
+system, to the point it cost several days, if not weeks and probably
+prevented me from finishing the work.
+
+--
+Adrien Nader
+
+[http://www.satcom1.com/marketing/banner/PAS_sig_banner.jpg]<http://www.satcom1.com/event/paris-airshow-2015-hall-4-e15/>
+
+From edwin+ml-ocaml at etorok.net  Mon Jun  1 14:34:02 2015
+From: edwin+ml-ocaml at etorok.net (=?UTF-8?B?VMO2csO2ayBFZHdpbg==?=)
+Date: Mon, 01 Jun 2015 16:34:02 +0300
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556C4FB1.2090007@satcom1.com>
+References: <556C4FB1.2090007@satcom1.com>
+Message-ID: <556C5F4A.4010703@etorok.net>
+
+On 06/01/2015 03:27 PM, Adrien Nader wrote:
+> I just opened a bug on mantis after trying to build under Cygwin64 for
+> cygwin64. I actually got two major issues.
+> First, the simple one: lots of Cygwin-specific C code doesn't work
+> because it is behind #ifdef __CYGWIN32__ and that define is only for 32
+> bits.
+> The more annoying one: no flexlink binaries for Cygwin64. My
+> understanding is that there should be a flexlink_cygwin64.o file or
+> similar but currently it tries to use the 32bits .o and fails (it says
+> "undefined references" but that's expected for such a case).
+
+I got a flexlink installed by WODI64 according to my backup, but I didn't build it myself:
+https://gist.githubusercontent.com/anonymous/5d7193abd52806ee33e6/raw/wodi64.7z%20backuplist
+
+IIUC it was built using the patches from here: https://github.com/fdopen/godi-repo/tree/4.02/godi/godi-flexdll
+
+> 
+> You mention you used Cygwin64 quite some time ago.
+
+Around 2015-04-28.
+
+> It is fairly young so
+> you probably tried it at a fairly early stage. With a recent
+> installation, I also got weird stuff: I couldn't pipe code to 'ocaml
+> -stdin', make wouldn't always redo .PHONY rules and not all toplevel
+> expressions in OCaml were always evaluated it /seems/ (that's something
+> I got when cross-compiling but never really understood).
+> 
+> Overall I would say the port is not in a good-enough shape to announce
+> as supported, even with limitations. That doesn't imply anything about
+> the Windows 64 port a priori.
+
+Good to know, I'll stick to the 32-bit ports next time.
+
+Best regards,
+--Edwin
+
+From alain.frisch at lexifi.com  Mon Jun  1 18:20:23 2015
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Mon, 01 Jun 2015 19:20:23 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556C4FB1.2090007@satcom1.com>
+References: <556C4FB1.2090007@satcom1.com>
+Message-ID: <556C9457.3040509@lexifi.com>
+
+On 06/01/2015 02:27 PM, Adrien Nader wrote:
+> I believe we should focus on cross-compilation to solve that. Currently
+> we need a mutant approach because OCaml's build on Cygwin for use
+> outside of Cygwin is itself a mutant.
+> If we had cross-compilation, we would have one ocamlbuild.exe (for
+> instance) that runs as a cygwin executable and one that runs as a native
+> windows executable; the former would use POSIX-style paths while the
+> latter would use Windows-style paths. There would be a clear distinction
+> and no need to have both usable at the same time.
+
+If we are talking about building packages for native ports of OCaml 
+(msvc or mingw), in which cases would one need a version of 
+ocamlbuild.exe as a cygwin executable?  I'm not familiar with 
+ocamlbuild, but I assume that it takes on its command-line typically 
+relative paths, not absolute ones, so what would be the purpose of 
+supporting POSIX-style paths (when the commands it will run expect 
+Windows-style path)?
+
+Ideally, a simple pure OCaml package should be buildable by a simple 
+invocation of (native) ocamlbuild.exe without requiring a cygwin 
+environment.
+
+> By the way, C:/foo/bar is a perfectly valid Windows paths and avoids
+> many troubles with backslashes. Don't fear using forward slashes in paths.
+
+It's valid, but it could create problems with cmd.exe.  And OCaml 
+programs tend to use cmd.exe under Windows to run external commands 
+(e.g. with Sys.command).
+
+http://stackoverflow.com/questions/10523708/why-does-the-cmd-exe-shell-on-windows-fail-with-paths-using-a-forward-slash
+
+Simply typing in cmd.exe:
+
+   foo/bar.exe
+
+instead of
+
+   foo\bar.exe
+
+fails.  One could argue that to support whitespaces in filenames, one 
+should quote the program name anyway, and indeed typing
+
+   "foo/bar.exe"
+
+in cmd.exe works.
+
+
+
+Alain
+
+From yotambarnoy at gmail.com  Mon Jun  1 19:01:33 2015
+From: yotambarnoy at gmail.com (Yotam Barnoy)
+Date: Mon, 1 Jun 2015 14:01:33 -0400
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556C9457.3040509@lexifi.com>
+References: <556C4FB1.2090007@satcom1.com> <556C9457.3040509@lexifi.com>
+Message-ID: <CAN6ygO=qX2yCY0s6Qk8-r8yPtStK-5JKg9ctM=yWPa9jst_k2w@mail.gmail.com>
+
+>
+>
+> Ideally, a simple pure OCaml package should be buildable by a simple
+> invocation of (native) ocamlbuild.exe without requiring a cygwin
+> environment.
+>
+>
+I completely agree with this.
+
+I've been looking more into the different build options for OCaml over the
+last couple of days, and it's a shame ocamlbuild punted on the job of task
+multiplexing (installing different configurations and options and such) and
+left it to makefiles and shell scripts. It seems like myocamlbuild.ml can
+sometimes do part of this task, but projects that use myocamlbuild.ml also
+have shell scripts or makefiles to multiplex different build options.
+
+You then get some projects using OASIS, where some multiplexing is done
+from the declarative layer, and all other files are built automatically,
+but even then a Makefile is usually created by OASIS as the entry point.
+
+It appears that there's no way to get around this issue. We need some
+scripting language as a compilation front-end, but we don't want to invent
+a new one (like OMake) since that's another cognitive burden. At the same
+time, everyone agrees that Makefile rules are painful, as is bash
+scripting, and worst of all, they're not cross-platform compatible.
+
+For the front end, one option is to do the scripting inside something like
+myocamlbuild.ml, which ocamlbuild makes sure to only compile when needed.
+If the right cross-platform libraries are automatically imported, this can
+be made relatively painless. But another option is to use something like
+python scripting. Python is available on just about every system, and the
+python devs have already dealt with cross-platform issues, which means a
+python layer over ocamlbuild or python generated by OASIS and customized
+could be much cleaner and more cross-platform compatible than the current
+situation with Makefiles and shell scripts.
+
+For the backend, ocamlbuild seems to be inadequate on its own once complex
+C integration is required, mostly because its automatic dependency search
+is really targeted at ocaml only. I've seen a claim that ocamlbuild can
+build the entire ocaml compiler, and I'd like to see if that's really
+possible. If so, perhaps a switch-over is worth considering for
+simplicity's sake?
+
+-Yotam
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20150601/1db64493/attachment.html>
+
+From bernhardschommer at gmail.com  Mon Jun  1 20:53:29 2015
+From: bernhardschommer at gmail.com (Bernhard Schommer)
+Date: Mon, 01 Jun 2015 21:53:29 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <CAN6ygO=qX2yCY0s6Qk8-r8yPtStK-5JKg9ctM=yWPa9jst_k2w@mail.gmail.com>
+References: <556C4FB1.2090007@satcom1.com> <556C9457.3040509@lexifi.com>
+ <CAN6ygO=qX2yCY0s6Qk8-r8yPtStK-5JKg9ctM=yWPa9jst_k2w@mail.gmail.com>
+Message-ID: <556CB839.3090502@gmail.com>
+
+Hi all,
+
+I also think that setting up this list is great.
+
+1.) A few words about my working experience with ocaml under windows:
+
+We build software which works both on windows and linux. For the windows 
+build we build the current ocaml version using MSVC and cygwin. For the 
+build of our actual applications we use pure Makefiles and a windows 
+port of gnu-make. As library we currently use:
+-menhir with a hand written makefile that performs that does the same as 
+ocamlbuild
+-zarith with a few patches in the c-bindings to work with older visual 
+studio versions
+
+In general this is working reliable, however gnu-make under windows is 
+not that stable and can fail for the strangest reasons.
+
+2.) My two cents on ocaml under windows:
+In general the state is not that bad. But as already pointed out before 
+I also see the dependency on cygwin under windows as one of the greatest 
+problems, since using cygwin always results in great pain. As a first 
+step it would be nice if ocaml itself could be build without cygwin and 
+having ocamlbuild working under windows without cygwin or msys would be 
+a good next step. I already did some experiments on my own removing the 
+call to the shell under windows and using windows commands in shell.ml 
+and it seems that it is possible to get it working at least for small 
+examples and I'm convinced if the calls to other programs were performed 
+using create_process ocamlbuild could be made working under windows.
+
+Best Regards,
+Bernhard
+
+From alain.frisch at lexifi.com  Tue Jun  2 09:01:42 2015
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Tue, 02 Jun 2015 10:01:42 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556CA52F.5030005@satcom1.com>
+References: <556C4FB1.2090007@satcom1.com> <556C9457.3040509@lexifi.com>
+ <556CA52F.5030005@satcom1.com>
+Message-ID: <556D62E6.4080805@lexifi.com>
+
+On 06/01/2015 08:32 PM, Adrien Nader wrote:
+> Yes, the best case would be an ocaml tool (ocamlbuild, assemblage,
+> omake, that's not the question) that does everything without relying on
+> the host posixness.
+>
+> However I do not expect this to be doable for all the cases, current or
+> future. If the build system runs mt (control magnetic tape drive
+> operation: autoconf sometimes check for it :)) through a direct command
+> invocation, then it will need a posix host. My 'mt' example was a bit
+> silly but it's very very common to see shell scripts used in build
+> system hooks. Such things will always happen. For these we will always
+> need a posix environment.
+
+I completely agree.  But in my experience, using omake (as a native 
+non-cywin application) works well even if it needs to call cygwin tools 
+(e.g. "zip") -- perhaps because it relies on relative paths -- and I 
+expect something similar to be achievable by ocamlbuild.  I understand 
+your point that jumping from cygwin realm to "native" back and forth is 
+not ideal, but providing Cygwin + native versions of all build tools 
+would also be confusing.
+
+Do you see concrete cases where using a cygwin ocamlbuild.exe to drive 
+the compilation with a native port of OCaml would be useful?
+
+
+> As for relative paths and ocamlbuild, I'm not even sure about that but
+> paths are only a small part of the issue; maybe we could avoid that but
+> it's a never-ending fight. I would rather tell people: "If it uses
+> ocamlbuild, omake, assemblage or jenga, you can build it directly;
+> otherwise you need Cygwin." and have builds for cygwin easy to setup.
+
+Even with omake, of course it depends on what rules do.  For ocamlbuild, 
+one could at least try to enforce this property when there is no custom 
+myocamlbuild.ml in the project.
+
+
+> This applies to cmd.exe but the use of cmd.exe should be banned
+> altogether. Calls to Sys.command are done with a POSIX shell in mind.
+> This is precisely why ocamlbuild depends on bash.exe from cygwin or
+> msys: to interpret posix shell command-line and escapes. Noone will
+> learn and apply the syntax rules of cmd.exe: the only solution is to
+> have APIs based on string array at the OCaml level and implement the
+> escape rules properly (Windows' CreateProcess() takes a string argument,
+> not a string array one: it's needed if not using cmd.exe).
+
+Does one need a new API, or fix Unix.create_process and co?
+
+Do you know why ocamlbuild uses bash instead of Unix to run external 
+commands?
+
+
+Alain
+
+From bernhardschommer at gmail.com  Tue Jun  2 09:22:08 2015
+From: bernhardschommer at gmail.com (Bernhard Schommer)
+Date: Tue, 2 Jun 2015 10:22:08 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556D62E6.4080805@lexifi.com>
+References: <556C4FB1.2090007@satcom1.com> <556C9457.3040509@lexifi.com>
+ <556CA52F.5030005@satcom1.com> <556D62E6.4080805@lexifi.com>
+Message-ID: <CAG8G+ns6H11WpM2VCj53ExGw7YwEWCMGxu0OLffSFR3Uw0JpxQ@mail.gmail.com>
+
+2015-06-02 10:01 GMT+02:00 Alain Frisch <alain.frisch at lexifi.com>:
+
+>
+> Does one need a new API, or fix Unix.create_process and co?
+>
+> Creat Process works the intended way under windows and also does the
+necessary quoting.
+
+
+> Do you know why ocamlbuild uses bash instead of Unix to run external
+> commands?
+>
+> I think its because ocamlbuild was intended to also work when the unix
+library is not available and some of the commands are not currently not
+implemented in the unix library like rm -r or cp -R.
+
+Best Regards,
+Bernhard
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20150602/7584c0fe/attachment.html>
+
+From dra-news at metastack.com  Tue Jun  2 10:00:51 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Tue, 2 Jun 2015 09:00:51 +0000
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+References: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9BE77B0@Remus.metastack.local>
+
+I also add my thanks for this list's being started!
+
+My one-man-band has worked on OCaml software on Windows since 2003 (though I compile some projects on Linux and BSD as well). I develop using a host of Windows-compiled UNIX utilities run from cmd (unusual, I know - I simply find it more stable and considerably faster than using Cygwin's bash, which crashes a lot, and worrying about the shell seems to me to be micro-optimising - I spend most of my time actually writing or looking at code, not sitting in a shell). I edit code using Vim with Merlin.
+
+Largely owing to laziness, I'm still on OCaml 4.01 mingw32 (though I have been using 4.02 when working on porting OPAM) with findlib, extlib, ocaml-calendar, pcre-ocaml, ocaml-csv, batteries, pgocaml, camlzip, ocaml-ssl, cryptokit, ocamlnet, json-wheel/json-static, spidercaml, ocaml-sha, ocamldap, cppo, camlmix, caml2html, easy-format, biniou, yojson, menhir, merlin, type_conv, odn, ocamlmod, ocamlify, fileutils, expect, ounit, oasis, cmdliner, cudf, dose3, jsonm, ocamlgraph, re & uutf
+
+My installation scripts have morphed over the years - I typically upgrade all libraries with a new compiler release and it's all maintained in a shell script which installs Cygwin (for new installations), and manages dependencies, documentation generation and parallel compiles all the packages. It's a while since I last did it, but all I have to do is invoke "build.cmd" and go and have a quick lunch as it takes about 30 mins on my slightly aged laptop to set-up. It is of course a pain if I have to upgrade one single library.
+
+I'd been planning on getting it all put online in order to share patches (though I try as far as possible to submit patches back upstream), but decided at the end of last year that the effort would be better into porting OPAM (cemented by GODI being shutdown). I did some work on OPAM last November and December (completing the work required for opam init and getting to the stage of installing compiler switches). I've had to pause so far this year to work on another project, but the two things will shortly converge as I want to use opam pins as a way of configuring the compiler and library versions used to build releases in git (I got severely stung by a change in standard library behaviour between 3.12.x and 4.x). But perhaps OPAM 1.3 will arrive before I finish porting it :o)
+
+I'm strongly of the opinion that the way forward for Windows is to get a comprehensive infrastructure in place, without changing anything about how OCaml on Windows works at the moment. So eliminating bash from ocamlbuild, trying to get rid of the need for Cygwin for building libraries, etc. are irrelevant to me - all they do is make the barrier to getting a complete system impossibly bogged down in very difficult features. In my view, the target should be to have a single installer (or simple set of instructions) which gets a fully working compiler suite and package manager installed which should be usable for *all* of the scenarios described so far. So that means source-based package management and installing (or integrating with an existing) Cygwin for now.
+
+My own porting of OPAM, for general interest, has the following goals:
+1. All four Windows ports[1] available in the same installation (so you can say opam switch 4.02.1+msvc or opam switch 4.01.0+mingw)
+2. Full installation of OCaml 4.02+ possible for the mingw ports simply by downloading the opam binary[2] - opam init capable of downloading and installing Cygwin into .opam if a local installation isn't found). For the MSVC ports, the only requirement be that an appropriate Windows SDK must be pre-installed (licensing prevents that being bundled or automated, I think)
+3. Required C libraries (zlib, etc.) available in an opam repository - probably a separate one automatically enabled for Windows installations, but with the ability to use a "system" copy of each library, if found.
+
+Once it's got to the stage that my own script is entirely replaced with opam init && opam switch 4.02.1+mingw && opam install <my list of packages> then I'll push it up for others to criticise :o)
+
+
+David
+
+[1] Cygwin is a flavour of UNIX, requiring tweaking for OCaml more along the lines of supporting, say, Solaris or *BSD vs Linux (it even uses the main configure system, which the native ports don't [yet]). I personally think discussions about Windows support would much simpler if the Cygwin ports weren't mentioned, so that "Windows ports" referred only to the native ones - mingw32, mingw64, msvc and msvc64.
+[2] 4.01 and earlier requiring the manual installation of ActiveTcl
+
+From an at satcom1.com  Wed Jun  3 08:51:33 2015
+From: an at satcom1.com (Adrien Nader)
+Date: Wed, 3 Jun 2015 09:51:33 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <556C4FB1.2090007@satcom1.com>
+References: <556C4FB1.2090007@satcom1.com>
+Message-ID: <556EB205.7020003@satcom1.com>
+
+
+
+On 06/01/2015 02:27 PM, Adrien Nader wrote:
+> Hi,
+>
+> Sorry for breaking the threading and having a poor formatting: I
+> subscribed recently to the mailing-list and had to read the archives.
+>
+> From Edwin T?r?k:
+>
+>> Cygwin64 unreliability
+>> ----------------------
+>>
+>> I don't know if the bug is in Windows, Cygwin64 or my VM configuration
+>> but the build system itself crashes a lot and randomly
+>> (there seems to be plenty of RAM available).
+>> Even things like make.exe or rm.exe crash with: segfault, fork:
+>> resource unavailable, exit code -1073741819.
+>> Restarting the cygwin shell helps sometimes but the errors are soon
+>> back, even when using just make -j1.
+>> The situation was bad enough that I had to repeat the build  4-5 times
+>> until it finally succeeded as it kept crashing in different places.
+>> Someone else tried WODI32 and didn't see such errors there, so that
+>> seems like a more reliable build system.
+>> Was about to report this as a bug in Cygwin64, but next week WODI was
+>> shutdown so that ended my Windows testing as well.
+>
+> I just opened a bug on mantis after trying to build under Cygwin64 for
+> cygwin64. I actually got two major issues.
+> First, the simple one: lots of Cygwin-specific C code doesn't work
+> because it is behind #ifdef __CYGWIN32__ and that define is only for 32
+> bits.
+> The more annoying one: no flexlink binaries for Cygwin64. My
+> understanding is that there should be a flexlink_cygwin64.o file or
+> similar but currently it tries to use the 32bits .o and fails (it says
+> "undefined references" but that's expected for such a case).
+>
+> You mention you used Cygwin64 quite some time ago. It is fairly young so
+> you probably tried it at a fairly early stage. With a recent
+> installation, I also got weird stuff: I couldn't pipe code to 'ocaml
+> -stdin', make wouldn't always redo .PHONY rules and not all toplevel
+> expressions in OCaml were always evaluated it /seems/ (that's something
+> I got when cross-compiling but never really understood).
+>
+> Overall I would say the port is not in a good-enough shape to announce
+> as supported, even with limitations. That doesn't imply anything about
+> the Windows 64 port a priori.
+>
+> Nevertheless it is important to have cygwin ports. For a sane system, we
+> need to avoid having a cygwin shell than spawns an non-cygwin executable
+> (build tool) which then spawns a cygwin bash which spawns a non-cygwin
+> executable (ocamlopt for instance). It's better to remain in the same
+> realm (no matter which one) for as many consecutive steps as possible
+> and at least some builds will definitely continue to require a unix
+> environment.
+
+I tried the same thing with Cygwin 32 bits on Monday and almost
+everything worked at once and more importantly, there were no quantum
+physics involved: thing either worked or not.
+
+--
+Adrien Nader
+[http://www.satcom1.com/marketing/banner/PAS_sig_banner.jpg]<http://www.satcom1.com/event/paris-airshow-2015-hall-4-e15/>
+
+From fabrice.le_fessant at ocamlpro.com  Wed Jun  3 09:05:20 2015
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Wed, 3 Jun 2015 10:05:20 +0200
+Subject: [wg-windows] OCPWin status
+Message-ID: <CAHvkLrM3KW5wuF2VQC+VgrwQJEb2kejHygaKU9SzRs+WzLJCJg@mail.gmail.com>
+
+Hi,
+
+  I postponed my reply on OCPWin, because we still have a bug that
+makes using the current version dangerous (it erases the PATH
+sometimes, probably when it is bigger than 1024 bytes, something
+inherited from earlier versions of Jonathan's installer), but I can
+still talk about the philosophy of OCPWin:
+
+1/ OCPWin targets non-Cygwin users. It can still be used under Cygwin
+(you need to make sure its bindir is then before
+Cygwin's one, to avoid conflicts between tools), but its goal is to be
+used directly in a pure Windows environment ("cmd").
+For that, we include a (stripped) version of the MinGW compiler.
+
+2/ OCPWin targets all toolchains except the Cygwin one. In particular,
+it is available in both 32 and 64 bits, and can be used
+with both MinGW and the MSVC Toolchain (same version as OCaml). MSVC
+tools ("Microsoft Windows 7 SDK") are detected automatically.
+
+3/ OCPWin comes with two different build systems:
+   3.1/ a "-make" option to the compiler, that can be used to build an
+executable by just specifying the last module (something
+similar to what "ocamlbuild" would do, but much less powerful)
+   3.2/ we internally use "ocp-build" to build packages. Although it
+is still in a beta version, with the syntax probably changing in the
+near future, it works well under native Windows, and specifying how to
+build a library is simple enough.
+
+ Of course, we are interested in adapting to OCaml any other native
+build system for Windows. We did not get the time to test "omake", but
+its complexity and the lack of support is a problem. "cmake" might be
+an interesting option, but we see it more as a way to build a complete
+project, while the part in OCaml would be built using ocp-build.
+
+Right now, we compile a small set of packages with ocp-build directly
+on Windows without Cygwin : ocamlgraph and Alt-Ergo, menhir, and
+js_of_ocaml (including ssl and lwt). Since we do that on our spare
+time (we have currently no contract to work on Windows), the project
+did not make any progress in the last six months, but we hope to be
+able to release a new version for 4.02.1 in the next weeks with the
+installer fixed.
+
+--Fabrice
+-- 
+Fabrice LE FESSANT
+Scientific Advisor, OCamlPro SAS
+
+From andreashauptmann at t-online.de  Wed Jun  3 15:12:16 2015
+From: andreashauptmann at t-online.de (Andreas Hauptmann)
+Date: Wed, 3 Jun 2015 14:12:16 +0000
+Subject: [wg-windows] Improving the state of OCaml on Windows
+References: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+Message-ID: <mkn200$fad$1@ger.gmane.org>
+
+Hi,
+
+On Fri, 29 May 2015 17:10:36 +0200
+Thomas Braibant wrote:
+> Some of the sources needed to use WODI are still available, but the
+> system does not work out of the box now that the server has gone
+> offline. With a little work, we might be able to bring it back, to
+> smooth the transition.
+
+I've finally sorted it out and put everything necessary online at:
+http://wodi.forge.ocamlcore.org/
+
+If you extract the files at the described locations, no files must be
+fetched from the server that has gone offline.
+
+cu,
+ andreas
+
+
+From anil at recoil.org  Wed Jun  3 19:24:40 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 3 Jun 2015 19:24:40 +0100
+Subject: [wg-windows] OCPWin status
+In-Reply-To: <CAHvkLrM3KW5wuF2VQC+VgrwQJEb2kejHygaKU9SzRs+WzLJCJg@mail.gmail.com>
+References: <CAHvkLrM3KW5wuF2VQC+VgrwQJEb2kejHygaKU9SzRs+WzLJCJg@mail.gmail.com>
+Message-ID: <E13935F2-1BCC-449C-B1E4-FBA8CDB05DAF@recoil.org>
+
+On 3 Jun 2015, at 09:05, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+> 
+> 3/ OCPWin comes with two different build systems:
+>   3.1/ a "-make" option to the compiler, that can be used to build an
+> executable by just specifying the last module (something
+> similar to what "ocamlbuild" would do, but much less powerful)
+>   3.2/ we internally use "ocp-build" to build packages. Although it
+> is still in a beta version, with the syntax probably changing in the
+> near future, it works well under native Windows, and specifying how to
+> build a library is simple enough.
+
+The built-in -make mode is interesting -- can you compile up a
+useful subset of packages without dropping into a full ocp-build
+make, or is it only really for simple projects?
+
+-anil
+
+From fabrice.le_fessant at ocamlpro.com  Thu Jun  4 08:13:44 2015
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Thu, 4 Jun 2015 09:13:44 +0200
+Subject: [wg-windows] OCPWin status
+In-Reply-To: <E13935F2-1BCC-449C-B1E4-FBA8CDB05DAF@recoil.org>
+References: <CAHvkLrM3KW5wuF2VQC+VgrwQJEb2kejHygaKU9SzRs+WzLJCJg@mail.gmail.com>
+ <E13935F2-1BCC-449C-B1E4-FBA8CDB05DAF@recoil.org>
+Message-ID: <CAHvkLrM36AOnAiXsUYQ=S281gx5CRsH4sw4se6aUfs8ZzgJ7Lw@mail.gmail.com>
+
+On Wed, Jun 3, 2015 at 8:24 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 3 Jun 2015, at 09:05, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+>>   3.1/ a "-make" option to the compiler, that can be used to build an
+>> executable by just specifying the last module (something
+>> similar to what "ocamlbuild" would do, but much less powerful)
+>
+> The built-in -make mode is interesting -- can you compile up a
+> useful subset of packages without dropping into a full ocp-build
+> make, or is it only really for simple projects?
+
+I tested successfully the built-in -make mode on ocamlgraph (library)
+and Alt-Ergo (program), but did not try on anything else. It can
+manage automatically ".mll" and ".mly" file extensions (by calling
+ocamllex and ocamlyacc), and accepts ".mllib" and ".mlpack" targets
+for libraries and packed modules (but I am not sure you can combine
+them :-( ).
+
+--Fabrice
+-- 
+Fabrice LE FESSANT
+Scientific Advisor, OCamlPro SAS
+
+From thomas.braibant at gmail.com  Wed Jun 10 12:05:09 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Wed, 10 Jun 2015 13:05:09 +0200
+Subject: [wg-windows] Improving the state of OCaml on Windows
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9BE77B0@Remus.metastack.local>
+References: <CAHR=VkyJ83Y1CmpdJNvgSNZ2+-M4_k6ppC05eH-nQ3=8c1Hgvw@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9E9BE77B0@Remus.metastack.local>
+Message-ID: <CAHR=VkyzNQMocqBauK4Vm9gxZbe_qC4wx2eog4u0YjsxYwCTcw@mail.gmail.com>
+
+Hi David,
+
+I have some installation scripts that were used to bring Cygwin (as the
+environment), WODI (that compiles OCaml using the mingw toolchains), and a
+few libraries (some from WODI, some from sources) on a bare Windows
+machine. I tried to hack the scripts to do the same thing + installing OPAM
+via WODI's OCaml. (I think that could be a first step toward porting some
+of the WODI packages to an opam-windows repository.) I have fixed a few
+issues, but it looks like you are a bit farther than me on this side. Would
+you consider providing the sources of your OPAM port to try to share the
+work?
+
+Best,
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20150610/8604b520/attachment.html>
+
+From thomas.braibant at gmail.com  Mon Jun 15 13:08:46 2015
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Mon, 15 Jun 2015 14:08:46 +0200
+Subject: [wg-windows] OPAM branch?
+Message-ID: <CAHR=Vkwyg=O7MqLj-VVV6POONP8kROx=9z9RvEpSiCcggKPxhQ@mail.gmail.com>
+
+Hi
+
+There has been some recent questions about the status of OPAM on Windows.
+
+https://github.com/ocaml/opam/issues/2192
+https://github.com/ocaml/opam/issues/2191
+
+and some work done trying to port OPAM
+
+https://github.com/ocaml/opam/issues/246#issuecomment-85543210
+
+I have not found any public branch of OPAM on the subject. If there is not,
+it might be worth making one somewhere to try to work in that direction. If
+someone with a deeper understanding of OPAM internals than myself has some
+ideas about what are the concrete steps in that direction, I would be very
+happy to contribute working on this, rather than hacking through OPAM.
+
+I might be mistaken, but from the various posts so far, I think that we
+concur to say that having OPAM working under Cygwin (with a native Win32
+port) is the first step toward improving the status of OCaml on Windows.
+
+Best,
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-windows/attachments/20150615/fb13783c/attachment.html>
+
+From daniel.buenzli at erratique.ch  Tue Jun 30 17:58:21 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 30 Jun 2015 17:58:21 +0100
+Subject: [wg-windows] Identifying windows ports for build systems & cross
+ compiling distinctions
+Message-ID: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+
+Hello,  
+
+In the context of building things, one apparently needs to be able precisely identify the windows ports in order to produce build artefacts with correct extensions (see [1]). It seems that: 
+
+1) Using the OCaml MSVC ports, windows specific extensions are used
+2) Using the OCaml mingw ports, unix extensions are used
+3) Using the OCaml cygwin port, unix extensions are used
+
+The problem is that at the moment various detection bits e.g. [2] conflate 1) + 2) under a single variable, namely win32. Something is needed to distinguish them in build systems in general.
+
+Here are a few ideas:
+
+a) Introduce a new toolchain variable, that specifies the toolchain used, whatever that means. 
+b) Distinguish an OS for the mingw ports 
+c) Distinguish these 3 cases through a distribution variable [3]
+
+I have the impression that a) is going to introduce again more noise, names and branches in the eco-system which already has plenty enough. Regarding c) I think it would be bending the semantics of the variable. Given that cygwin is already treated as an OS I would suggest that we rather use b) and introduce a "win32-mingw" or "mingw" (or whichever name windows users would find accurate) value for OS like variables. 
+
+Besides for cross compilation of packages we need to distinguish between `build-os` and `host-os` (os on which the build products are run). It would be nice if opam could somehow provide variables for these values for build systems to use in order to configure packages properly. IIRC opam currently only has an `os` variable which has the value of `build-os` but is currently being used for `host-os` semantics. 
+
+Note that some other variables pertaining to the capabilities of the installed OCaml compilers see [4] will also need {build,host}-os distinction (e.g. `ocaml-native` and `ocaml-native-dynlink`). In order to remain backward compatible with the current repository, I guess that the simplest is to deem all current variables as having host semantics and introduce only new variables for build semantics i.e. `build-os-ocaml-native`, `build-os-ocaml-native-dynlink`, `build-os-ocaml-version`, etc.
+
+Best,
+
+Daniel
+
+P.S. To windows users. I would also be interested in knowing if there is a tool invocation that is actually able to distinguish between 1) and 2).
+
+[1] https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094
+[2] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+[3] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L76-L109
+[4] https://opam.ocaml.org/doc/manual/dev-manual.html#sec37
+
+
+
+From david at allsopps.net  Tue Jun 30 18:13:12 2015
+From: david at allsopps.net (David Allsopp)
+Date: Tue, 30 Jun 2015 17:13:12 +0000
+Subject: [wg-windows] Identifying windows ports for build systems &
+ cross compiling distinctions
+In-Reply-To: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+
+Daniel B?nzli wrote:
+> Hello,
+> 
+> In the context of building things, one apparently needs to be able
+> precisely identify the windows ports in order to produce build artefacts
+> with correct extensions (see [1]). It seems that:
+> 
+> 1) Using the OCaml MSVC ports, windows specific extensions are used
+> 2) Using the OCaml mingw ports, unix extensions are used
+
+Not quite: shared libraries are .dll rather than .so
+
+> 3) Using the OCaml cygwin port, unix extensions are used
+
+I can't remember if Cygwin uses .so.dll or just .so, but I expect whatever it does that it fakes everything to work with just .so (just as it fakes things to work without .exe) - tricks which *do not work* when dealing with mingw-compiled programs which obviously don't have the Cygwin layer.
+
+> The problem is that at the moment various detection bits e.g. [2] conflate
+> 1) + 2) under a single variable, namely win32. Something is needed to
+> distinguish them in build systems in general.
+> 
+> Here are a few ideas:
+> 
+> a) Introduce a new toolchain variable, that specifies the toolchain used,
+> whatever that means.
+
+$OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc. Equally, all of the required extensions can be determined by grep'ing the output of ocamlopt -config (or with more recent OCamls by using the Config module of compiler-libs.common)
+
+> b) Distinguish an OS for the mingw ports
+> c) Distinguish these 3 cases through a distribution variable [3]
+> 
+> I have the impression that a) is going to introduce again more noise,
+> names and branches in the eco-system which already has plenty enough.
+> Regarding c) I think it would be bending the semantics of the variable.
+> Given that cygwin is already treated as an OS I would suggest that we
+> rather use b) and introduce a "win32-mingw" or "mingw" (or whichever name
+> windows users would find accurate) value for OS like variables.
+> 
+> Besides for cross compilation of packages we need to distinguish between
+> `build-os` and `host-os` (os on which the build products are run). It
+> would be nice if opam could somehow provide variables for these values for
+> build systems to use in order to configure packages properly. IIRC opam
+> currently only has an `os` variable which has the value of `build-os` but
+> is currently being used for `host-os` semantics.
+
+The mingw compiler already use the form w64 for the host, so that the compilers "fake" a cross-compiling triple (e.g. i686-w64-mingw32-gcc and x86_64-w64-mingw32-gcc). Perhaps that would be better?
+
+> Note that some other variables pertaining to the capabilities of the
+> installed OCaml compilers see [4] will also need {build,host}-os
+> distinction (e.g. `ocaml-native` and `ocaml-native-dynlink`). In order to
+> remain backward compatible with the current repository, I guess that the
+> simplest is to deem all current variables as having host semantics and
+> introduce only new variables for build semantics i.e. `build-os-ocaml-
+> native`, `build-os-ocaml-native-dynlink`, `build-os-ocaml-version`, etc.
+> 
+> Best,
+> 
+> Daniel
+> 
+> P.S. To windows users. I would also be interested in knowing if there is a
+> tool invocation that is actually able to distinguish between 1) and 2).
+> 
+> [1] https://github.com/dbuenzli/topkg/issues/11#issuecomment-117050094
+> [2] https://github.com/ocaml/opam-
+> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+> [3] https://github.com/ocaml/opam-
+> depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L76-L109
+> [4] https://opam.ocaml.org/doc/manual/dev-manual.html#sec37
+> 
+> 
+> _______________________________________________
+> wg-windows mailing list
+> wg-windows at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-windows
+
+From daniel.buenzli at erratique.ch  Tue Jun 30 18:52:16 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 30 Jun 2015 18:52:16 +0100
+Subject: [wg-windows] Identifying windows ports for build systems &
+ cross compiling distinctions
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+Message-ID: <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+
+Le mardi, 30 juin 2015 ? 18:13, David Allsopp a ?crit :
+> $OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc.  
+
+Ok thanks, so it can at least be discovered. On my osx machine I have cc in there, so I guess this means the C toolchain ?  
+
+> (or with more recent OCamls by using the Config module of compiler-libs.common)
+Assuming we are accessing this from a build system implemented in OCaml, I guess this fails in cross-compilation settings since you will get the values of the build-os OCaml compilers in there.
+
+
+> The mingw compiler already use the form w64 for the host, so that the compilers "fake" a cross-compiling triple (e.g. i686-w64-mingw32-gcc and x86_64-w64-mingw32-gcc). Perhaps that would be better?
+I don't understand what you are proposing here. Did you say we should use "mingw32" as an OS value to denote the mingw ports ?  
+
+Best,
+
+Daniel
+

@@ -1,0 +1,302 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Merlin-discuss] Merlin's configuration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:merlin%40lists.ocaml.org?Subject=Re%3A%20%5BMerlin-discuss%5D%20Merlin%27s%20configuration&In-Reply-To=%3CCAN_VbetnEV9VJXZsqU7qbZa-321jR87B5qiJx%3D04_3kzzOo9Dw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000005.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Merlin-discuss] Merlin's configuration</H1>
+    <B>Roshan James</B> 
+    <A HREF="mailto:merlin%40lists.ocaml.org?Subject=Re%3A%20%5BMerlin-discuss%5D%20Merlin%27s%20configuration&In-Reply-To=%3CCAN_VbetnEV9VJXZsqU7qbZa-321jR87B5qiJx%3D04_3kzzOo9Dw%40mail.gmail.com%3E"
+       TITLE="[Merlin-discuss] Merlin's configuration">rjames
+       </A><BR>
+    <I>Tue Nov 19 20:39:58 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000005.html">[Merlin-discuss] Merlin's configuration
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#6">[ date ]</a>
+              <a href="thread.html#6">[ thread ]</a>
+              <a href="subject.html#6">[ subject ]</a>
+              <a href="author.html#6">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>A running merlin instance can compute, for each .ml file that one
+visits:
+
+  1. the type environment in scope at the top of the file
+  2. the preprocessors used on the file
+  3. the location of the .cmt files for modules in the environment
+
+Merlin accomplishes this via .merlin files, which give this
+information at the granularity of a directory (all files in a
+directory have the same toplevel environment).
+
+We propose:
+
+  A. There should be a way to state this information per file.
+  B. The merlin command should use the same syntax as an ocamlopt
+     call for expressing the information.
+  C. The information from the command-line in B also be used to
+     determine other aspects of type checking, e.g. warnings.
+  D. An auxiliary file (.merlin) be used for expressing only things
+     that the ocamlopt call doesn't express, e.g. (3).
+  E. A running merlin process should accept a command that updates
+     this information.
+  F. A running merlin process should accept a command that tells it
+     when a .cmt or .cmi changes, and should update its internal
+     cache.
+
+The thinking behind using an ocamlopt call as the mechanism of
+expression is that it is already present in all build systems,
+and is thus very likely to reflect what the build system is
+actually doing. Here is an example:
+
+ocamlopt.opt -I +camlp4 -thread -w @a-4-7-29 -strict-sequence
+-bin-annot -inline 20 -nodynlink -g
+-pp 'camlp4o ../../lib/pa_type_conv/pa_type_conv.cmo
+../../lib/pa_sexp_conv/pa_sexp_conv.cmo
+../../lib/pa_bin_prot/pa_bin_prot.cmo
+../../lib/pa_fields_conv/pa_fields_conv.cmo
+../../lib/pa_variants_conv/pa_variants_conv.cmo
+../../lib/pa_compare/pa_compare.cmo ../../lib/pa_pipebang/pa_pipebang.cmo
+../../lib/pa_here/pa_here.cmo
+../../lib/pa_custom_printf/pa_custom_printf.cmo
+../../lib/pa_test/pa_test.cmo ../../lib/pa_enumerate/pa_enumerate.cmo
+../../lib/pa_ounit/pa_ounit.cmo -pa-ounit-lib bins'
+-I ../../lib/pa_ounit_lib -I ../../lib/bin_prot -I ../../lib/fieldslib
+-I ../../lib/sexplib -I ../../lib/variantslib -I ../../lib/core_kernel
+-I ../../lib/core -I ../../lib/textutils -I ../../lib/async_core
+-I ../../lib/async_extra -I ../../lib/async_unix -I ../../lib/pcre
+-I ../../lib/core_extended -I ../../lib/async -I ../../lib/async_extended
+-I ../../lib/varg -I ../../lib/sh -I ../../lib/jane_extended -c z.ml
+
+In more detail:
+
+(1) This command specifies the exact namespace visible to each
+.ml file. From each include path one can collect the relevant
+.cmi files to construct the namespace visible to the file being
+compiled.
+
+(2) Any additional compiler flags relevant to compiling the .ml
+files should be available here. For example, it would be valuable
+for us if merlin flagged the right warnings are errors.
+
+(3) Every build system already knows how to generate such
+compilation commands. Merlin should be able to parse this
+relatively easily given its roots in the ocaml toplevel.
+Further, merlin can ignore switches it doesn't understand for now
+and silently add more support in the future without needing
+everyone to change their build scripts.
+
+(4) The missing information in the compilation command includes
+where to find the .cmt files of each library and the mapping of
+preprocessors to merlin's EXT specifications. These can be
+communicated in a .merlin file. For example:
+
+EXT binprot  ../../lib/pa_bin_prot/pa_bin_prot.cmo
+EXT sexp     ../../lib/pa_bin_prot/pa_bin_prot.cmo
+EXT here ../../lib/pa_here/pa_here.cmo
+CMT core_kernel ../../base/core/kernel/lib
+
+i.e. if a call to camlopt mentions core_kernel, then merlin can
+use this mapping to find the [.cmt] files.  This mapping can be
+specified either in each local directory or once at the root of
+the repo.
+
+(5) How should the compilation command be communicated to merlin?
+There are at least three approaches that one can think of, of
+which we think the third has several advantages:
+
+(i) Write things into files: As you proposed, we can write out
+such compilation commands into a file. If any .ml specific
+customization is required, it will be captured in this format. If
+all the files of a dir are compiled the same way, one need
+specify only one compilation command with some glob patterns.
+
+(ii) Have merlin ask the build system: As you proposed, we can
+specify a command that merlin calls, that returns the info in (i)
+to merlin.
+
+(iii) Have the build system notify merlin: Merlin can provide a
+command that the build system calls to communicate the ocamlopt
+compilation command to the current running instance of
+merlin. This has the advantage that merlin gets updates whenever
+the build system needs to recompile files. Further, merlin can be
+notified of successful build completion of each .ml file.
+
+(6) Finally, one property worth thinking about is how to make
+merlin provide &quot;best effort&quot; completion: Consider the situation
+where one is working on both an exe and a lib that it depends
+on. During development there maybe some .ml files in the lib that
+compile and some that don't. The ones that don't yet compile
+prevent the lib.cmi file from being built/updated. In such cases,
+it would be nice if merlin can still provide the latest
+completion information for the .ml files of the lib that are
+compiling.
+
+Roshan
+
+
+
+On Tue, Nov 19, 2013 at 11:26 AM, Sylvain Le Gall &lt;sylvain at le-gall.net&gt;wrote:
+
+&gt;<i> In OASIS we have a function that automatically generates _tags from
+</I>&gt;<i> _oasis, generating a somehow similar tool-readable output in a plugin
+</I>&gt;<i> will be super easy for OASIS.
+</I>&gt;<i>
+</I>&gt;<i> We can also fine tune a lot for Merlin. We can implement new fields to
+</I>&gt;<i> embed most of the configuration needed. If we get it right -- and if
+</I>&gt;<i> you want -- I think it may be possible to replace .merlin by a few
+</I>&gt;<i> fields in _oasis and reuse information from this file.
+</I>&gt;<i>
+</I>&gt;<i> 2013/11/19 Gabriel Scherer &lt;gabriel.scherer at gmail.com&gt;:
+</I>&gt;<i> &gt; Re. the second point, I think trying to reimplement the build system's
+</I>&gt;<i> &gt; job in Merlin is a dead end. You must defer to the existing build
+</I>&gt;<i> &gt; system(s) to provide you this information.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; ocamlbuild has a -show-tags option that does a fair bit of what you
+</I>&gt;<i> &gt; want (but maybe not all: it reads _tags but does not provide as much
+</I>&gt;<i> &gt; information as computed dynamically by the actual compilation rules;
+</I>&gt;<i> &gt; and it returns an unspecified ocamlbuild pretty-printing format that
+</I>&gt;<i> &gt; was planned for humans, not tools, to read). More can be implemented.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; .merlin has always been a bit of a hack, duplicating information that
+</I>&gt;<i> &gt; was already known by the build logic (plus possibly some
+</I>&gt;<i> &gt; merlin-specific configuration that has its place). We should be
+</I>&gt;<i> &gt; working with tool authors to *reduce* it, not extend it.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; On Tue, Nov 19, 2013 at 12:26 PM, Sylvain Le Gall &lt;sylvain at le-gall.net&gt;
+</I>&gt;<i> wrote:
+</I>&gt;<i> &gt;&gt; Hello,
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; I will be more than happy to help you on the second point to integrate
+</I>&gt;<i> &gt;&gt; an external process that can ask directly oasis to generate a
+</I>&gt;<i> &gt;&gt; configuration. I can help you on this project and even help you write
+</I>&gt;<i> &gt;&gt; the extension.
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; Regards
+</I>&gt;<i> &gt;&gt; Sylvain
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; 2013/11/19 Thomas Refis &lt;thomas.refis at gmail.com&gt;:
+</I>&gt;<i> &gt;&gt;&gt; Hi!
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; There have been some changes recently on merlin's configuration, and
+</I>&gt;<i> &gt;&gt;&gt; we're also considering some more heavy changes on the syntax for the
+</I>&gt;<i> &gt;&gt;&gt; .merlin file.  We'd like to have people's input on this.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt;    * * *
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; First we've added two new &quot;directives&quot;: CMT and CMI, these are
+</I>&gt;<i> &gt;&gt;&gt; refinements of the &quot;B&quot; directive, which was used to add directories to
+</I>&gt;<i> &gt;&gt;&gt; the build path. The need for this is primarily felt at JaneStreet.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; At janestreet, there is one big repository including, among others,
+</I>&gt;<i> &gt;&gt;&gt; core and async.  Every source directory is also a build directory but
+</I>&gt;<i> &gt;&gt;&gt; the cmi for packed modules are afterwards copied to a particular lib/
+</I>&gt;<i> &gt;&gt;&gt; directory at the root of this repo.
+</I>&gt;<i> &gt;&gt;&gt; You then have two options to set-up your build path in merlin: add
+</I>&gt;<i> &gt;&gt;&gt; only lib/, or add every source directory.
+</I>&gt;<i> &gt;&gt;&gt; The first option is unsatisfactory since you won't have access to cmt
+</I>&gt;<i> &gt;&gt;&gt; files (that implies no fancy source browsing), but the second is also
+</I>&gt;<i> &gt;&gt;&gt; problematic.  Indeed there is a lot of module name conflicts, and
+</I>&gt;<i> &gt;&gt;&gt; there's no predictable way to tell which one will be choosen. That
+</I>&gt;<i> &gt;&gt;&gt; results in the frequent presence of the error message &quot;Module Foo and
+</I>&gt;<i> &gt;&gt;&gt; Bar make inconsistent assumptions over interface Baz&quot;.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; With the new directives, one can now add lib/ to the &quot;CMI&quot; dirs (i.e.
+</I>&gt;<i> &gt;&gt;&gt; the buildpath) and every other directory to the &quot;CMT&quot; dirs.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; On simpler setups, one can of course still simply use &quot;B&quot;.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; NB: This is not on the opam package yet, only on the git repository.
+</I>&gt;<i> &gt;&gt;&gt; We should however make a new release soon (in the next two weeks I'd
+</I>&gt;<i> &gt;&gt;&gt; say).
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt;    * * *
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; We are considering moving to a more expressive syntax for the .merlin
+</I>&gt;<i> &gt;&gt;&gt; files, the goal is to be more precise about which files/directories
+</I>&gt;<i> &gt;&gt;&gt; require which packages/compiler flags and which do not.
+</I>&gt;<i> &gt;&gt;&gt; There is two different paths we can follow here:
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt;   The first one is to adopt the syntax ocamlbuild uses in its _tags
+</I>&gt;<i> &gt;&gt;&gt; file. This should be precise enough to express everything one would
+</I>&gt;<i> &gt;&gt;&gt; ever need. Also it has the advantage of being a syntax everyone
+</I>&gt;<i> &gt;&gt;&gt; already knows, and one can also imagine that at some point in the
+</I>&gt;<i> &gt;&gt;&gt; future, merlin would be able to understand (at least partially) _tags
+</I>&gt;<i> &gt;&gt;&gt; files whenever there is no .merlin.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt;   The second one, a bit more ambitious, consist of finding a way to
+</I>&gt;<i> &gt;&gt;&gt; delegate the work to external tools. That is: merlin would call an
+</I>&gt;<i> &gt;&gt;&gt; (arbitrary) external process, giving it the path of the file currently
+</I>&gt;<i> &gt;&gt;&gt; under edition. And that process would then output merlin's
+</I>&gt;<i> &gt;&gt;&gt; configuration.
+</I>&gt;<i> &gt;&gt;&gt; That way, people could first have the configuration file in their
+</I>&gt;<i> &gt;&gt;&gt; language of choice, or call a tool to generate a configuration from an
+</I>&gt;<i> &gt;&gt;&gt; _tags, _oasis, ?, but would also be able to have merlin integrated in
+</I>&gt;<i> &gt;&gt;&gt; their build process. For example people using a build system running
+</I>&gt;<i> &gt;&gt;&gt; in &quot;daemon&quot; mode (jenga, OMake) could then feed it the path of the
+</I>&gt;<i> &gt;&gt;&gt; file being edited, and would then receive a list of the dependencies
+</I>&gt;<i> &gt;&gt;&gt; of that file, as well as compiler flags required.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; We would like to know if you think either of this approach is useful,
+</I>&gt;<i> &gt;&gt;&gt; or interesting... or not.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt;    * * *
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; That's about it.
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; Cheers,
+</I>&gt;<i> &gt;&gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; Frederic and Thomas.
+</I>&gt;<i> &gt;&gt;&gt; _______________________________________________
+</I>&gt;<i> &gt;&gt;&gt; Merlin-discuss mailing list
+</I>&gt;<i> &gt;&gt;&gt; Merlin-discuss at lists.forge.ocamlcore.org
+</I>&gt;<i> &gt;&gt;&gt; <A HREF="https://lists.ocamlcore.org/cgi-bin/listinfo/merlin-discuss">https://lists.ocamlcore.org/cgi-bin/listinfo/merlin-discuss</A>
+</I>&gt;<i> &gt;&gt; _______________________________________________
+</I>&gt;<i> &gt;&gt; Merlin-discuss mailing list
+</I>&gt;<i> &gt;&gt; Merlin-discuss at lists.forge.ocamlcore.org
+</I>&gt;<i> &gt;&gt; <A HREF="https://lists.ocamlcore.org/cgi-bin/listinfo/merlin-discuss">https://lists.ocamlcore.org/cgi-bin/listinfo/merlin-discuss</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocamlcore.org/pipermail/merlin-discuss/attachments/20131119/f702e79a/attachment-0001.html">http://lists.ocamlcore.org/pipermail/merlin-discuss/attachments/20131119/f702e79a/attachment-0001.html</A>&gt;
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000005.html">[Merlin-discuss] Merlin's configuration
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#6">[ date ]</a>
+              <a href="thread.html#6">[ thread ]</a>
+              <a href="subject.html#6">[ subject ]</a>
+              <a href="author.html#6">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/merlin">More information about the Merlin
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Lwt/Async abstraction for HTTP library
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3CC83A6D18-3331-4311-8874-AD50F5640E37%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Lwt/Async abstraction for HTTP library</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3CC83A6D18-3331-4311-8874-AD50F5640E37%40recoil.org%3E"
+       TITLE="Lwt/Async abstraction for HTTP library">anil at recoil.org
+       </A><BR>
+    <I>Fri Aug 17 02:46:15 BST 2012</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1359">[ date ]</a>
+              <a href="thread.html#1359">[ thread ]</a>
+              <a href="subject.html#1359">[ subject ]</a>
+              <a href="author.html#1359">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+I've been working on a release of a cooperative threading HTTP library, and have been using the opportunity to experiment with parameterising it over Lwt/Async.  I had a few (basic) Async questions as a result.
+
+The code is at:
+<A HREF="https://github.com/avsm/ocaml-cohttp/tree/v2-interface">https://github.com/avsm/ocaml-cohttp/tree/v2-interface</A>
+(requires Lwt-current to build at the moment)
+
+The basic IO interface that takes care of low-level parsing is very straightforward to implement in Async and Lwt:
+<A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async_raw.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async_raw.ml</A>
+<A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt_raw.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt_raw.ml</A>
+
+The higher-level client HTTP interface is where Lwt and Async diverge, and so have different implementations. The Async version exposes the body as a Pipe which can be lazily consumed or passed to a proxy. This means that pipelined requests must be careful to wait until previous requests have fully consumed their respective bodies before using that particular channel.  In Lwt, this can be modelled with Lwt_stream.t that maps over the requests and responses.
+
+In Async, I ran into a few basic questions while building the equivalent Lwt support.
+
+- Only one Scheduler.go is supported (unlike Lwt_main, which can run multiple times in a program), which makes multiple Async tests hard to compose in oUnit.  Do you have a custom oUnit that can isolate  multiple Async test-cases, or should I write a forking one that does this?
+
+- What's the best way to get a human-readable error?  I have this in the oUnit right now, which is very clunky:
+
+  let _ =  Async_core.Scheduler.within' (fun () -&gt;
+    Monitor.try_with make_net_req &gt;&gt;=
+    function
+    |Error exn -&gt; 
+      (* TODO: how to dump out top-level errors in a nicer way? *)
+       Printf.fprintf stderr &quot;err %s.\n%!&quot; (Exn.backtrace ()); return ()
+    |Ok _ -&gt; return ()
+  ) in Async_unix.Scheduler.go ()
+
+- Async_streams are deprecated, and I should use Pipes instead. I need to be able to run a background task that will close the I/O channel whenever the Pipe is completed to close the underlying fd.  I obtain a Deferred via Pipe.closed, but how should this run in the background?  Should I just ignore the return, or register it with the Scheduler?
+
+In general, are there any toy network programs written using Async that I could crib good style from?
+
+cheers,
+Anil
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1359">[ date ]</a>
+              <a href="thread.html#1359">[ thread ]</a>
+              <a href="subject.html#1359">[ subject ]</a>
+              <a href="author.html#1359">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

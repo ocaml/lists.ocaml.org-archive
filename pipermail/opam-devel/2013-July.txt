@@ -1,0 +1,1229 @@
+From daniel.buenzli at erratique.ch  Tue Jul  2 16:53:43 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 2 Jul 2013 16:53:43 +0100
+Subject: [opam-devel] Conditional build instructions for pinned packages
+Message-ID: <9D137C12154C4BB0A890983515043386@erratique.ch>
+
+Hello, 
+
+I'd like to make my released opam packages pinable with their corresponding git repos. 
+
+For that I need to invoke a special script *only whenever* I build from a git checkout. This script prepares the sources, injects the right version number so that ocamlfind correctly identifies the installed version and generates the oasis artefacts:
+
+build: [
+["devel/pkg-opam-git-setup" ] { WHAT CAN I WRITE HERE }
+["ocaml" "setup.ml" "-configure" "--prefix" "%{prefix}%" ]
+["ocaml" "setup.ml" "-build"]
+["ocaml" "setup.ml" "-install"]
+
+]
+
+So for "WHAT CAN I WRITE HERE" is it possible to either test for `devel/pkg-opam-git-setup` existence (it is not in the release tarballs) or is there some kind of special variable to test that indicates a pinned status ? 
+
+Thanks, 
+
+Daniel
+
+
+
+From anil at recoil.org  Thu Jul  4 10:44:45 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 4 Jul 2013 10:44:45 +0100
+Subject: [opam-devel] Conditional build instructions for pinned packages
+In-Reply-To: <9D137C12154C4BB0A890983515043386@erratique.ch>
+References: <9D137C12154C4BB0A890983515043386@erratique.ch>
+Message-ID: <94CB9AF0-AB9A-43A6-83BC-D5828A959955@recoil.org>
+
+Having some constraints to indicate a pinned package (or a development remote as opposed to an archive) seems reasonable.  Could you create a bug about this on the tracker?
+
+-anil
+
+On 2 Jul 2013, at 16:53, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Hello, 
+> 
+> I'd like to make my released opam packages pinable with their corresponding git repos. 
+> 
+> For that I need to invoke a special script *only whenever* I build from a git checkout. This script prepares the sources, injects the right version number so that ocamlfind correctly identifies the installed version and generates the oasis artefacts:
+> 
+> build: [
+> ["devel/pkg-opam-git-setup" ] { WHAT CAN I WRITE HERE }
+> ["ocaml" "setup.ml" "-configure" "--prefix" "%{prefix}%" ]
+> ["ocaml" "setup.ml" "-build"]
+> ["ocaml" "setup.ml" "-install"]
+> 
+> ]
+> 
+> So for "WHAT CAN I WRITE HERE" is it possible to either test for `devel/pkg-opam-git-setup` existence (it is not in the release tarballs) or is there some kind of special variable to test that indicates a pinned status ? 
+> 
+> Thanks, 
+> 
+> Daniel
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From thomas at ocamlpro.com  Thu Jul  4 10:51:49 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Thu, 4 Jul 2013 11:51:49 +0200
+Subject: [opam-devel] Conditional build instructions for pinned packages
+In-Reply-To: <94CB9AF0-AB9A-43A6-83BC-D5828A959955@recoil.org>
+References: <9D137C12154C4BB0A890983515043386@erratique.ch>
+ <94CB9AF0-AB9A-43A6-83BC-D5828A959955@recoil.org>
+Message-ID: <112370F6-ABA5-4733-887A-E56DBE115B47@ocamlpro.com>
+
+> Having some constraints to indicate a pinned package (or a development remote as opposed to an archive) seems reasonable.  Could you create a bug about this on the tracker?
+
+Indeed.
+
+You might also try a cumbersome workaround fro your issue: if you define `OPAM_foo=true` in your shell then "%{foo}%" will be evaluated to `true` in your OPAM filters. 
+
+--
+Thomas
+
+
+> 
+> -anil
+> 
+> On 2 Jul 2013, at 16:53, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+>> Hello, 
+>> 
+>> I'd like to make my released opam packages pinable with their corresponding git repos. 
+>> 
+>> For that I need to invoke a special script *only whenever* I build from a git checkout. This script prepares the sources, injects the right version number so that ocamlfind correctly identifies the installed version and generates the oasis artefacts:
+>> 
+>> build: [
+>> ["devel/pkg-opam-git-setup" ] { WHAT CAN I WRITE HERE }
+>> ["ocaml" "setup.ml" "-configure" "--prefix" "%{prefix}%" ]
+>> ["ocaml" "setup.ml" "-build"]
+>> ["ocaml" "setup.ml" "-install"]
+>> 
+>> ]
+>> 
+>> So for "WHAT CAN I WRITE HERE" is it possible to either test for `devel/pkg-opam-git-setup` existence (it is not in the release tarballs) or is there some kind of special variable to test that indicates a pinned status ? 
+>> 
+>> Thanks, 
+>> 
+>> Daniel
+>> 
+>> 
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 12:48:24 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 12:48:24 +0100
+Subject: [opam-devel] Testing for byte/native compilers
+Message-ID: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+
+Hello, 
+
+Is there a way to test for the presence of byte/native compilers in the build: section ?
+
+    opam config list globals 
+
+seems to indicate me that this is not the case. 
+
+Best,
+
+Daniel 
+
+
+
+From anil at recoil.org  Sun Jul  7 12:55:13 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 7 Jul 2013 12:55:13 +0100
+Subject: [opam-devel] Testing for byte/native compilers
+In-Reply-To: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+References: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+Message-ID: <8EA6C188-8018-4761-8A17-AA2C2E57AF91@recoil.org>
+
+No, and we need to add this too.  OPAM builds on bytecode-only architectures such as Sparc64 are over 50% failures at the moment due to this.  Issue please...
+
+-anil
+
+On 7 Jul 2013, at 12:48, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Hello, 
+> 
+> Is there a way to test for the presence of byte/native compilers in the build: section ?
+> 
+>    opam config list globals 
+> 
+> seems to indicate me that this is not the case. 
+> 
+> Best,
+> 
+> Daniel 
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 13:21:59 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 13:21:59 +0100
+Subject: [opam-devel] Testing for byte/native compilers
+In-Reply-To: <8EA6C188-8018-4761-8A17-AA2C2E57AF91@recoil.org>
+References: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+ <8EA6C188-8018-4761-8A17-AA2C2E57AF91@recoil.org>
+Message-ID: <D9E8709CF88D4A6C85203430B38F1C52@erratique.ch>
+
+Other question, would it make sense to also add variables for profiling/debug so that a package can be configured for that ? 
+
+Best,
+
+Daniel
+
+
+
+From anil at recoil.org  Sun Jul  7 13:23:37 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 7 Jul 2013 13:23:37 +0100
+Subject: [opam-devel] Testing for byte/native compilers
+In-Reply-To: <D9E8709CF88D4A6C85203430B38F1C52@erratique.ch>
+References: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+ <8EA6C188-8018-4761-8A17-AA2C2E57AF91@recoil.org>
+ <D9E8709CF88D4A6C85203430B38F1C52@erratique.ch>
+Message-ID: <2BD8DB05-58CC-4E59-9F05-AB8F6796E994@recoil.org>
+
+I'd leave that as a separate concern for the moment.  Fabrice added environment variables in 4.1 that can control some of these flags, so it's a separate feature design from the compiler variants one (ocamlopt vs ocamlc vs ocamljava)
+
+-anil
+
+On 7 Jul 2013, at 13:21, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Other question, would it make sense to also add variables for profiling/debug so that a package can be configured for that ? 
+> 
+> Best,
+> 
+> Daniel
+> 
+> 
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 13:49:25 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 13:49:25 +0100
+Subject: [opam-devel] Generating .install file
+Message-ID: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+
+If my build system generates this file where (which path) should it generate them ? What's the variable to use ? Is there an example of a package that does that ?  
+
+Thanks, 
+
+Daniel 
+
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 13:52:19 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 13:52:19 +0100
+Subject: [opam-devel] Generating .install file
+In-Reply-To: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+References: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+Message-ID: <47BF58B93DFA42999738BA379681ABE2@erratique.ch>
+
+Le dimanche, 7 juillet 2013 ? 13:49, Daniel B?nzli a ?crit :
+> If my build system generates this file where (which path) should it generate them ? What's the variable to use ? Is there an example of a package that does that ?
+
+Oh and do I understand correctly that if I install all my files that way (even the library) this somehow renders the remove: field of the opam file useless ?  
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 17:03:29 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 17:03:29 +0100
+Subject: [opam-devel] Generating .install file
+In-Reply-To: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+References: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+Message-ID: <32F6F594F14B4C5B840D1A29831C186A@erratique.ch>
+
+Le dimanche, 7 juillet 2013 ? 13:49, Daniel B?nzli a ?crit :
+> If my build system generates this file where (which path) should it generate them ?
+
+In the root directory of the distribution.
+
+> Oh and do I understand correctly that if I install all my files that way (even the library) this somehow renders the remove: field of the opam file useless ?
+Yes you do Daniel.
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Sun Jul  7 17:04:04 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 7 Jul 2013 17:04:04 +0100
+Subject: [opam-devel] Github Releases, with excellent timing
+In-Reply-To: <17CACD37-2D8D-433E-86D3-C0DB2D02E5DB@recoil.org>
+References: <58149577-C2E3-46FA-9015-77897051CE08@recoil.org>
+ <3EF2B73CADFD4E4192C955A26D6F1564@erratique.ch>
+ <6F0F33A1-3519-4DCE-9B4B-EC38A10976A0@recoil.org>
+ <45D8F98CC82F478DB31DF1349B0E3237@erratique.ch>
+ <17CACD37-2D8D-433E-86D3-C0DB2D02E5DB@recoil.org>
+Message-ID: <B7CB666E9B344695BE436EFBB9E1BE6F@erratique.ch>
+
+Le mercredi, 3 juillet 2013 ? 15:27, Anil Madhavapeddy a ?crit :
+> None of these seem like substantive blockers. A quick online hunt shows that they're planning to extend the API to add Releases when it's stable. An API would let us easily automate including the CHANGES file in the release tag, as well as auto-generating the release tarballs with the autogen files. For now, I've experimentally released ocaml-cow to see what it looks like:
+
+Sure but at that point you actually implemented the damn thing by yourself, which does indicates that they released a toy?
+
+Regarding:
+
+> P.S. By the way opam really needs a way to show things like release notes and readmes associated to a package along with the documentation.
+
+You said:
+>  
+> This can be done with external tools, which I've started at
+> https://github.com/avsm/opam-repo-tools/
+> but won't have time to finish for a while. I'll probably extend it as soon as the Release API is out, as that'll save some time.
+
+In fact I realize now that opam's .install files do actually work as advertised. I don't think external tools or the github Release API are needed here (and we want to be able to consult that while being disconnected).
+
+With install files it's easy to add README{,.md} and CHANGES{,.md} to the doc directory of the package located in .opam/$SWITCH/doc/$PKG
+
+So it would just be a matter of looking up if these files exist in that directory and spit them out, or simply provide some kind of standard invocation to enable easy access to documentation directory of a package.
+
+Best,
+
+Daniel
+
+
+
+
+From thomas at ocamlpro.com  Mon Jul  8 08:52:20 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Mon, 8 Jul 2013 09:52:20 +0200
+Subject: [opam-devel] Generating .install file
+In-Reply-To: <32F6F594F14B4C5B840D1A29831C186A@erratique.ch>
+References: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+ <32F6F594F14B4C5B840D1A29831C186A@erratique.ch>
+Message-ID: <C7303F1A-0D7C-4975-B772-4AD09AEE1EB7@ocamlpro.com>
+
+> Le dimanche, 7 juillet 2013 ? 13:49, Daniel B?nzli a ?crit :
+>> If my build system generates this file where (which path) should it generate them ?
+> 
+> In the root directory of the distribution.
+
+And it needs to be named `<package-name>.install`.
+
+Both of these limitation (root + package name should be known) are a bit severe, so I was thinking to let the user specifies which install file he wants to use in the OPAM file, in the same spirit at the 'patch' fields. As nobody never really used this file as it was intended to (eg. generated by the build system) I didn't implement this, but if you feel that's convenient I certainly can.
+
+>> Oh and do I understand correctly that if I install all my files that way (even the library) this somehow renders the remove: field of the opam file useless ?
+> Yes you do Daniel.
+
+Indeed :-)
+
+Thomas
+
+From thomas.gazagnaire at ocamlpro.com  Mon Jul  8 08:58:50 2013
+From: thomas.gazagnaire at ocamlpro.com (Thomas Gazagnaire)
+Date: Mon, 8 Jul 2013 09:58:50 +0200
+Subject: [opam-devel] Testing for byte/native compilers
+In-Reply-To: <2BD8DB05-58CC-4E59-9F05-AB8F6796E994@recoil.org>
+References: <8E505CA9F2334874AEAF117435412103@erratique.ch>
+ <8EA6C188-8018-4761-8A17-AA2C2E57AF91@recoil.org>
+ <D9E8709CF88D4A6C85203430B38F1C52@erratique.ch>
+ <2BD8DB05-58CC-4E59-9F05-AB8F6796E994@recoil.org>
+Message-ID: <591B9024-3156-4941-A805-2EC45C3ACF12@ocamlpro.com>
+
+> I'd leave that as a separate concern for the moment.  Fabrice added environment variables in 4.1 that can control some of these flags, so it's a separate feature design from the compiler variants one (ocamlopt vs ocamlc vs ocamljava)
+
+Indeed. What we had in mind at the beginning was to: activate debugging by default on the "official" compiler switch and have separate compiler switches for profiling. It was not possible before because we didn't control the build system, but with Fabrice's patch it will be easier to control this kind of behavior.
+
+To answer the original question: that's indeed a good idea and I'm glad you've opened an issue on Github to track that[1].
+
+Thomas
+[1] https://github.com/OCamlPro/opam/issues/672
+
+
+From thomas at ocamlpro.com  Mon Jul  8 10:25:13 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Mon, 8 Jul 2013 11:25:13 +0200
+Subject: [opam-devel] Parallel builds
+In-Reply-To: <CAP_800qnFkSgCDHzyAV9dWBpPK8HJML0pu0=NP7decD3WFx-dQ@mail.gmail.com>
+References: <CAP_800qnFkSgCDHzyAV9dWBpPK8HJML0pu0=NP7decD3WFx-dQ@mail.gmail.com>
+Message-ID: <8ABF8B50-0298-4EE1-9E1F-4D39489BA9AE@ocamlpro.com>
+
+> Many packages seem to use Oasis for building, but I couldn't find any
+> package specification that calls the build process in a way that
+> allows for parallel builds.
+> 
+> E.g. I might want to specify this in an OPAM package (i.e. use up to 4 CPUs):
+> 
+>  ["ocaml" "setup.ml" "-build" "-j 4"]
+> 
+> Does anybody have objections to parallel builds?  Any suggestions
+> concerning their number?  I think it should generally work fine and
+> give a typical speedup of maybe around 20%.
+
+Is there any way to specify that "j" argument on the command-line ? That would be quite handy if the is the case, as you could simply do: `OASISJOBS=4 opam install foo`
+
+I feel not very satisfactory to hard-code the number of jobs in the OPAM file, though.
+
+
+--
+Thomas
+
+
+From thomas at ocamlpro.com  Mon Jul  8 10:27:59 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Mon, 8 Jul 2013 11:27:59 +0200
+Subject: [opam-devel] next opam release
+In-Reply-To: <74525A27-75F9-4B9A-BED1-1BC595417859@cam.ac.uk>
+References: <CAMu2m2+5SYeyKaue3Z05DwHq3NN4j-DKuTpF4x90UHSKEmOK6g@mail.gmail.com>
+ <74525A27-75F9-4B9A-BED1-1BC595417859@cam.ac.uk>
+Message-ID: <00B896FE-DE1D-4F29-9E5D-42F4778C4E93@ocamlpro.com>
+
+> I moved to HEAD after I hit a bug a while ago. 
+> 
+> Thomas, Is there something blocking a 1.0.1 release?
+
+Unfortunately yes. The status of update/pinned package is still not completely clear, and you might hit some weird corner-cases if you rely too much on the "advanced" features of OPAM. So I'm not totally happy with the current state of `master` and I need to find few days of full-time hacking to fix this. Unfortunately, it's hard to get these ... But releasing 1.0.1 is very high on my priority list.
+
+--
+Thomas
+
+> 
+> Best wishes,
+> Amir
+> 
+> --
+> sent via mobile
+> 
+> On 5 Jun 2013, at 18:51, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> 
+>> Just wondering if another opam release is expected? The latest official one is still 1.0.0, and I just got hit by a bug fixed in master a long time ago.
+>> 
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From daniel.buenzli at erratique.ch  Mon Jul  8 13:23:38 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 8 Jul 2013 13:23:38 +0100
+Subject: [opam-devel] Generating .install file
+In-Reply-To: <C7303F1A-0D7C-4975-B772-4AD09AEE1EB7@ocamlpro.com>
+References: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+ <32F6F594F14B4C5B840D1A29831C186A@erratique.ch>
+ <C7303F1A-0D7C-4975-B772-4AD09AEE1EB7@ocamlpro.com>
+Message-ID: <1C10FCCB0E1A45EEA099081C8D24AB5C@erratique.ch>
+
+Le lundi, 8 juillet 2013 ? 08:52, Thomas Gazagnaire a ?crit :
+> And it needs to be named `<package-name>.install`.
+>  
+> Both of these limitation (root + package name should be known) are a bit severe,  
+Well not really:  
+
+1) opam invokes the build system from the root so you are there.
+2) The environement variable $OPAM_PACKAGE_NAME has the name  
+
+So it's not that severe.
+  
+> so I was thinking to let the user specifies which install file he wants to use in the OPAM file, in the same spirit at the 'patch' fields. As nobody never really used this file as it was intended to (eg. generated by the build system)
+
+Well there is now such a system... Having had a build crisis over the week-end, being fed up with any build system or meta build system doing half of the things I'd like them to do and/or in a undocumented way. And realizing that oasis was actually doing very little work for me but costing too much time in terms of how I can express that in there, how wait I cannot so I need to patch the _tags file anyway etc. I decided to reclaim control and I implemented a trivial system that should work for my (simple) packages. Basically it:
+
+1) Uses an opam description file for the metadata (but doesn't do something particular with it, I got a little bit less obssesed by DRY to simplify things).  
+
+2) Uses ocamlbuild to build. Write yourself the support files for libs (.mllib, etc). It's not hard and reasonably documented, no need for oasis to generate them.  
+
+3) Write the META file yourself, it's not hard and handles optdeps stuff gracefully with exists_if. No need for oasis to generate them or meta program them. Here for example for Vg which has conditional support on js_of_ocaml:
+
+https://github.com/dbuenzli/vg/blob/master/pkg/META
+
+4) For building your package just list what you want to build and install in a simple script that handles conditionals. This is how this script looks for Vg:
+
+https://github.com/dbuenzli/vg/blob/master/pkg/build
+
+Yes it's hand written, I don't care, at least it's very explicit. It uses the functions of this *trivial* package-independent script:
+
+https://github.com/dbuenzli/vg/blob/master/pkg/pkg-builder
+
+that just records what you `add` in which section (filtering out native stuff if you don't have support for it or choosing byte vs native for binaries). Then invokes a one shot `ocamlbuild` on what you added if you call `build` and generates an opam install file if you call `install` with what it recorded (see the invocation in the above `build` script).
+
+This leads to the following simple opam package file:
+
+https://github.com/dbuenzli/vg/blob/master/pkg/opam
+
+Best,
+
+Daniel
+
+
+
+
+
+
+
+
+
+
+
+From anil at recoil.org  Mon Jul  8 14:29:52 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 8 Jul 2013 14:29:52 +0100
+Subject: [opam-devel] Github Releases, with excellent timing
+In-Reply-To: <B7CB666E9B344695BE436EFBB9E1BE6F@erratique.ch>
+References: <58149577-C2E3-46FA-9015-77897051CE08@recoil.org>
+ <3EF2B73CADFD4E4192C955A26D6F1564@erratique.ch>
+ <6F0F33A1-3519-4DCE-9B4B-EC38A10976A0@recoil.org>
+ <45D8F98CC82F478DB31DF1349B0E3237@erratique.ch>
+ <17CACD37-2D8D-433E-86D3-C0DB2D02E5DB@recoil.org>
+ <B7CB666E9B344695BE436EFBB9E1BE6F@erratique.ch>
+Message-ID: <48E9C037-E2C8-4610-A2BE-52D91CE51E99@recoil.org>
+
+On 7 Jul 2013, at 17:04, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Le mercredi, 3 juillet 2013 ? 15:27, Anil Madhavapeddy a ?crit :
+>> None of these seem like substantive blockers. A quick online hunt shows that they're planning to extend the API to add Releases when it's stable. An API would let us easily automate including the CHANGES file in the release tag, as well as auto-generating the release tarballs with the autogen files. For now, I've experimentally released ocaml-cow to see what it looks like:
+> 
+> Sure but at that point you actually implemented the damn thing by yourself, which does indicates that they released a toy?
+
+To reiterate: it now has the facility for binary downloads, which they yanked about 12 months ago due to scaling issues.  You couldn't do that before, and you can do so now (albeit manually).
+
+> 
+> In fact I realize now that opam's .install files do actually work as advertised. I don't think external tools or the github Release API are needed here (and we want to be able to consult that while being disconnected).
+> 
+> With install files it's easy to add README{,.md} and CHANGES{,.md} to the doc directory of the package located in .opam/$SWITCH/doc/$PKG
+> 
+> So it would just be a matter of looking up if these files exist in that directory and spit them out, or simply provide some kind of standard invocation to enable easy access to documentation directory of a package.
+
+Yep, I agree with this.  Do you write your META files by hand at the moment?
+
+-anil
+
+From markus.mottl at gmail.com  Mon Jul  8 14:53:22 2013
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Mon, 8 Jul 2013 09:53:22 -0400
+Subject: [opam-devel] Parallel builds
+In-Reply-To: <8ABF8B50-0298-4EE1-9E1F-4D39489BA9AE@ocamlpro.com>
+References: <CAP_800qnFkSgCDHzyAV9dWBpPK8HJML0pu0=NP7decD3WFx-dQ@mail.gmail.com>
+ <8ABF8B50-0298-4EE1-9E1F-4D39489BA9AE@ocamlpro.com>
+Message-ID: <CAP_800r5exWVV7XaaWW7K7fKJcscRc5osQgSLP10kT4NJF_0qQ@mail.gmail.com>
+
+I agree that hard-coding does not seem like a good idea.  It should be
+possible for users to specify the level of parallelism in a
+configuration file or environment variable.  I think this should
+actually be supported by OPAM, because different packages may use
+different build systems.  Maybe OPAM, which is pretty much already the
+de-facto standard OCaml package manager, can pass a standardized
+environment variable to the build process so that package maintainers
+can query it for the level of parallelism?
+
+Regards,
+Markus
+
+On Mon, Jul 8, 2013 at 5:25 AM, Thomas Gazagnaire <thomas at ocamlpro.com> wrote:
+>> Many packages seem to use Oasis for building, but I couldn't find any
+>> package specification that calls the build process in a way that
+>> allows for parallel builds.
+>>
+>> E.g. I might want to specify this in an OPAM package (i.e. use up to 4 CPUs):
+>>
+>>  ["ocaml" "setup.ml" "-build" "-j 4"]
+>>
+>> Does anybody have objections to parallel builds?  Any suggestions
+>> concerning their number?  I think it should generally work fine and
+>> give a typical speedup of maybe around 20%.
+>
+> Is there any way to specify that "j" argument on the command-line ? That would be quite handy if the is the case, as you could simply do: `OASISJOBS=4 opam install foo`
+>
+> I feel not very satisfactory to hard-code the number of jobs in the OPAM file, though.
+>
+>
+> --
+> Thomas
+>
+
+
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From daniel.buenzli at erratique.ch  Mon Jul  8 15:16:25 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 8 Jul 2013 15:16:25 +0100
+Subject: [opam-devel] Github Releases, with excellent timing
+In-Reply-To: <48E9C037-E2C8-4610-A2BE-52D91CE51E99@recoil.org>
+References: <58149577-C2E3-46FA-9015-77897051CE08@recoil.org>
+ <3EF2B73CADFD4E4192C955A26D6F1564@erratique.ch>
+ <6F0F33A1-3519-4DCE-9B4B-EC38A10976A0@recoil.org>
+ <45D8F98CC82F478DB31DF1349B0E3237@erratique.ch>
+ <17CACD37-2D8D-433E-86D3-C0DB2D02E5DB@recoil.org>
+ <B7CB666E9B344695BE436EFBB9E1BE6F@erratique.ch>
+ <48E9C037-E2C8-4610-A2BE-52D91CE51E99@recoil.org>
+Message-ID: <DDF7FB5EAF6A400E9E5AC3BA94EE628B@erratique.ch>
+
+Le lundi, 8 juillet 2013 ? 14:29, Anil Madhavapeddy a ?crit :
+> To reiterate: it now has the facility for binary downloads, which they yanked about 12 months ago due to scaling issues. You couldn't do that before, and you can do so now (albeit manually).
+
+Ok, didn't get the binary thing was the point.  
+  
+> Yep, I agree with this. Do you write your META files by hand at the moment?
+
+Yes, since last night I do that again (see the other thread on opam-devel).  
+
+Best,
+
+Daniel
+
+
+
+From anil at recoil.org  Wed Jul 17 15:22:14 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 17 Jul 2013 15:22:14 +0100
+Subject: [opam-devel] Ubuntu PPAs for OCaml (4.00 and 4.01dev)
+Message-ID: <5AB70B1E-B94D-4951-9FA0-83758869A788@recoil.org>
+
+I've put together two Ubuntu PPAs to make it more convenient to use modern OCaml/OPAM versions on Ubuntu via binary packages.
+
+OPAM stable:
+https://launchpad.net/~avsm/+archive/ppa
+This includes the latest stable OCaml (4.00.1) and OPAM (1.0.0).
+
+OPAM unstable:
+https://launchpad.net/~avsm/+archive/ppa-opam-unstable
+This includes the latest snapshot of OCaml (4.01.0dev) and OPAM (1.0.1dev).  This should get you reasonably stable snapshot of both, and will include the release candidates of OCaml when it's released.
+
+For now, these are experimental PPAs as I muddle my way through learning how Debian packaging works.  Reports of breakage or success to me directly would be appreciated.  Most of this PPA was based on the excellent Debian package sources, and thanks to Mehdid Dogguy in particular for the OPAM packaging.
+
+cheers,
+Anil
+
+From anil at recoil.org  Wed Jul 17 15:33:45 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 17 Jul 2013 15:33:45 +0100
+Subject: [opam-devel] [Caml-list] Ubuntu PPAs for OCaml (4.00 and
+	4.01dev)
+In-Reply-To: <CAFOJvunLM_SPZDQ6EkG=L9pavFyfgAcjTPM_dH30iqeefyEvng@mail.gmail.com>
+References: <5AB70B1E-B94D-4951-9FA0-83758869A788@recoil.org>
+ <CAFOJvunLM_SPZDQ6EkG=L9pavFyfgAcjTPM_dH30iqeefyEvng@mail.gmail.com>
+Message-ID: <702E4851-7F18-4EB6-AD79-F4F85FBDC2E6@recoil.org>
+
+It is, if people could confirm to me that the existing ones work first on Raring.  There's a certain manual effort in supporting the older versions that I'll script up if the existing packages do the job.
+
+And please do note that these PPA packages are really intended to be all you need to bootstrap OPAM and do source-based development.  They're really not intended to supplant the full range of binary packages that the Debian OCaml team develops, nor be held to the same quality standard as their packages.
+
+-anil
+
+On 17 Jul 2013, at 15:29, Andrew Shweduke <shweduke at gmail.com> wrote:
+
+> Hi Anil,
+> 
+> Would it be possible to support older versions (at least 12.04) of Ubuntu?
+> 
+> Thanks,
+> Andrew
+> 
+> 
+> On Wed, Jul 17, 2013 at 10:22 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> I've put together two Ubuntu PPAs to make it more convenient to use modern OCaml/OPAM versions on Ubuntu via binary packages.
+> 
+> OPAM stable:
+> https://launchpad.net/~avsm/+archive/ppa
+> This includes the latest stable OCaml (4.00.1) and OPAM (1.0.0).
+> 
+> OPAM unstable:
+> https://launchpad.net/~avsm/+archive/ppa-opam-unstable
+> This includes the latest snapshot of OCaml (4.01.0dev) and OPAM (1.0.1dev).  This should get you reasonably stable snapshot of both, and will include the release candidates of OCaml when it's released.
+> 
+> For now, these are experimental PPAs as I muddle my way through learning how Debian packaging works.  Reports of breakage or success to me directly would be appreciated.  Most of this PPA was based on the excellent Debian package sources, and thanks to Mehdid Dogguy in particular for the OPAM packaging.
+> 
+> cheers,
+> Anil
+> --
+> Caml-list mailing list.  Subscription management and archives:
+> https://sympa.inria.fr/sympa/arc/caml-list
+> Beginner's list: http://groups.yahoo.com/group/ocaml_beginners
+> Bug reports: http://caml.inria.fr/bin/caml-bugs
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130717/3fa790eb/attachment.html>
+
+From jp.deplaix at gmail.com  Sun Jul 21 00:16:25 2013
+From: jp.deplaix at gmail.com (Jacques-Pascal Deplaix)
+Date: Sun, 21 Jul 2013 01:16:25 +0200
+Subject: [opam-devel] Ubuntu PPAs for OCaml (4.00 and 4.01dev)
+Message-ID: <51EB1A49.5080303@gmail.com>
+
+Hi,
+
+This repo also works with Debian Sid. The debian repo being unavailable,
+this one is a good backup plan.
+
+cheers,
+
+From anil at recoil.org  Mon Jul 22 14:30:51 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 22 Jul 2013 14:30:51 +0100
+Subject: [opam-devel] [Caml-list] opam and godi
+In-Reply-To: <20130722074459.GA10640@notk.org>
+References: <383739793.214096184.1374254520546.JavaMail.root@zimbra27-e5.priv.proxad.net>
+ <7b4c87b5d9aa76728e239f0a2172b795.squirrel@gps.dynxs.de>
+ <6796313D-9F02-4C70-87D9-8DC9BC896028@recoil.org>
+ <CACLX4jRcSAGE_N65PnjmTw+mQ80wTmYgvWVA9ADFPY8p4mXfEA@mail.gmail.com>
+ <20130722074459.GA10640@notk.org>
+Message-ID: <66667E06-8E92-4CB8-BF59-578E1E961AC0@recoil.org>
+
+On 22 Jul 2013, at 08:44, Adrien Nader <adrien at notk.org> wrote:
+
+> In the end, maybe you have:
+> - godi, slower package updates but usually more stable; bugs in packages
+>  are less common but when they exist, they can also take time to fix
+> - opam, many more updates, maybe too many, packages get less testing
+>  before they reach others (if you want new software, you can't have a
+>  week of testing between each release)
+> 
+> NB: don't get me wrong, I don't blame any package maintainer or package
+> on slow updates or bugs: many issues arise when software is used on 10
+> different setups (different CPUs, different OS, ....)
+
+This is absolutely true.  I've been assembling a little machine pool of
+'exotic architectures' that make it easier to test all the various 
+permutations.  OPAM has a vestigial autobuilder now that runs through a
+bunch of different platforms.  For a *temporary* URL with our development
+version, see:
+https://ocaml-www3.ocamllabs.cl.cam.ac.uk/github/OCamlPro/opam-repository
+
+Once the teething issues are sorted, David Sheets has also written Github
+bindings so that work will be queued up directly from a Github pull request.
+Anyone submitting a report can have their package tested on systems they
+don't normally have access to.  This will in turn let us do acceptance tests
+before merging pull requests into the 'stable' OPAM repository.
+
+I really like the Git workflow behind all this.  It basically reflects
+how we work with OCaml in an industrial setting: pool up a sequence of
+local changes (across multiple repositories), publish them to an internal
+OPAM remote, and then issue pull requests upstream until you hit the
+central stable repository.  At no point do you have to block waiting for
+someone else to do something for you, unless it's the default central
+repository that Thomas and I monitor.
+
+I'm also very pleased to announce that Rackspace (who use OCaml via the
+Xen Cloud toolstack) have recently donated a significant number of VMs
+to power all the builds behind this. We can use this infrastructure to
+securely run unit tests: we just need to set up a "gold image" VM with
+the build, unplugging its external network interface, run the test,
+and then replug it back into the network.  All via HTTP interfaces,
+with feedback sent back to the package maintainer via the Github pull
+request interface.
+
+-anil
+
+(PS: for those concerned about an over-dependence on Github, I'm currently
+evaluating Gitlab, which Jeremy Yallop pointed out to me -- it seems a
+good candidate to mirror all this activity somewhere else, while still
+using Github as a primary source).
+
+From mmatalka at gmail.com  Wed Jul 24 07:29:03 2013
+From: mmatalka at gmail.com (Malcolm Matalka)
+Date: Wed, 24 Jul 2013 06:29:03 +0000
+Subject: [opam-devel] Using OPAM with other languages
+Message-ID: <8738r4fp3k.fsf@gmail.com>
+
+In an email recently, Thomas said that OPAM is not tightly bound to
+Ocaml.  This peaked my interest as I am running into issues managing
+deps in an Erlang project.
+
+Is there any information out there on using OPAM with other languages?
+
+Thanks,
+/Malcolm
+
+From anil at recoil.org  Wed Jul 24 17:54:57 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 24 Jul 2013 09:54:57 -0700
+Subject: [opam-devel] Using OPAM with other languages
+In-Reply-To: <8738r4fp3k.fsf@gmail.com>
+References: <8738r4fp3k.fsf@gmail.com>
+Message-ID: <FA97101E-DC07-4173-9F9E-9A88B7817660@recoil.org>
+
+On 23 Jul 2013, at 23:29, Malcolm Matalka <mmatalka at gmail.com> wrote:
+
+> In an email recently, Thomas said that OPAM is not tightly bound to
+> Ocaml.  This peaked my interest as I am running into issues managing
+> deps in an Erlang project.
+> 
+> Is there any information out there on using OPAM with other languages?
+
+I use it occasionally with some kernel builds and such.  I think you
+can just go ahead and write shell scripts for whatever you want, as
+long as you dont mind there being global roots into the ocaml toolchain
+(e.g. you have to have some ocaml installed before OPAM will init).
+
+I'd be interested to hear what you do end up using it for... the
+constraint solver certainly has applications beyond just the OCaml
+use it's being put to at the moment.
+
+-anil
+
+From anil at recoil.org  Wed Jul 24 18:10:48 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 24 Jul 2013 10:10:48 -0700
+Subject: [opam-devel] [Caml-list] list of Opam repositories
+In-Reply-To: <E6DD1C5B-DC34-4507-8E6E-C6D622AA7ABB@cam.ac.uk>
+References: <CAAmHUA=1ZQSNHgxuJ1JHE3sxabgUAc3kqZrBqjyTUErEWfAmtA@mail.gmail.com>
+ <E6DD1C5B-DC34-4507-8E6E-C6D622AA7ABB@cam.ac.uk>
+Message-ID: <7DCB4071-7A6F-4288-9571-6FD09769A4E6@recoil.org>
+
+[switching from caml-list to opam-devel]
+
+On 23 Jul 2013, at 09:11, Amir Chaudhry <amc79 at cam.ac.uk> wrote:
+
+> 
+> On 23 Jul 2013, at 16:55, Rapha?l Proust <raphlalou at gmail.com> wrote:
+> 
+>> On Tue, Jul 23, 2013 at 4:44 PM, Daniel B?nzli
+>> <daniel.buenzli at erratique.ch> wrote:
+>>> I can't speak for godi, but at least for opam you get your facts wrong. There's nothing specific about github in opam and everybody can be a dictator. I'm one, just type:
+>>> 
+>>>   opam repo add erratique-u http://erratique.ch/software/opam/unreleased
+>>>   opam upgrade
+>> 
+>> Is there a list of repositories available somewhere? (Not necessarily
+>> an authoritative list.)
+>> Is anyone maintaining such a list?
+>> 
+>> 
+>> https://github.com/search?q=opam-repository gives a good start but it
+>> surely misses others?
+> 
+> https://github.com/search?q=opam+repo gives more results (11 more than the search above).
+> Most of these look like project based repos (or personal ones).
+> 
+> Would a list of them really be useful?
+
+Homebrew has a 'tap' feature.
+https://github.com/mxcl/homebrew/wiki/Interesting-Taps-%26-Branches
+
+Maintaining a list of well-known remotes on the OPAM wiki would be useful, yes.  We have Daniel, Mirage, Citrix, Xen, Ocsigen, Jun Furuse, and more we don't know about yet.  It would let us add those into the autobuild pool more easily.
+
+-anil
+
+
+From agarwal1975 at gmail.com  Wed Jul 24 21:54:57 2013
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Wed, 24 Jul 2013 16:54:57 -0400
+Subject: [opam-devel] reopen issue 675: The documentation for `.install`
+	files should be improved
+Message-ID: <CAMu2m2LhV84JqhQBqXcpFtmuUZN4Prsg9-2FDvR1s+Adh2RFjw@mail.gmail.com>
+
+Hi. I request reopening issue 675, comment therein explaining the reason.
+Thomas, I'm happy to make the changes and submit a pull request if you can
+confirm answers I'm unsure of.
+
+https://github.com/OCamlPro/opam/issues/675
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130724/53882f43/attachment.html>
+
+From thomas at ocamlpro.com  Wed Jul 24 23:02:12 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Thu, 25 Jul 2013 00:02:12 +0200
+Subject: [opam-devel] reopen issue 675: The documentation for `.install`
+	files should be improved
+In-Reply-To: <CAMu2m2LhV84JqhQBqXcpFtmuUZN4Prsg9-2FDvR1s+Adh2RFjw@mail.gmail.com>
+References: <CAMu2m2LhV84JqhQBqXcpFtmuUZN4Prsg9-2FDvR1s+Adh2RFjw@mail.gmail.com>
+Message-ID: <DC0309AB-0A08-4015-AF06-706D485060C2@ocamlpro.com>
+
+> Hi. I request reopening issue 675, comment therein explaining the reason. Thomas, I'm happy to make the changes and submit a pull request if you can confirm answers I'm unsure of.
+
+Sure! Go for it. Any help is kindly appreciated on the documentation front (and on other fronts as well :p)
+
+--
+Thomas
+
+
+From pmeunier at caltech.edu  Wed Jul 24 19:38:07 2013
+From: pmeunier at caltech.edu (Pierre-Etienne Meunier)
+Date: Wed, 24 Jul 2013 11:38:07 -0700
+Subject: [opam-devel] [Caml-list] GODI is shutting down
+In-Reply-To: <1B6BB035-9909-4F0C-9DEA-F713B977A467@ocamlpro.com>
+References: <1374669368.25411.5@samsung>
+ <1B6BB035-9909-4F0C-9DEA-F713B977A467@ocamlpro.com>
+Message-ID: <19644708-F869-46C3-9D55-7C038F75C54A@caltech.edu>
+
+Hi,
+
+I do not like the troll happening on the caml mailing list, but I must recognize it is a nice ad for opam, because the "real" arguments for opam get told, and there is more to it that what your website says.
+This is why I would like to ask a bunch of frequent questions, so that you can hopefully add them to your collection. I am no software engineering expert, nor am I a programming expert, or anything. This is the opinion of an amateur programmer, with an enthusiasm for freedom and sharing.
+
+- I wrote something about dictators in a previous mail. This is a general tendency today, from startups. You are a startup. Therefore, unless you explicitly state the following argument, by Thomas Gazagnaire in a recent email:
+
+> I disagree, people should be free to use whatever system they want.
+
+
+I will suspect you of trying to become dictators, and I will not use your software. Answering to this concern in mailing-lists is not enough to convince someone like me.
+
+
+- Ok, now I want to use it. I know how to write a package, how to make my own repository, how to install a package, how to submit it to the "official repository" (whose name would look more friendly to me as "Ocamlpro's repository"). I have a big problem, though: I do not know how to *use* a package. Are you using ocamlfind? I would guess not, right? You must have a more clever algorithm to tell ocamlopt what options it should get to use a library, can you tell me what to do if I want to use my package?
+
+
+- Finally, I understand you used really cool state of the art algorithm for sorting dependencies out. I am already pretty impressed by debian's system, how is your system different? Can you give a link to the papers describing these algorithms?
+
+
+Cheers,
+Pierre
+
+
+From amc79 at cam.ac.uk  Thu Jul 25 01:02:35 2013
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Thu, 25 Jul 2013 01:02:35 +0100
+Subject: [opam-devel] [Caml-list] GODI is shutting down
+In-Reply-To: <19644708-F869-46C3-9D55-7C038F75C54A@caltech.edu>
+References: <1374669368.25411.5@samsung>
+ <1B6BB035-9909-4F0C-9DEA-F713B977A467@ocamlpro.com>
+ <19644708-F869-46C3-9D55-7C038F75C54A@caltech.edu>
+Message-ID: <7E21416C-8ED4-4B0E-9A17-6F5F734B2A33@cam.ac.uk>
+
+Hi Pierre, I'm not one of opam devs but I do have some questions for you.
+
+On 24 Jul 2013, at 19:38, Pierre-Etienne Meunier <pmeunier at caltech.edu> wrote:
+
+> Hi,
+> 
+> I do not like the troll happening on the caml mailing list, but I must recognize it is a nice ad for opam, because the "real" arguments for opam get told, and there is more to it that what your website says.
+> This is why I would like to ask a bunch of frequent questions, so that you can hopefully add them to your collection. I am no software engineering expert, nor am I a programming expert, or anything. This is the opinion of an amateur programmer, with an enthusiasm for freedom and sharing.
+> 
+> - I wrote something about dictators in a previous mail. This is a general tendency today, from startups. You are a startup. Therefore, unless you explicitly state the following argument, by Thomas Gazagnaire in a recent email:
+> 
+>> I disagree, people should be free to use whatever system they want.
+> 
+> 
+> I will suspect you of trying to become dictators, and I will not use your software. Answering to this concern in mailing-lists is not enough to convince someone like me.
+
+I don't really understand what you mean about dictators.  What would dictatorship look like to you?  I'm always free to remove software from my machine (assuming that it was sensibly installed) so I find it difficult to understand your viewpoint.  If it's a case of contributions I've made to software, then I guess I can't revoke my actual commits but I can stop contributing more.
+
+Side note: I think your characterisation of 'startups = dictators' is overly broad and not particularly useful.  By that reasoning *any and every* new project is trying to be a dictator.  Do you really believe that?  I notice that Patoline's site doesn't explicitly state that you're not trying to be dictators (but of course, I wouldn't have assumed that you were).  I don't really want to get into a debate about free vs open vs closed software, I'm just trying to understand what 'dictators' means to you.
+
+
+> - Ok, now I want to use it. I know how to write a package, how to make my own repository, how to install a package, how to submit it to the "official repository" (whose name would look more friendly to me as "Ocamlpro's repository").
+
+I'd find OCamlPro-Repository to be quite confusing.  I'd expect it to be 'opam-repository' and also for it to the be first one I get with opam.  Not sure how this comes across as 'unfriendly'.
+
+Amir
+
+
+From pmeunier at caltech.edu  Thu Jul 25 02:21:25 2013
+From: pmeunier at caltech.edu (Pierre-Etienne Meunier)
+Date: Wed, 24 Jul 2013 18:21:25 -0700
+Subject: [opam-devel] [Caml-list] GODI is shutting down
+In-Reply-To: <7E21416C-8ED4-4B0E-9A17-6F5F734B2A33@cam.ac.uk>
+References: <1374669368.25411.5@samsung>
+ <1B6BB035-9909-4F0C-9DEA-F713B977A467@ocamlpro.com>
+ <19644708-F869-46C3-9D55-7C038F75C54A@caltech.edu>
+ <7E21416C-8ED4-4B0E-9A17-6F5F734B2A33@cam.ac.uk>
+Message-ID: <37D493F2-747F-47C9-97C8-D345A654EE78@caltech.edu>
+
+Hi Amir,
+Hi Opam developers,
+
+Before starting to clarify what I meant, I would like to state that I did not mean any harm to anyone. The least thing I want is to start trolls. I feel sorry if my initial email sounded aggressive to you, this was not my intention at all! I realize that I wrote it in a rush, like almost everything I do, and I should have taken my time to explain what I meant more clearly.
+
+You gave me the opportunity to clearly state what I meant with this "dictator" jargon, so let me take it and try to be as clear as possible. This is one of my favorite topics of discussion, by the way, so I am interested in continuing this conversation, if you want.
+
+
+> I don't really understand what you mean about dictators.  What would dictatorship look like to you?  I'm always free to remove software from my machine (assuming that it was sensibly installed) so I find it difficult to understand your viewpoint.  If it's a case of contributions I've made to software, then I guess I can't revoke my actual commits but I can stop contributing more.
+
+Without saying anything general about startups being all dictators (I was trying to be careful in my first email to avoid abusive generalizations, sorry if I missed this ;-), I would identify several dictatorial behaviors in the following current software adventures:
+
+- Steve wants to sell phones. Rather, he wants to sell phones running software he likes. Since he does not want to write all the code himself, he found it cheaper to create a "hype" around his phone, and have armies of people working for him for free. Why not? But he becomes a dictator when he decides to choose who has the right to run software on the phones he sells, and who hasn't. His stage of dictatorship is so advanced, that he even discards people's work after its completion!
+
+- Gerd wrote a nice package management system for his favorite programming language. He wants to manage all the packages people use. Fine! But he becomes a dictator when he removes a package from his servers because of a personal conflict with its authors. When a coup is decided, he even goes crazy and starts insulting everyone around.
+
+- Tom wants to sell software. Problem is, he does not have the technical skills to produce it. He thus decides to open a "free" repository service, using other people's software to sell whatever other people are producing. Business is business, right? But he becomes a dictator when he makes the system so closed, and the people so dependent on it, that he can get control over what software people get interested in, what software deserves to die. He can make people believe that any software not using his platform is crappy, any project not "github-compliant" is a dying project.
+
+- Eric runs an internet search engine, based on an awesome algorithm. He wants to make as much money as possible with this software, and everyone agrees, making money with math is the coolest thing. But he becomes a dictator when he uses this power to decide who should see such and such result, what advertising they should see based on what happened in their private life, for instance in the satellite photo of their garden last night.
+
+- Mark wants to let people stay in touch with their friends. He could do it with blogs and rss feeds, but he really wants to design something new. If he can come up with a better design, that would be awesome, right? Sure, but he became a dictator as soon as he used it to control how people can connect with each other, what they can exchange, censor whatever he wants for the sole sake of his own profit and power.
+Of course, no one is forced to use it. But in a world where the "hype" has taken over all my friends, should I replace my friends, or fight for a better world?
+
+- As a comparison, let me just finish with the case of Ian, who started a linux distribution a few years ago. He designed it to be distributed and mirrored everywhere by any volunteering participant. He retired from the project three years after starting it, and moved on to something else, after ensuring no one could take control over "his" project, not even himself.
+
+
+> Side note: I think your characterisation of 'startups = dictators' is overly broad and not particularly useful.  By that reasoning *any and every* new project is trying to be a dictator.  Do you really believe that?  I notice that Patoline's site doesn't explicitly state that you're not trying to be dictators (but of course, I wouldn't have assumed that you were).  I don't really want to get into a debate about free vs open vs closed software, I'm just trying to understand what 'dictators' means to you.
+
+I am really sorry if my characterization seemed too general. I said something more moderate, like "there is a trend" and "repeating so often that you admire a dictatorial company such as github". This does not mean at all that I do not admire people who start ambitious projects, this is even one of the main ways the world improves!
+
+It just means that, given some of the current patterns in the software business, that I listed above, this is a reasonable concern. If opam were completely closed, on the model of cabal, for instance, I would really find it less interesting: after all, if I am considering writing packages on my free time, I don't mind if someone makes profit out of it, but I do if they can control its distribution, based on their own standards of quality or whatever: I consider it a restriction of my freedom of expression.
+
+My point was not to start a troll on freedom, nor on opam, nor on godi, nor on anything. I just wanted to make a comment as constructive as possible on a project that I find nice, but that would require me an effort, and a part of my limited time, to start using.
+Before adopting it, and contributing to it, I just wanted to make sure its authors shared my standards of ethics, freedom about the way I normally distribute my work. I am not employed by any company, I may be in the future, but I will certainly never work for one for free.
+
+
+The example you picked with Patoline raises an interesting point. We do not state anything about dictators on our website, because Patoline is a product, and not a service. If someone sells you a product like a chair or a table, you have the right to use it in whatever way you want. You can place it upside down in your living room, stand up on it, throw it on your neighbors and colleagues if you want. It is not even possible to imagine a dictator of tables (well, the case of Steve's phone, above, is an exception ;-). Ocaml does not need to clarify this, either. It is a product, you can run it on your machine without requiring any input from anyone.
+The particular case of opam is strange, as it qualifies both as a product and as an online service. I do not know what this means.
+
+But in the story of Mark, above, since he runs an almost purely online service, he definitely needs to clarify this point. And he does: "Everything you post on facebook is ours. We are sorry, and fuck you."
+
+
+By the way, Patoline started as an academic project, so the comparison is difficult: we do not intend to make profit with it. The constraints of a startup are different, but I know we need them in order to get good quality software, moving fast. I shamelessly admit that I spend more than 95% of my time doing research in theoretical computer science and maths, and less than 5% on Patoline. A startup would have already delivered two nice versions of Patoline, while we are still struggling to get a crappy version 0.1 out.
+
+
+>> - Ok, now I want to use it. I know how to write a package, how to make my own repository, how to install a package, how to submit it to the "official repository" (whose name would look more friendly to me as "Ocamlpro's repository").
+> 
+> I'd find OCamlPro-Repository to be quite confusing.  I'd expect it to be 'opam-repository' and also for it to the be first one I get with opam.  Not sure how this comes across as 'unfriendly'.
+
+Again, I hate sounding aggressive.
+I am deeply sorry if this looked unfriendly to opam developers, and I understanding it, after these days of pointless flame wars on the caml list, but "more friendly" does not mean that the others are "unfriendly". It just means that a possible way to comfort paranoid people like me about these freedom issues would be to not have "official" rulers of the service, and only "main developers" of the product.
+I believe that our freedom of expression on the internet still needs to be defended at this time of "cloud hype". For products, a statement I like was given in the debian project : http://www.debian.org/intro/free.
+
+I feel sorry for all this useless noise, and for my quick instinctive reactions.
+PE
+
+
+From daniel.buenzli at erratique.ch  Fri Jul 26 02:07:28 2013
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 26 Jul 2013 02:07:28 +0100
+Subject: [opam-devel] Generating .install file
+In-Reply-To: <1C10FCCB0E1A45EEA099081C8D24AB5C@erratique.ch>
+References: <8C9AADB6E0404DA784C97193AD37A026@erratique.ch>
+ <32F6F594F14B4C5B840D1A29831C186A@erratique.ch>
+ <C7303F1A-0D7C-4975-B772-4AD09AEE1EB7@ocamlpro.com>
+ <1C10FCCB0E1A45EEA099081C8D24AB5C@erratique.ch>
+Message-ID: <ADEB1D45A80340A395267C96C5057FCB@erratique.ch>
+
+Le lundi, 8 juillet 2013 ? 13:23, Daniel B?nzli a ?crit :
+> Yes it's hand written, I don't care, at least it's very explicit. It uses the functions of this *trivial* package-independent script:
+>  
+> https://github.com/dbuenzli/vg/blob/master/pkg/pkg-builder
+I have improved that script to support all the new opam install sections. It can be found in this git repo:
+
+https://github.com/dbuenzli/pkgopkg/blob/master/pkg/pkg-builder
+
+which aggregates package development/publication tools I used to copy around in my packages. Note that a fun (haha) property of that repo is that it's both an opam repository and an opam package -- this allows me to quickly get my tools in an opam install.
+
+A non trivial (but still pure ocaml) example of usage can be found here:
+
+https://github.com/dbuenzli/webglue/blob/master/pkg/build
+
+This project has a command line tool, an api, dynamically loaded plugins all build via ocamlbuild. Man pages are defined via cmdliner and the plugins themselves add man pages to the tool. Thus these pages can only be extracted once the tool and the plugin have been built.  
+
+A call to `pkg/build true` builds the project and generates this [1] install file.  
+
+Best,
+
+Daniel
+
+[1]
+
+opam-version: "1"
+lib: [
+"_build/pkg/META" {"META"}
+"_build/src/api/wg.mli" {"wg.mli"}
+"_build/src/api/wg.cmi" {"wg.cmi"}
+"_build/src/api/wg.cmx" {"wg.cmx"}
+"_build/src/api/wg.cmxa" {"wg.cmxa"}
+"_build/src/api/wg.cmxs" {"wg.cmxs"}
+"_build/src/formats/w_css.cmxs" {"w_css.cmxs"}
+"_build/src/formats/w_text.cmxs" {"w_text.cmxs"}
+"_build/src/formats/w_files.cmxs" {"w_files.cmxs"}
+"_build/src/formats/w_timestamp.cmxs" {"w_timestamp.cmxs"}
+"_build/src/formats/w_sitemap.cmxs" {"w_sitemap.cmxs"}
+"_build/src/formats/w_xml.cmxs" {"w_xml.cmxs"}
+]
+bin: [
+"_build/src/tool/webglue.native" {"webglue"}
+]
+toplevel: [
+]
+share: [
+"_build/share/dotemacs" {"dotemacs"}
+"_build/share/example/home.map" {"example/home.map"}
+"_build/share/example/locale-menus.map" {"example/locale-menus.map"}
+"_build/share/example/text.map" {"example/text.map"}
+]
+doc: [
+"_build/README.md" {"README.md"}
+"_build/CHANGES.md" {"CHANGES.md"}
+]
+misc: [
+]
+stublibs: [
+]
+man: [
+"_build/webglue.1" {"man1/webglue.1"}
+"_build/webglue-content.1" {"man1/webglue-content.1"}
+"_build/webglue-diagnose.1" {"man1/webglue-diagnose.1"}
+"_build/webglue-get.1" {"man1/webglue-get.1"}
+"_build/webglue-help.1" {"man1/webglue-help.1"}
+"_build/webglue-set.1" {"man1/webglue-set.1"}
+"_build/webglue-show.1" {"man1/webglue-show.1"}
+"_build/webglue-uriset.1" {"man1/webglue-uriset.1"}
+"_build/webglue- at -text.7" {"man7/webglue- at -text.7"}
+"_build/webglue-directives.7" {"man7/webglue-directives.7"}
+"_build/webglue-formats.5" {"man5/webglue-formats.5"}
+"_build/webglue-s-expressions.5" {"man5/webglue-s-expressions.5"}
+"_build/webglue-standard-uris.7" {"man7/webglue-standard-uris.7"}
+"_build/w.css.5" {"man5/w.css.5"}
+"_build/w.files.5" {"man5/w.files.5"}
+"_build/w.map.5" {"man5/w.map.5"}
+"_build/w.sitemap.5" {"man5/w.sitemap.5"}
+"_build/w.text.5" {"man5/w.text.5"}
+"_build/w.timestamp.5" {"man5/w.timestamp.5"}
+"_build/w.xml.5" {"man5/w.xml.5"}
+]
+
+
+
+
+
+
+
+
+From vb at luminar.eu.org  Wed Jul 31 15:19:11 2013
+From: vb at luminar.eu.org (Vincent Bernardoff)
+Date: Wed, 31 Jul 2013 15:19:11 +0100
+Subject: [opam-devel] [Caml-list] GODI is shutting down
+In-Reply-To: <37D493F2-747F-47C9-97C8-D345A654EE78@caltech.edu>
+References: <1374669368.25411.5@samsung>
+ <1B6BB035-9909-4F0C-9DEA-F713B977A467@ocamlpro.com>
+ <19644708-F869-46C3-9D55-7C038F75C54A@caltech.edu>
+ <7E21416C-8ED4-4B0E-9A17-6F5F734B2A33@cam.ac.uk>
+ <37D493F2-747F-47C9-97C8-D345A654EE78@caltech.edu>
+Message-ID: <51F91CDF.4030100@luminar.eu.org>
+
+On 25/07/2013 02:21, Pierre-Etienne Meunier wrote:
+> Hi Amir, Hi Opam developers,
+>
+> Before starting to clarify what I meant, I would like to state that I
+> did not mean any harm to anyone. The least thing I want is to start
+> trolls. I feel sorry if my initial email sounded aggressive to you,
+> this was not my intention at all! I realize that I wrote it in a
+> rush, like almost everything I do, and I should have taken my time to
+> explain what I meant more clearly.
+
+You did not sound aggressive to me at least.
+
+>
+> You gave me the opportunity to clearly state what I meant with this
+> "dictator" jargon, so let me take it and try to be as clear as
+> possible. This is one of my favorite topics of discussion, by the
+> way, so I am interested in continuing this conversation, if you
+> want.
+>
+>
+>> I don't really understand what you mean about dictators.  What
+>> would dictatorship look like to you?  I'm always free to remove
+>> software from my machine (assuming that it was sensibly installed)
+>> so I find it difficult to understand your viewpoint.  If it's a
+>> case of contributions I've made to software, then I guess I can't
+>> revoke my actual commits but I can stop contributing more.
+>
+> Without saying anything general about startups being all dictators (I
+> was trying to be careful in my first email to avoid abusive
+> generalizations, sorry if I missed this ;-), I would identify several
+> dictatorial behaviors in the following current software adventures:
+>
+> - Steve wants to sell phones. Rather, he wants to sell phones running
+> software he likes. Since he does not want to write all the code
+> himself, he found it cheaper to create a "hype" around his phone, and
+> have armies of people working for him for free. Why not? But he
+> becomes a dictator when he decides to choose who has the right to run
+> software on the phones he sells, and who hasn't. His stage of
+> dictatorship is so advanced, that he even discards people's work
+> after its completion!
+> [...]
+
+I enjoyed reading this passage. I too think that any kind of power on 
+any thing should be framed from the start, to prevent abuses. I also 
+believe that power corrupts and absolute power corrupt absolutely and 
+that kind of stuff.
+
+So basically you're concern is "If I put energy on OPAM I don't want my 
+work to fall into the hands of OcamlPro". If OCaml was to become really 
+big and OPAM was to become the main source to discover new packages, 
+then indeed the maintainers of OPAM repository (currently jointly 
+OCamlPro/Ocamllabs) would have a big power. It can happen, I personally 
+discovered many libraries/programs written in OCaml by watching the 
+opam-repository on github.
+
+To counter that, it is necessary that OPAM would be managed like Debian, 
+by a consortium of stakeholders of the OCaml ecosystem (what GODI never 
+was). Is is already the case, Anil being a commiter of 
+OCamlPro/opam-repository on Github. And would OcamlPro becoming 
+dictatorial, nothing would prevent a fork anyway (of the repository, of 
+the program).
+
+I doubt OCamlPro wants to cling to OPAM that much anyway. It is so much 
+work to maintain this kind of thing that it can only be done by many 
+contributors in the same time. Now, could you please tell us what kind 
+of guarantees would you like to have in order to feel confident you can 
+contribute to OPAM ? What does Debian has that guarantees that no one 
+can take control of it that OPAM would not have ?
+
+Currently I see only one: The fact that Debian is bigger, thus have more 
+contributors, diluting the amount of power every contributor 
+individually has. And the fact that Debian is not a for-profit company. 
+That's what I ask you, imagine you were in charge of OPAM, in those 
+conditions (owning OCamlPro or sth like that). What would you do ?
+
+>> Side note: I think your characterisation of 'startups = dictators'
+>> is overly broad and not particularly useful.  By that reasoning
+>> *any and every* new project is trying to be a dictator.  Do you
+>> really believe that?  I notice that Patoline's site doesn't
+>> explicitly state that you're not trying to be dictators (but of
+>> course, I wouldn't have assumed that you were).  I don't really
+>> want to get into a debate about free vs open vs closed software,
+>> I'm just trying to understand what 'dictators' means to you.
+>
+> I am really sorry if my characterization seemed too general. I said
+> something more moderate, like "there is a trend" and "repeating so
+> often that you admire a dictatorial company such as github". This
+> does not mean at all that I do not admire people who start ambitious
+> projects, this is even one of the main ways the world improves!
+>
+> It just means that, given some of the current patterns in the
+> software business, that I listed above, this is a reasonable concern.
+
+Yes, I agree completely. Organisations that hold any kind of power of 
+all sort should have a structural scheme to prevent any abuse. This is 
+precisely what, as you said, most companies do not do and this is 
+personnally what I require also. But in the case of OPAM, I don't see 
+OCamlPro having enough power over it to make it a problem.
+
+> If opam were completely closed, on the model of cabal, for instance,
+> I would really find it less interesting: after all, if I am
+> considering writing packages on my free time, I don't mind if someone
+> makes profit out of it, but I do if they can control its
+> distribution, based on their own standards of quality or whatever: I
+> consider it a restriction of my freedom of expression.
+
+You can use any repository you like with OPAM. Would it make you feel 
+comfortable if, for example, "opam init" would ask for what default 
+repository to use (maybe already the case actually, I don't remember).
+
+Vincent
+

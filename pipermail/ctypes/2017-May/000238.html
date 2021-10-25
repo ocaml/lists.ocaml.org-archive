@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] ocaml as callback to C code with event loop
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20ocaml%20as%20callback%20to%20C%20code%20with%20event%20loop&In-Reply-To=%3CCAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH%3D%2B4qihiLgt0A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000237.html">
+   <LINK REL="Next"  HREF="000239.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] ocaml as callback to C code with event loop</H1>
+    <B>Serge Sivkov</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20ocaml%20as%20callback%20to%20C%20code%20with%20event%20loop&In-Reply-To=%3CCAOUGqWyE9SGCsqXXGhS3FnY6jB9tnYU0hNPyvH%3D%2B4qihiLgt0A%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] ocaml as callback to C code with event loop">ssp.mryau at gmail.com
+       </A><BR>
+    <I>Fri May 12 10:46:07 BST 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000237.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+        <LI>Next message: <A HREF="000239.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#238">[ date ]</a>
+              <a href="thread.html#238">[ thread ]</a>
+              <a href="subject.html#238">[ subject ]</a>
+              <a href="author.html#238">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+here is minimal example, which works without any problems on x86 and raises
+CallToExpiredClosure on ARM:
+<A HREF="https://github.com/mryau/ctypes-mintest">https://github.com/mryau/ctypes-mintest</A>
+
+WBR, ssp
+
+2017-05-11 16:37 GMT+05:00 Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt;:
+
+&gt;<i> On 11 May 2017 at 10:20, Serge Sivkov &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">ssp.mryau at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; thank for your reply, it allow me partially resolve problem: code works
+</I>&gt;<i> on
+</I>&gt;<i> &gt; x86 without any problems (yet with Gc.compact() calls insert after each
+</I>&gt;<i> line
+</I>&gt;<i> &gt; of code). But ARM version allways raises CallToExpiredClosure on the
+</I>&gt;<i> first
+</I>&gt;<i> &gt; call to callback.
+</I>&gt;<i> &gt; I've tried next variants to store callback if struct field:
+</I>&gt;<i> &gt; - existing toplevel function by name
+</I>&gt;<i> &gt; - store function name to toplevel ref and save it to struct field by
+</I>&gt;<i> &gt; !ref_name
+</I>&gt;<i> &gt; - by register closure to function (fun a b c d -&gt; top_level_function a b
+</I>&gt;<i> c
+</I>&gt;<i> &gt; d) with Ctypes.Root.create
+</I>&gt;<i> &gt; - by store same closure to Hashtbl.
+</I>&gt;<i> &gt; - by register finaliser with Gc.finalise for closure (and it has not been
+</I>&gt;<i> &gt; called)
+</I>&gt;<i> &gt; All this variants work on x86 and do not work on ARM, i.e. first call to
+</I>&gt;<i> &gt; OCaml callback from C raises CallToExpiredClosure.
+</I>&gt;<i> &gt; It seems I don't understand problem at all.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; So here is base questions:
+</I>&gt;<i> &gt; - in case I store in C struct field existing toplevel function by name,
+</I>&gt;<i> may
+</I>&gt;<i> &gt; it be GC'ed?
+</I>&gt;<i>
+</I>&gt;<i> Yes.  The only way to prevent a value from being collected is to
+</I>&gt;<i> ensure that it's visible to the GC, which requires keeping a reference
+</I>&gt;<i> to it in an OCaml object.  The GC doesn't scan C memory, such as
+</I>&gt;<i> struct fields, so storing a function in a struct field won't stop it
+</I>&gt;<i> being collected.
+</I>&gt;<i>
+</I>&gt;<i> &gt; -what may cause CallToExpiredClosure raise too if I has only one
+</I>&gt;<i> callback to
+</I>&gt;<i> &gt; call and at C side this struct in GDB seems to be correct?
+</I>&gt;<i>
+</I>&gt;<i> If there's an OCaml reference to the function passed to C then
+</I>&gt;<i> CallToExpiredClosure should never occur.  But it has to be exactly the
+</I>&gt;<i> same function -- for example, storing a function in a struct field,
+</I>&gt;<i> then reading from the struct field will create a new copy of the
+</I>&gt;<i> function, which won't prevent the original from being collected.
+</I>&gt;<i>
+</I>&gt;<i> If you have a (smallish) running example somewhere of the code that's
+</I>&gt;<i> causing problems I'd be happy to take a look.
+</I>&gt;<i>
+</I>&gt;<i> Kind regards,
+</I>&gt;<i>
+</I>&gt;<i> Jeremy.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20170512/e842a84c/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20170512/e842a84c/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000237.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+	<LI>Next message: <A HREF="000239.html">[ocaml-ctypes] ocaml as callback to C code with event loop
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#238">[ date ]</a>
+              <a href="thread.html#238">[ thread ]</a>
+              <a href="subject.html#238">[ subject ]</a>
+              <a href="author.html#238">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

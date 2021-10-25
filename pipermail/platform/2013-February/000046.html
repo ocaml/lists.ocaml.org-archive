@@ -1,0 +1,196 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Does Core change too often?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Does%20Core%20change%20too%20often%3F&In-Reply-To=%3C87ip5tb3zf.fsf%40li195-236.members.linode.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000045.html">
+   <LINK REL="Next"  HREF="000047.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Does Core change too often?</H1>
+    <B>Malcolm Matalka</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Does%20Core%20change%20too%20often%3F&In-Reply-To=%3C87ip5tb3zf.fsf%40li195-236.members.linode.com%3E"
+       TITLE="[ocaml-platform] Does Core change too often?">mmatalka at gmail.com
+       </A><BR>
+    <I>Fri Feb 15 22:35:00 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000045.html">[ocaml-platform] Does Core change too often?
+</A></li>
+        <LI>Next message: <A HREF="000047.html">[ocaml-platform] Does Core change too often?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#46">[ date ]</a>
+              <a href="thread.html#46">[ thread ]</a>
+              <a href="subject.html#46">[ subject ]</a>
+              <a href="author.html#46">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I don't know how Ocaml linking works, but here is how I believe it works
+in Nix, which is mostly C-based packages, of course:
+
+- All packages are given a unique path
+
+- When you compile a package, if its deps are statically linked then
+  they are just compiled into it, so it doesn't matter what else you're
+  linking against when you use this as dep
+
+- If they are dynamically linked, a post-processing step rewrites the
+  binary so all paths to deps are the unique path, I *think* this means
+  if you have the diamond problem it's ok because the dep will always
+  load the version of the library it was compiled against.
+
+But I could easily be way wrong.
+
+/M
+
+Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; writes:
+
+&gt;<i> I think the diamond dependency problem is a fundamental semantic
+</I>&gt;<i> issue, and can't be worked around by tools.  If I use a Core.Map.t
+</I>&gt;<i> from version 109.06, and the implementation changes in 109.07, then if
+</I>&gt;<i> libraries A and B both use Core.Map.t's in their interface, there's no
+</I>&gt;<i> way they can communicate, unless you propagate the versioning into the
+</I>&gt;<i> library!  You could have a Core_109_07.Map.t, and Core_109_06.Map.t,
+</I>&gt;<i> but I'm pretty sure madness lies that way...
+</I>&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i> On Fri, Feb 15, 2013 at 7:09 AM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> My Nix setup is a huge hack right now, but! here is my current public
+</I>&gt;&gt;<i> fork of nixpkgs with an OLD version of opam + Core 108.07.01:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="https://github.com/orbitz/nixpkgs/commit/fd598f1b55c94b4d466ac5ddffb304136bdc433e">https://github.com/orbitz/nixpkgs/commit/fd598f1b55c94b4d466ac5ddffb304136bdc433e</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The only interesting change is I had to patch Async because its build
+</I>&gt;&gt;<i> script requires /bin/bash and /bin/mkdir. And the build failure for
+</I>&gt;&gt;<i> Async is pretty awesome btw :)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> (I'm not 100% sure that the above branch works on Nix since I have some
+</I>&gt;&gt;<i> local changes that have been sitting around for awhile, but it gives the
+</I>&gt;&gt;<i> gist.  If more complete, working versions, are interested to anyone I
+</I>&gt;&gt;<i> can put the effort in to give a more complete demonstration)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I also have these cheap scripts I use to create my environment when
+</I>&gt;&gt;<i> playing locally.  This should really be done as an eval like opam's
+</I>&gt;&gt;<i> config but right now I do something like 'ocaml_run.sh make'.  Or
+</I>&gt;&gt;<i> ocaml.sh to get the REPL.  This plays fine with opam (for me) since my
+</I>&gt;&gt;<i> script is additive to the environment.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="https://github.com/orbitz/ocaml_wrapper">https://github.com/orbitz/ocaml_wrapper</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> @yaron - Correct, AFAIK this does not some diamond dep problem.  Based
+</I>&gt;&gt;<i> on what Anil said I guess ocamlfind needs to be modified for that.  Or
+</I>&gt;&gt;<i> the ability for libraries to be built with their deps linked in already.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> /Malcolm
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">anil at recoil.org</A>&gt; writes:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Right, but the opportunities for re-using previously compiled libraries
+</I>&gt;&gt;&gt;<i> are limited, because of the exact-version requirements.  Having multiple
+</I>&gt;&gt;&gt;<i> OPAM switches per set of constraints would be almost as good, if much
+</I>&gt;&gt;&gt;<i> more burdensome from a command-line perspective.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Do you have your Nix setup available anywhere? I'd definitely like to
+</I>&gt;&gt;&gt;<i> have a play with it.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> -anil
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On 15 Feb 2013, at 11:37, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> I get around this in Nix with chroot and building OCAMLPATH on the fly.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> On Feb 15, 2013 12:34 PM, &quot;Anil Madhavapeddy&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i> OPAM has a strong dependency on ocamlfind at the moment, which doesn't
+</I>&gt;&gt;&gt;&gt;<i> support multiple library versions.  OPAM could be extended to support
+</I>&gt;&gt;&gt;&gt;<i> multiple installations (since the constraint model expresses it fine),
+</I>&gt;&gt;&gt;&gt;<i> but would need to understand more of the build process too.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> There are some steps towards this already, such as the `.install` files
+</I>&gt;&gt;&gt;&gt;<i> which automate binary installation/removal.  We were reluctant to put
+</I>&gt;&gt;&gt;&gt;<i> any more in the first version in the interests of getting something out.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> -anil
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> On 15 Feb 2013, at 11:21, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">mmatalka at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> &gt; Right now, I think Core not being afraid to change frequently is good.
+</I>&gt;&gt;&gt;&gt;<i> &gt; I'd rather have that than a stale API that kind of sucks.  And I'd hate
+</I>&gt;&gt;&gt;&gt;<i> &gt; to have the public Core get out of synch with what Jane St uses
+</I>&gt;&gt;&gt;&gt;<i> &gt; internally because it increases the overhead for you which decreases the
+</I>&gt;&gt;&gt;&gt;<i> &gt; chance of timely releases.
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; Multiple versions has not been a problem for me since I convert opam
+</I>&gt;&gt;&gt;&gt;<i> &gt; packages I'm interested in to Nix packages, and Nix handles multiple
+</I>&gt;&gt;&gt;&gt;<i> &gt; versions of installed packages just fine.  It's probably too late in the
+</I>&gt;&gt;&gt;&gt;<i> &gt; game for opam to have this style as well, I don't know anything about
+</I>&gt;&gt;&gt;&gt;<i> &gt; opam's design, but it's worked pretty well in Nix for me.
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; Beyond that, I think good semantic versioning is probably key.  If the
+</I>&gt;&gt;&gt;&gt;<i> &gt; majority of Core changes are backwards compatible (I have no idea if
+</I>&gt;&gt;&gt;&gt;<i> &gt; this is the case) then installing the right package for a lot of the
+</I>&gt;&gt;&gt;&gt;<i> &gt; apps probably isn't so bad.
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; /Malcolm
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt; Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; writes:
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; Right now, the Core suite of libraries changes a lot --- we have a new
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; release of everything every week.  The changes on a given week are
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; small, but there are always changes.
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; I can imagine this being something of a problem for OPAM.  If packages
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; specify specific revisions of the Core suite, then we're going to have
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; a massive version mismatch problem, where no two libraries can agree
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; on the version of Core that they need.
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; I have no obvious ideas as to how to solve this.  Does anyone else
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; have ideas?  Should we simply encourage packagers to specify a
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; lower-bound constraint on the Core libraries?
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; y
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; _______________________________________________
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; Platform mailing list
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;&gt;&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;&gt;&gt;&gt;<i> &gt; _______________________________________________
+</I>&gt;&gt;&gt;&gt;<i> &gt; Platform mailing list
+</I>&gt;&gt;&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;&gt;&gt;&gt;<i> &gt;
+</I>&gt;&gt;&gt;&gt;<i>
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000045.html">[ocaml-platform] Does Core change too often?
+</A></li>
+	<LI>Next message: <A HREF="000047.html">[ocaml-platform] Does Core change too often?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#46">[ date ]</a>
+              <a href="thread.html#46">[ thread ]</a>
+              <a href="subject.html#46">[ subject ]</a>
+              <a href="author.html#46">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

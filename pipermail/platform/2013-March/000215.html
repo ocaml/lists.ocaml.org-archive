@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Unique file names
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Unique%20file%20names&In-Reply-To=%3CCAPFanBEy5K8AQb3fxbzjOb7gNrBXNN%2Bf95OA%3DHS_QPbRdFrOrA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000214.html">
+   <LINK REL="Next"  HREF="000217.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Unique file names</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Unique%20file%20names&In-Reply-To=%3CCAPFanBEy5K8AQb3fxbzjOb7gNrBXNN%2Bf95OA%3DHS_QPbRdFrOrA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Unique file names">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Sun Mar  3 15:59:50 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000214.html">[ocaml-platform] Unique file names
+</A></li>
+        <LI>Next message: <A HREF="000217.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#215">[ date ]</a>
+              <a href="thread.html#215">[ thread ]</a>
+              <a href="subject.html#215">[ subject ]</a>
+              <a href="author.html#215">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>The filenames are important for two distinct reasons now:
+1. they determine the &quot;internal name&quot; of the compilation unit (the one
+stored in the .cmo/.cmi data); this one must absolutely be unique for
+linking to work: you cannot link together two modules of the same
+internal name
+2. with the current implementation, they determine the mapping from
+compilation unit names to compilation units: the current &quot;namespace&quot;
+semantics is to map the compunit-name Foo to a file foo.cmi or Foo.cmi
+in the search path
+
+Regarding aspect (2), having filename conflicts is not an issue if
+your namespace language is rich enough to let you map two different
+identifiers to two compunits of the same filename. As far as I
+understand, this is currently not the case of Alain's proposal (which
+rebinds compunits names to compunits names, still search within the
+search-path so not conflict-robust), but some transformations of it
+may make it possible (eg. specifying that the compunits specified in a
+.ns file are only looked up in the .ns directory, rather than all the
+search-path, so that same-filename compunits in distinct repositories
+do not conflict); in the general case, a mapping from compilation unit
+names to compilation unit paths avoid this issue (but how path are
+specified remain to be fully fleshed out: absolute paths, relative to
+stdlib, ocamlfind queries...).
+
+Note that Alain's proposal also map the namespace names to .ns
+filenames. My guess would be that if we today recognize that binding
+compunit source-names to their filenames is a mistake, we may regret
+making the exact same choice for the upper-level construct in the
+future.
+
+Regarding aspect (1), we discussed enriching the compilation unit with
+information not coming from the filename itself (eg. the &quot;provenance
+field&quot; in spec.pdf). The most general situation is to consider that an
+internal prefix (or suffix) can be passed to the compiler at
+invocation time, as is currently used -for-pack (you're then free to
+express directory-local policies, random choices, interface hashes or
+whatever on top of this very primitive idea).
+
+This however opens the door for more things to work out that Alain's
+minimalistic proposal avoided. One aspect is the way modules are
+referred to in tools output (ocamldoc, ocamldep, etc.). My source my
+refer to the compilation unit Foo, which through the compilation
+environment resolves to the compilation unit /foo/bar.cm[io]. In
+Alain's proposal, ocamldoc would return a reference to the module Bar,
+that is the &quot;authoritative&quot; compilation unit name, obtained through
+following the namespace rebindings. But if you allow to mix
+same-filename compilation units in a project, there is no such
+&quot;authoritative&quot; compilation unit name. Ocamldoc output must either
+mention the compilation unit path (&quot;/foo/bar&quot;) or enhanced internal
+name (&quot;janestreet.core.bar.h2d846sc&quot;), which are not very nice, or
+refer to the compilation unit name used in the original source file,
+Foo, which makes its output relative to the compilation environment
+used at invocation time. I personally think this last option is the
+way to go (I already consider compilation to be dependent on the
+compilation environment, that is the search path filesystem state),
+but that is one more subtlety that Alain was happy to avoid.
+
+On Sun, Mar 3, 2013 at 4:17 PM, Daniel B&#252;nzli
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">daniel.buenzli at erratique.ch</A>&gt; wrote:
+&gt;<i> Le dimanche, 3 mars 2013 &#224; 15:30, Yaron Minsky a &#233;crit :
+</I>&gt;&gt;<i> It seems like developers' lives would
+</I>&gt;&gt;<i> be simpler (and their ls output full of less repetitive noise) if we
+</I>&gt;&gt;<i> don't literally need to name files in this way.
+</I>&gt;<i>
+</I>&gt;<i> Agreed, if we need to convince him, we could try to quantify the loss of productivity due to editor open/switch buffer completion not being unique while working on a library...
+</I>&gt;<i>
+</I>&gt;<i> Daniel
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000214.html">[ocaml-platform] Unique file names
+</A></li>
+	<LI>Next message: <A HREF="000217.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#215">[ date ]</a>
+              <a href="thread.html#215">[ thread ]</a>
+              <a href="subject.html#215">[ subject ]</a>
+              <a href="author.html#215">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

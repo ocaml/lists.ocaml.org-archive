@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [ocaml-infra] Wireframe demo of OCaml.og
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5Bocaml-infra%5D%20Wireframe%20demo%20of%20OCaml.og&In-Reply-To=%3C201303151335.00714.louis.gesbert%40ocamlpro.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000021.html">
+   <LINK REL="Next"  HREF="000023.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [ocaml-infra] Wireframe demo of OCaml.og</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5Bocaml-infra%5D%20Wireframe%20demo%20of%20OCaml.og&In-Reply-To=%3C201303151335.00714.louis.gesbert%40ocamlpro.com%3E"
+       TITLE="[opam-devel] [ocaml-infra] Wireframe demo of OCaml.og">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Fri Mar 15 12:35:00 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000021.html">[opam-devel] [ocaml-infra] Wireframe demo of OCaml.og
+</A></li>
+        <LI>Next message: <A HREF="000023.html">[opam-devel] [ocaml-platform] [ocaml-infra] Wireframe demo of	OCaml.og
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#22">[ date ]</a>
+              <a href="thread.html#22">[ thread ]</a>
+              <a href="subject.html#22">[ subject ]</a>
+              <a href="author.html#22">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Here is a quick &amp; dirty shell/sed script that I used to put links to the github pages, for our projects hosted on github. Better than nothing for now.
+
+If anyone may find it useful:
+
+for f in **/url; do          
+    homepage=$(sed \
+        's#archive: *&quot;\(http.\?://.\+\.github\.com/[^/]\+\)/.*&quot;#\1#; t ok; s#archive: *&quot;\(http.\?://github.com/[^/]\+/[^/]\+\)/.*&quot;#\1#; t ok; d; :ok' $f)
+    if [ -n &quot;$homepage&quot; ]; then
+        echo -en &quot;\e[32m$f\e[m... &quot;
+        if \! grep -q 'ocamlpro.com' ${f%url}opam; then
+            echo '\e[31mNot ours\e[m'
+        elif grep -q 'homepage' ${f%url}opam; then
+            echo -e '\e[32mAlready there\e[m'
+        else
+            echo &quot;\e[33mAdding $homepage\e[m&quot;
+            echo &quot;homepage: \&quot;$homepage\&quot;&quot; &gt;&gt; ${f%url}opam
+        fi
+    fi
+done
+
+Louis
+
+Le Friday 15 March 2013 12:34:42, Thomas Gazagnaire a &#233;crit :
+&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> &gt; I mean: could it be possible to create some kind of &quot;info&quot; packages in
+</I>&gt;<i> &gt; opam to indicate that a library/tool/... exists but is not packaged
+</I>&gt;<i> &gt; yet ? With a flag to make them appear in opam list and search ?
+</I>&gt;<i> 
+</I>&gt;<i> You can already create &quot;empty&quot; packages with a dummy build instruction which just display &quot;NOT PACKAGED YET!&quot; and exit with a non-zero code, but I doubt this would be very helpful to the user (and quite frustrating). But why not ...
+</I>&gt;<i> 
+</I>&gt;<i> &gt; This could encourage contributors to package not yet packaged tools and
+</I>&gt;<i> &gt; libs.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Regarding tags, it is possible that I missed the information, but is
+</I>&gt;<i> &gt; opam going to handle tags associated to packages ? (I saw some
+</I>&gt;<i> &gt; tag-based search in packages in Amir's demos)
+</I>&gt;<i> 
+</I>&gt;<i> Yup, OPAM 1.0.0 supports tags but we haven't advertise that properly yet (the priority was to release the tool with all the rights features in). Now we can concentrate on the package metadata themselves.
+</I>&gt;<i> 
+</I>&gt;<i> If you look at section 1.2.4 of the dev-manual[1] your can see that you can add these new fields in the .opam:
+</I>&gt;<i> 
+</I>&gt;<i> homepage: &quot;url&quot;
+</I>&gt;<i> authors: [ &quot;me&quot; &quot;you&quot; ]
+</I>&gt;<i> tags: [ &quot;foo&quot; &quot;bar&quot; ]
+</I>&gt;<i> 
+</I>&gt;<i> I encourage everybody with some spare time to add these relevant fields to the existing package metadata :-) Bonus points if you come-up with some automatic tools to do this.
+</I>&gt;<i> For the tag conventions, I'm pretty in favor of re-using the great work that has already been put in the hump. Is there a list of tags and their description available somewhere ?
+</I>&gt;<i> 
+</I>&gt;<i> You can query the tags on the command line: `opam info foo -f tags` will display the tags associated to the package foo but I just realize that the search function doesn't look at the tags yet ... I've opened [2] to to keep track of this.
+</I>&gt;<i> 
+</I>&gt;<i> &gt; At last, I also saw in Amir's demos news feeds associated to packages.
+</I>&gt;<i> &gt; Will the RSS feed be indicated in opam package information ?
+</I>&gt;<i> 
+</I>&gt;<i> This is a great idea, I'm not sure how to do this properly yet but that's something what we really aim for (ie. give the user the ability to get quick feedback on a given package). This is now tracked by [3].
+</I>&gt;<i> 
+</I>&gt;<i> --
+</I>&gt;<i> Thomas
+</I>&gt;<i> 
+</I>&gt;<i> [1] <A HREF="https://github.com/OCamlPro/opam/raw/master/doc/dev-manual/dev-manual.pdf">https://github.com/OCamlPro/opam/raw/master/doc/dev-manual/dev-manual.pdf</A>
+</I>&gt;<i> [2] <A HREF="https://github.com/OCamlPro/opam/issues/535">https://github.com/OCamlPro/opam/issues/535</A>
+</I>&gt;<i> [3] <A HREF="https://github.com/OCamlPro/opam/issues/536">https://github.com/OCamlPro/opam/issues/536</A>
+</I>&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i> 
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000021.html">[opam-devel] [ocaml-infra] Wireframe demo of OCaml.og
+</A></li>
+	<LI>Next message: <A HREF="000023.html">[opam-devel] [ocaml-platform] [ocaml-infra] Wireframe demo of	OCaml.og
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#22">[ date ]</a>
+              <a href="thread.html#22">[ thread ]</a>
+              <a href="subject.html#22">[ subject ]</a>
+              <a href="author.html#22">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

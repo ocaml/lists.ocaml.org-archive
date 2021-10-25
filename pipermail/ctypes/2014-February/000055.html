@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Spinning process on osx
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3C8E00A7387FE74F49B548B18409A08BD2%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000054.html">
+   <LINK REL="Next"  HREF="000056.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Spinning process on osx</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3C8E00A7387FE74F49B548B18409A08BD2%40erratique.ch%3E"
+       TITLE="[ocaml-ctypes] Spinning process on osx">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Tue Feb 11 16:18:36 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000054.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+        <LI>Next message: <A HREF="000056.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#55">[ date ]</a>
+              <a href="thread.html#55">[ thread ]</a>
+              <a href="subject.html#55">[ subject ]</a>
+              <a href="author.html#55">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I managed to get a little bit more info by compiling libffi with `--enable-debug` and everything compiled with -g under ocaml.
+
+Using lldb it seems something bad happens during the setup of ffi_call call in ctypes's ctypes_call function. See the `-&gt;' in the second disassemble below which points to this line:
+
+<A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/ocaml-ctypes-0.2.2/src/ctypes-foreign-base/ffi_call_stubs.c#L302">https://github.com/ocamllabs/ocaml-ctypes/blob/ocaml-ctypes-0.2.2/src/ctypes-foreign-base/ffi_call_stubs.c#L302</A>
+
+Daniel
+
+&gt;<i> lldb bug.native 
+</I>Current executable set to 'bug.native' (x86_64).
+(lldb) run
+Process 43924 launched: '/Users/dbuenzli/bug/bug.native' (x86_64)
+Process 43924 stopped
+* thread #1: tid = 0x26ff7d, 0x00000001007a37b0, queue = 'com.apple.main-thread, stop reason = EXC_BAD_ACCESS (code=2, address=0x1007a37b0)
+    frame #0: 0x00000001007a37b0
+-&gt; 0x1007a37b0:  xorb   %ch, 65539(%rbx)
+   0x1007a37b6:  addb   %al, (%rax)
+   0x1007a37b8:  addl   (%rax), %eax
+   0x1007a37ba:  addb   %al, (%rax)
+(lldb) bt
+* thread #1: tid = 0x26ff7d, 0x00000001007a37b0, queue = 'com.apple.main-thread, stop reason = EXC_BAD_ACCESS (code=2, address=0x1007a37b0)
+    frame #0: 0x00000001007a37b0
+    frame #1: 0x0000000100076d50 bug.native`ctypes_call(function=4303202416, callspec_=4303295728, argwriter=4302976944, rvreader=4303196432) + 304 at ffi_call_stubs.c:298
+    frame #2: 0x000000010003ae3c bug.native`.L141 + 24
+(lldb) up
+frame #1: 0x0000000100076d50 bug.native`ctypes_call(function=4303202416, callspec_=4303295728, argwriter=4302976944, rvreader=4303196432) + 304 at ffi_call_stubs.c:298
+(lldb) di --mixed -c 13 -s $pc-20
+bug.native`ctypes_call + 284 at ffi_call_stubs.c:293
+   0x100076d3c:  clc    
+   0x100076d3d:  addq   %rdi, %r15
+bug.native`ctypes_call + 288 at ffi_call_stubs.c:298
+   0x100076d40:  callq  0x1000870c0               ; caml_copy_int64
+   0x100076d45:  movq   %r14, %rdi
+   0x100076d48:  movq   %rax, %rsi
+   0x100076d4b:  callq  0x100094bd0               ; caml_callback
+bug.native`ctypes_call + 304 at ffi_call_stubs.c:302
+-&gt; 0x100076d50:  movq   -64(%rbp), %rax
+   0x100076d54:  movq   64(%rax), %rdi
+bug.native`ctypes_call + 312 at ffi_call_stubs.c:300
+   0x100076d58:  movq   -56(%rbp), %rax
+   0x100076d5c:  movq   8(%rax), %rsi
+bug.native`ctypes_call + 320 at ffi_call_stubs.c:302
+   0x100076d60:  movq   %r15, %rdx
+   0x100076d63:  movq   %r13, %rcx
+   0x100076d66:  callq  0x1000979f0               ; symbol stub for: caml_system__code_end
+(lldb) frame variable
+(value) function = 4303202416
+(value) callspec_ = 4303295728
+(value) argwriter = 4302976944
+(value) rvreader = 4303196432
+(caml__roots_block) caml__roots_function = {
+  next = 0x0000000000000000
+  ntables = 4
+  nitems = 1
+  tables = {
+    [0] = 0x00007fff5fbff6d8
+    [1] = 0x00007fff5fbff6d0
+    [2] = 0x00007fff5fbff6c8
+    [3] = 0x00007fff5fbff6c0
+    [4] = 0x000000010003ad20
+  }
+}
+(caml__roots_block) caml__roots_function = {
+  next = 0x0000000000000000
+  ntables = 4
+  nitems = 1
+  tables = {
+    [0] = 0x00007fff5fbff6d8
+    [1] = 0x00007fff5fbff6d0
+    [2] = 0x00007fff5fbff6c8
+    [3] = 0x00007fff5fbff6c0
+    [4] = 0x000000010003ad20
+  }
+}
+(caml__roots_block *) caml__frame = &lt;register r12 is not available&gt;
+(int) caml__dummy_function = 0
+(size_t) arg_array_offset = &lt;variable not available&gt;
+(char *) return_slot = &lt;register r15 is not available&gt;
+(void (*)()) cfunction = &lt;variable not available&gt;
+(callspec *) callspec = &lt;no location, value may have been optimized out&gt;
+(int) roffset = &lt;no location, value may have been optimized out&gt;
+(size_t) bytes = &lt;no location, value may have been optimized out&gt;
+(char *) callbuffer = &lt;no location, value may have been optimized out&gt;
+
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000054.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+	<LI>Next message: <A HREF="000056.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#55">[ date ]</a>
+              <a href="thread.html#55">[ thread ]</a>
+              <a href="subject.html#55">[ subject ]</a>
+              <a href="author.html#55">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

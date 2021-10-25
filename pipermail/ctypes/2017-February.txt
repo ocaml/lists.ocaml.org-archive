@@ -1,0 +1,227 @@
+From yallop at gmail.com  Wed Feb  1 15:22:05 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 1 Feb 2017 15:22:05 +0000
+Subject: [ocaml-ctypes] Static function callback.
+In-Reply-To: <CABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ@mail.gmail.com>
+References: <CABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ@mail.gmail.com>
+Message-ID: <CAAxsn=Gc0AVDGeA6-qT7Cjtea1XVj_AKVtY+Uq6xP1f-S1_9sw@mail.gmail.com>
+
+On 31 January 2017 at 22:31, Romain Beauxis <romain.beauxis at gmail.com> wrote:
+> I am playing with a binding for OSX's SecureTransport API. The API
+> abstracts away the underlying socket implementation and, thus,
+> requires to pass (static) callbacks, which is where I am having
+> trouble..
+>
+> Here are the relevant part of the code:
+>
+> let fd_read = (...)
+>
+> let fd_write = (...)
+>
+> let _set_io_funcs = foreign ~from:lib "SSLSetIOFuncs"
+>   (ptr void @-> fd_io_typ @-> fd_io_typ @-> returning int)
+
+Assuming that fd_io_typ is defined something like this
+
+   let fd_io_typ =
+     funptr (connection_ref @-> ptr void @-> ptr size_t @-> returning
+oss_status)
+
+and that fd_read and fd_write are actually top-level (i.e. "static")
+functions then you shouldn't need to do anything special.  Top-level
+functions stay alive for the duration of the program, so there's no
+danger of their being prematurely collected.
+
+>   let read = Root.create fd_read in
+
+I'm not sure that the Root module is really what you need here.  Root
+is useful for passing pointers to OCaml values to C when the OCaml
+part of the program doesn't keep a reference to the values.  But in
+this case the OCaml program should always have a reference to fd_read
+and fd_write.  So I suspect the problem may lie elsewhere.
+
+> I've tried my best to make sure that the passed callback would be
+> immune to Gc issues. Unfortunately, I am still experiencing issues
+> with them which, I think, relate to the Gc messing with those.
+
+> Besides using C stubs (which I am trying to avoid as an exercise
+> here), is there anything else that I could do to make this work?
+
+One useful trick for tracking down GC issues is to add calls to
+Gc.compact to your program, so that objects that are collected too
+early are collected even earlier.
+
+From romain.beauxis at gmail.com  Thu Feb  2 04:33:24 2017
+From: romain.beauxis at gmail.com (Romain Beauxis)
+Date: Wed, 1 Feb 2017 22:33:24 -0600
+Subject: [ocaml-ctypes] Static function callback.
+In-Reply-To: <CAAxsn=Gc0AVDGeA6-qT7Cjtea1XVj_AKVtY+Uq6xP1f-S1_9sw@mail.gmail.com>
+References: <CABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ@mail.gmail.com>
+ <CAAxsn=Gc0AVDGeA6-qT7Cjtea1XVj_AKVtY+Uq6xP1f-S1_9sw@mail.gmail.com>
+Message-ID: <CABWZ6OSqZQSujp4kB2U+QwNvF1cKMRowGzwZqGbGJpG_TiEyXA@mail.gmail.com>
+
+2017-02-01 9:22 GMT-06:00 Jeremy Yallop <yallop at gmail.com>:
+> On 31 January 2017 at 22:31, Romain Beauxis <romain.beauxis at gmail.com> wrote:
+>> I am playing with a binding for OSX's SecureTransport API. The API
+>> abstracts away the underlying socket implementation and, thus,
+>> requires to pass (static) callbacks, which is where I am having
+>> trouble..
+>>
+>> Here are the relevant part of the code:
+>>
+>> let fd_read = (...)
+>>
+>> let fd_write = (...)
+>>
+>> let _set_io_funcs = foreign ~from:lib "SSLSetIOFuncs"
+>>   (ptr void @-> fd_io_typ @-> fd_io_typ @-> returning int)
+>
+> Assuming that fd_io_typ is defined something like this
+>
+>    let fd_io_typ =
+>      funptr (connection_ref @-> ptr void @-> ptr size_t @-> returning
+> oss_status)
+>
+> and that fd_read and fd_write are actually top-level (i.e. "static")
+> functions then you shouldn't need to do anything special.  Top-level
+> functions stay alive for the duration of the program, so there's no
+> danger of their being prematurely collected.
+>
+>>   let read = Root.create fd_read in
+>
+> I'm not sure that the Root module is really what you need here.  Root
+> is useful for passing pointers to OCaml values to C when the OCaml
+> part of the program doesn't keep a reference to the values.  But in
+> this case the OCaml program should always have a reference to fd_read
+> and fd_write.  So I suspect the problem may lie elsewhere.
+>
+>> I've tried my best to make sure that the passed callback would be
+>> immune to Gc issues. Unfortunately, I am still experiencing issues
+>> with them which, I think, relate to the Gc messing with those.
+>
+>> Besides using C stubs (which I am trying to avoid as an exercise
+>> here), is there anything else that I could do to make this work?
+>
+> One useful trick for tracking down GC issues is to add calls to
+> Gc.compact to your program, so that objects that are collected too
+> early are collected even earlier.
+
+Thanks for the feedback! Turned out I did not understand how to use the API..
+
+The code has been pushed and it works fine:
+https://github.com/toots/ocaml-osx-secure-transport
+
+Romain
+
+From travis.brady at gmail.com  Fri Feb 17 04:23:44 2017
+From: travis.brady at gmail.com (Travis)
+Date: Thu, 16 Feb 2017 22:23:44 -0600
+Subject: [ocaml-ctypes] Undefined symbols error on OS X
+Message-ID: <CABHK4nVsor0bfeRHya6mz9VXtazr7rBeqGeE8-UBZbdLJSGF_A@mail.gmail.com>
+
+I'm attempting experimental OCaml bindings to Vowpal Wabbit and am stuck
+with the error here:
+https://gist.github.com/travisbrady/21a83ac57790455d4b9d545e8b18539a
+
+My code is visible at: https://github.com/travisbrady/ocaml-vw
+
+This is with OCaml 4.03.0, ctypes 0.11.3, Darwin 14.5.0 and libffi 3.0.13
+installed via Homebrew.
+
+After changing the package order manually I still get the error. Is it an
+issue with my code? Should I  install a more recent version of libffi?
+
+thank you
+Travis
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170216/26301527/attachment.html>
+
+From yallop at gmail.com  Mon Feb 20 15:11:42 2017
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 20 Feb 2017 15:11:42 +0000
+Subject: [ocaml-ctypes] Undefined symbols error on OS X
+In-Reply-To: <CABHK4nVsor0bfeRHya6mz9VXtazr7rBeqGeE8-UBZbdLJSGF_A@mail.gmail.com>
+References: <CABHK4nVsor0bfeRHya6mz9VXtazr7rBeqGeE8-UBZbdLJSGF_A@mail.gmail.com>
+Message-ID: <CAAxsn=FOhpy8aghejvceEcU1f+3=1JWO0oB+07N+GNki2z60PQ@mail.gmail.com>
+
+Dear Travis,
+
+On 17 February 2017 at 04:23, Travis <travis.brady at gmail.com> wrote:
+> I'm attempting experimental OCaml bindings to Vowpal Wabbit and am stuck
+> with the error here:
+> https://gist.github.com/travisbrady/21a83ac57790455d4b9d545e8b18539a
+>
+> My code is visible at: https://github.com/travisbrady/ocaml-vw
+>
+> This is with OCaml 4.03.0, ctypes 0.11.3, Darwin 14.5.0 and libffi 3.0.13
+> installed via Homebrew.
+>
+> After changing the package order manually I still get the error. Is it an
+> issue with my code? Should I  install a more recent version of libffi?
+
+This looks like it could be a name mangling error:
+
+   Undefined symbols for architecture x86_64:
+     "_VW_Initialize", referenced from:
+         _vw_1_VW_Initialize in libvw_stubs.a(vw_stubs.o)
+        (maybe you meant: _vw_1_VW_Initialize)
+   ld: symbol(s) not found for architecture x86_64
+
+Is it possible that the C linker is being used with a C++-only library?
+
+Kind regards,
+
+Jeremy
+
+From travis.brady at gmail.com  Tue Feb 21 00:47:54 2017
+From: travis.brady at gmail.com (Travis)
+Date: Tue, 21 Feb 2017 00:47:54 +0000
+Subject: [ocaml-ctypes] Undefined symbols error on OS X
+In-Reply-To: <CAAxsn=FOhpy8aghejvceEcU1f+3=1JWO0oB+07N+GNki2z60PQ@mail.gmail.com>
+References: <CABHK4nVsor0bfeRHya6mz9VXtazr7rBeqGeE8-UBZbdLJSGF_A@mail.gmail.com>
+ <CAAxsn=FOhpy8aghejvceEcU1f+3=1JWO0oB+07N+GNki2z60PQ@mail.gmail.com>
+Message-ID: <CABHK4nUxbW7vD6vUFysZxereVFxwPxMoxV_2_avMjAj3G6jYYQ@mail.gmail.com>
+
+Thank you, Jeremy. It was due to my misunderstanding of the library
+upstream but I've got it sorted out now.
+
+Thanks very much again
+Travis
+
+
+On Mon, Feb 20, 2017 at 9:11 AM Jeremy Yallop <yallop at gmail.com> wrote:
+
+> Dear Travis,
+>
+> On 17 February 2017 at 04:23, Travis <travis.brady at gmail.com> wrote:
+> > I'm attempting experimental OCaml bindings to Vowpal Wabbit and am stuck
+> > with the error here:
+> > https://gist.github.com/travisbrady/21a83ac57790455d4b9d545e8b18539a
+> >
+> > My code is visible at: https://github.com/travisbrady/ocaml-vw
+> >
+> > This is with OCaml 4.03.0, ctypes 0.11.3, Darwin 14.5.0 and libffi 3.0.13
+> > installed via Homebrew.
+> >
+> > After changing the package order manually I still get the error. Is it an
+> > issue with my code? Should I  install a more recent version of libffi?
+>
+> This looks like it could be a name mangling error:
+>
+>    Undefined symbols for architecture x86_64:
+>      "_VW_Initialize", referenced from:
+>          _vw_1_VW_Initialize in libvw_stubs.a(vw_stubs.o)
+>         (maybe you meant: _vw_1_VW_Initialize)
+>    ld: symbol(s) not found for architecture x86_64
+>
+> Is it possible that the C linker is being used with a C++-only library?
+>
+> Kind regards,
+>
+> Jeremy
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20170221/c9896d7c/attachment.html>
+

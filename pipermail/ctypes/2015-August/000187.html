@@ -1,0 +1,238 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000186.html">
+   <LINK REL="Next"  HREF="000188.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?</H1>
+    <B>Andi McClure</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAJDLOYKtum8hJVWdwJ1h0sUBjoYw3ktO_v23izpo5QXwQnzuag%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?">andi.m.mcclure at gmail.com
+       </A><BR>
+    <I>Fri Aug 14 22:58:26 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000186.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+        <LI>Next message: <A HREF="000188.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#187">[ date ]</a>
+              <a href="thread.html#187">[ thread ]</a>
+              <a href="subject.html#187">[ subject ]</a>
+              <a href="author.html#187">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thanks again&#8212; I have an update and then another question or three.
+
+With help from people on IRC, I have a working version of this now. You can
+find it here:
+<A HREF="https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default">https://bitbucket.org/runhello/test-emily-game/src/e1cac5bf0546234ab7b69977b53625efaef7d8d7/src/internalPackage.ml?at=default</A>
+And a demo of the code running:
+<A HREF="https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large">https://pbs.twimg.com/media/CMRG8wZUcAAd7B2.png:large</A>
+
+What I have is a module FfiSupport. It is based around functions
+cToValueFor and a valueToCFor, which given a type name can spit out a
+converter from any specified C type to my &quot;value&quot; variant, or a converter
+from my &quot;value&quot; variant to any specified C type. The 'ctype-&gt;value (or vice
+versa) &quot;converter&quot; function comes paired with a ctypes typ, so I can pass
+that directly into 'foreign'. The key part is:
+
+      let ValueToCFn (argType, argConvert) = valueToCFor argTypeName in
+      let CToValueFn (retType, retConvert) = cToValueFor retTypeName in
+      let ffi_binding = foreign name (argType @-&gt; returning retType) in
+      fun arg -&gt; retConvert (ffi_binding (argConvert arg))
+
+So that is very satisfying, but there is an obvious problem, which is that
+this only works for unary functions. I need it to work for functions of any
+arity.
+
+I have an intuition about how to do this, but a couple of days of tinkering
+have gotten me nowhere and I am very concerned about whether, if I
+completed my implementation, OCaml could type it. I'd like to describe this
+possibly-unworkable solution, and then ask a question.
+
+My thought is this: If I have for example a 2-ary function, I feel like I
+need to construct two things, an ocaml-ctypes type spec ('a typ @-&gt; 'b typ
+@-&gt; returning 'c typ), and a function ('a -&gt; 'b -&gt;
+'c)-&gt;(value-&gt;value-&gt;value).
+
+So maybe the way I achieve this is I construct a base function ('a -&gt;
+'b)-&gt;(value-&gt;value), and then I construct a &quot;successor&quot; function which
+transforms
+('b typ @-&gt; ... @-&gt; returning 'z typ) and ('b -&gt; ... -&gt;
+'z)-&gt;(value-&gt;...-&gt;value)
+into
+('a typ @-&gt; 'b typ @-&gt; ... @-&gt; returning 'z typ) and ('a-&gt;'b -&gt; ... -&gt;
+'z)-&gt;(value-&gt;value-&gt;...-&gt;value).
+I hope, if I could implement this &quot;successor&quot; function, it would all stay
+within what the existential types feature can type sensibly, and this will
+compile :) but, I am feeling stymied, and in my tries so far I haven't
+really even succeeded in formulating the ('a-&gt;'b)-&gt;(value-&gt;value) &quot;base
+case&quot;. (This is as far as I got
+<A HREF="https://bitbucket.org/runhello/test-emily-game/src/86e8bf4598e64ef0e1288f5cc6b86f70287d378b/src/internalPackage.ml?at=default">https://bitbucket.org/runhello/test-emily-game/src/86e8bf4598e64ef0e1288f5cc6b86f70287d378b/src/internalPackage.ml?at=default</A>
+and
+line 56 is... wrong.) The problem seems to be that the OCaml type system is
+not set up to describe curried functions of indeterminate arity; I have no
+idea what the type signature for my &quot;successor&quot; function would even look
+like.
+
+So, my question is: How would you recommend attacking the n-arity case? Do
+you think this will even be possible?
+
+OCaml-ctypes must have a solution to this kind of problem because it itself
+works with functions of arbitrary arity. Could I unify my implementation
+approach better with OCaml-ctypes's?
+
+I notice that OCaml-ctypes on the inside seems to be working with a thing
+like:
+type _ fn =
+  | Returns  : 'a typ   -&gt; 'a fn
+  | Function : 'a typ * 'b fn  -&gt; ('a -&gt; 'b) fn
+This looks much superior to what I am doing, which is pure noodly function
+manipulation. It seems like I would benefit a lot from using something like
+that, with my retConvert and argConvert list embedded in the structure. But
+it is unclear to me how to get from what I have to there (GADTs are very
+new to me) and, I'm not sure if THAT will ultimately be permitted by the
+OCaml type checker either!
+
+Any advice welcome, in the meantime I am going to try just starting by
+manually writing out 2-ary, 3-ary, 4-ary implementations to unblock this
+particular project in the short term, and probably reading the Types and
+Programming Languages chapter on existential types to see if it leaves me
+less confused. &gt;_&gt;
+
+One last thing. You mentioned in a previous email the idea of a
+&quot;Ctypes_untyped&quot;
+module. I think if I got this working, it would *probably* be something
+that could be generalized by making a first-class module paramerizing the
+value type and the &quot;constructor factory&quot; functions. It seems like a is a
+useful thing. If this eventually worked, would it be eventually worth
+submitting that parameterized Ctypes_variant back to ocaml-ctypes as a pull
+request?
+
+Thanks again!
+
+- Andi
+
+On Tue, Aug 11, 2015 at 2:41 AM, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+
+&gt;<i> On 10/08/2015, Andi McClure &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andi.m.mcclure at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; The syntax could use some work :P But never mind that. I've so far got it
+</I>&gt;<i> &gt; where when you invoke ffi.c.function, the function specification you
+</I>&gt;<i> &gt; provided gets piped into OCaml and turned into this OCaml data structure:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;     type foreignSpec = { name : string; args : string list; returning:
+</I>&gt;<i> &gt; string; }
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; This seems like a straightforward representation of the information @-&gt;
+</I>&gt;<i> &gt; encodes; it seems something parsing a header would need to represent the
+</I>&gt;<i> &gt; data the same way.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; My naive impulse is to imagine that this is straightforward, and I need
+</I>&gt;<i> to
+</I>&gt;<i> &gt; just build up a typ variable by repeatedly chaining @-&gt;, something like:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;     let typeConvert = function &quot;void&quot; -&gt; void | &quot;int&quot; -&gt; int | _ -&gt;
+</I>&gt;<i> &gt; failwith &quot;??&quot;
+</I>&gt;<i>
+</I>&gt;<i> Right: it should be possible to do things like that once you've dealt
+</I>&gt;<i> with the typing problem you describe.
+</I>&gt;<i>
+</I>&gt;<i> The easiest approach to dealing with the fact that 'int', 'void', etc.
+</I>&gt;<i> have different types is to use an existential type.  Existential types
+</I>&gt;<i> in OCaml are a sort of variant, but defined with a different syntax;
+</I>&gt;<i> instead of writing something like this:
+</I>&gt;<i>
+</I>&gt;<i>    type t = A of x
+</I>&gt;<i>           | B of y
+</I>&gt;<i>
+</I>&gt;<i> you give the type signature for each constructor, like this:
+</I>&gt;<i>
+</I>&gt;<i>    type t = A : x -&gt; t
+</I>&gt;<i>           | B : y -&gt; t
+</I>&gt;<i>
+</I>&gt;<i> By itself that doesn't give you any extra power, and you can actually
+</I>&gt;<i> write any variant type definition this way.  The distinctive feature
+</I>&gt;<i> of existential types is that you can mention type variables on the
+</I>&gt;<i> right of the '=' that don't appear in the type parameters on the left.
+</I>&gt;<i> Here's an example:
+</I>&gt;<i>
+</I>&gt;<i>    type ty = Ty : 'a Ctypes.typ -&gt; ty
+</I>&gt;<i>
+</I>&gt;<i> As the type signature says, 'Ty' takes a value of type 'a Ctypes.typ'
+</I>&gt;<i> for any type 'a' and builds a value of type 'ty'.  You can therefore
+</I>&gt;<i> use 'Ty' to wrap Ctypes.typ values of different types up as 'ty'
+</I>&gt;<i> values.  For example, you can build a list of typs:
+</I>&gt;<i>
+</I>&gt;<i>    # [Ty void; Ty int];;
+</I>&gt;<i>    - : ty list = [Ty void; Ty int]
+</I>&gt;<i>
+</I>&gt;<i> and you can wrap the variously-typed results of your 'typeConvert'
+</I>&gt;<i> function so that they all have the same type 'ty':
+</I>&gt;<i>
+</I>&gt;<i>    let typeConvert = function
+</I>&gt;<i>        &quot;void&quot; -&gt; Ty void
+</I>&gt;<i>      | &quot;int&quot; -&gt; Ty int
+</I>&gt;<i>      | _ -&gt; failwith &quot;??&quot;
+</I>&gt;<i>
+</I>&gt;<i> The same difficulty arises with 'Ctypes.fn' and your 'functionFrom'
+</I>&gt;<i> definition, which needs to build function type descriptions of all
+</I>&gt;<i> sorts of different types.  Here's a second existential type which
+</I>&gt;<i> wraps 'Ctypes.fn':
+</I>&gt;<i>
+</I>&gt;<i>    type fn = Fn : ('a -&gt; 'b) Ctypes.fn -&gt; fn
+</I>&gt;<i>
+</I>&gt;<i> This time the type signature says that 'Fn' takes a value of type '(a
+</I>&gt;<i> -&gt; b) Ctypes.fn' for any types 'a' and 'b' and builds a value of type
+</I>&gt;<i> 'fn'.  It should be possible to build something like 'functionFrom'
+</I>&gt;<i> that wraps and unwraps intermediate values using 'Ty' and 'Fn' to deal
+</I>&gt;<i> with the immediate typing problems (leaving the interesting question
+</I>&gt;<i> of how to turn the function returned by 'Foreign.foreign' into
+</I>&gt;<i> something that can be called from your interpreter).
+</I>&gt;<i>
+</I>&gt;<i> I hope that helps a bit.
+</I>&gt;<i>
+</I>&gt;<i> Kind regards,
+</I>&gt;<i>
+</I>&gt;<i> Jeremy.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20150814/f8e1a4de/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20150814/f8e1a4de/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000186.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+	<LI>Next message: <A HREF="000188.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#187">[ date ]</a>
+              <a href="thread.html#187">[ thread ]</a>
+              <a href="subject.html#187">[ subject ]</a>
+              <a href="author.html#187">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-devel%5D%20Keeping%20attributes%20in%20.cmi%20files%3F&In-Reply-To=%3C523AADF3.9090501%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000457.html">
+   <LINK REL="Next"  HREF="000459.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-devel%5D%20Keeping%20attributes%20in%20.cmi%20files%3F&In-Reply-To=%3C523AADF3.9090501%40lexifi.com%3E"
+       TITLE="[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Sep 19 08:55:31 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000457.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+        <LI>Next message: <A HREF="000459.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#458">[ date ]</a>
+              <a href="thread.html#458">[ thread ]</a>
+              <a href="subject.html#458">[ subject ]</a>
+              <a href="author.html#458">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 09/19/2013 02:25 AM, Jacques Garrigue wrote:
+&gt;<i> On the principle, I have nothing against keeping attribute in .cmi files, since they are not supposed to change.
+</I>&gt;<i> But to be honest I have not followed the discussion on attributes, and the inclusion in trunk was kind of sudden.
+</I>
+I announced my intention to integrate the branch to caml-devel in the 
+trunk on Jul. 22 (&quot;Landing extension_points?&quot;), nobody complained, and I 
+did the merge more than one month later (Aug. 29).  The branch itself 
+has been created on Feb. 28, extensively discussed on the wg-camlp4 list 
+during the first months.  Then for some months, the branch has been 
+stable and the discussion more quiet.
+
+As I explained, nothing is frozen yet and the goals of landing the 
+branch early are to avoid tricky conflicts in the future (considering 
+that there are a lot of changes to the Parsetree) and to gather more 
+feedback (this goal, at least, is achieved :-)).
+
+&gt;<i> I am a bit concerned by the fact the syntax tree is now completely mutually recursive:
+</I>&gt;<i> an attribute appearing in a type may contain a structure.
+</I>&gt;<i> What is the rationale behind that ?
+</I>
+The intention is to allow greater flexibility in the content of 
+attributes (while still keeping a fixed syntax to enable editor support 
+and allow interactions between tools).   It is not clear exactly what 
+will be needed for specific use cases, and allowing structure + patterns 
+(with an optional guard) + type expressions cover a lot of possibly 
+useful syntax fragments (in particular, structures cover both the empty 
+case and expressions).
+
+Allowing expressions as arguments is useful to support scenario where 
+type declaration need to be annotation by code, such as the 
+&quot;sexp_drop_if&quot; attribute in sexplib.  Since expression can already 
+contain structures, I just found more convenient to allow arbitrary 
+structures.  Of course, a specific tool or extension can put arbitrary 
+constraints of what is exactly supported as the attribute argument.
+
+&gt;<i> And for pattern attributes in types ?
+</I>&gt;<i> Does it mean that you want to include whole structures in .cmi files ?
+</I>&gt;<i> Wouldn't it be better to restrict attributes to type expressions, constants, and identifiers/paths ?
+</I>&gt;<i> Should all nodes allow all attributes ?
+</I>
+It's just easier and more uniform if the argument of attribute can 
+always be the same, independently on the attribute target (and we use 
+the same definition for the content of extension nodes).  I don't see 
+any technical problem with it, this is just uninterpreted syntax.  What 
+are your concerns?
+
+Just as an example, a pattern in a type could be useful to specify 
+&quot;invariants&quot; (used to generate assertions or proof obligations).
+
+  type t =
+     | A of bool * bool
+     | B of int list
+     [@@invariant? A (true, _) | A (_, true) | B (_ :: _)]
+
+type s = (char [@invariant? 'a'..'z']) list
+
+An expression in a type can be useful for conditional compilation:
+
+   type flags =
+     | Foo
+     | Bar [@if os = &quot;Windows&quot;]
+     | Baz
+
+It's hard to predict exactly how attributes and extension nodes will be 
+used, so I think it's better to be quite general, considering that it 
+doesn't bring any additional complexity.
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000457.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+	<LI>Next message: <A HREF="000459.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#458">[ date ]</a>
+              <a href="thread.html#458">[ thread ]</a>
+              <a href="subject.html#458">[ subject ]</a>
+              <a href="author.html#458">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

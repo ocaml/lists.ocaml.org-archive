@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] A new branch to experiment with extension points
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C513765F5.5020900%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000310.html">
+   <LINK REL="Next"  HREF="000312.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] A new branch to experiment with extension points</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C513765F5.5020900%40lexifi.com%3E"
+       TITLE="[wg-camlp4] A new branch to experiment with extension points">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Wed Mar  6 15:51:17 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000310.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+        <LI>Next message: <A HREF="000312.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#311">[ date ]</a>
+              <a href="thread.html#311">[ thread ]</a>
+              <a href="subject.html#311">[ subject ]</a>
+              <a href="author.html#311">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/06/2013 04:17 PM, Xavier Clerc wrote:
+&gt;<i> I will not discuss the syntax per se, but I wonder whether
+</I>&gt;<i> having both prefix and suffix attributes is not error-prone.
+</I>&gt;<i> Could you elaborate on the need of having both?
+</I>
+I proposed to use a prefix attribute (on an include statement) to create 
+ocamldoc sections:
+
+[^^doc section &quot;Section Title&quot;] include
+    ...
+end
+
+but I now tend to prefer &quot;floating&quot; attributes in signatures.
+
+Gabriel gave another example to justify the need for a prefix syntax:
+
+  begin [: pragma(non_exhaustive_match) :]
+     ...
+  end
+
+but this might be subsumed by the special form:
+
+    begin[@id expr] ... end
+
+which is equivalent to:
+
+   (...)[@id expr]
+
+
+Do people see use cases where the prefix syntax is much better?
+
+&gt;<i> Another, unrelated question: as an extension developer, it
+</I>&gt;<i> seems that I will have to deal with full-fledged expressions
+</I>&gt;<i> as attributes values. Do you plan some mechanism to allow
+</I>&gt;<i> easy access to an identifier used in such an expression.
+</I>&gt;<i> I mean, it can even refer to another module. This also implies
+</I>&gt;<i> that you could create dependencies between modules solely
+</I>&gt;<i> through attributes; is that correct?
+</I>
+Expressions used inside attributes/extension nodes are just syntactical 
+expressions.  They are never type-checked and their identifiers are not 
+resolved; ocamldep does not look inside those expressions.
+
+We could use any &quot;universal&quot; type instead of expressions (strings, 
+s-expressions, xml, json).  Some arguments to use OCaml expressions:
+
+  - This is a rich language, in which we can encode various DSL 
+understood by extensions, so that the extensions don't need to do any 
+parsing.
+
+  - We already have a parser!
+
+  - The syntax will look familiar to OCaml developers and adapting 
+editors to nicely support (colors, indentation, etc) them will be easy.
+
+  - It won't be uncommon to embed fragments of OCaml code, to be 
+inserted into the real code fed to the compiler, within those 
+expressions. Example:
+
+   type t = {
+      x: int;
+      y [@default (x + 1)]: int;
+      z [@optional]: int option;
+   } [@@builder {with_labels; invariant=(x &lt;= y)}]
+
+  rewritten to:
+
+   type t = {
+      x: int;
+      y: int;
+   }
+
+   let build_t ~x ?(y = x + 1) ?z () =
+      assert(x &lt;= y);
+      {x; y; z}
+
+
+
+As an extension developer, you don't need to suffer from the complexity 
+of OCaml expression.  Instead,  you are free to define the subset of 
+OCaml expressions which make sense inside &quot;your&quot; attributes/extension 
+nodes, and fail when the user doesn't comply with this constraint.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000310.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+	<LI>Next message: <A HREF="000312.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#311">[ date ]</a>
+              <a href="thread.html#311">[ thread ]</a>
+              <a href="subject.html#311">[ subject ]</a>
+              <a href="author.html#311">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

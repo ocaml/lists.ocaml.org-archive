@@ -1,0 +1,420 @@
+<tt>
+&lt;html&gt;<br>
+&nbsp;&nbsp;&lt;head&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;meta&nbsp;http-equiv=&quot;Content-Type&quot;&nbsp;content=&quot;text/html;&nbsp;charset=UTF-8&quot;&gt;<br>
+&nbsp;&nbsp;&lt;/head&gt;<br>
+&nbsp;&nbsp;&lt;body&nbsp;text=&quot;#000000&quot;&nbsp;bgcolor=&quot;#FFFFFF&quot;&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;p&gt;Shouldn't&nbsp;we&nbsp;just&nbsp;standardize&nbsp;on&nbsp;bunzli's&nbsp;libraries&nbsp;(including<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;new&nbsp;&lt;a&nbsp;class=&quot;moz-txt-link-freetext&quot;&nbsp;href=&quot;https://github.com/dbuenzli/utext&quot;&gt;https://github.com/dbuenzli/utext&lt;/a&gt;)&nbsp;instead&nbsp;of&nbsp;trying&nbsp;to<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;re-write&nbsp;code&nbsp;that&nbsp;usually&nbsp;ends&nbsp;up&nbsp;being&nbsp;quite&nbsp;subtle&nbsp;in&nbsp;each<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;standard&nbsp;library&nbsp;?&lt;br&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/p&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;br&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;div&nbsp;class=&quot;moz-cite-prefix&quot;&gt;Le&nbsp;10/02/2018&nbsp;à&nbsp;20:53,&nbsp;Simon&nbsp;Cruanes&nbsp;a<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;écrit :&lt;br&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/div&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;blockquote&nbsp;type=&quot;cite&quot;&nbsp;cite=&quot;mid:20180210195351.GE1388@carty&quot;&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pre&nbsp;wrap=&quot;&quot;&gt;Hi&nbsp;Peter,<br>
+<br>
+Thanks&nbsp;for&nbsp;the&nbsp;suggestions.&nbsp;I'm&nbsp;no&nbsp;expert&nbsp;in&nbsp;unicode,&nbsp;but&nbsp;I&nbsp;do&nbsp;agree<br>
+that&nbsp;such&nbsp;basic&nbsp;functionalities&nbsp;should&nbsp;be&nbsp;more&nbsp;easily&nbsp;available.<br>
+Maybe&nbsp;a&nbsp;`Ustring`&nbsp;module&nbsp;in&nbsp;containers&nbsp;would&nbsp;make&nbsp;sense&nbsp;(as&nbsp;a&nbsp;private<br>
+alias&nbsp;to&nbsp;`string`);&nbsp;most&nbsp;functionalities&nbsp;below&nbsp;would&nbsp;fit&nbsp;there,&nbsp;I&nbsp;think.<br>
+<br>
+Would&nbsp;you&nbsp;consider&nbsp;opening&nbsp;PRs&nbsp;against&nbsp;gen,&nbsp;sequence,&nbsp;and&nbsp;containers<br>
+repositories&nbsp;so&nbsp;we&nbsp;can&nbsp;discuss&nbsp;that&nbsp;without&nbsp;spamming&nbsp;the&nbsp;list?&nbsp;I&nbsp;can<br>
+help&nbsp;if&nbsp;needed,&nbsp;or&nbsp;do&nbsp;it&nbsp;myself.<br>
+I'm&nbsp;interested&nbsp;in&nbsp;tests&nbsp;too,&nbsp;but&nbsp;will&nbsp;probably&nbsp;write&nbsp;some&nbsp;(possibly<br>
+using&nbsp;Uutf&nbsp;as&nbsp;a&nbsp;reference);&nbsp;some&nbsp;of&nbsp;the&nbsp;tests&nbsp;you&nbsp;wrote&nbsp;below&nbsp;I&nbsp;can<br>
+retrofit&nbsp;in&nbsp;the&nbsp;qtest&nbsp;mechanism.<br>
+<br>
+Cheers!<br>
+<br>
+<br>
+Le&nbsp;Sat,&nbsp;10&nbsp;Feb&nbsp;2018,&nbsp;peter&nbsp;frey&nbsp;wrote:<br>
+&lt;/pre&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;blockquote&nbsp;type=&quot;cite&quot;&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pre&nbsp;wrap=&quot;&quot;&gt;(*<br>
+Reading&nbsp;recent&nbsp;posts&nbsp;on&nbsp;discuss.ocal.org&nbsp;gives&nbsp;me&nbsp;the&nbsp;impression&nbsp;that&nbsp;some<br>
+tiny<br>
+number&nbsp;of&nbsp;utf&nbsp;related&nbsp;routines&nbsp;should&nbsp;be&nbsp;more&nbsp;easily&nbsp;available.<br>
+Container's&nbsp;Sequence.t&nbsp;and&nbsp;Gen.t,&nbsp;in&nbsp;particular&nbsp;could&nbsp;benefit&nbsp;from&nbsp;a&nbsp;couple<br>
+of<br>
+simple&nbsp;routines. &nbsp;The&nbsp;code&nbsp;below&nbsp;fits&nbsp;well&nbsp;into&nbsp;that&nbsp;frame&nbsp;work.<br>
+I&nbsp;am&nbsp;treating&nbsp;it&nbsp;as&nbsp;public&nbsp;domain&nbsp;code&nbsp;but&nbsp;feel&nbsp;free&nbsp;to&nbsp;make&nbsp;it&nbsp;your&nbsp;own&nbsp;and<br>
+to<br>
+include&nbsp;it&nbsp;where&nbsp;appropriate.&nbsp;(Perhaps&nbsp;some&nbsp;of&nbsp;the&nbsp;tests&nbsp;could&nbsp;go&nbsp;into&nbsp;the<br>
+example&nbsp;directory...)<br>
+The&nbsp;routines&nbsp;here&nbsp;DO&nbsp;NOT&nbsp;verify&nbsp;unless&nbsp;its&nbsp;unavoidable. &nbsp;In&nbsp;particular&nbsp;they<br>
+accept&nbsp;ALL&nbsp;code&nbsp;points&nbsp;that&nbsp;can&nbsp;be&nbsp;encoded&nbsp;by&nbsp;the&nbsp;original&nbsp;Utf8&nbsp;definition.<br>
+It&nbsp;is&nbsp;only&nbsp;a&nbsp;matter&nbsp;of&nbsp;language;&nbsp;we&nbsp;could&nbsp;call&nbsp;it&nbsp;utf31&nbsp;...<br>
+Restricting&nbsp;the&nbsp;range&nbsp;is&nbsp;trivial;&nbsp;as&nbsp;would&nbsp;be&nbsp;including&nbsp;some&nbsp;verification<br>
+code.<br>
+<br>
+<br>
+<br>
+*)<br>
+<br>
+open&nbsp;Containers<br>
+<br>
+(*&nbsp;Create&nbsp;a&nbsp;generator&nbsp;from&nbsp;a&nbsp;utf8-string.&nbsp;Each&nbsp;call&nbsp;produces&nbsp;a&nbsp;code&nbsp;point.<br>
+ *&nbsp;The&nbsp;optional&nbsp;parameter&nbsp;srcIdx&nbsp;specifies&nbsp;then&nbsp;start&nbsp;point&nbsp;in&nbsp;the&nbsp;string.<br>
+ *&nbsp;srcIdx&nbsp;must&nbsp;point&nbsp;to&nbsp;a&nbsp;valid&nbsp;suffix&nbsp;of&nbsp;a&nbsp;utf8&nbsp;string.<br>
+ *&nbsp;*)<br>
+let&nbsp;gen_of_utf8&nbsp;?(srcIdx=ref&nbsp;0)&nbsp;str&nbsp;=<br>
+   &nbsp;let&nbsp;lim&nbsp;=&nbsp;String.length&nbsp;str&nbsp;in<br>
+   &nbsp;let&nbsp;assemble_next&nbsp;()&nbsp;=    &nbsp;(*&nbsp;we&nbsp;come&nbsp;here&nbsp;only&nbsp;for&nbsp;multi-byte<br>
+characters&nbsp;*)<br>
+     &nbsp;let&nbsp;cv&nbsp;jmax&nbsp;accu&nbsp;=     &nbsp;(*&nbsp;utf8&nbsp;character&nbsp;length;&nbsp;construction&nbsp;of<br>
+uchar&nbsp;*)<br>
+       &nbsp;let&nbsp;rec&nbsp;cv'&nbsp;j&nbsp;accu'&nbsp;=         &nbsp;(*&nbsp;inner&nbsp;loop&nbsp;j&nbsp;=&nbsp;1..jmax&nbsp;;&nbsp;each<br>
+uchar&nbsp;*)<br>
+         &nbsp;let&nbsp;ch&nbsp;=&nbsp;Char.code&nbsp;str.[&nbsp;!srcIdx&nbsp;+&nbsp;j]&nbsp;in<br>
+         &nbsp;let&nbsp;next&nbsp;=&nbsp;(&nbsp;(accu'&nbsp;lsl&nbsp;6)&nbsp;lor&nbsp;(&nbsp;ch&nbsp;land&nbsp;0x7f&nbsp;))&nbsp;in<br>
+         &nbsp;if&nbsp;j&nbsp;=&nbsp;jmax&nbsp;then&nbsp;begin    &nbsp;(*&nbsp;except&nbsp;for&nbsp;1st,&nbsp;each&nbsp;char&nbsp;gives&nbsp;6<br>
+bits*)<br>
+           &nbsp;srcIdx&nbsp;:=&nbsp;!srcIdx&nbsp;+&nbsp;j&nbsp;+1;&nbsp;Some&nbsp;next           &nbsp;(*&nbsp;+1&nbsp;for&nbsp;1st<br>
+char&nbsp;*)<br>
+         &nbsp;end&nbsp;else&nbsp;cv'&nbsp;(succ&nbsp;j)&nbsp;next<br>
+     &nbsp;in&nbsp;cv'&nbsp;1 &nbsp;(*&nbsp;1st&nbsp;char&nbsp;is&nbsp;already&nbsp;proccessed!&nbsp;*)&nbsp;accu<br>
+   &nbsp;in&nbsp;if&nbsp;!srcIdx&nbsp;&gt;=&nbsp;lim&nbsp;then&nbsp;None&nbsp;else<br>
+   &nbsp;let&nbsp;n&nbsp;=&nbsp;str.[&nbsp;!srcIdx&nbsp;]&nbsp;in&nbsp;match&nbsp;n&nbsp;with<br>
+   &nbsp;(*&nbsp;0xxxxxxx&nbsp;*)&nbsp;|&nbsp;'\000'&nbsp;..&nbsp;'\127'&nbsp;-&gt;&nbsp;incr&nbsp;srcIdx;&nbsp;Some&nbsp;(int_of_char&nbsp;n)<br>
+   &nbsp;(*&nbsp;110yyyyy&nbsp;*)&nbsp;|&nbsp;'\128'&nbsp;..&nbsp;'\223'&nbsp;-&gt;&nbsp;cv&nbsp;1&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b11111&nbsp;)<br>
+   &nbsp;(*&nbsp;1110zzzz&nbsp;*)&nbsp;|&nbsp;'\224'&nbsp;..&nbsp;'\239'&nbsp;-&gt;&nbsp;cv&nbsp;2&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b1111&nbsp;)<br>
+   &nbsp;(*&nbsp;11110uuu&nbsp;*)&nbsp;|&nbsp;'\240'&nbsp;..&nbsp;'\247'&nbsp;-&gt;&nbsp;cv&nbsp;3&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b111&nbsp;)<br>
+   &nbsp;(*&nbsp;111110vv&nbsp;*)&nbsp;|&nbsp;'\248'&nbsp;..&nbsp;'\251'&nbsp;-&gt;&nbsp;cv&nbsp;4&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b11&nbsp;)<br>
+   &nbsp;(*&nbsp;1111110w&nbsp;*)&nbsp;|&nbsp;'\252'&nbsp;..&nbsp;'\253'&nbsp;-&gt;&nbsp;cv&nbsp;5&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b1&nbsp;)<br>
+   &nbsp;(*&nbsp;1111111X&nbsp;*)&nbsp;|&nbsp;'\254'&nbsp;..&nbsp;'\255'&nbsp;-&gt;&nbsp;raise&nbsp;(Failure&nbsp;&quot;Bad&nbsp;stream&quot;)<br>
+ &nbsp;in &nbsp;assemble_next;;<br>
+<br>
+<br>
+(*&nbsp;The&nbsp;'natural'&nbsp;stream&nbsp;representation&nbsp;of&nbsp;a&nbsp;utf-string&nbsp;is&nbsp;a&nbsp;generator.<br>
+ *&nbsp;But&nbsp;Sequences&nbsp;are&nbsp;not&nbsp;far&nbsp;away&nbsp;...&nbsp;*)<br>
+let&nbsp;makeUtf8Seq&nbsp;?(srcIdx=ref&nbsp;0)&nbsp;str&nbsp;=&nbsp;Sequence.of_gen&nbsp;(gen_of_utf8&nbsp;~srcIdx<br>
+str)<br>
+<br>
+<br>
+<br>
+(*&nbsp;Convert&nbsp;a&nbsp;code&nbsp;point&nbsp;to&nbsp;a&nbsp;string;&nbsp;Hopefully&nbsp;some&nbsp;day&nbsp;this&nbsp;will&nbsp;be&nbsp;in&nbsp;the<br>
+ *&nbsp;standard&nbsp;library.&nbsp;There&nbsp;are&nbsp;various&nbsp;equally&nbsp;trivial&nbsp;versions&nbsp;of&nbsp;this<br>
+around.<br>
+ *&nbsp;The&nbsp;returned&nbsp;string&nbsp;is&nbsp;created&nbsp;(allocated)&nbsp;fresh&nbsp;for&nbsp;each&nbsp;k.<br>
+ *&nbsp;*)<br>
+<br>
+let&nbsp;code_to_string&nbsp;k&nbsp;=<br>
+ &nbsp;let&nbsp;mask&nbsp;=&nbsp;0b111111&nbsp;in<br>
+ &nbsp;if&nbsp;k&nbsp;&lt;&nbsp;0&nbsp;||&nbsp;k&nbsp;&gt;=&nbsp;0x4000000&nbsp;then&nbsp;begin<br>
+   &nbsp;let&nbsp;s&nbsp;=&nbsp;Bytes.create&nbsp;6&nbsp;in<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.chr&nbsp;(0xfc&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;30)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;24)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;18)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;4&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;5&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;s&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7f&nbsp;then<br>
+   &nbsp;Bytes.make&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;k)<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7ff&nbsp;then&nbsp;begin<br>
+   &nbsp;let&nbsp;s&nbsp;=&nbsp;Bytes.create&nbsp;2&nbsp;in<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xc0&nbsp;lor&nbsp;(k&nbsp;lsr&nbsp;6)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;s&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0xffff&nbsp;then&nbsp;begin<br>
+   &nbsp;let&nbsp;s&nbsp;=&nbsp;Bytes.create&nbsp;3&nbsp;in<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xe0&nbsp;lor&nbsp;(k&nbsp;lsr&nbsp;12)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;s&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x1fffff&nbsp;then&nbsp;begin<br>
+   &nbsp;let&nbsp;s&nbsp;=&nbsp;Bytes.create&nbsp;4&nbsp;in<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xf0&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;18)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;s&nbsp;end<br>
+ &nbsp;else&nbsp;begin<br>
+   &nbsp;let&nbsp;s&nbsp;=&nbsp;Bytes.create&nbsp;5&nbsp;in<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xf8&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;24)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;18)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;4&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;s&nbsp;end<br>
+<br>
+let&nbsp;string_to_code&nbsp;str&nbsp;=<br>
+   &nbsp;let&nbsp;cv&nbsp;jmax&nbsp;accu&nbsp;=     &nbsp;(*&nbsp;utf8&nbsp;character&nbsp;length;&nbsp;construction&nbsp;of&nbsp;uchar<br>
+*)<br>
+   &nbsp;if&nbsp;jmax&nbsp;&gt; &nbsp;String.length&nbsp;str&nbsp;then&nbsp;raise&nbsp;(Failure&nbsp;&quot;string_to_code&quot;)<br>
+   &nbsp;else&nbsp;let&nbsp;rec&nbsp;cv'&nbsp;j&nbsp;accu'&nbsp;=      &nbsp;(*&nbsp;inner&nbsp;loop&nbsp;j&nbsp;=&nbsp;1..jmax&nbsp;;&nbsp;each&nbsp;uchar<br>
+*)<br>
+     &nbsp;let&nbsp;ch&nbsp;=&nbsp;Char.code&nbsp;(String.unsafe_get&nbsp;str&nbsp;j)&nbsp;in<br>
+     &nbsp;let&nbsp;next&nbsp;=&nbsp;(&nbsp;(accu'&nbsp;lsl&nbsp;6)&nbsp;lor&nbsp;(&nbsp;ch&nbsp;land&nbsp;0x7f&nbsp;))&nbsp;in<br>
+     &nbsp;if&nbsp;j&nbsp;=&nbsp;jmax&nbsp;then&nbsp;next&nbsp;else&nbsp;cv'&nbsp;(succ&nbsp;j)&nbsp;next<br>
+     &nbsp;in&nbsp;cv'&nbsp;1 &nbsp;(*&nbsp;1st&nbsp;char&nbsp;is&nbsp;already&nbsp;proccessed!&nbsp;*)&nbsp;accu<br>
+   &nbsp;in&nbsp;let&nbsp;n&nbsp;=&nbsp;str.[0]&nbsp;in&nbsp;match&nbsp;n&nbsp;with<br>
+   &nbsp;(*&nbsp;0xxxxxxx&nbsp;*)&nbsp;|&nbsp;'\000'&nbsp;..&nbsp;'\127'&nbsp;-&gt;&nbsp;int_of_char&nbsp;n<br>
+   &nbsp;(*&nbsp;110yyyyy&nbsp;*)&nbsp;|&nbsp;'\128'&nbsp;..&nbsp;'\223'&nbsp;-&gt;&nbsp;cv&nbsp;1&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b11111&nbsp;)<br>
+   &nbsp;(*&nbsp;1110zzzz&nbsp;*)&nbsp;|&nbsp;'\224'&nbsp;..&nbsp;'\239'&nbsp;-&gt;&nbsp;cv&nbsp;2&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b1111&nbsp;)<br>
+   &nbsp;(*&nbsp;11110uuu&nbsp;*)&nbsp;|&nbsp;'\240'&nbsp;..&nbsp;'\247'&nbsp;-&gt;&nbsp;cv&nbsp;3&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b111&nbsp;)<br>
+   &nbsp;(*&nbsp;111110vv&nbsp;*)&nbsp;|&nbsp;'\248'&nbsp;..&nbsp;'\251'&nbsp;-&gt;&nbsp;cv&nbsp;4&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b11&nbsp;)<br>
+   &nbsp;(*&nbsp;1111110w&nbsp;*)&nbsp;|&nbsp;'\252'&nbsp;..&nbsp;'\253'&nbsp;-&gt;&nbsp;cv&nbsp;5&nbsp;((Char.code&nbsp;n)&nbsp;land&nbsp;0b1&nbsp;)<br>
+   &nbsp;(*&nbsp;1111111X&nbsp;*)&nbsp;|&nbsp;'\254'&nbsp;..&nbsp;'\255'&nbsp;-&gt;&nbsp;raise&nbsp;(Failure&nbsp;&quot;Bad&nbsp;stream&quot;)<br>
+<br>
+<br>
+(*&nbsp;code_into_string&nbsp;over-writes&nbsp;string&nbsp;s&nbsp;which&nbsp;must&nbsp;be&nbsp;7-byte&nbsp;string.<br>
+ *&nbsp;n-byte&nbsp;String&nbsp;ends&nbsp;with&nbsp;'\000'&nbsp;which&nbsp;is&nbsp;set&nbsp;as&nbsp;needed&nbsp;(in&nbsp;case&nbsp;you&nbsp;feed<br>
+it<br>
+ *&nbsp;to&nbsp;a&nbsp;c-program).&nbsp;The&nbsp;last&nbsp;byte&nbsp;of&nbsp;a&nbsp;string&nbsp;contains&nbsp;the&nbsp;#&nbsp;of&nbsp;unused&nbsp;bytes<br>
+in<br>
+ *&nbsp;then&nbsp;string.&nbsp;It&nbsp;is&nbsp;set&nbsp;here,&nbsp;for&nbsp;example,&nbsp;by&nbsp;&quot;Bytes.unsafe_set&nbsp;s&nbsp;6<br>
+'\000'&quot;<br>
+ *&nbsp;If&nbsp;the&nbsp;string&nbsp;is&nbsp;longer&nbsp;than&nbsp;1&nbsp;word&nbsp;(plus&nbsp;header)&nbsp;all&nbsp;hell&nbsp;breaks&nbsp;loose.<br>
+ *&nbsp;Use&nbsp;only&nbsp;if&nbsp;the&nbsp;string&nbsp;is&nbsp;copied&nbsp;afterwards.&nbsp;(Buffer.add_string&nbsp;...&nbsp;etc)<br>
+ *&nbsp;DUBIOUS&nbsp;(and&nbsp;about&nbsp;twice&nbsp;as&nbsp;fast&nbsp;because&nbsp;allocation&nbsp;is&nbsp;not&nbsp;needed)<br>
+ *&nbsp;js_of_ocaml&nbsp;might&nbsp;be&nbsp;unhappy&nbsp;with&nbsp;this...<br>
+*)<br>
+let&nbsp;code_into_string&nbsp;s&nbsp;k&nbsp;=<br>
+ &nbsp;let&nbsp;mask&nbsp;=&nbsp;0b111111&nbsp;in<br>
+ &nbsp;if&nbsp;k&nbsp;&lt;&nbsp;0&nbsp;||&nbsp;k&nbsp;&gt;=&nbsp;0x4000000&nbsp;then&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.chr&nbsp;(0xfc&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;30)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;24)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;18)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;4&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;5&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(&nbsp;k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;6&nbsp;'\000';                  &nbsp;(*&nbsp;string&nbsp;internals&nbsp;s/b<br>
+OK&nbsp;*)<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;1&nbsp;);  &nbsp;(*&nbsp;string&nbsp;internals<br>
+DUBIOUS&nbsp;*)<br>
+   &nbsp;()&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7f&nbsp;then&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.chr&nbsp;k);<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;'\000';<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;6&nbsp;);<br>
+   &nbsp;()&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7ff&nbsp;then&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xc0&nbsp;lor&nbsp;(k&nbsp;lsr&nbsp;6)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;'\000';<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;5&nbsp;);<br>
+   &nbsp;()&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0xffff&nbsp;then&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xe0&nbsp;lor&nbsp;(k&nbsp;lsr&nbsp;12)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;'\000';<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;4&nbsp;);<br>
+   &nbsp;()&nbsp;end<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x1fffff&nbsp;then&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xf0&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;18)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;4&nbsp;'\000';<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;3&nbsp;);<br>
+   &nbsp;()&nbsp;end<br>
+ &nbsp;else&nbsp;begin<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;0&nbsp;(Char.unsafe_chr&nbsp;(0xf8&nbsp;+&nbsp;(k&nbsp;lsr&nbsp;24)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;1&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;18)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;2&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;12)&nbsp;land<br>
+mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;3&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;((k&nbsp;lsr&nbsp;6)&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;4&nbsp;(Char.unsafe_chr&nbsp;(0x80&nbsp;lor&nbsp;(k&nbsp;land&nbsp;mask)));<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;5&nbsp;'\000';<br>
+   &nbsp;Bytes.unsafe_set&nbsp;s&nbsp;7&nbsp;(Char.unsafe_chr &nbsp;2&nbsp;);<br>
+   &nbsp;()&nbsp;end<br>
+<br>
+(*&nbsp;Automaton&nbsp;to&nbsp;map&nbsp;a&nbsp;(utf8)&nbsp;char&nbsp;Sequence.t&nbsp;into&nbsp;an&nbsp;int&nbsp;Sequence.t<br>
+  &nbsp;Accept&nbsp;up&nbsp;to&nbsp;6&nbsp;characters,&nbsp;converting&nbsp;them&nbsp;to&nbsp;an&nbsp;integer&nbsp;to&nbsp;feed&nbsp;to&nbsp;k.<br>
+  &nbsp;This&nbsp;code&nbsp;demonstrates&nbsp;that&nbsp;being&nbsp;at&nbsp;the&nbsp;receiving&nbsp;end&nbsp;of&nbsp;a&nbsp;sequence&nbsp;can<br>
+  &nbsp;cause&nbsp;hardship&nbsp;...&nbsp;It&nbsp;needs&nbsp;often&nbsp;a&nbsp;state-machine<br>
+  &nbsp;...&nbsp;and&nbsp;perhaps&nbsp;a&nbsp;better&nbsp;name &nbsp;*)<br>
+ &nbsp;let&nbsp;mapUtf8Char2Code&nbsp;(k:&nbsp;int&nbsp;-&gt;&nbsp;unit)&nbsp;=<br>
+   &nbsp;let&nbsp;rec&nbsp;next&nbsp;=&nbsp;ref&nbsp;first<br>
+   &nbsp;and&nbsp;accu&nbsp;=&nbsp;ref&nbsp;0<br>
+   &nbsp;and&nbsp;first&nbsp;ch&nbsp;=&nbsp;match&nbsp;ch&nbsp;with<br>
+     &nbsp;(*&nbsp;0xxxxxxx&nbsp;*)&nbsp;|&nbsp;'\000'&nbsp;..&nbsp;'\127'&nbsp;-&gt;&nbsp;k&nbsp;(int_of_char&nbsp;ch);&nbsp;accu&nbsp;:=&nbsp;0<br>
+     &nbsp;(*&nbsp;110yyyyy&nbsp;*)&nbsp;|&nbsp;'\128'&nbsp;..&nbsp;'\223'&nbsp;-&gt;&nbsp;cv&nbsp;s1&nbsp;ch&nbsp;0b11111<br>
+     &nbsp;(*&nbsp;1110zzzz&nbsp;*)&nbsp;|&nbsp;'\224'&nbsp;..&nbsp;'\239'&nbsp;-&gt;&nbsp;cv&nbsp;s2&nbsp;ch&nbsp;0b1111<br>
+     &nbsp;(*&nbsp;11110uuu&nbsp;*)&nbsp;|&nbsp;'\240'&nbsp;..&nbsp;'\247'&nbsp;-&gt;&nbsp;cv&nbsp;s3&nbsp;ch&nbsp;0b111<br>
+     &nbsp;(*&nbsp;111110vv&nbsp;*)&nbsp;|&nbsp;'\248'&nbsp;..&nbsp;'\251'&nbsp;-&gt;&nbsp;cv&nbsp;s4&nbsp;ch&nbsp;0b11<br>
+     &nbsp;(*&nbsp;1111110w&nbsp;*)&nbsp;|&nbsp;'\252'&nbsp;..&nbsp;'\253'&nbsp;-&gt;&nbsp;cv&nbsp;s5&nbsp;ch&nbsp;0b1<br>
+     &nbsp;(*&nbsp;1111111X&nbsp;*)&nbsp;|&nbsp;'\254'&nbsp;..&nbsp;'\255'&nbsp;-&gt;&nbsp;raise&nbsp;(Failure&nbsp;&quot;Bad&nbsp;stream&quot;)<br>
+   &nbsp;and&nbsp;inline&nbsp;ch&nbsp;=&nbsp;accu&nbsp;:=&nbsp;(!accu&nbsp;lsl&nbsp;6)&nbsp;lor&nbsp;((Char.code&nbsp;ch)&nbsp;land&nbsp;0x7f&nbsp;)<br>
+   &nbsp;and&nbsp;s1&nbsp;ch&nbsp;=&nbsp;inline&nbsp;ch;&nbsp;next&nbsp;:=&nbsp;first;&nbsp;k&nbsp;!accu<br>
+   &nbsp;and&nbsp;s2&nbsp;ch&nbsp;=&nbsp;inline&nbsp;ch;&nbsp;next&nbsp;:=&nbsp;s1&nbsp;and&nbsp;s3&nbsp;ch&nbsp;=&nbsp;inline&nbsp;ch;&nbsp;next&nbsp;:=&nbsp;s2<br>
+   &nbsp;and&nbsp;s4&nbsp;ch&nbsp;=&nbsp;inline&nbsp;ch;&nbsp;next&nbsp;:=&nbsp;s3&nbsp;and&nbsp;s5&nbsp;ch&nbsp;=&nbsp;inline&nbsp;ch;&nbsp;next&nbsp;:=&nbsp;s4<br>
+   &nbsp;and&nbsp;cv&nbsp;startState&nbsp;initialValue&nbsp;mask&nbsp;=<br>
+       &nbsp;next&nbsp;:=&nbsp;startState;<br>
+       &nbsp;accu&nbsp;:=&nbsp;(Char.code&nbsp;initialValue)&nbsp;land&nbsp;mask<br>
+ &nbsp;in&nbsp;(fun&nbsp;c&nbsp;-&gt;&nbsp;!next&nbsp;c)&nbsp;;;<br>
+<br>
+let&nbsp;code_len&nbsp;k&nbsp;=<br>
+ &nbsp;if&nbsp;k&nbsp;&lt;&nbsp;0&nbsp;||&nbsp;k&nbsp;&gt;=&nbsp;0x4000000&nbsp;then&nbsp;6&nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7f&nbsp;then&nbsp;1<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x7ff&nbsp;then&nbsp;2&nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0xffff&nbsp;then&nbsp;3<br>
+ &nbsp;else&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;0x1fffff&nbsp;then&nbsp;4&nbsp;else&nbsp;5<br>
+<br>
+<br>
+(*<br>
+(*<br>
+===========================================================================<br>
+ *          &nbsp;various&nbsp;tests&nbsp;of&nbsp;above<br>
+*)<br>
+<br>
+<br>
+(*&nbsp;measure.ml<br>
+ *&nbsp;included&nbsp;to&nbsp;avoid&nbsp;dependency&nbsp;on&nbsp;some&nbsp;other&nbsp;(more&nbsp;capable)&nbsp;measuring&nbsp;tool<br>
+ *                               &nbsp;*)<br>
+let&nbsp;measure&nbsp;fn&nbsp;arg&nbsp;(units:int) &nbsp;comment&nbsp;=<br>
+ &nbsp;(*&nbsp;arg&nbsp;is&nbsp;last&nbsp;argument&nbsp;of&nbsp;fn&nbsp;(or&nbsp;unit&nbsp;not&nbsp;belonging&nbsp;to&nbsp;fn);<br>
+    &nbsp;argument&nbsp;units&nbsp;is&nbsp;only&nbsp;used&nbsp;for&nbsp;ratio&nbsp;(units&nbsp;/.&nbsp;elapsed)&nbsp;*)<br>
+ &nbsp;let&nbsp;start&nbsp;=&nbsp;Unix.gettimeofday()&nbsp;in<br>
+ &nbsp;let&nbsp;res&nbsp;=&nbsp;fn&nbsp;arg&nbsp;in<br>
+ &nbsp;let&nbsp;endt&nbsp;=&nbsp;Unix.gettimeofday()&nbsp;in&nbsp;let&nbsp;elapsed&nbsp;=&nbsp;endt&nbsp;-.&nbsp;start&nbsp;in<br>
+ &nbsp;let&nbsp;open&nbsp;Printf&nbsp;in<br>
+ &nbsp;printf&quot;\n%s\n\tTime:%f&nbsp;Units:%i&nbsp;Units/sec:%s&nbsp;uSecs/Unit:%s\n%!&quot;<br>
+       &nbsp;(sprintf&quot;Measured&nbsp;&lt;&lt;%s&gt;&gt;&quot;&nbsp;comment)<br>
+       &nbsp;elapsed&nbsp;units<br>
+       &nbsp;(&nbsp;if&nbsp;units&nbsp;&lt;=&nbsp;1&nbsp;then&nbsp;&quot;N/A&quot;&nbsp;else<br>
+         &nbsp;sprintf&quot;%8.0f&quot;&nbsp;((float_of_int&nbsp;units)&nbsp;/.&nbsp;elapsed&nbsp;)&nbsp;)<br>
+       &nbsp;(&nbsp;if&nbsp;units&nbsp;&lt;=&nbsp;1&nbsp;then&nbsp;&quot;N/A&quot;&nbsp;else<br>
+         &nbsp;sprintf&quot;%2.8f&quot;&nbsp;(elapsed&nbsp;/.&nbsp;(float_of_int&nbsp;units)&nbsp;*.&nbsp;1000000.0&nbsp;)&nbsp;);<br>
+ &nbsp;res<br>
+<br>
+<br>
+open&nbsp;Printf<br>
+module&nbsp;S&nbsp;=&nbsp;Sequence<br>
+module&nbsp;V&nbsp;=&nbsp;Vector<br>
+<br>
+let&nbsp;code_to_string_test&nbsp;last&nbsp;=                             &nbsp;(*<br>
+code_to_string&nbsp;*)<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do&nbsp;ignore&nbsp;(code_to_string&nbsp;i) &nbsp;done&nbsp;;;<br>
+<br>
+let&nbsp;code_into_string_test&nbsp;last&nbsp;=                         &nbsp;(*<br>
+code_into_string&nbsp;*)<br>
+ &nbsp;let&nbsp;str&nbsp;=&nbsp;Bytes.create&nbsp;6&nbsp;in<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do&nbsp;ignore&nbsp;(code_into_string&nbsp;str&nbsp;i) &nbsp;done&nbsp;;;<br>
+<br>
+let&nbsp;round_about2&nbsp;last&nbsp;=                           &nbsp;(*&nbsp;code_to_string&nbsp;and<br>
+back&nbsp;*)<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do<br>
+   &nbsp;let&nbsp;str&nbsp;=&nbsp;code_to_string&nbsp;i&nbsp;in&nbsp;(*&nbsp;convert&nbsp;code&nbsp;point&nbsp;to&nbsp;char&nbsp;string&nbsp;*)<br>
+   &nbsp;let&nbsp;j&nbsp;=&nbsp;string_to_code&nbsp;str&nbsp;in &nbsp;(*&nbsp;convert&nbsp;the&nbsp;char&nbsp;string&nbsp;back&nbsp;to&nbsp;code<br>
+*)<br>
+   &nbsp;assert(&nbsp;i&nbsp;=&nbsp;j)<br>
+ &nbsp;done<br>
+<br>
+let&nbsp;round_about3&nbsp;last&nbsp;=                         &nbsp;(*&nbsp;code_into_string&nbsp;and<br>
+back&nbsp;*)<br>
+ &nbsp;let&nbsp;len&nbsp;=&nbsp;ref&nbsp;1&nbsp;in<br>
+ &nbsp;let&nbsp;str&nbsp;=&nbsp;Bytes.create&nbsp;6&nbsp;in<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do<br>
+   &nbsp;code_into_string&nbsp;str&nbsp;i;&nbsp;(*&nbsp;convert&nbsp;code&nbsp;point&nbsp;to&nbsp;char&nbsp;string&nbsp;*)<br>
+   &nbsp;let&nbsp;j&nbsp;=&nbsp;string_to_code&nbsp;str&nbsp;in &nbsp;(*&nbsp;convert&nbsp;the&nbsp;char&nbsp;string&nbsp;back&nbsp;to&nbsp;code<br>
+*)<br>
+   &nbsp;assert(&nbsp;i&nbsp;=&nbsp;j);<br>
+   &nbsp;if&nbsp;code_len&nbsp;i&nbsp;&lt;&gt;&nbsp;!len&nbsp;then&nbsp;(printf&quot;New&nbsp;len&nbsp;at&nbsp;%x:%s\n&quot;&nbsp;i&nbsp;str;<br>
+                              &nbsp;len&nbsp;:=&nbsp;code_len&nbsp;i&nbsp;)<br>
+ &nbsp;done<br>
+<br>
+<br>
+let&nbsp;make_big_string&nbsp;last&nbsp;=&nbsp;(*&nbsp;create&nbsp;a&nbsp;utf8&nbsp;string&nbsp;of&nbsp;consecutive&nbsp;code<br>
+points&nbsp;*)<br>
+ &nbsp;let&nbsp;buf&nbsp;=&nbsp;Buffer.create&nbsp;(16&nbsp;*&nbsp;1024&nbsp;*&nbsp;1024&nbsp;)&nbsp;in&nbsp;(*&nbsp;ocaml&nbsp;tolerates&nbsp;large&nbsp;*)<br>
+ &nbsp;let&nbsp;str&nbsp;=&nbsp;Bytes.create&nbsp;6&nbsp;in<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do<br>
+   &nbsp;code_into_string&nbsp;str&nbsp;i;<br>
+   &nbsp;Buffer.add_string&nbsp;buf&nbsp;str;<br>
+ &nbsp;done;<br>
+ &nbsp;Buffer.contents&nbsp;buf<br>
+ &nbsp;;;<br>
+<br>
+let&nbsp;make_big_string&nbsp;last&nbsp;=&nbsp;(*&nbsp;create&nbsp;a&nbsp;utf8&nbsp;string&nbsp;of&nbsp;consecutive&nbsp;code<br>
+points&nbsp;*)<br>
+ &nbsp;let&nbsp;buf&nbsp;=&nbsp;Buffer.create&nbsp;(16&nbsp;*&nbsp;1024&nbsp;*&nbsp;1024&nbsp;)&nbsp;in&nbsp;(*&nbsp;ocaml&nbsp;tolerates&nbsp;large&nbsp;*)<br>
+ &nbsp;let&nbsp;str&nbsp;=&nbsp;Bytes.create&nbsp;7&nbsp;in<br>
+ &nbsp;for&nbsp;i&nbsp;=&nbsp;0&nbsp;to&nbsp;last&nbsp;do<br>
+   &nbsp;code_into_string&nbsp;str&nbsp;i;<br>
+   &nbsp;Buffer.add_string&nbsp;buf&nbsp;str;<br>
+ &nbsp;done;<br>
+ &nbsp;let&nbsp;b&nbsp;=&nbsp;Buffer.contents&nbsp;buf&nbsp;in<br>
+ &nbsp;printf&quot;\n\ncreated&nbsp;%i&nbsp;strings.&nbsp;\nfinal&nbsp;length:&nbsp;%i&nbsp;bytes.&nbsp;\<br>
+        &nbsp;\nAvg&nbsp;len&nbsp;%f\n%!&quot;<br>
+        &nbsp;last<br>
+        &nbsp;(String.length&nbsp;b)<br>
+        &nbsp;((float_of_int&nbsp;(String.length&nbsp;b))&nbsp;/.&nbsp;(float_of_int&nbsp;last));<br>
+ &nbsp;b<br>
+<br>
+let&nbsp;decode_big&nbsp;big&nbsp;=             &nbsp;(*&nbsp;create&nbsp;a&nbsp;utf8&nbsp;string;&nbsp;convert&nbsp;to&nbsp;int<br>
+S.t&nbsp;*)<br>
+ &nbsp;let&nbsp;check&nbsp;=&nbsp;ref&nbsp;0&nbsp;in            &nbsp;(*&nbsp;map&nbsp;char&nbsp;S.t&nbsp;to&nbsp;int&nbsp;S.t&nbsp;and&nbsp;test<br>
+result&nbsp;*)<br>
+ &nbsp;(String.to_seq&nbsp;big)<br>
+ &nbsp;(mapUtf8Char2Code&nbsp;(fun&nbsp;j&nbsp;-&gt;&nbsp;assert&nbsp;(j&nbsp;=&nbsp;!check)&nbsp;;&nbsp;incr&nbsp;check))<br>
+<br>
+<br>
+let&nbsp;last1&nbsp;=&nbsp;0x3ffffff;;&nbsp;(*   &nbsp;67_108_863&nbsp;*)<br>
+let&nbsp;last2&nbsp;=&nbsp;0x7fffffff;;&nbsp;(*&nbsp;1073_741_823&nbsp;*)<br>
+let&nbsp;last&nbsp;=&nbsp;last2&nbsp;(*&nbsp;last2&nbsp;uses&nbsp;ALL&nbsp;code&nbsp;points&nbsp;and&nbsp;takes&nbsp;a&nbsp;while&nbsp;*)<br>
+<br>
+(*&nbsp;Sample:&nbsp;Convert&nbsp;a&nbsp;utf8&nbsp;char&nbsp;string&nbsp;to&nbsp;a&nbsp;Vector&nbsp;*)<br>
+let&nbsp;utf8_to_vector&nbsp;str&nbsp;=&nbsp;str&nbsp;|&gt;&nbsp;gen_of_utf8&nbsp;|&gt;&nbsp;V.of_gen<br>
+<br>
+let&nbsp;_&nbsp;=&nbsp;printf&nbsp;&quot;\&quot;SKサイトリf\&quot;&nbsp;|&gt;&nbsp;utf8_to_vector&nbsp;\n\t&nbsp;|&gt;&nbsp;Vector.to_seq&nbsp;|&gt;<br>
+S.map&nbsp;code_to_string&nbsp;|&gt;&nbsp;fun&nbsp;seq&nbsp;-&gt;&nbsp;seq&nbsp;(printf\&quot;%s\t\&quot;)\n!&quot;;;<br>
+<br>
+&quot;SKサイトリf&quot;&nbsp;|&gt;&nbsp;utf8_to_vector&nbsp;|&gt;&nbsp;Vector.to_seq&nbsp;|&gt;&nbsp;S.map&nbsp;code_to_string&nbsp;|&gt;<br>
+ fun&nbsp;seq&nbsp;-&gt;&nbsp;seq&nbsp;(printf&quot;%s\t&quot;);;<br>
+<br>
+(*&nbsp;Test&nbsp;below&nbsp;does&nbsp;not&nbsp;work&nbsp;for&nbsp;last&nbsp;2&nbsp;because&nbsp;it&nbsp;allocates&nbsp;a&nbsp;to&nbsp;big&nbsp;string<br>
+*)<br>
+let&nbsp;big&nbsp;=&nbsp;measure&nbsp;make_big_string&nbsp;last1&nbsp;last1&nbsp;&quot;make_big_string&quot;;;<br>
+measure&nbsp;decode_big&nbsp;big&nbsp;last1&nbsp;&quot;decode_big&quot;;;<br>
+<br>
+(*&nbsp;Here&nbsp;last2&nbsp;encodes/decodes&nbsp;ALL&nbsp;possible&nbsp;code&nbsp;points&nbsp;*)<br>
+measure&nbsp;round_about2&nbsp;last&nbsp;last&nbsp;&quot;round_about2&quot;;;<br>
+measure&nbsp;round_about3&nbsp;last&nbsp;last&nbsp;&quot;round_about3&quot;;;<br>
+measure&nbsp;code_into_string_test&nbsp;last&nbsp;last&nbsp;&quot;code_into_string&quot;;;<br>
+measure&nbsp;code_to_string_test&nbsp;last&nbsp;last&nbsp;&quot;code_to_string&quot;;;<br>
+<br>
+let&nbsp;_&nbsp;=&nbsp;(*&nbsp;One&nbsp;can&nbsp;never&nbsp;have&nbsp;to&nbsp;many&nbsp;samples&nbsp;...&nbsp;*)<br>
+ printf&quot;\n\n   &nbsp;&quot;;&nbsp;S.(&nbsp;0&nbsp;--&nbsp;15)&nbsp;(fun&nbsp;i&nbsp;-&gt;&nbsp;printf&quot;&nbsp;%2x&quot;&nbsp;i);<br>
+ S.(&nbsp;0&nbsp;--&nbsp;15)<br>
+ &nbsp;(fun&nbsp;i&nbsp;-&gt;&nbsp;printf&quot;\n%4x &nbsp;&quot;&nbsp;(i&nbsp;*&nbsp;16&nbsp;+&nbsp;0x2500);<br>
+   &nbsp;S.(&nbsp;(0x2500&nbsp;+&nbsp;i&nbsp;*&nbsp;16)&nbsp;--&nbsp;(0x250F&nbsp;+&nbsp;i&nbsp;*&nbsp;16))<br>
+   &nbsp;|&gt;&nbsp;S.map&nbsp;code_to_string<br>
+   &nbsp;|&gt;&nbsp;S.to_list&nbsp;|&gt;&nbsp;String.concat&nbsp;&quot; &nbsp;&quot;&nbsp;|&gt;&nbsp;print_string<br>
+ &nbsp;);;<br>
+*)<br>
+<br>
+&lt;/pre&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/blockquote&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pre&nbsp;wrap=&quot;&quot;&gt;<br>
+<br>
+&lt;/pre&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;br&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;fieldset&nbsp;class=&quot;mimeAttachmentHeader&quot;&gt;&lt;/fieldset&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;br&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;pre&nbsp;wrap=&quot;&quot;&gt;_______________________________________________<br>
+Containers-users&nbsp;mailing&nbsp;list<br>
+&lt;a&nbsp;class=&quot;moz-txt-link-abbreviated&quot;&nbsp;href=&quot;mailto:Containers-users@lists.ocaml.org&quot;&gt;Containers-users@lists.ocaml.org&lt;/a&gt;<br>
+&lt;a&nbsp;class=&quot;moz-txt-link-freetext&quot;&nbsp;href=&quot;http://lists.ocaml.org/listinfo/containers-users&quot;&gt;http://lists.ocaml.org/listinfo/containers-users&lt;/a&gt;<br>
+&lt;/pre&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;/blockquote&gt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;br&gt;<br>
+&nbsp;&nbsp;&lt;/body&gt;<br>
+&lt;/html&gt;<br>
+
+</tt>

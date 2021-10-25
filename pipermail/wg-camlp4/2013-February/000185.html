@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBGWLmjhXD%2BzGVich5mPd50NKGgHknwtL40rU-z05ycbqw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000178.html">
+   <LINK REL="Next"  HREF="000186.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAPFanBGWLmjhXD%2BzGVich5mPd50NKGgHknwtL40rU-z05ycbqw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Feb  1 15:38:59 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000178.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+        <LI>Next message: <A HREF="000186.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> In which category would you put code generators based on type declaration (a
+</I>&gt;<i> la type-conv) also fall in this category?
+</I>
+I think it depends on the &quot;phase&quot; in which the code generation results
+are needed.
+
+You could shoehorn type-conv into structured comments by saying that
+the type definitions present in foo.ml, annotated with structured
+comments, result in the production of a derived foo_with.ml file
+(containing the generated stuff) -- that could later be used in your
+project along with foo.ml
+
+(Note: this seems somehow related to a change Hongbo made to the
+Camlp4 map/fold/filter generators in Fan, that I'm not sure I
+completely understand or like, and was discussed in
+<A HREF="http://old.nabble.com/Some-utilities-about-camlp4-td33360537.html">http://old.nabble.com/Some-utilities-about-camlp4-td33360537.html</A> )
+
+However, this mode of use puts constraints on the use of the
+extension: you cannot in a same file have a type-conv-using
+declaration, and refer to the (morally, not yet produced) result of
+the boilerplate generation. I believe most people would rather see
+type-conv in the second category of &quot;shallow embeddings&quot;, under a
+syntax in the spirit of
+
+  (@deriving Eq Hash Print)
+  type foo =
+    ...
+  ;;
+
+I would have liked to choose a postfix syntax, but there is in general
+no end delimiter to attach to unambiguously: in (type foo = Bar of baz
+(+ blah)), the annotation may attach either to the constructor
+argument type expression, or to the whole phrase. The real syntax
+extension in fact adds an additional optional terminal, &quot;with&quot;. The
+only &quot;end-closed&quot; type declarations are record declarations, and this
+is only because record types are not first-class type expressions.
+
+Thanks you for your detailed syntax examples in the other topic. I
+have taken the liberty to put them on the wiki:
+  <A HREF="https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases-using-light-annotations">https://github.com/gasche/ocaml-syntax-extension-discussion/wiki/Use-Cases-using-light-annotations</A>
+
+Regarding concrete syntax, I would be tempted to suggest that (prefix
+or postfix) annotations be attached to non-terminals (including
+parenthesis). I believe there is an important difference between
+&quot;modulating this AST node&quot; and &quot;modulating the whole enclosed
+expression&quot; that would relevant for reasoning on the locality and
+composability of syntactic extensions. I'm not sure yet what's the
+best way to go (I'll try to see what Leo and you suggest).
+
+Finally, I think -ppx + arbitrary annotations, without any further
+restriction, is too free-form for robust syntax extensions: one
+important problem with Camlp4 is that it allowed syntax extension
+writers to modify the syntax in very bad way that hurt robustness. As
+already discussed, I have a strong distaste for extensions that only
+piggyback on existing syntax (without adding any explicit marker); I
+would feel safer if the extension *mechanism* disallowed such
+unstructured extensions, or at least made them less rewarding to write
+than the composable ones. (For example by only passing to the
+extension writer the part(s) of the AST that have been annotated).
+Unfortunately, I don't see how Bisect would fit any such restriction.
+Maybe that's a problem best solved by socialization (writing a
+documentation on good practices, and yelling on people), but I sort of
+doubt it -- I don't know how many time I've had to argue for *not*
+globally changing the associativity of infix operators through Camlp4
+in Batteries.
+
+On Fri, Feb 1, 2013 at 8:50 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain at frisch.fr</A>&gt; wrote:
+&gt;<i> On 1/31/2013 10:13 PM, Gabriel Scherer wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I like Leo's idea of distinguishing three different forms of syntax
+</I>&gt;&gt;<i> extensions (I'm not discussing concrete syntax):
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 1. structured comments
+</I>&gt;&gt;<i> 2. shallow embeddings
+</I>&gt;&gt;<i> 3. deep embeddings
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> In which category would you put code generators based on type declaration (a
+</I>&gt;<i> la type-conv) also fall in this category?  For me, this is one of the most
+</I>&gt;<i> important use case of -ppx (the other being instrumentation of code, covered
+</I>&gt;<i> by 1 I guess).  Basically, they only require the ability to add annotations
+</I>&gt;<i> on type declaration and type expressions (and one needs to be able to
+</I>&gt;<i> include OCaml expressions in the annotations).  If/when runtime types are
+</I>&gt;<i> added to OCaml, they will hopefully also benefit from those annotations.
+</I>&gt;<i>
+</I>&gt;<i> I guess that 1 is excluded because those annotations are required to compile
+</I>&gt;<i> to program and 3 is excluded, because this has nothing to do with syntax.
+</I>&gt;<i> But 2 does not seem to apply either.
+</I>&gt;<i>
+</I>&gt;<i> -- Alain
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000178.html">[wg-camlp4] Structured comments, shallow embeddings and deep quasiquotations
+</A></li>
+	<LI>Next message: <A HREF="000186.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#185">[ date ]</a>
+              <a href="thread.html#185">[ thread ]</a>
+              <a href="subject.html#185">[ subject ]</a>
+              <a href="author.html#185">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,115 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] ocamlfind and -ppx option
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20ocamlfind%20and%20-ppx%20option&In-Reply-To=%3Ce453a94676f28b1ae543c2df07da2bba%40whitequark.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000507.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] ocamlfind and -ppx option</H1>
+    <B>Peter Zotov</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20ocamlfind%20and%20-ppx%20option&In-Reply-To=%3Ce453a94676f28b1ae543c2df07da2bba%40whitequark.org%3E"
+       TITLE="[wg-camlp4] ocamlfind and -ppx option">whitequark at whitequark.org
+       </A><BR>
+    <I>Thu May 15 14:44:01 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000507.html">[wg-camlp4] [Caml-devel]   Built-in attributes
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#508">[ date ]</a>
+              <a href="thread.html#508">[ thread ]</a>
+              <a href="subject.html#508">[ subject ]</a>
+              <a href="author.html#508">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2014-05-12 22:38, Gerd Stolpmann wrote:
+&gt;<i> I think the user should simply invoke a ppx with
+</I>&gt;<i> 
+</I>&gt;<i> ocamlfind ... -syntax ppx_tools ...
+</I>&gt;<i> 
+</I>&gt;<i> (maybe with a subpackage ppx_tools.ppx_metaquot if there are several
+</I>&gt;<i> commands in the same package), just in the same way as it is currently
+</I>&gt;<i> possible with camlp4. findlib would have to figure out what to do. For
+</I>&gt;<i> constructing the -pp switch findlib is looking for a
+</I>&gt;<i> 
+</I>&gt;<i> preprocessor = ...
+</I>&gt;<i> 
+</I>&gt;<i> setting in the package or some ancestor. Similarly, it could look for a
+</I>&gt;<i> 
+</I>&gt;<i> ppx = ...
+</I>&gt;<i> 
+</I>&gt;<i> setting to construct the -ppx switch.
+</I>
+There is a valid point against that solution. Currently, the idiom for
+invoking camlp4 extensions is to pass &quot;-package foo.syntax&quot;, which
+would internally specify the correct options to the camlp4 invocation.
+
+As such, both the users and the tooling expect that it is possible to
+fully activate an extension by passing a single -package option, which
+would then require all the necessary components and pass all the flags.
+
+In particular, OASIS makes it very convenient to pass -package options
+(the BuildDepends: field), but not -syntax ones (you have to use both
+ByteOpt: and NativeOpt: fields).
+
+In addition, it's much more user-friendly if you consider the toplevel:
+a single #require &quot;package.syntax&quot;;; is much better than a disparate 
+combo
+of #require and #syntax.
+
+This also avoids the need to disambiguate -syntax for camlp4 and ppx
+extensions, and is simpler conceptually.
+
+I have implemented this solution in a patchset:
+
+1. Do not install safe_camlp4 if configured without it
+<A HREF="https://github.com/whitequark/ocaml-findlib/commit/26d24392738c0232893115977b0c6b165dd89acb.diff">https://github.com/whitequark/ocaml-findlib/commit/26d24392738c0232893115977b0c6b165dd89acb.diff</A>
+2. Interpret ppx directive in META files
+<A HREF="https://github.com/whitequark/ocaml-findlib/commit/7862f3c7047376d6fa8cebfecadf71adc8b3d8e7.diff">https://github.com/whitequark/ocaml-findlib/commit/7862f3c7047376d6fa8cebfecadf71adc8b3d8e7.diff</A>
+3. Topfind support for ppx directive
+<A HREF="https://github.com/whitequark/ocaml-findlib/commit/e45dd0a19b15d4697f15addae44a0f37802004b3.diff">https://github.com/whitequark/ocaml-findlib/commit/e45dd0a19b15d4697f15addae44a0f37802004b3.diff</A>
+
+Additionally, I have implemented a -ppxopt option, whose job is similar
+to -ppopt: it passes additional arguments to ppx preprocessors. The 
+syntax
+is -ppxopt pkg,opt1,opt2,...:
+<A HREF="https://github.com/whitequark/ocaml-findlib/commit/a24d53c04610efe204c7e9461d3b60e63b2d65de.diff">https://github.com/whitequark/ocaml-findlib/commit/a24d53c04610efe204c7e9461d3b60e63b2d65de.diff</A>
+
+-- 
+Peter Zotov
+sip:<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">whitequark at sipnet.ru</A>
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000507.html">[wg-camlp4] [Caml-devel]   Built-in attributes
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#508">[ date ]</a>
+              <a href="thread.html#508">[ thread ]</a>
+              <a href="subject.html#508">[ subject ]</a>
+              <a href="author.html#508">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

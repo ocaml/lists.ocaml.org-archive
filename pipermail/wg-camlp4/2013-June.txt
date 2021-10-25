@@ -1,0 +1,148 @@
+From romain.bardou at inria.fr  Tue Jun  4 10:08:36 2013
+From: romain.bardou at inria.fr (Romain Bardou)
+Date: Tue, 04 Jun 2013 11:08:36 +0200
+Subject: [wg-camlp4] Status of extension_points extensions
+Message-ID: <51ADAE94.1050106@inria.fr>
+
+Dear wg-camlp4,
+
+Recently Alain has impressively shown great examples of extension_points
+in action.
+
+- An extension to generate .mli files from .ml files with annotations
+such as "this type should be abstract":
+
+[@@mli abstract]
+
+(Alain does *not* endorse the idea of generating .mli files
+automatically, this is just a proof-of-concept!)
+
+- an extension to put ocamldoc-like comments, added not as comments but
+as extension points (making it more clear that the comment is attached
+to a given node in the parsetree):
+
+[@@doc "This is an internal module."]
+
+- an extension to copy a type definition from the .mli to the .ml
+
+type t = [%copy_typedef]
+
+The syntax makes it very clear that extensions are not part of the
+language and are extensions. This is good. However, it also means that
+if the extension proves so useful that we want it part of the actual
+language, we are left with the following choices:
+- provide the extension as-is;
+- reprogram the extension with a dedicated syntax.
+
+If we provide the extension as-is, the fact that the syntax says it is
+an extension suddenly is a problem because it is not actually an
+extension anymore if it is part of the language. Moreover the syntax may
+not be ideal. And if this approach is used, and several extensions are
+included, we may end up with programs which are cluttered with brackets,
+so to speak.
+
+If, on the other hand, we reprogram the extension, we are able to
+provide a nicer syntax. For instance, just write "abstract" instead of
+"[@@mli abstract]". But it means more work and we would not know what to
+do with programs that used the extension before: rewrite them with the
+new syntax? Keep using the extension, which will probably no longer be
+maintained if it is part of the language?
+
+Until now, I saw extension_points as a very nice way to experiment with
+language extensions, and to provide custom, project-local extensions.
+But Alain just showed how powerful it is and my fear is now that,
+paradoxically, we and up with a lot of very useful extensions that would
+almost become need-to-haves? and with the drawback that for many of them
+the syntax would not be ideal.
+
+Has this issue already been discussed?
+
+That being said, it is a problem which is rather good to have.
+
+Cheers,
+
+-- 
+Romain Bardou
+
+From alain.frisch at lexifi.com  Wed Jun  5 09:28:37 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 05 Jun 2013 10:28:37 +0200
+Subject: [wg-camlp4] Status of extension_points extensions
+In-Reply-To: <51ADAE94.1050106@inria.fr>
+References: <51ADAE94.1050106@inria.fr>
+Message-ID: <51AEF6B5.3050404@lexifi.com>
+
+On 06/04/2013 11:08 AM, Romain Bardou wrote:
+> The syntax makes it very clear that extensions are not part of the
+> language and are extensions. This is good. However, it also means that
+> if the extension proves so useful that we want it part of the actual
+> language, we are left with the following choices:
+> - provide the extension as-is;
+> - reprogram the extension with a dedicated syntax.
+
+I don't think that many of the syntactic tools implemented currently 
+with Camlp4 or later with -ppx/extension_points will be seriously 
+considered for integration into OCaml.
+
+If we look at existing Camlp4 extensions, very few made their way into 
+the language.  I can actually only think of one example, pa_open_in => 
+"let open ... in" (the syntax changed lightly).  And I don't see any 
+obvious other candidates for integration into the language.
+
+So I'm not sure the question you raise will be of huge practical importance.
+
+> If we provide the extension as-is, the fact that the syntax says it is
+> an extension suddenly is a problem because it is not actually an
+> extension anymore if it is part of the language. Moreover the syntax may
+> not be ideal. And if this approach is used, and several extensions are
+> included, we may end up with programs which are cluttered with brackets,
+> so to speak.
+
+For "extension nodes", indeed, it would be very weird to have some of 
+them supported natively.  For attributes, I'm less sure.  Java or C#, 
+for instance, have notions of attributes/meta-data attached to methods 
+and classes; some of them are interpreted by external tools, but some of 
+them are given a built-in interpretation by the compiler.  I wouldn't be 
+shocked if, at some point, the OCaml compilers started to interpret some 
+attributes to drive optimizations or to tweak the OCaml FFI calling 
+convention, for instance.  This needs to be discussed, though.
+
+> If, on the other hand, we reprogram the extension, we are able to
+> provide a nicer syntax. For instance, just write "abstract" instead of
+> "[@@mli abstract]". But it means more work and we would not know what to
+> do with programs that used the extension before: rewrite them with the
+> new syntax? Keep using the extension, which will probably no longer be
+> maintained if it is part of the language?
+
+The extension will probably become straightforward, mapping directly to 
+the new built-in construction; so maintaining it would be very simple.
+
+> Until now, I saw extension_points as a very nice way to experiment with
+> language extensions, and to provide custom, project-local extensions.
+
+Extension_points can certainly help to experiment with new language 
+features, but maybe not in the way you suggest.  In particular, most new 
+interesting language features expect some special support in the 
+type-checker and/or the backend.  Extension_points can help by allowing 
+the people working on such an extension to focus on the interesting part 
+(type-checker / back-end) without having to adapt the parser, the 
+Parsetree and all the code relying on it (including Camlp4 if they want 
+to be able to try their new extension on large code base which require 
+Camlp4).
+
+Project-local extensions are also certainly a good candidate for using 
+extension_points.  But the main goal of extension_points, in my mind, is 
+to support "syntactic tools" which, most of the time, clearly don't 
+deserve to be part of the core language, and where a slightly "foreign" 
+syntax is not a big deal.  These tools can be code generators (such as 
+type-conv/deriving, or bitstring/ulex), code analyzers which require 
+some annotations (such as Bisect), or tools which need to extract 
+(annotated) information for external use (such as ocamldoc, or an FFI 
+generator).
+
+
+
+Cheers,
+
+Alain
+

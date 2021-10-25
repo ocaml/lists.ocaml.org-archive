@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> AW: scripting with ocaml and core
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20AW%3A%20scripting%20with%20ocaml%20and%20core&In-Reply-To=%3C1348485166.11634.1%40samsung%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000574.html">
+   <LINK REL="Next"  HREF="000576.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>AW: scripting with ocaml and core</H1>
+    <B>Gerd Stolpmann</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20AW%3A%20scripting%20with%20ocaml%20and%20core&In-Reply-To=%3C1348485166.11634.1%40samsung%3E"
+       TITLE="AW: scripting with ocaml and core">info at gerd-stolpmann.de
+       </A><BR>
+    <I>Mon Sep 24 12:12:46 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000574.html">scripting with ocaml and core
+</A></li>
+        <LI>Next message: <A HREF="000576.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#577">[ date ]</a>
+              <a href="thread.html#577">[ thread ]</a>
+              <a href="subject.html#577">[ subject ]</a>
+              <a href="author.html#577">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Am 24.09.2012 11:03:47 schrieb(en) Sylvain Le Gall:
+&gt;<i> +Gerd
+</I>&gt;<i> 
+</I>&gt;<i> 2012/9/24 David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt;:
+</I>&gt;<i> &gt; Well, hang on. The last example took 0.2s. This seems a lot more
+</I>&gt;<i> &gt; acceptable than the times reported ~2.5s by Sean.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Is your computer an order of magnitude faster than Sean's? What else
+</I>&gt;<i> &gt; is going on here?
+</I>&gt;<i> 
+</I>&gt;<i> Maybe it is related to findlib ?
+</I>&gt;<i> 
+</I>&gt;<i> I had a look at findlib code and I think we can do some cleanup to
+</I>&gt;<i> gain a significant boost (which will in turn boost general compilation
+</I>&gt;<i> as well). Maybe we can have a &quot;optimization day&quot; on findlib with Gerd
+</I>&gt;<i> ?
+</I>
+I don't think you can do here much. All algorithms in findlib are  
+linear (esp. the topological sorting of the packages), and I've never  
+seen any bigger problems with the implementation, even for really large  
+projects.
+
+My guess about the long opening time: It's loading all of Core, not  
+only Core.Std. It's a downside of packing modules.
+
+Gerd
+
+&gt;<i> &gt;
+</I>&gt;<i> &gt; On Mon, Sep 24, 2012 at 8:51 AM, J&#233;r&#233;mie Dimino  
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/core">jeremie at dimino.org</A>&gt; wrote:
+</I>&gt;<i> &gt;&gt; Le Sun, 23 Sep 2012 13:36:44 -0400,
+</I>&gt;<i> &gt;&gt; Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; a &#233;crit :
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;&gt; I've seen more or less the same thing.  Manipulating the name  
+</I>&gt;<i> space
+</I>&gt;<i> &gt;&gt;&gt; seems to be quite expensive.  To be fair, Core.Std is a pretty
+</I>&gt;<i> &gt;&gt;&gt; massive module. Does anyone who knows more about how the toplevel
+</I>&gt;<i> &gt;&gt;&gt; actually works have any thoughts on what might be going on, and  
+</I>&gt;<i> if it
+</I>&gt;<i> &gt;&gt;&gt; can be made more efficient?
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; I think it is opening the module in the environment that is slow
+</I>&gt;<i> &gt;&gt; (Typemod.type_open). It is not really related to the toplevel. On  
+</I>&gt;<i> my
+</I>&gt;<i> &gt;&gt; computer, compiling a file containing only &quot;open Core.Std&quot; takes  
+</I>&gt;<i> the
+</I>&gt;<i> &gt;&gt; same amount of time as doing it in the toplevel. Compilation using
+</I>&gt;<i> &gt;&gt; ocamlc.opt instead of ocamlc is only 2 times faster:
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   $ touch empty.ml
+</I>&gt;<i> &gt;&gt;   $ time ocaml -I /home/dim/findlib/core empty.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.009s
+</I>&gt;<i> &gt;&gt;   user  0m0.008s
+</I>&gt;<i> &gt;&gt;   sys   0m0.000s
+</I>&gt;<i> &gt;&gt;   $ time ocamlc -I /home/dim/findlib/core -c empty.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.007s
+</I>&gt;<i> &gt;&gt;   user  0m0.000s
+</I>&gt;<i> &gt;&gt;   sys   0m0.004s
+</I>&gt;<i> &gt;&gt;   $ time ocamlc.opt -I /home/dim/findlib/core -c empty.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.003s
+</I>&gt;<i> &gt;&gt;   user  0m0.000s
+</I>&gt;<i> &gt;&gt;   sys   0m0.000s
+</I>&gt;<i> &gt;&gt;   $ echo &quot;open Core.Std&quot; &gt; open_core_std.ml
+</I>&gt;<i> &gt;&gt;   $ time ocaml -I /home/dim/findlib/core open_core_std.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.384s
+</I>&gt;<i> &gt;&gt;   user  0m0.352s
+</I>&gt;<i> &gt;&gt;   sys   0m0.028s
+</I>&gt;<i> &gt;&gt;   $ time ocamlc -I /home/dim/findlib/core -c open_core_std.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.400s
+</I>&gt;<i> &gt;&gt;   user  0m0.372s
+</I>&gt;<i> &gt;&gt;   sys   0m0.008s
+</I>&gt;<i> &gt;&gt;   $ time ocamlc.opt -I /home/dim/findlib/core -c open_core_std.ml
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt;   real  0m0.190s
+</I>&gt;<i> &gt;&gt;   user  0m0.172s
+</I>&gt;<i> &gt;&gt;   sys   0m0.016s
+</I>&gt;<i> &gt;&gt;
+</I>&gt;<i> &gt;&gt; --
+</I>&gt;<i> &gt;&gt; J&#233;r&#233;mie
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>
+
+
+-- 
+------------------------------------------------------------
+Gerd Stolpmann, Darmstadt, Germany    <A HREF="http://lists.ocaml.org/listinfo/core">gerd at gerd-stolpmann.de</A>
+Creator of GODI and camlcity.org.
+Contact details:        <A HREF="http://www.camlcity.org/contact.html">http://www.camlcity.org/contact.html</A>
+Company homepage:       <A HREF="http://www.gerd-stolpmann.de">http://www.gerd-stolpmann.de</A>
+------------------------------------------------------------
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000574.html">scripting with ocaml and core
+</A></li>
+	<LI>Next message: <A HREF="000576.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#577">[ date ]</a>
+              <a href="thread.html#577">[ thread ]</a>
+              <a href="subject.html#577">[ subject ]</a>
+              <a href="author.html#577">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

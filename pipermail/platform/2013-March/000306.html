@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C87zjy10wga.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000302.html">
+   <LINK REL="Next"  HREF="000307.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3C87zjy10wga.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Mon Mar 18 11:38:29 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000302.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000307.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#306">[ date ]</a>
+              <a href="thread.html#306">[ thread ]</a>
+              <a href="subject.html#306">[ subject ]</a>
+              <a href="author.html#306">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> The problem with this fixed-syntactic choice is that it hampers
+</I>&gt;<i> composability of namespaces.
+</I>
+This is by design. This feature is only meant to provide support to
+specialised libraries, like Core, that wish to provide their own
+equivalent of the standard library's Pervasives module. We probably
+don't want to encourage its general use. I don't think it will be a
+problem that you can't easily compose the &quot;Core&quot; namespace with the
+standard library's namespace.
+
+&gt;<i> Assume you want to work with namespaces Foo and Bar at the same time.
+</I>&gt;<i> In a hierarchical setting you can build a namespace with two
+</I>&gt;<i> namespaces for Foo and Bar (eg. { A =&gt; Foo, B =&gt; Bar } ) and this has
+</I>&gt;<i> very simple properties (no conflict/shadowing involved). In a flat
+</I>&gt;<i> setting, or if you want to avoid adding one level of depth, you will
+</I>&gt;<i> rather use (A merge B). What happens then if both A and B have a
+</I>&gt;<i> Pervasives module?
+</I>
+This would be handled like two compilation units with the same name: one
+would shadow the other and so only one would be opened. This is safer
+than having both modules opened, since opening both may result in one
+module partially shadowing another, which is more likely to go
+unnoticed.
+
+&gt;<i> Regarding the proposal as a whole:
+</I>&gt;<i> - I'm curious and not sure: what is the reason to remove hierarchical
+</I>&gt;<i> namespaces from your proposal? At first I believed it was the ongoing
+</I>&gt;<i> tooling discussion with Alain, but he actually objects to
+</I>&gt;<i> non-canonicity of names (as permitted by aliasing) more than your
+</I>&gt;<i> foo-bar-baz hierarchical structure. Which perceived problems are
+</I>&gt;<i> solved by this change?
+</I>
+Despite Alain's concerns, I think that it will not be too difficult to
+handle the tooling for hierarchical namespaces. However, I think it will
+be easier to determine this once the tools have already been updated to
+support flat namespaces.
+
+Similarly, the design choice of shallow merging vs. deep merging for
+opening hierarchical namespaces may be easier to reason about once
+namespaces have been included in the language.
+
+These two issues are important, and require some thought before making a
+full proposal including hierarchical namespaces. Rather than waiting for
+these issues to be resolved, I would rather proceed, in the short term,
+with a proposal for flat namespaces.
+
+&gt;<i> - I believe the proposal is still inadequate, or at least
+</I>&gt;<i> underspecified, with regard to the internal name conflicts problem.
+</I>&gt;<i> What kind of conventions do you envision around your proposal to avoid
+</I>&gt;<i> such conflicts?
+</I>
+In my proposal modules must still have a unique name. This name will be
+reflected in the filename of the &quot;.cmi&quot; file (e.g. Foo#Bar as
+foo-bar.cmi). To avoid long source file names, the name can be specified
+with the &quot;-name&quot; command line argument.
+
+Since I expect people to provide a namespace for their package, I would
+expect the interface for module bar from package foo to be called
+&quot;foo-bar.cmi&quot;. If people don't use the same names for their packages
+then this should avoid all naming conflicts.
+
+An alternative mechanism, also supported by my proposal and useful for
+libraries that are compatible with versions of OCaml without namespaces,
+is to name the module bar in the package foo &quot;foo_bar.cmi&quot; and then
+provide a search path file &quot;foo.mlpath&quot; that maps &quot;Foo#Bar&quot; to
+&quot;foo_bar.cmi&quot;.
+
+Note that in both these solutions the source file can be named &quot;bar.ml&quot;,
+and the &quot;-name&quot; argument used to add the &quot;Foo#&quot; or &quot;Foo_&quot; prefix to the
+name. Build systems could easily add automatic support for these
+conventions.
+
+If people wish to be extra careful then they can use the &quot;-name&quot;
+argument to add whatever additional data they want to the module name to
+ensure that it is unique.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000302.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000307.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#306">[ date ]</a>
+              <a href="thread.html#306">[ thread ]</a>
+              <a href="subject.html#306">[ subject ]</a>
+              <a href="author.html#306">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Spinning process on osx
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3CA71CECB09FED44B1A83A217E602DAD25%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000020.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Spinning process on osx</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3CA71CECB09FED44B1A83A217E602DAD25%40erratique.ch%3E"
+       TITLE="[ocaml-ctypes] Spinning process on osx">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Wed Dec  4 11:21:23 GMT 2013</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000020.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#15">[ date ]</a>
+              <a href="thread.html#15">[ thread ]</a>
+              <a href="subject.html#15">[ subject ]</a>
+              <a href="author.html#15">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello, 
+
+I'm getting crazy with a kind of heisen bug that *seems* to occur only with OCaml 4.01.0 but not with 4.00.1.
+
+I have ctypes 0.2.2, libffi 3.0.13, xcode 5 (using clang) on osx 10.8.5.
+
+The bug is quite reproducible in different context with different (UI related) functions, it seems to be sensitive to the length of the function/program. In all the contexts where the bug occurs it eventually spins in obj_addExceptionHandler (see below), unable to get out of that it I try to step the program. 
+
+(gdb) bt
+#0 0x00007fff85f18a81 in memmove$VARIANT$sse42 ()
+#1 0x00007fff90fd2abc in libunwind::CFI_Parser&lt;libunwind::LocalAddressSpace&gt;::parseInstructions ()
+#2 0x00007fff90fd2a5e in libunwind::CFI_Parser&lt;libunwind::LocalAddressSpace&gt;::parseFDEInstructions ()
+#3 0x00007fff90fd28db in libunwind::UnwindCursor&lt;libunwind::LocalAddressSpace, libunwind::Registers_x86_64&gt;::getInfoFromDwarfSection ()
+#4 0x00007fff90fd0ebd in libunwind::UnwindCursor&lt;libunwind::LocalAddressSpace, libunwind::Registers_x86_64&gt;::setInfoBasedOnIPRegister ()
+#5 0x00007fff90fd1555 in libunwind::UnwindCursor&lt;libunwind::LocalAddressSpace, libunwind::Registers_x86_64&gt;::step ()
+#6 0x00007fff8ce8c7af in objc_addExceptionHandler ()
+#7 0x00007fff87055c6c in _CFDoExceptionOperation ()
+#8 0x00007fff8642724c in _NSAppKitLock ()
+#9 0x00007fff863e47f7 in NSAccessibilityPostNotificationWithUserInfo ()
+#10 0x00007fff865058db in -[NSApplication sendEvent:] ()
+#11 0x00000001001f3b84 in Cocoa_PumpEvents ()
+#12 0x000000010019ba3e in SDL_PumpEvents ()
+#13 0x0000000100172354 in ffi_call_unix64 ()
+
+
+This is with a program that has the following source, it gets stuck in the call to Sdl.pump_events (). If I try to comment out any part (and dependents) of this program the bug disappears. Especially, if I comment out one of the `video +` in main(), the bug disappears (`+` is `Unsigned.UInt32.logor`). So I suspect some kind of stack alignement issue. 
+
+let test () = 
+  match Sdl.create_window &quot;Test&quot; ~w:640 ~h:480 Sdl.Window.resizable with  
+  | `Error -&gt; ()
+  | `Ok w -&gt;
+      Sdl.pump_events ();
+      let e = Sdl.Event.create () in
+      let s = Sdl.get_event_state Sdl.Event.window_event in
+      Printf.printf &quot;Event state: %s&quot; begin match s with 
+      | s when s = Sdl.Event.disable -&gt; &quot;disable&quot; 
+      | s when s = Sdl.Event.enable -&gt; &quot;enable&quot; 
+      | _ -&gt; assert false
+      end;
+      ignore (Sdl.wait_event_timeout e 1);
+      Sdl.destroy_window w;
+      ()
+
+let main () = match Sdl.init Sdl.Init.(video + video + events) with 
+|<i> `Error -&gt; exit 1
+</I>|<i> `Ok -&gt; test (); exit 0
+</I>
+let () = main ()
+
+
+That's just a first probe if anybody has something obvious in mind. I will provide more info and a fully reproducible test case. But for now I think I'll stick with ocaml 4.00.1 (hoping it's not there but just hiding more deeply) as I need to get some work done. 
+
+Best,
+
+Daniel
+
+
+P.S. Also I do get the following warnings when I install ctypes
+
+clang: warning: argument unused during compilation: '-fno-defer-pop'
+../../../src/ctypes/type_info_stubs.c:134:48: warning: format specifies type 'short' but the argument has type 'int' [-Wformat]
+case Short: snprintf(buf, sizeof buf, &quot;%hd&quot;, Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+%d
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:143:53: warning: format specifies type 'char' but the argument has type 'int' [-Wformat]
+case Int8_t: snprintf(buf, sizeof buf, &quot;%&quot; PRId8, Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:144:55: warning: format specifies type 'short' but the argument has type 'int' [-Wformat]
+case Int16_t: snprintf(buf, sizeof buf, &quot;%&quot; PRId16, Int_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:76:20: note: expanded from macro 'Int_val'
+#define Int_val(x) ((int) Long_val(x))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+^
+../../../src/ctypes/type_info_stubs.c:146:55: warning: format specifies type 'long long' but the argument has type 'int64' (aka 'long') [-Wformat]
+case Int64_t: snprintf(buf, sizeof buf, &quot;%&quot; PRId64, Int64_val(v)); break;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~
+/Users/dbuenzli/.opam/4.01.0/lib/ocaml/caml/mlvalues.h:268:22: note: expanded from macro 'Int64_val'
+#define Int64_val(v) (*((int64 *) Data_custom_val(v)))
+^
+/usr/include/secure/_stdio.h:56:62: note: expanded from macro 'snprintf'
+__builtin___snprintf_chk (str, len, 0, __darwin_obsz(str), __VA_ARGS__)
+
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000020.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#15">[ date ]</a>
+              <a href="thread.html#15">[ thread ]</a>
+              <a href="subject.html#15">[ subject ]</a>
+              <a href="author.html#15">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

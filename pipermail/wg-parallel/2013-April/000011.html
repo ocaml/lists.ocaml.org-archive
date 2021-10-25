@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-parallel] About Lwt and Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3C517E97DA.3000800%40incubaid.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000009.html">
+   <LINK REL="Next"  HREF="000010.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-parallel] About Lwt and Async</H1>
+    <B>Romain Slootmaekers</B> 
+    <A HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3C517E97DA.3000800%40incubaid.com%3E"
+       TITLE="[wg-parallel] About Lwt and Async">romain at incubaid.com
+       </A><BR>
+    <I>Mon Apr 29 16:55:06 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000009.html">[wg-parallel] About Lwt and Async
+</A></li>
+        <LI>Next message: <A HREF="000010.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#11">[ date ]</a>
+              <a href="thread.html#11">[ thread ]</a>
+              <a href="subject.html#11">[ subject ]</a>
+              <a href="author.html#11">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 04/29/2013 05:12 PM, Jeremie Dimino wrote:
+&gt;<i> On Mon, Apr 29, 2013 at 3:57 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-parallel">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;<i> Got it. I don't have a feel for the performance impact of such deferred
+</I>&gt;&gt;<i> scheduling, except that the difference between busy-spinning if there are
+</I>&gt;&gt;<i> outstanding requests, vs dropping into select/kqueue/epoll more frequently
+</I>&gt;&gt;<i> is very significant.
+</I>&gt;<i> As Stephen said there shouldn't be more select/kqueue/epoll calls.
+</I>&gt;<i> The idea is to run all jobs until there is no one left (with a limit)
+</I>&gt;<i> before doing the blocking select/kqueue/epoll call.
+</I>&gt;<i>
+</I>&gt;&gt;<i> For example, the Arakoon folks anecdotally reported a 20x performance loss
+</I>&gt;&gt;<i> between a direct Unix implementation of their database layer vs an Lwt
+</I>&gt;&gt;<i> one.  A loss that large can only be explained by context switching or
+</I>&gt;&gt;<i> pathological scheduling somewhere (given we know that Lwt doesn't result
+</I>&gt;&gt;<i> in a lot more allocation on the major heap).
+</I>&gt;&gt;<i> <A HREF="http://www.slideshare.net/eikke/arakoon">http://www.slideshare.net/eikke/arakoon</A> (slide 14/15)
+</I>&gt;&gt;<i> (I'm CCing Romain, who might have details).
+</I>&gt;<i> I believe this was about the disk IO.  Disk IO are done using
+</I>&gt;<i> preemptive threads since unix doesn't support asynchronous disk IO.
+</I>&gt;<i> When data are cached it is indeed much slower.  You can get about the
+</I>&gt;<i> same as direct IO after some tweaking: set the async_method to
+</I>&gt;<i> 'switch' and force the process to run only on one cpu. But the switch
+</I>&gt;<i> method doesn't work with the threaded runtime.
+</I>Yes. it was about disk IO, on Linux.
+
+(from the top of my head, we did something like this:
+
+     Lwt_unix.execute_job
+-            (pread_job (Lwt_unix.unix_file_descr ch) len offset)
+-            (fun job -&gt; pread_result job buf pos)
+-            pread_free
+
+
+which was dead slow.
+
+
+At that point in time, we also experimented with Lwt_unix.Async_switch
+but that gave SEGVs
+
+Some more remarks:
+we have seen scheduling differences between different Lwt versions,
+In the past, the scheduling was eager, while the current one is very 
+round-robin-ish,
+and performance impact for us is about -10%. (we have no problem with 
+that, it's just an observation)
+
+Posix is indeed broken for all things related to file IO.
+* not all file descriptors are equal:
+[select on a file descriptor for a regular file, always returns true, 
+while for a socket you get more relevant results]
+* things can have empty implementations (fe I believe the fsync 
+implementation on OSX is something like this:
+    int fsync(int fd) {return 0;}
+
+    )
+
+* for a lot of behaviour,
+   you depend on file system choices and sys-admin choices (mount options)
+   and they have a talent for the wrong choices.
+
+
+In essence: the situation is a mess.
+
+have fun,
+
+Romain.
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000009.html">[wg-parallel] About Lwt and Async
+</A></li>
+	<LI>Next message: <A HREF="000010.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#11">[ date ]</a>
+              <a href="thread.html#11">[ thread ]</a>
+              <a href="subject.html#11">[ subject ]</a>
+              <a href="author.html#11">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-parallel">More information about the wg-parallel
+mailing list</a><br>
+</body></html>

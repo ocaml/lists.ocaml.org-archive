@@ -1,0 +1,99 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Logging function calls
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAAxsn%3DFOcQF7pVfuvE-PGdyXRnjhKwJndvZPzr_SwW1Fnu5cbw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000097.html">
+   <LINK REL="Next"  HREF="000099.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Logging function calls</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAAxsn%3DFOcQF7pVfuvE-PGdyXRnjhKwJndvZPzr_SwW1Fnu5cbw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Logging function calls">yallop at gmail.com
+       </A><BR>
+    <I>Tue Sep 16 10:21:28 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000097.html">[ocaml-ctypes] Logging function calls
+</A></li>
+        <LI>Next message: <A HREF="000099.html">[ocaml-ctypes] Inverted stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#98">[ date ]</a>
+              <a href="thread.html#98">[ thread ]</a>
+              <a href="subject.html#98">[ subject ]</a>
+              <a href="author.html#98">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 15 September 2014 10:01, Thomas Braibant &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">thomas.braibant at gmail.com</A>&gt; wrote:
+&gt;<i> Thanks for your reply. Your proposal is quite close to what I had in
+</I>&gt;<i> mind. Yet, I am a bit puzzled about the dereferencing of the pointer
+</I>&gt;<i> in format_val. Shouldn't we test if it is the null-pointer before
+</I>&gt;<i> doing that?
+</I>
+Sure: there are different opinions on this, but I agree that a test
+for null would be reasonable here.
+
+&gt;<i> In that case, is testing if p = Ctypes.null the preferred
+</I>&gt;<i> way to do that? (I spotted that pattern somewhere in memory.ml I
+</I>&gt;<i> think.)
+</I>
+It's better in general to use Ctypes.ptr_compare, since ptr is an
+abstract type and the values contain extra data besides the raw
+address.  (I think polymorphic equality will do what you expect for
+the special case of comparing to Ctypes.null, but in general you can
+have two Ctypes.ptr values referencing the same object but not
+considered equal by =.)
+
+Even better, if your pointers are nullable you might use
+Ctypes.ptr_opt to construct them, and pattern matching against
+Some/None to check for null.
+
+&gt;<i> Regarding my other use case, what I miss is a way to tag a view (with
+</I>&gt;<i> the identity coercion both way) with a name, and be able to use that
+</I>&gt;<i> name to pick the right pretty printer (for flags, and so on). That
+</I>&gt;<i> would be a tiny bit more convenient than reading the integer value of
+</I>&gt;<i> (FLAG_BAR | FLAG_FOO) in my log, but I can cope with that.
+</I>
+It'd be convenient to have a way to add custom value printers for
+views, along similar lines to the format_typ optional argument to the
+view function.  I think that would actually solve both your problems
+neatly: you could have a view with a custom printer for your flags
+which turned integers into symbolic names, and a view with a custom
+printer for your pointer-to-struct arguments which printed out the
+pointed-to values rather than the addresses.  Pull requests welcome!
+(or feel free to raise an issue, if you prefer).
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000097.html">[ocaml-ctypes] Logging function calls
+</A></li>
+	<LI>Next message: <A HREF="000099.html">[ocaml-ctypes] Inverted stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#98">[ date ]</a>
+              <a href="thread.html#98">[ thread ]</a>
+              <a href="subject.html#98">[ subject ]</a>
+              <a href="author.html#98">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,116 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> hope to see some blog posts about Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20hope%20to%20see%20some%20blog%20posts%20about%20Async&In-Reply-To=%3CCAJsFioU4mDkUjta8ntn5ToeA18YushN5oN7RhF%3DUN7utdRxhsA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000134.html">
+   <LINK REL="Next"  HREF="000138.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>hope to see some blog posts about Async</H1>
+    <B>Stephen Weeks</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20hope%20to%20see%20some%20blog%20posts%20about%20Async&In-Reply-To=%3CCAJsFioU4mDkUjta8ntn5ToeA18YushN5oN7RhF%3DUN7utdRxhsA%40mail.gmail.com%3E"
+       TITLE="hope to see some blog posts about Async">sweeks at sweeks.com
+       </A><BR>
+    <I>Fri Jan 20 18:31:40 GMT 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000134.html">hope to see some blog posts about Async
+</A></li>
+        <LI>Next message: <A HREF="000138.html">hope to see some blog posts about Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#140">[ date ]</a>
+              <a href="thread.html#140">[ thread ]</a>
+              <a href="subject.html#140">[ subject ]</a>
+              <a href="author.html#140">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> 2) is perhaps a bit of of a low blow, since all the Async C code is
+</I>&gt;<i> hidden in Core :-) There isn't a particularly large disparity
+</I>&gt;<i> between the two if you include Core in the count.
+</I>..
+&gt;<i> Stephen read over lwt and was quite surprised by the amount and
+</I>&gt;<i> nature of the c code, so on that basis I don't think this is just a
+</I>&gt;<i> line-accounting trick.  The c code in core is largely wrapping
+</I>&gt;<i> system calls.  But I believe that Stephen was saying that
+</I>&gt;<i> significant fractions of the complexity of the runtime are in C.
+</I>&gt;<i> Stephen, can you elaborate?
+</I>
+Core has approx 3k lines of C code, most of which isn't relevant to
+Async.  If I had to write C bindings for Async from scratch without
+using Core, I guess it would come in comfortably under 1k lines, maybe
+even under 500.  One just needs basic wrappers for system calls (read,
+write, select) and OCaml's existing Thread API.  The Async scheduler
+and job handling are all implemented in OCaml using those.
+
+LWT has approx 6k lines of C code, of which 5k lives in
+lwt_unix_unix.c and lwt_unix_stubs.c.  I'm far from an expert on LWT,
+but it does appear that much of that code has to do with the scheduler
+and job handling.
+
+&gt;<i> There's a reasonable amount of Lwt C code to deal with the 'detached'
+</I>&gt;<i> threads which are mapped to pthreads. That's unfortunately necessary for
+</I>&gt;<i> the synchronous APIs in *NIX like DNS resolution and disk I/O
+</I>
+I think this does not imply a need for lots of C code.  OCaml has a
+thread API, and Async has OCaml code that uses threads to make
+blocking calls (like DNS resolution and disk I/O).  Having a basic C
+wrapper around the blocking call that releases the OCaml lock is
+sufficient.  With that, one can do the rest in OCaml.
+
+&gt;<i> The actual socket handling in the Lwt UNIX backend is also quite complex
+</I>&gt;<i> OCaml code, but this appear to be due to the need for cancellation to free
+</I>&gt;<i> resources like fds when Lwt.cancel is invoked
+</I>
+Again, I think this does not imply a need for lots of C code.  Async
+supports interruptible socket operations, and frees up file
+descriptors when the interrupt happens.  Of course, one needs access
+to system calls, but the logic can be (and is, in Async) written in
+OCaml.
+
+&gt;<i> One of my favourite things about Lwt is how it explicitly has a
+</I>&gt;<i> src/core directory with the pure code, and src/unix with all the
+</I>&gt;<i> evaluation modules to drive the cothreads. It makes porting it to
+</I>&gt;<i> different platforms (or microkernels!) in stages an absolute breeze.
+</I>...
+&gt;<i> That is in fact a great idea, and Stephen rearranged Async to follow
+</I>&gt;<i> the same design.
+</I>
+Yeah, I really liked that about LWT, and now that I copied the approach in
+Async, I like that about Async too :-)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120120/a4164230/attachment.html">http://lists.ocaml.org/pipermail/core/attachments/20120120/a4164230/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000134.html">hope to see some blog posts about Async
+</A></li>
+	<LI>Next message: <A HREF="000138.html">hope to see some blog posts about Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#140">[ date ]</a>
+              <a href="thread.html#140">[ thread ]</a>
+              <a href="subject.html#140">[ subject ]</a>
+              <a href="author.html#140">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

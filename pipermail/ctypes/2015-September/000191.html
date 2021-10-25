@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Creating a C wrapper for an OCaml value
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Creating%20a%20C%20wrapper%20for%20an%20OCaml%20value&In-Reply-To=%3CCAAxsn%3DF89Ys8WYGpGLiqS5t1xFiu4%2BC%2B4trXAz%3D092YJZYxcjw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000190.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Creating a C wrapper for an OCaml value</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Creating%20a%20C%20wrapper%20for%20an%20OCaml%20value&In-Reply-To=%3CCAAxsn%3DF89Ys8WYGpGLiqS5t1xFiu4%2BC%2B4trXAz%3D092YJZYxcjw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Creating a C wrapper for an OCaml value">yallop at gmail.com
+       </A><BR>
+    <I>Fri Sep 11 18:46:48 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000190.html">[ocaml-ctypes] Creating a C wrapper for an OCaml value
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#191">[ date ]</a>
+              <a href="thread.html#191">[ thread ]</a>
+              <a href="subject.html#191">[ subject ]</a>
+              <a href="author.html#191">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 11/09/2015, EMMA R TURETSKY &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">eturetsky at wisc.edu</A>&gt; wrote:
+&gt;<i> So I guess the meat of my question is how do I pass a value in OCaml to C
+</I>&gt;<i> and just create a wrapper around it in a way that I can pass the same value
+</I>&gt;<i> back when I call OCaml from C using ctypes?  I feel like this should be
+</I>&gt;<i> simple and obvious from the manual, but my OCaml understanding is very
+</I>&gt;<i> weak.
+</I>
+Passing OCaml values to C is actually a slightly unusual use case,
+since most uses of ctypes involve passing C values to OCaml, so it's
+probably not especially well documented.  It is possible, though, at
+least with the master (unreleased) version of ctypes, which you can
+install as follows:
+
+    opam pin add ctypes <A HREF="http://lists.ocaml.org/listinfo/ctypes">git at github.com</A>:ocamllabs/ocaml-ctypes.git
+
+The main thing to be aware of is that the OCaml garbage collector can
+run in between the time that you pass the OCaml value to C and the
+time that you pass it back to OCaml.  The GC can move values around,
+changing their addresses, so simply passing the address of a value
+directly to C isn't safe.  The way to avoid problems is to register
+values as roots, then pass the addresses of those roots to C, rather
+than the values themseles.  Ctypes provides a module Ctypes.Root with
+a few functions for root management:
+
+    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/758e620d/src/ctypes/ctypes.mli#L417-L432">https://github.com/ocamllabs/ocaml-ctypes/blob/758e620d/src/ctypes/ctypes.mli#L417-L432</A>
+    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/pull/318">https://github.com/ocamllabs/ocaml-ctypes/pull/318</A>
+
+The Root API is rather low-level, so I recommend wrapping calls to it
+using signatures with stronger typing.  Here's a full example of
+passing an OCaml module value to C, retrieving it via a separate C
+call and invoking some of the module functions.  First, some C
+functions which store and retrieve OCaml values using 'void *':
+
+    /* c_bit.c */
+    #include &lt;stddef.h&gt;
+    #include &lt;assert.h&gt;
+
+    static void *ocaml_modules[] = {NULL, NULL};
+
+    void store_module(int i, void *m)
+    {
+      assert (i == 0 || i == 1);
+      ocaml_modules[i] = m;
+    }
+
+    void *retrieve_module(int i)
+    {
+      assert(i == 0 || i == 1);
+      assert(ocaml_modules[i] != NULL);
+      return ocaml_modules[i];
+    }
+
+Next, an OCaml module with low-level interfaces to 'store_module' and
+'retrieve_module' and a higher-level wrapper module 'HL' which
+enforces the use of roots and the correct types:
+
+    (* ocaml_bit.ml *)
+    module LL =
+    struct
+      (* Low-level functions for passing OCaml values to and from C *)
+      let store_module = Foreign.foreign &quot;store_module&quot;
+          Ctypes.(int @-&gt; ptr void @-&gt; returning void)
+      and retrieve_module = Foreign.foreign &quot;retrieve_module&quot;
+          Ctypes.(int @-&gt; returning (ptr void))
+    end
+
+    module type S =
+    sig
+      val say_hello : unit -&gt; unit
+      val add : int -&gt; int -&gt; int
+    end
+
+    module HL :
+    sig
+      type t = (module S)
+      type handle
+      val register : t -&gt; handle
+      val release  : handle -&gt; unit
+      val store    : int -&gt; handle -&gt; unit
+      val retrieve : int -&gt; t
+    end =
+    struct
+      type t = (module S) and handle = unit Ctypes.ptr
+      let register = Ctypes.Root.create
+      and release  = Ctypes.Root.release
+      and store    = LL.store_module
+      and retrieve i = Ctypes.Root.get (LL.retrieve_module i)
+    end
+
+Findlib provides a convenient way to build the example:
+
+    ocamlfind c c_bit.c
+    ocamlfind mklib -o example -package ctypes.foreign c_bit.o ocaml_bit.ml
+
+Finally, here's everything working in the top level:
+
+    # #use &quot;topfind&quot;;;
+    - : unit = ()
+    (* ... *)
+    # #require &quot;ctypes.foreign&quot;;;
+    (* ... *)
+    # #load &quot;example.cma&quot;;;
+    # open Ocaml_bit;;
+    # let handle = HL.register
+         (module struct
+           let say_hello () = print_endline &quot;hello&quot;
+           and add = (+)
+         end);;
+    val handle : Ocaml_bit.HL.handle = &lt;abstr&gt;
+    # HL.store 0 handle;;
+    - : unit = ()
+    # let handle2 = HL.register
+         (module struct
+           let say_hello () = print_endline &quot;hi&quot;
+           and add = (-)
+         end);;
+    val handle2 : Ocaml_bit.HL.handle = &lt;abstr&gt;
+    # HL.store 1 handle2;;
+    - : unit = ()
+    # module M1 = (val HL.retrieve 0);;
+    module M1 : Ocaml_bit.S
+    # module M2 = (val HL.retrieve 1);;
+    module M2 : Ocaml_bit.S
+    # M1.say_hello ();;
+    hello
+    - : unit = ()
+    # M2.say_hello ();;
+    hi
+    - : unit = ()
+
+I hope that helps a bit!  Feel free to follow-up, of course, if
+anything's not clear (e.g. how to call back into OCaml from C).
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000190.html">[ocaml-ctypes] Creating a C wrapper for an OCaml value
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#191">[ date ]</a>
+              <a href="thread.html#191">[ thread ]</a>
+              <a href="subject.html#191">[ subject ]</a>
+              <a href="author.html#191">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

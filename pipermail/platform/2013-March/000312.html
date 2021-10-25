@@ -1,0 +1,188 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGKMHo8buSD-qTAmPGehKMC03exUozZdewcFkeMznUeCA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000311.html">
+   <LINK REL="Next"  HREF="000313.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCAPFanBGKMHo8buSD-qTAmPGehKMC03exUozZdewcFkeMznUeCA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Mon Mar 18 14:03:51 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000311.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000313.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#312">[ date ]</a>
+              <a href="thread.html#312">[ thread ]</a>
+              <a href="subject.html#312">[ subject ]</a>
+              <a href="author.html#312">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> I would somewhat prefer more flexibility for auto-open modules (i.e.,
+</I>&gt;<i> allow for the specification of multiple modules to open, of arbitrary
+</I>&gt;<i> name, and allow for merge operations to open both, in order, rather
+</I>&gt;<i> than just one), and I don't really understand why this more limited
+</I>&gt;<i> version is preferable; but I don't mind enough to fight.
+</I>
+I tend to agree that the semantics I proposed in my email, that allows
+arbitrary &quot;open lists&quot; and in particular proper merging, would be a
+better choice.
+
+Leo's main argument is that systematically using Pervasives is more
+predictable for users (that may not want to have to look at namespace
+descriptions to know which compilation units will be opened by
+default).
+I'd say in practice it's rather obvious at medium scale (for any given
+software project) which module is meant to be the
+Pervasives/Std/Prelude one, and large scale composability by default
+could be a better choice. But for large-scale composability of
+namespaces I believe more in the hierarchical model than in merging
+all namespaces, anyway.
+
+On Mon, Mar 18, 2013 at 2:51 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+&gt;<i> Got it.  That matches my initial mental model.  Just to be explicit:
+</I>&gt;<i>
+</I>&gt;<i>     open namespace Core
+</I>&gt;<i>     open namespace Async
+</I>&gt;<i>
+</I>&gt;<i> Will lead to separate opens of the Core and Async Pervasives modules.
+</I>&gt;<i>
+</I>&gt;<i> I would somewhat prefer more flexibility for auto-open modules (i.e.,
+</I>&gt;<i> allow for the specification of multiple modules to open, of arbitrary
+</I>&gt;<i> name, and allow for merge operations to open both, in order, rather
+</I>&gt;<i> than just one), and I don't really understand why this more limited
+</I>&gt;<i> version is preferable; but I don't mind enough to fight.  This
+</I>&gt;<i> solution seems like it would solve the use cases that I am aware of.
+</I>&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i> On Mon, Mar 18, 2013 at 9:28 AM, Gabriel Scherer
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> This is fine: it will desugar into:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   open namespace Core
+</I>&gt;&gt;<i>   open Pervasives (* line produced only if Core#Pervasives exists *)
+</I>&gt;&gt;<i>   let () = printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;<i>   open namespace Async
+</I>&gt;&gt;<i>   open Pervasives (* line produced only if Async#Pervasives exists *)
+</I>&gt;&gt;<i>   let () = printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> You would be in trouble if you defined a CorePlusAsync namespace as, say
+</I>&gt;&gt;<i>    include &quot;core.ns&quot;
+</I>&gt;&gt;<i>    include &quot;async.ns&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and then did
+</I>&gt;&gt;<i>    open namespace CorePlusAsync
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> it would desugar into
+</I>&gt;&gt;<i>    open namespace CorePlusAsync
+</I>&gt;&gt;<i>    open Pervasives
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> which is equivalent to
+</I>&gt;&gt;<i>    open namespace CorePlusAsync
+</I>&gt;&gt;<i>    open Async#Pervasives
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and not
+</I>&gt;&gt;<i>    open namespace CorePlusAsync
+</I>&gt;&gt;<i>    open Core#Pervasives
+</I>&gt;&gt;<i>    open Async#Pervasives
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Mar 18, 2013 at 1:55 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> It occurs to me I just don't understand the semantics of this.  What
+</I>&gt;&gt;&gt;<i> happens if I do this:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     open namespace Core
+</I>&gt;&gt;&gt;<i>     let () = printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;&gt;<i>     open namespace Async
+</I>&gt;&gt;&gt;<i>     let () = printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> or, for that matter:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     open namespace Core
+</I>&gt;&gt;&gt;<i>     let () = printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;&gt;<i>     let open namespace Async in
+</I>&gt;&gt;&gt;<i>     printf &quot;Hello world!\n&quot;
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Async and Core have different definitions of printf, as it happens.
+</I>&gt;&gt;&gt;<i> Which gets called in these cases?
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> y
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Mon, Mar 18, 2013 at 8:34 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;&gt;<i> Can the case of both Core and Async (and opening both of their
+</I>&gt;&gt;&gt;&gt;&gt;<i> pervasives modules) be handled here?  This seems to me to be of
+</I>&gt;&gt;&gt;&gt;&gt;<i> fundamental importance.  If that's missing, then I misunderstood
+</I>&gt;&gt;&gt;&gt;&gt;<i> the proposal.
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Yes that is fine. It just means that if you made a new namespace by
+</I>&gt;&gt;&gt;&gt;<i> merging the Core namespace with the Async namespace then the Pervasives
+</I>&gt;&gt;&gt;&gt;<i> module of one would shadow the Pervasives module of the other.
+</I>&gt;&gt;&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000311.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000313.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#312">[ date ]</a>
+              <a href="thread.html#312">[ thread ]</a>
+              <a href="subject.html#312">[ subject ]</a>
+              <a href="author.html#312">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3C20150520100220.GB5283%40nodbug.lucina.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001092.html">
+   <LINK REL="Next"  HREF="001098.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration</H1>
+    <B>Martin Lucina</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3C20150520100220.GB5283%40nodbug.lucina.net%3E"
+       TITLE="[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration">martin at lucina.net
+       </A><BR>
+    <I>Wed May 20 11:02:20 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001092.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+        <LI>Next message: <A HREF="001098.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1097">[ date ]</a>
+              <a href="thread.html#1097">[ thread ]</a>
+              <a href="subject.html#1097">[ subject ]</a>
+              <a href="author.html#1097">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tuesday, 19.05.2015 at&#160;15:58, Martin Lucina wrote:
+&gt;<i> &gt; &gt;E: Failure(&quot;Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+</I>&gt;<i> &gt; &gt;doesn't exist.&quot;)
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt;This is expected; the rumprun toolchain does not support dynamic
+</I>&gt;<i> &gt; &gt;linking
+</I>&gt;<i> &gt; &gt;and I have configured the ocaml-rumprun compiler with
+</I>&gt;<i> &gt; &gt;-no-shared-libs. Is
+</I>&gt;<i> &gt; &gt;there some way to tell OASIS to not expect any shared libraries to be
+</I>&gt;<i> &gt; &gt;built?
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Nope. OASIS is painfully inflexible, especially when cross-compiling.
+</I>&gt;<i> &gt; You can probably patch setup.ml so that it thinks that the current
+</I>&gt;<i> &gt; OCaml is built without dynlink, but this is package-specific.
+</I>&gt;<i> 
+</I>&gt;<i> Turns out it's a two-line patch, at least in the case of Lwt:
+</I>&gt;<i> 
+</I>&gt;<i> <A HREF="https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433">https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433</A>
+</I>
+Getting further through the list of Mirage dependencies, trying to get
+sexplib building for rumprun hits another different problem with OASIS:
+
+I use the following commands to build sexplib-rumprun, similar to what the
+android build does:
+
+  [&quot;ocaml&quot; &quot;setup.ml&quot; &quot;-configure&quot; &quot;--prefix&quot; &quot;${prefix}/x86_64-rumprun-netbsd&quot; &quot;--disable-syntax&quot;]
+  [&quot;ocamlbuild&quot; &quot;-use-ocamlfind&quot; &quot;-just-plugin&quot;]
+  [&quot;env&quot; &quot;OCAMLFIND_TOOLCHAIN=rumprun&quot; &quot;ocaml&quot; &quot;setup.ml&quot; &quot;-build&quot;]
+  [&quot;env&quot; &quot;OCAMLFIND_TOOLCHAIN=rumprun&quot; &quot;ocaml&quot; &quot;setup.ml&quot; &quot;-install&quot;]
+  [&quot;find&quot; sexplib:lib &quot;-name&quot; &quot;pa_sexp_conv.*&quot; &quot;-exec&quot; &quot;ln&quot; &quot;-sf&quot; &quot;{}&quot; &quot;%{prefix}%/x86_64-rumprun-netbsd/lib/sexplib/&quot; &quot;;&quot;] { type_conv-rumprun:installed }
+
+Now, sexplib tries to build a .cmxs which won't work with the rumprun
+toolchain, so I've patched its setup.ml to force native_dynlink to be
+false:
+
+<A HREF="https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch">https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch</A>
+
+The problem I'm seeing is that if I run &quot;opam install sexplib-rumprun
+--verbose&quot;, it fails in the setup.ml -install setup with a stack overflow:
+
+- Installed /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/sexplib_unix.cmx
+- Installed /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/META
+- E: Stack overflow
+[ERROR] The compilation of sexplib-rumprun failed at &quot;env
+        OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -install&quot;.
+
+However: If I run the OPAM build commands from a shell in the build
+directory for sexplib, the install step works fine.
+
+Any ideas?
+
+Martin
+</PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001092.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+	<LI>Next message: <A HREF="001098.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1097">[ date ]</a>
+              <a href="thread.html#1097">[ thread ]</a>
+              <a href="subject.html#1097">[ subject ]</a>
+              <a href="author.html#1097">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

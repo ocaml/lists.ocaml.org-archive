@@ -1,0 +1,37 @@
+(*
+  Example : List.filter [%matches{| 'a' .. 'z' |}] text
+  Output : List.filter
+             (function 'a' .. 'z' when true -> true | _ -> false) text
+  
+  Compilation:
+    ocamlfind ocamlc -package compiler-libs.common -linkpkg ppx_matches.ml -o ppx_matches.exe
+  Test:
+    ocamlc -ppx ./ppx_matches.exe -dsource test_ppx.ml
+*)
+
+open Asttypes
+open Parsetree
+
+let mapper =
+  object(this)
+    inherit Ast_mapper.mapper as super
+
+    method! expr e =
+      let loc = e.pexp_loc in
+      match e.pexp_desc with
+      | Pexp_extension({txt="matches";_}, [{pstr_desc=Pstr_eval (e, _);_}]) ->
+        begin match e.pexp_desc with
+          | Pexp_constant (Const_string (pat, _)) ->
+            (* expect a {|...|} constant of the form {|<pattern> when <expr>|} *)
+            let body = Printf.sprintf "function %s -> true | _ -> false" pat in
+            Parse.expression (Lexing.from_string body)
+          | _ ->
+            (* error handling inspired from experimental/frisch/metaquot.ml *)
+            Format.eprintf "%a{|<patt>|} or {|<patt> when <expr>|} expected.@."
+              Location.print_error loc;
+            exit 2
+        end
+      | _ -> super#expr e
+  end
+
+let () = Ast_mapper.main mapper

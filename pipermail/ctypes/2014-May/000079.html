@@ -1,0 +1,145 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Finalising data
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DFwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000088.html">
+   <LINK REL="Next"  HREF="000081.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Finalising data</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DFwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Finalising data">yallop at gmail.com
+       </A><BR>
+    <I>Sat May 17 00:52:13 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000088.html">[ocaml-ctypes] Bit field encoding.
+</A></li>
+        <LI>Next message: <A HREF="000081.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#79">[ date ]</a>
+              <a href="thread.html#79">[ thread ]</a>
+              <a href="subject.html#79">[ subject ]</a>
+              <a href="author.html#79">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Florian,
+
+On 30/04/2014, Florian Pichlmeier &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">florian.pichlmeier at mytum.de</A>&gt; wrote:
+&gt;<i> i have this create function
+</I>&gt;<i>
+</I>&gt;<i> type t = unit ptr
+</I>&gt;<i> let zframe : t typ = ptr void
+</I>&gt;<i> let zframe_opt : t option typ = ptr_opt void
+</I>&gt;<i>
+</I>&gt;<i> let create msg =
+</I>&gt;<i>   let stub = foreign &quot;zframe_new&quot;
+</I>&gt;<i>       (string @-&gt; size_t @-&gt; returning zframe_opt)
+</I>&gt;<i>   in
+</I>&gt;<i>   let msg_size =  Size_t.of_int (String.length msg) in
+</I>&gt;<i>   match stub msg msg_size with
+</I>&gt;<i>   | None -&gt; raise Frame_creation
+</I>&gt;<i>   | Some x -&gt; x
+</I>&gt;<i>
+</I>&gt;<i> How can i tell the garbage collector to call my specific
+</I>&gt;<i> destroy function?
+</I>
+You can attach a finaliser, either to the zframe value itself, or to
+another object which has the same lifetime as the zframe.  The
+drawback of attaching the finaliser directly to the zframe is that a
+number of ctypes functions (e.g. the functions for pointer arithmetic)
+create new ptr values, so you may end up destroying the object while
+you still have a pointer to it.  For example:
+
+    let zf = create msg in
+    let () = Gc.finalise destroy_zframe zf in
+      (zf +@ 0)
+    (* At this point you still have a pointer to the zframe you
+       created, but the original Ctypes.ptr value has gone, so the
+       GC is free to run the finaliser attached to it. *)
+
+If you're already wrapping the zframe in a larger OCaml value, such as
+a record, it would probably be wiser to attach the finaliser to that
+value instead, since you can see more easily in your own code exactly
+when copies are made.  If you want even stronger guarantees, you
+should make sure that the type you use to wrap the zframe has a
+mutable field, since the runtime is free to make copies of immutable
+values.
+
+It may be more advisable to consider an alternative interface that
+makes the lifetime of your zframes deterministic and explicit.  One
+simple approach is to follow the design of the channel interfaces in
+the standard library, and expose a pair of functions
+
+   val create : string -&gt; t
+   val destroy : t -&gt; unit
+
+then leave it up to the user to ensure that destroy_zframe is closed
+at an appropriate moment (but perhaps catching other errors, such as
+double closes).
+
+An alternative approach is to follow the design often used in Scheme,
+and expose a single higher-order function that manages the lifetime of
+the frame.  For example, if you have a function with the following
+interface
+
+   val with_zframe : string -&gt; (t -&gt; 'a) -&gt; 'a
+
+then you might call it as follows
+
+   with_zframe msg
+     (fun zframe -&gt;
+         (* body: the zframe value is &quot;live&quot; here *)
+     )
+
+and the user can be confident that -- whether the body finishes
+normally or with an exception -- with_zframe will destroy the value in
+a timely way.  This approach is used in the Batteries library to
+manage files: see with_file_in and with_file_out, for example:
+
+   <A HREF="http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_in">http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_in</A>
+   <A HREF="http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_out">http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_out</A>
+
+I hope that helps,
+
+Jeremy.
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000088.html">[ocaml-ctypes] Bit field encoding.
+</A></li>
+	<LI>Next message: <A HREF="000081.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#79">[ date ]</a>
+              <a href="thread.html#79">[ thread ]</a>
+              <a href="subject.html#79">[ subject ]</a>
+              <a href="author.html#79">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

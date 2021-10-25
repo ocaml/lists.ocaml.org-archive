@@ -1,0 +1,116 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Bind a function with a type external to the	library
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bind%20a%20function%20with%20a%20type%20external%20to%20the%0A%09library&In-Reply-To=%3C54CFD820.3000903%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000149.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Bind a function with a type external to the	library</H1>
+    <B>Jacques-Pascal Deplaix</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bind%20a%20function%20with%20a%20type%20external%20to%20the%0A%09library&In-Reply-To=%3C54CFD820.3000903%40gmail.com%3E"
+       TITLE="[ocaml-ctypes] Bind a function with a type external to the	library">jp.deplaix at gmail.com
+       </A><BR>
+    <I>Mon Feb  2 20:03:44 GMT 2015</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000149.html">[ocaml-ctypes]  GC finalizer
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#148">[ date ]</a>
+              <a href="thread.html#148">[ thread ]</a>
+              <a href="subject.html#148">[ subject ]</a>
+              <a href="author.html#148">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thanks a lot !
+
+I've fixed it that way:
+<A HREF="https://github.com/LamaUrbain/ocaml-memphis/commit/7644dbc5970067be264aa5f6b610dbb68e1b5994">https://github.com/LamaUrbain/ocaml-memphis/commit/7644dbc5970067be264aa5f6b610dbb68e1b5994</A>
+
+Sorry, I wasn't precise on which cairo binding I used. Unfortunately 
+there are two bindings that look pretty much the same. Moreover the 
+header is not installed with the ocaml package, so I couldn't use the C 
+define.
+
+I've another question on a different topic. I'll do another thread for that.
+
+Thanks again,
+
+On 01/27/2015 12:45 PM, Jeremy Yallop wrote:
+&gt;<i> On 21 January 2015 at 22:07, Jacques-Pascal Deplaix
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">jp.deplaix at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> I'm trying to bind libmemphis with ctypes and I encounter some problems with
+</I>&gt;&gt;<i> one function in particular:
+</I>&gt;&gt;<i> <A HREF="https://github.com/LamaUrbain/ocaml-memphis/blob/master/src/memphis_renderer.ml#L55">https://github.com/LamaUrbain/ocaml-memphis/blob/master/src/memphis_renderer.ml#L55</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The function takes a cairo_t in C but in OCaml I would like to use
+</I>&gt;&gt;<i> Cairo.context.
+</I>&gt;&gt;<i> So I tried by using Obj.magic in the overloading just below (in the code
+</I>&gt;&gt;<i> linked above) but when I try to use the function it segfaults in some random
+</I>&gt;&gt;<i> cairo function (memphis_renderer_draw_tile is called before and seems to
+</I>&gt;&gt;<i> work).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Is there an other way to use an OCaml type (Cairo.context) instead of the
+</I>&gt;&gt;<i> abstract C type or the problem might comes from somewhere else ?
+</I>&gt;<i> If the cairo_t value isn't used abstractly inside libmemphis then
+</I>&gt;<i> passing an OCaml value instead of a cairo_t won't work.  You need to
+</I>&gt;<i> somehow extract the address of the underlying C object from the
+</I>&gt;<i> abstract Cairo representation and then pass that address to
+</I>&gt;<i> libmemphis.  A quick look at the Cairo source suggests that something
+</I>&gt;<i> along the following lines might work, but I haven't compiled or tested
+</I>&gt;<i> it:
+</I>&gt;<i>
+</I>&gt;<i>    /* C stub for turning a Cairo.t into a ctypes-compatible address */
+</I>&gt;<i>    #include &quot;ml_cairo.h&quot;
+</I>&gt;<i>    #include &lt;caml/mlvalues.h&gt;
+</I>&gt;<i>    #include &lt;caml/alloc.h&gt;
+</I>&gt;<i>    #include &lt;stdint.h&gt;
+</I>&gt;<i>
+</I>&gt;<i>    value cairo_address(value v)
+</I>&gt;<i>    {
+</I>&gt;<i>       return caml_copy_native_int((intptr_t)cairo_t_val(v));
+</I>&gt;<i>    }
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>    (* ML binding for the C stub *)
+</I>&gt;<i>    external cairo_raw_address : Cairo.t -&gt; nativeint =
+</I>&gt;<i>      &quot;cairo_address&quot;
+</I>&gt;<i>
+</I>&gt;<i>    let ctypes_ptr_of_cairo_t : Cairo.t -&gt; unit Ctypes.ptr =
+</I>&gt;<i>      fun c -&gt; Ctypes.ptr_of_raw_address (cairo_raw_address c)
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000149.html">[ocaml-ctypes]  GC finalizer
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#148">[ date ]</a>
+              <a href="thread.html#148">[ thread ]</a>
+              <a href="subject.html#148">[ subject ]</a>
+              <a href="author.html#148">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

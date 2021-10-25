@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3C20150519135807.GD10420%40nodbug.lucina.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001081.html">
+   <LINK REL="Next"  HREF="001085.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration</H1>
+    <B>Martin Lucina</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BMirageOS-devel%5D%20Cross-compiling%20OCaml%2C%0A%20Mirage%20OS%20for%20rumprun%2C%20OPAM%20integration&In-Reply-To=%3C20150519135807.GD10420%40nodbug.lucina.net%3E"
+       TITLE="[opam-devel] [MirageOS-devel] Cross-compiling OCaml, Mirage OS for rumprun, OPAM integration">martin at lucina.net
+       </A><BR>
+    <I>Tue May 19 14:58:07 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001081.html">[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration
+</A></li>
+        <LI>Next message: <A HREF="001085.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1083">[ date ]</a>
+              <a href="thread.html#1083">[ thread ]</a>
+              <a href="subject.html#1083">[ subject ]</a>
+              <a href="author.html#1083">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tuesday, 19.05.2015 at&#160;14:09, Peter Zotov wrote:
+&gt;<i> &gt;What can be done to fix the above? Should I be using a host
+</I>&gt;<i> &gt;compiler built
+</I>&gt;<i> &gt;and installed by OPAM rather than the system compiler
+</I>&gt;<i> &gt;(4.02.1-1ppa3~precise
+</I>&gt;<i> &gt;on Debian wheezy). [I'll try this and see if it helps...]
+</I>&gt;<i> 
+</I>&gt;<i> No. This is an issue with Lwt's discover.ml script. You're going in
+</I>&gt;<i> the right direction below, though using --enable-android-target
+</I>&gt;<i> for this is a bit awkward.
+</I>
+I'll see what I can do to fix discover.ml better, but given that I know
+almost no OCaml it might take a while.
+
+&gt;<i> 
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;I tried to hack around the problem by using
+</I>&gt;<i> &gt;--enable-android-target, that
+</I>&gt;<i> &gt;causes discover.ml to succeed and the build then proceeds, failing on a
+</I>&gt;<i> &gt;different problem:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;E: Failure(&quot;Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+</I>&gt;<i> &gt;doesn't exist.&quot;)
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;This is expected; the rumprun toolchain does not support dynamic
+</I>&gt;<i> &gt;linking
+</I>&gt;<i> &gt;and I have configured the ocaml-rumprun compiler with
+</I>&gt;<i> &gt;-no-shared-libs. Is
+</I>&gt;<i> &gt;there some way to tell OASIS to not expect any shared libraries to be
+</I>&gt;<i> &gt;built?
+</I>&gt;<i> 
+</I>&gt;<i> Nope. OASIS is painfully inflexible, especially when cross-compiling.
+</I>&gt;<i> You can probably patch setup.ml so that it thinks that the current
+</I>&gt;<i> OCaml is built without dynlink, but this is package-specific.
+</I>
+Turns out it's a two-line patch, at least in the case of Lwt:
+
+<A HREF="https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433">https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433</A>
+
+&gt;<i> &gt;AFAICS there are multiple approaches being used in the wild and OCaml
+</I>&gt;<i> &gt;upstream *claims* to include support for cross-compiling via -host and
+</I>&gt;<i> &gt;-target, however that support is not actually functional?
+</I>&gt;<i> 
+</I>&gt;<i> Cross-compiling is not there yet. The switches are only half functional,
+</I>&gt;<i> if you're lucky.
+</I>
+Yeah, I figured that out after battling with it for a day or so, then found
+your patches which mostly[*] worked.
+
+[*: It seems that the Github mirror at ocaml/ocaml is a bit slow, I was
+going to write about how I couldn't get your 4.02.02 compiler package to
+work without patches, but it looks like the commit for PR#6266 has landed
+on Github now, couldn't see it yesterday.]
+
+&gt;<i> &gt;For the rumprun support to be as user-friendly as possible, we
+</I>&gt;<i> &gt;need an easy
+</I>&gt;<i> &gt;way of switching the backend rumprun cross-compiler and linker used by
+</I>&gt;<i> &gt;ocaml when the user wants to switch platforms or architectures. The
+</I>&gt;<i> &gt;approach used by the android repository I based my work off
+</I>&gt;<i> &gt;implies either:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;a) the user would have to *reinstall* the cross compiler
+</I>&gt;<i> &gt;(specifying eg.
+</I>&gt;<i> &gt;RUMPRUN_CC in the environment) and all packages using native code
+</I>&gt;<i> &gt;whenever
+</I>&gt;<i> &gt;they want to switch the backend compiler.
+</I>&gt;<i> 
+</I>&gt;<i> Correct. This is what opam-android uses.
+</I>
+And, as I just found out now, it's not just the native packages, it's *all*
+packages that need to be rebuilt. So, for Mirage I'd have to produce
+-rumprun variants of all its dependent packages, right? This would include
+teaching the &quot;mirage configure&quot; script about them.
+
+This begs the question, why did you use the approach of building the
+cross-compiler as a normal OPAM package, rather than as a compiler package?
+
+If I understand correctly how &quot;OPAM switch&quot; works, then the latter option
+would at least get rid of the need to deal with the -android (or -rumprun)
+renaming of packages since each compiler has its own set of packages.
+
+Obviously, there'd still have to be some way of getting
+the OCAMLFIND_TOOLCHAIN and/or other cross-compilation patches into the
+system but at first glance it seems like it would be more flexible than
+adding suffixes to package names.
+
+Thoughts?
+
+Martin
+</PRE>
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001081.html">[opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,	OPAM integration
+</A></li>
+	<LI>Next message: <A HREF="001085.html">[opam-devel] [MirageOS-devel] Cross-compiling OCaml,	Mirage OS for rumprun, OPAM integration
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1083">[ date ]</a>
+              <a href="thread.html#1083">[ thread ]</a>
+              <a href="subject.html#1083">[ subject ]</a>
+              <a href="author.html#1083">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

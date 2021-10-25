@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Tcp.where_to_connect
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Tcp.where_to_connect&In-Reply-To=%3CCACLX4jQjyR3a4SymbTg2G2M5sNEiPm8m61_5Oo3cX5hdDjnWVg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000884.html">
+   <LINK REL="Next"  HREF="001771.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Tcp.where_to_connect</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Tcp.where_to_connect&In-Reply-To=%3CCACLX4jQjyR3a4SymbTg2G2M5sNEiPm8m61_5Oo3cX5hdDjnWVg%40mail.gmail.com%3E"
+       TITLE="Tcp.where_to_connect">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Feb  5 19:09:30 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000884.html">Tcp.where_to_connect
+</A></li>
+        <LI>Next message: <A HREF="001771.html">Tcp.where_to_connect
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1770">[ date ]</a>
+              <a href="thread.html#1770">[ thread ]</a>
+              <a href="subject.html#1770">[ subject ]</a>
+              <a href="author.html#1770">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Couldn't we just change the address from a closure to a Lazy.t?  Then
+you can ask for it how ever many times you want, but it gets computed
+just once.  I suppose I could imagine weird cases where that would
+bite you, if you reuse one of these over and over for a long period...
+
+y
+
+On Tue, Feb 5, 2013 at 2:04 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+&gt;<i> Exposing get_address () like that would require the name resolution
+</I>&gt;<i> to be done twice.  There's no guarantee I'd get the same IP address
+</I>&gt;<i> back the second time around if the DNS server is serving multiple RRs.
+</I>&gt;<i>
+</I>&gt;<i> type 'addr where_to_connect =
+</I>&gt;<i>   { socket_type : 'addr Socket.Type.t;
+</I>&gt;<i>     address : unit -&gt; 'addr Deferred.t;
+</I>&gt;<i>   }
+</I>&gt;<i>
+</I>&gt;<i> The reasoning behind address being a closure is probably to force
+</I>&gt;<i> name resolution to happen on every connect.  This leaves the only
+</I>&gt;<i> way to retrieve the destination IP address by modifying the
+</I>&gt;<i> type of Tcp.connect in a backwards incompatible way (to add the
+</I>&gt;<i> dest IP to the tuple).
+</I>&gt;<i>
+</I>&gt;<i> The other alternative is to have an optional callback function to
+</I>&gt;<i> ['a with_connect_options'] such as
+</I>&gt;<i>
+</I>&gt;<i> ?dest_socket:(Socket.Address.t -&gt; [`Ok | `Reject])
+</I>&gt;<i>
+</I>&gt;<i> which would give the connecting function a chance to interrupt the
+</I>&gt;<i> connection establishment if it doesn't like the results of name
+</I>&gt;<i> resolution.  This defaults to `Ok of course.
+</I>&gt;<i>
+</I>&gt;<i> Does the latter sound sensible?  I can cook up the pull request if
+</I>&gt;<i> so.  I suspect the former is too invasive.
+</I>&gt;<i>
+</I>&gt;<i> -anil
+</I>&gt;<i>
+</I>&gt;<i> On 5 Feb 2013, at 18:18, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/core">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> I don't see one exposed, but it seems like one could add something
+</I>&gt;&gt;<i> with a signature like this:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> val get_address : 'a where_to_connect -&gt; 'a Deferred.t
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Seems like a small enough change.  I think right now you can reuse the
+</I>&gt;&gt;<i> where_to_connect, but you can't actually extract the address proper.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What do you want it for?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think we'd be happy to accept a pull request for this change.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue, Feb 5, 2013 at 1:02 PM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> Is there any way to retrieve the Socket.Address.t after connecting using the Tcp.to_host_and_port function in Async_extra?
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I'm passing in a hostname and port, and need to stash the resulting IP endpoint after the connection is established, for logging purposes.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> -anil
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> --
+</I>&gt;&gt;&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;&gt;&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;&gt;&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+-- 
+You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core+unsubscribe at googlegroups.com.</A>
+For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+
+
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000884.html">Tcp.where_to_connect
+</A></li>
+	<LI>Next message: <A HREF="001771.html">Tcp.where_to_connect
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1770">[ date ]</a>
+              <a href="thread.html#1770">[ thread ]</a>
+              <a href="subject.html#1770">[ subject ]</a>
+              <a href="author.html#1770">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

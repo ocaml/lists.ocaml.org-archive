@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Lifecycle of a callback?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifecycle%20of%20a%20callback%3F&In-Reply-To=%3CCAAxsn%3DGTsKzC78PSZhuQFaG2c-DnZmkaaWkOxT773JDyrFSacw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000119.html">
+   <LINK REL="Next"  HREF="000121.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Lifecycle of a callback?</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifecycle%20of%20a%20callback%3F&In-Reply-To=%3CCAAxsn%3DGTsKzC78PSZhuQFaG2c-DnZmkaaWkOxT773JDyrFSacw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Lifecycle of a callback?">yallop at gmail.com
+       </A><BR>
+    <I>Tue Oct 21 14:13:21 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000119.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+        <LI>Next message: <A HREF="000121.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#120">[ date ]</a>
+              <a href="thread.html#120">[ thread ]</a>
+              <a href="subject.html#120">[ subject ]</a>
+              <a href="author.html#120">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 21 October 2014 13:24, Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">trevorsummerssmith at gmail.com</A>&gt; wrote:
+&gt;<i> In the libuv bindings I am working on there is need for user callbacks. A
+</I>&gt;<i> user registers the callback with a function, and then at an arbitrary point
+</I>&gt;<i> in time later, the callback code is actually ran (started when the user
+</I>&gt;<i> starts the libuv event loop). I had naively thought that I would need to
+</I>&gt;<i> keep a reference to the user callback and then release this reference after
+</I>&gt;<i> the user callback was actually called (because the callback would be used at
+</I>&gt;<i> an arbitrary point in the future and could get gc'd).
+</I>
+Yes, that's exactly right.
+
+&gt;<i> I made an example this morning to test this out, however I cannot get it to
+</I>&gt;<i> fail (ie throw an CallToExpiredClosure).
+</I>&gt;<i>
+</I>&gt;<i> Perhaps my assumption is wrong, and I do not have to keep around a
+</I>&gt;<i> reference? Or my test is not testing what I think it is?
+</I>
+It's the latter.  Your callback function
+
+    let cb fs = Printf.printf &quot;XXX Called '%s'\n&quot; (getf !@fs C._path) in
+
+doesn't reference anything from the local environment, so no closure
+is allocated, and there's nothing for the GC to collect.  If you
+change the function to reference the local environment -- for example,
+by adding a dummy use of 'data'
+
+    let cb fs =
+       let _ = Obj.repr data in
+       Printf.printf &quot;XXX Called '%s'\n&quot; (getf !@fs C._path) in
+
+then the test fails with CallToExpiredClosure as expected.  Besides
+inspecting the source of the function, you can check whether a closure
+is allocated by attempting to add a finaliser to the function, which
+will fail for non-closures, or by inspecting the generated cmm (using
+-dcmm), which looks like this for the non-closure case
+
+      (let
+        (cb/1325 &quot;camlTest_lifecycle__17&quot;
+
+(i.e. cb is just a reference to a static function), and like this for
+the closure case:
+
+      (let
+        (cb/1325 (alloc 3319 &quot;camlTest_lifecycle__cb_1325&quot; 3 data/1324)
+
+I hope that helps,
+
+Jeremy.
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000119.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+	<LI>Next message: <A HREF="000121.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#120">[ date ]</a>
+              <a href="thread.html#120">[ thread ]</a>
+              <a href="subject.html#120">[ subject ]</a>
+              <a href="author.html#120">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAAxsn%3DF-6FMk%2BBJqphG18O-a5%3DLd__zsePjBHAbp8qJgpaXWNQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000185.html">
+   <LINK REL="Next"  HREF="000187.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAAxsn%3DF-6FMk%2BBJqphG18O-a5%3DLd__zsePjBHAbp8qJgpaXWNQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations">yallop at gmail.com
+       </A><BR>
+    <I>Sat Feb  2 16:17:14 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000185.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+        <LI>Next message: <A HREF="000187.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#186">[ date ]</a>
+              <a href="thread.html#186">[ thread ]</a>
+              <a href="subject.html#186">[ subject ]</a>
+              <a href="author.html#186">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 1 February 2013 15:38, Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+&gt;<i> Finally, I think -ppx + arbitrary annotations, without any further
+</I>&gt;<i> restriction, is too free-form for robust syntax extensions: one
+</I>&gt;<i> important problem with Camlp4 is that it allowed syntax extension
+</I>&gt;<i> writers to modify the syntax in very bad way that hurt robustness. As
+</I>&gt;<i> already discussed, I have a strong distaste for extensions that only
+</I>&gt;<i> piggyback on existing syntax (without adding any explicit marker); I
+</I>&gt;<i> would feel safer if the extension *mechanism* disallowed such
+</I>&gt;<i> unstructured extensions, or at least made them less rewarding to write
+</I>&gt;<i> than the composable ones. (For example by only passing to the
+</I>&gt;<i> extension writer the part(s) of the AST that have been annotated).
+</I>&gt;<i> Unfortunately, I don't see how Bisect would fit any such restriction.
+</I>&gt;<i> Maybe that's a problem best solved by socialization (writing a
+</I>&gt;<i> documentation on good practices, and yelling on people), but I sort of
+</I>&gt;<i> doubt it -- I don't know how many time I've had to argue for *not*
+</I>&gt;<i> globally changing the associativity of infix operators through Camlp4
+</I>&gt;<i> in Batteries.
+</I>
+I agree with Gabriel.  Actually, I think that a small tweak to the
+design of -ppx could address both this and a number of problems that
+others have raised during the discussion here.
+
+The -ppx approach applies one or more global transformations to the
+ASTs of OCaml source files; these transformations can be parameterized
+by attributes attached at particular points in the syntax tree.  This
+is a significant improvement over the Camlp4 approach, largely because
+it exchanges the (unnecessary) ability to change the concrete syntax
+for a number of valuable guarantees, which make extensions easier to
+write and code that uses extensions easier to understand.
+
+We can go further in this direction, and give up more (unnecessary)
+power in return for further guarantees.  As Gabriel says, since -ppx
+extensions can arbitrarily transform the AST, it's not possible to
+understand any part of a program that uses extensions without
+understanding every aspect of the behaviour of every extension.  We
+could, of course, seek to solve this by convention and social
+pressure, but there seems to be an emerging consensus that this isn't
+really satisfactory.  One of the nice things about functional
+programming is that you have strong guarantees (via parametricity,
+immutability, and so on) about the effects of calling a particular
+function. We should strive to make it possible to reason in the same
+manner about the effects of syntax extensions.
+
+There are other legitimate concerns with the current proposal.  As
+Xavier Clerc and others point out, attributes are apparently
+undeclared (i.e. global) and untyped.  Alain rightly notes that it
+seems to be difficult to introduce declarations and types for
+attributes without significant complexity.  Still, as OCaml
+programmers we're used to the benefits of precisely-scoped names and
+strongly-typed data, and it seems a shame to give these benefits up if
+we can find a way to keep them.
+
+Hongbo Zhang raises a further concern: when syntax extensions are
+global transformations on the whole file, the order in which
+extensions are applied becomes significant.  This is a fairly serious
+matter, I think: the semantics of code that uses syntax extensions is
+now dependent on external factors, since we need to look for the flags
+passed to OCaml in the build configuration in order to understand the
+source.
+
+I think we can address all these concerns with a small adjustment in
+perspective.  Instead of globally-scoped, untyped attributes processed
+by file-level externally-specified transformations, we might add a
+single node to the OCaml grammar for statically-executed AST
+rewriters.  Using the same syntax already proposed for attributes, we
+might write, for example:
+
+   (@deriving [&quot;sexp&quot;; &quot;json&quot;])
+   type t = F of int | G of s
+    and s = H of (t * t)
+
+or
+
+    (@perform)
+       (x &lt;-- m;
+        y &lt;-- n;
+        return (x y))
+
+In order for this to be valid code, 'deriving' and 'perform' should
+resolve to functions of appropriate types:
+
+    val deriving : string list -&gt; Parsetree.structure_item -&gt;
+Parsetree.structure_item
+
+    val perform : Parsetree.expression -&gt; Parsetree.expression
+
+Either during parsing or in a post parsing phase, the ASTs following
+'@deriving [&quot;sexp&quot;; &quot;json&quot;]' and '@perform' are passed to those
+functions and the results are inserted in place into the AST.
+Gabriel's concern is addressed, because there's no way for @perform
+(say) to access other parts of the AST: its effects are purely local.
+Xavier's concern is addressed, since AST rewriters, unlike attributes
+are declared and typed (and hence scoped). Hongbo's concern is
+addressed, since composition is explicit:
+
+    (@deriving [&quot;sexp&quot;])
+    (@nonrec)
+    type t = C of t
+
+(Here '@deriving [&quot;sexp&quot;]' is applied to the result of applying '@nonrec'.)
+
+It should be possible to write almost all extensions in this manner.
+A variant of the stream parser syntax fits easily:
+
+    (@parser)
+       ([ `If; x = expr; `Then; y = expr; `Else; z = expr ] =&gt; &quot;if&quot;;
+        [ `Let; `Ident x; `Equal; x = expr; In; y = expr ] =&gt; &quot;let&quot;)
+
+as does Anil's cstruct extension:
+
+    (@cstruct ~endianness:little)
+    type pcap_header = {
+       uint32_t magic_number;   (* magic number *)
+       uint16_t version_major;  (* major version number *)
+       ...
+    }
+
+Other extensions such as ifdef, js_of_ocaml, and pgsql could be
+handled in the same sort of way.
+
+Jeremy.
+
+[I'm deliberately avoiding the interesting but orthogonal questions of
+custom lexical syntax, and benign annotations for tools here.]
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000185.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+	<LI>Next message: <A HREF="000187.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#186">[ date ]</a>
+              <a href="thread.html#186">[ thread ]</a>
+              <a href="subject.html#186">[ subject ]</a>
+              <a href="author.html#186">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

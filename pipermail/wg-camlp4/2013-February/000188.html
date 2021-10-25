@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAOOOohQStOb%3DDkGFzyc99KBVekLUmjSVUiPyJ6bJw%2BWozyQaZw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000187.html">
+   <LINK REL="Next"  HREF="000195.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations</H1>
+    <B>Philippe Veber</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Structured%20comments%2C%0A%09shallow%20embeddings%20and%20deep%20quasiquotations&In-Reply-To=%3CCAOOOohQStOb%3DDkGFzyc99KBVekLUmjSVUiPyJ6bJw%2BWozyQaZw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations">philippe.veber at gmail.com
+       </A><BR>
+    <I>Sun Feb  3 09:57:36 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000187.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+        <LI>Next message: <A HREF="000195.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#188">[ date ]</a>
+              <a href="thread.html#188">[ thread ]</a>
+              <a href="subject.html#188">[ subject ]</a>
+              <a href="author.html#188">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi all,
+
+I find Jeremy's proposal very convincing : it's very clean and seems to fit
+with a lot of situations. One of its main strengths is that the functions
+called at ppx time are only passed the annotated expression/item (maybe
+that was proposed before, but I did not see it). I think this is a major
+improvement from the current ppx option, which deals with the whole parsed
+tree each time, and makes extension composition a lot more difficult to
+grasp. Having extensions mapped to functions (like deriving or perform) is
+also a very nice way to prevent conflicting extensions.
+
+So as a potential user, I'd buy it without hesitation, but maybe there is
+some limitation I overlooked?
+
+Another great thing I think is that it may also simplify the build process
+:<i> writing an extension is as easy as providing a cma to the compiler,
+</I>containing Parsedtree rewriter functions, which are called through the @
+notation. One just has to be careful giving cma to ocamlc/ocamlopt and cmxa
+to ocamlc.opt/ocamlopt.opt.
+
+ph.
+
+2013/2/2 Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt;
+
+&gt;<i>    (@deriving [&quot;sexp&quot;; &quot;json&quot;])
+</I>&gt;&gt;<i>   type t = F of int | G of s
+</I>&gt;&gt;<i>    and s = H of (t * t)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> or
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    (@perform)
+</I>&gt;&gt;<i>       (x &lt;-- m;
+</I>&gt;&gt;<i>        y &lt;-- n;
+</I>&gt;&gt;<i>        return (x y))
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In order for this to be valid code, 'deriving' and 'perform' should
+</I>&gt;&gt;<i> resolve to functions of appropriate types:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    val deriving : string list -&gt; Parsetree.structure_item -&gt;
+</I>&gt;&gt;<i> Parsetree.structure_item
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    val perform : Parsetree.expression -&gt; Parsetree.expression
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i> I have a broader proposal that is along these lines, which is intended to
+</I>&gt;<i> be the second part of my earlier blog post. There are in general some
+</I>&gt;<i> difficulties with just calling functions during parsing, but I think the
+</I>&gt;<i> general idea of declared extensions is the right way to do things.
+</I>&gt;<i>
+</I>&gt;<i> The reason I haven't mentioned this proposal yet, is that it is a more
+</I>&gt;<i> long term proposal. We can easily implement the changes needed to support
+</I>&gt;<i> ppx before the next OCaml release. Whereas full support for declared
+</I>&gt;<i> extensions will require more time, and probably a lot more debate before it
+</I>&gt;<i> can be included.
+</I>&gt;<i>
+</I>&gt;<i> Since moving an extension from ppx to some kind of declared mechanism
+</I>&gt;<i> would require only minimal work, I see no harm in promoting ppx in the
+</I>&gt;<i> short/medium term, while also developing a more complete solution.
+</I>&gt;<i>
+</I>&gt;<i> In particular I think that the extension/template syntaxes ( &quot;(: lid
+</I>&gt;<i> expr)&quot;, &quot;{: lid { string }}&quot;, etc.) that have been discussed so far will be
+</I>&gt;<i> a very good match for a declaration based mechanism. It is also another
+</I>&gt;<i> argument for forcing extensions to have names.
+</I>&gt;<i>
+</I>&gt;<i> I will try to put my own proposals in that blog post early next week.
+</I>&gt;<i>
+</I>&gt;<i> ______________________________**_________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/**listinfo/wg-camlp4&lt;http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/**listinfo/wg-camlp4&lt;http://lists.ocaml.org/listinfo/wg-camlp4</A>&gt;
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130203/a8887181/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130203/a8887181/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000187.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+	<LI>Next message: <A HREF="000195.html">[wg-camlp4] Structured comments,	shallow embeddings and deep quasiquotations
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#188">[ date ]</a>
+              <a href="thread.html#188">[ thread ]</a>
+              <a href="subject.html#188">[ subject ]</a>
+              <a href="author.html#188">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

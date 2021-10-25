@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] A new branch to experiment with extension points
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3CCAPFanBE5MncSgihzf3VevEAPwrGVt%3D5Mz8ko5kN6_jVVbQi9eQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000278.html">
+   <LINK REL="Next"  HREF="000280.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] A new branch to experiment with extension points</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3CCAPFanBE5MncSgihzf3VevEAPwrGVt%3D5Mz8ko5kN6_jVVbQi9eQ%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] A new branch to experiment with extension points">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Mar  1 13:40:22 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000278.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+        <LI>Next message: <A HREF="000280.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#279">[ date ]</a>
+              <a href="thread.html#279">[ thread ]</a>
+              <a href="subject.html#279">[ subject ]</a>
+              <a href="author.html#279">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I'm not fond of having &quot;with&quot; as a special case. If you don't support
+the type-conv or deriving syntax as is, could we take this as an
+opportunity to go back to an uniform syntax? Type declaration could be
+handled like any structure item.
+
+Don't we want to have attributes on signature items as well?
+
+Finally, I bet the non-terminal &quot;..&quot; will get little love, but I'm
+sure you considered other option (for example just ;;(:foo), but that
+doesn't work in the toplevel and we really want &quot;;;&quot; to help *avoid*
+precedence issues) and trust that this is one of the less ugly ones.
+
+Is that proposal sufficient to do ocamldoc with structured attributes
+rather than comments? It looks like it is. Can an annotation node, by
+itself, stand as a structure item (I'm thinking section comments)?
+
+On Fri, Mar 1, 2013 at 2:05 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 03/01/2013 09:08 AM, Mark Shinwell wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> 1. If possible, I'd rather see one new syntactic form, rather than
+</I>&gt;&gt;<i> three.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I've made the syntax more uniform, dropped prefix attributes, and added
+</I>&gt;<i> attributes on type declarations.
+</I>&gt;<i>
+</I>&gt;<i> The current syntax is:
+</I>&gt;<i>
+</I>&gt;<i> Attributes:
+</I>&gt;<i>
+</I>&gt;<i>   On expressions:         expr (:foo expr)
+</I>&gt;<i>   On type expressions:    type (:foo expr)
+</I>&gt;<i>   On structure items:     str_item ..(:foo expr)
+</I>&gt;<i>   On type declarations:   type t = ... with (:foo1 expr1) (:foo2 expr2)
+</I>&gt;<i>
+</I>&gt;<i> Extension nodes:
+</I>&gt;<i>
+</I>&gt;<i>   On expressions:         (&amp;foo expr)
+</I>&gt;<i>   On type expressions:    (&amp;foo expr)
+</I>&gt;<i>   On structure items:     ..(&amp;foo expr)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> A type-conv like example (attributes on type expressions and type
+</I>&gt;<i> declarations):
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i>  type t = {
+</I>&gt;<i>     x : int (:default 42);
+</I>&gt;<i>     y : int (:default 3) (:sexp_drop_default);
+</I>&gt;<i>     z : int (:default 3) (:sexp_drop_if z_test);
+</I>&gt;<i>  } with (:sexp)
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> A Bisect-like example (attributes on expressions and structure items):
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i> let f x =
+</I>&gt;<i>   match List.map foo [x; a x; b x] with
+</I>&gt;<i>   | [y1; y2; y3] -&gt; tata
+</I>&gt;<i>   | _ -&gt; (assert false) (:bisect visit)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> let unused = ()
+</I>&gt;<i> ..(:bisect ignore)
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> A Bolt-like example (extension nodes on expressions):
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i> let funct n =
+</I>&gt;<i>   (&amp;log) &quot;funct(%d)&quot; n LEVEL DEBUG;
+</I>&gt;<i>   for i = 1 to n do
+</I>&gt;<i>     print_endline &quot;...&quot;
+</I>&gt;<i>   done
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i> or:
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i> let funct n =
+</I>&gt;<i>   (&amp;log &quot;funct(%d)&quot; n LEVEL DEBUG);
+</I>&gt;<i>   for i = 1 to n do
+</I>&gt;<i>     print_endline &quot;...&quot;
+</I>&gt;<i>   done
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> A map/fold generator (extension nodes on structure item):
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i> type variable = string
+</I>&gt;<i>  and term =
+</I>&gt;<i>   | Var of variable
+</I>&gt;<i>   | Lam of variable * term
+</I>&gt;<i>   | App of term * term
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> ..(&amp;generate_map map term)
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i> or, if we also add extension nodes on class expressions:
+</I>&gt;<i>
+</I>&gt;<i> =================================================
+</I>&gt;<i> type variable = string
+</I>&gt;<i>  and term =
+</I>&gt;<i>   | Var of variable
+</I>&gt;<i>   | Lam of variable * term
+</I>&gt;<i>   | App of term * term
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> class map = (&amp;generate_map term)
+</I>&gt;<i> =================================================
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> -- Alain
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000278.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+	<LI>Next message: <A HREF="000280.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#279">[ date ]</a>
+              <a href="thread.html#279">[ thread ]</a>
+              <a href="subject.html#279">[ subject ]</a>
+              <a href="author.html#279">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87txof8qxw.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000264.html">
+   <LINK REL="Next"  HREF="000268.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87txof8qxw.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 13 11:44:27 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000264.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000268.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#267">[ date ]</a>
+              <a href="thread.html#267">[ thread ]</a>
+              <a href="subject.html#267">[ subject ]</a>
+              <a href="author.html#267">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> Having
+</I>&gt;<i> namespace opening be a special-case thing that only happens on the
+</I>&gt;<i> file level and that is hidden from the source just seems like an
+</I>&gt;<i> unfortunate special-casing of a namespace manipulation tool (like let
+</I>&gt;<i> and open) that should be available generally.
+</I>
+Just to be clear I'm not proposing to have namespace opening at file
+level, just the hidden opening of modules.
+
+&gt;&gt;<i>
+</I>&gt;&gt;<i> I think the awkwardness is more related to how you treat things like:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    Core#Foo
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> where Foo might be a sub-module of Core#Common.
+</I>&gt;<i>
+</I>&gt;<i> Can you elaborate a bit?  Why is this case problematic?  I can kind of
+</I>&gt;<i> see why this is weird, but other than making an explicit requirement
+</I>&gt;<i> of having an ordered semantics (which to me seems like the right
+</I>&gt;<i> answer anyway, since it's more in tune with how OCaml's other
+</I>&gt;<i> namespace manipulation operators work), it seems fairly
+</I>&gt;<i> straight-ahead.  But I'm probably missing something important.
+</I>
+We should propbably stop calling this idea &quot;auto-opening&quot; because it is
+really about allowing modules to be &quot;included&quot; within a namespace. This
+is not a small change to the semantics. Without &quot;auto-opens&quot; namespaces
+are simply a mechanism for controlling the names of compilation units,
+with them they become a partial replacement modules: able to contain
+values, types, exception, etc. Having two different features that
+substantially overlap is normally a bad idea since it can cause a lot of
+confusion.
+
+Without auto-opens the namespace system is completely oblivious to the
+actual contents of modules. With auto-opens the compiler must look
+inside modules to work out whether &quot;Core#Foo&quot; refers to a member of Core
+or a sub-module of one of its auto-opened modules.
+
+Also, an ordered semantics is not for free. It makes having a
+namespace defined in multiple places (as with users adding to existing
+namespaces) much more fragile.
+
+I think this is why people are reluctent to include automatically opened
+modules in the namespaces proposal: it is quite a large change to the
+semantics to handle a problem that is only likely to affect a few
+libraries.
+
+However, I think that I can see a way to avoid the problems of an ordered
+semantics and possible &quot;Core#Foo&quot; conflicts.
+
+The basic idea is to define a module named &quot;Core&quot; containing the values
+that you would like automatically opened, as well as a namespace named
+&quot;Core&quot;. Then you provide some kind of opening operation that opens both
+the namespace and the module named &quot;Core&quot;.
+
+This avoids the problem of ordering members of namespaces, since there
+should only be one module called &quot;Core&quot;. Technically there could be
+multiple &quot;Core&quot; modules in the search path, but we simply use the first
+one we find just like normal modules.
+
+It also avoids the issue of &quot;Core#Foo&quot; conflicts, since &quot;Core#Foo&quot; must
+refer to the &quot;Foo&quot; member of the &quot;Core&quot; namespace, while &quot;Core.Foo&quot;
+would refer to the &quot;Foo&quot; sub-module of the &quot;Core&quot; module.
+
+This could be added to a namespaces proposal in a number of ways. For
+example we could allow modules named &quot;Core#_&quot; (or core-_.ml) to be
+defined. These modules could be refered to directly in programs as
+&quot;Core&quot;. When the compiler encouters a &quot;open namespace Core&quot; construct it
+first opens the &quot;Core&quot; namespace, and then it searches for a module
+named &quot;Core#_&quot; and opens that as well.
+
+Regards,
+
+Leo
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000264.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000268.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#267">[ date ]</a>
+              <a href="thread.html#267">[ thread ]</a>
+              <a href="subject.html#267">[ subject ]</a>
+              <a href="author.html#267">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

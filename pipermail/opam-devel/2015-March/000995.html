@@ -1,0 +1,210 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Package%20signing%20%28was%20Re%3A%20%20OPAM%201.3%20roadmap%29&In-Reply-To=%3C55002CBE.3050805%40mehnert.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001001.html">
+   <LINK REL="Next"  HREF="000997.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)</H1>
+    <B>Hannes Mehnert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Package%20signing%20%28was%20Re%3A%20%20OPAM%201.3%20roadmap%29&In-Reply-To=%3C55002CBE.3050805%40mehnert.org%3E"
+       TITLE="[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)">hannes at mehnert.org
+       </A><BR>
+    <I>Wed Mar 11 11:53:34 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001001.html">[opam-devel] Package signing (was Re: OPAM 1.3 roadmap)
+</A></li>
+        <LI>Next message: <A HREF="000997.html">[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#995">[ date ]</a>
+              <a href="thread.html#995">[ thread ]</a>
+              <a href="subject.html#995">[ subject ]</a>
+              <a href="author.html#995">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA384
+
+On 03/11/2015 02:39, Louis Gesbert wrote:
+&gt;<i> # On the current state
+</I>&gt;<i> 
+</I>&gt;<i> the current client-server protocol and repackaging of archives are
+</I>&gt;<i> kind of there by legacy more than by design, and this could be a
+</I>&gt;<i> good opportunity to improve on them
+</I>
+great to hear.
+
+&gt;<i> # Proposal (just random remarks)
+</I>&gt;<i> 
+</I>&gt;<i> Threat model: * an attacker can compromise the repository
+</I>
+what does this mean? as mentioned, I'd prefer to have the repository
+being untrusted.
+
+&gt;<i> Package signature: this should probably sign over * the package
+</I>&gt;<i> definition, excluding the url file (everything under
+</I>&gt;<i> `~repo/packages/&lt;pkg&gt;/&lt;pkg&gt;.&lt;version&gt;/`) * the upstream package
+</I>&gt;<i> archive (and possibly its url and mirrors ?)
+</I>
+I'd hash all the files of the package definition, and the tarball, and
+keep a list in the file &quot;checksums&quot;:
+&lt;name&gt;,&lt;size&gt;,[&lt;hash-algorithm&gt;,&lt;hash-value&gt;]+
+
+thus, replacement (or multiple) hash algorithms can be used. the
+&lt;checksum&gt; in url is no longer needed.
+
+let's start with SHA-256. signature is made on the SHA-256 hash of
+&quot;checksums&quot;.
+
+&gt;<i> Key delegation: * We can simply delegate to sub-directories of the
+</I>&gt;<i> repository * OPAM should probably be changed not to accept package
+</I>&gt;<i> definitions anywhere in the hierarchy then (I _think_
+</I>&gt;<i> `~repo/foo/foo.1/bar.1/` would work as a definition for `bar.1` at
+</I>&gt;<i> the moment, OPAM makes no assumptions on the hierarchy)
+</I>
+both good points.
+
+&gt;<i> Root key: * TUF propoposes several root keys with a threshold. That
+</I>&gt;<i> could be a nice security since it makes revocation of root keys
+</I>&gt;<i> possible.
+</I>
+agreed.
+
+&gt;<i> claimed/unclaimed/recently claimed maintainer keys (from Python's
+</I>&gt;<i> pep480): * I think we'll need some kind of 'unclaimed' at least to
+</I>&gt;<i> ensure the progressive migration to signed packages, having all
+</I>&gt;<i> maintainers sign up-front before rolling 1.3 sounds difficult. Then
+</I>&gt;<i> we don't have Pypi's flow of incoming packages, so we may not need
+</I>&gt;<i> as much infrastructure -- having a default delegated maintainer
+</I>&gt;<i> could be enough.
+</I>
+true.
+
+&gt;<i> Timestamp server: * I'd love to see that done by a unikernel that
+</I>&gt;<i> fetches from github, signs, then pushes back to the repository HTTP
+</I>&gt;<i> server. Still needs to get its key from somewhere though.
+</I>
+in fact, that was my idea as well.
+
+&gt;<i> # open questions
+</I>&gt;<i> 
+</I>&gt;<i> * Allowing non-maintainer updates: I have been wondering about this
+</I>&gt;<i> as well. It's not easy, and modification of dependency constraints
+</I>&gt;<i> can be an attack vector already (adding a dep to a compromised
+</I>&gt;<i> package, or even an unsafe older package version). Sometimes, there
+</I>&gt;<i> is also a trivial packaging bug, and the repository maintainers
+</I>&gt;<i> should be able to fix it if the package maintainer is not
+</I>&gt;<i> responsive enough. We could try and detect 'innocuous' changes, but
+</I>&gt;<i> that sounds like something that can get too complex very quickly
+</I>&gt;<i> and will open more weaknesses. No better solution than letting the
+</I>&gt;<i> modified package get signed by a general repository maintainer,
+</I>&gt;<i> maybe with a time window for the rightful owner to sign it ? I'll
+</I>&gt;<i> think some more about it.
+</I>
+sounds good.
+
+&gt;<i> * opam-publish: I'd like to see it get more widely used. Maybe I
+</I>&gt;<i> should make it more clear that the first step (`opam publish
+</I>&gt;<i> prepare`) only gathers metadata locally and is very generic, while
+</I>&gt;<i> the second (`opam publish submit`) is github specific and bound to
+</I>&gt;<i> opam-repository by default. Anyway, the signing process will be
+</I>&gt;<i> open and should be reproducible by hand, with minimum hassle. But
+</I>&gt;<i> having opam-publish generate, and manage keys would be a definite
+</I>&gt;<i> gain in usability IMO.
+</I>
+it should prepare &quot;checksums&quot;
+
+&gt;<i> * dependencies to command-line utilities: OPAM's parallel command
+</I>&gt;<i> engine relies on parallelism at the sub-process level (we don't
+</I>&gt;<i> want to embed lwt into OPAM); but having our own download handling
+</I>&gt;<i> would certainly help with several issues, also including
+</I>&gt;<i> portability.
+</I>
+and running opam within a unikernel :)
+
+&gt;<i> # some more * Would we want to use the TUF specified json format ?
+</I>
+or sexp, since that's already a first-class citizen!
+
+&gt;<i> * Last, I'd like your advice and opinion on the algorithms and
+</I>&gt;<i> signing to use. Small elliptic-curve based signature (ed25519) seem
+</I>&gt;<i> to be all the hype now with stuff like signify or minilock. What is
+</I>&gt;<i> the state of what we currently have in native OCaml, and what would
+</I>&gt;<i> you recommend ?
+</I>
+this whole minilock seems to be a not-yet-though-out-idea (looking
+into the thread
+<A HREF="https://moderncrypto.org/mail-archive/messaging/2015/001559.html">https://moderncrypto.org/mail-archive/messaging/2015/001559.html</A>)
+
+what we have
+- - cryptokit (RSA/DH/hashes)
+- - cryptohash (hashes)
+- - ocaml-sha (sha)
+- - ocaml-nocrypto (RSA/DH/DSA/hashes)
+- - ocaml-sodium (bindings to libsodium/nacl [curve 25519])
+
+what I'd recommend: be agile! use a keytype and keydata field --
+initially support both RSA and ED25519 keys (I believe PyPi people did
+the same).
+
+
+hannes
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2
+
+iQIcBAEBCQAGBQJVACy+AAoJELyJZYjffCju8ggP+wYwMU7bPLVNYBlS4PyXSPrM
+HLEFToldVAREWLciKfrGn2/tcpLiiBFLU5luyKt0i4l5Wtx4icZbS4o+BzKyFJMW
+e1TKOmmjrI8DphNRraI/4URIgFHCjRib9PRTtQYaQ3hW89/SnShgkALE9lO+3Fr6
+3GOIqIBR5g0LayJ8slUm3c2Fj+cx3OuDYBtMYiNqSkAW1UPheSckOuHcop/DvSAz
+x7xnuVqhybi+/+UZQKQnFBACOv6DmNdCj6AB+IE/L0p4EABxc/HodLHX05UPR2ru
+Uk/fxHtUph3JkxcuoJuRvjgaQpOVDh7/nFDIWwRnwW0ZZdEkjNE3MluRQy0ZfCNK
+Mz0RK2PD7E5LqIVDiZj4tW9bt2EIH9lYeleU9ZPgQDJzuQ3pAscIiAIZxYHORVLV
+gihXpUfNKYK7Ps7aYHYlmGQgsqsLK1yJo/LGsLJLYiByB63H1AJIuYh7/20juep0
+lqkWcntfuExtvxUOefZheVrdsX5wC06bf4zx6GicMka9r9dqE9Td1p+eqCEVMY4k
+C/6XePWfDY5Cjp6Q5X3+XpXKphX6lLo+BsPaaMZPKO6SOF8hrvMYk/Hf7CVJbNHj
+mMim/qOIT40D2LVyszbuMgG4lsNt3BSVMKPgp5v4cR3ELYkJ63dyBPNX4sNup8T0
+GYVB6WCq7o0cGjDrA870
+=xtFb
+-----END PGP SIGNATURE-----
+</PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001001.html">[opam-devel] Package signing (was Re: OPAM 1.3 roadmap)
+</A></li>
+	<LI>Next message: <A HREF="000997.html">[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#995">[ date ]</a>
+              <a href="thread.html#995">[ thread ]</a>
+              <a href="subject.html#995">[ subject ]</a>
+              <a href="author.html#995">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Less copying, a hybrid approach
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Less%20copying%2C%20a%20hybrid%20approach&In-Reply-To=%3CA5F3DFD047FF469CBAB8B43EDDCA4CE4%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000032.html">
+   <LINK REL="Next"  HREF="000034.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Less copying, a hybrid approach</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Less%20copying%2C%20a%20hybrid%20approach&In-Reply-To=%3CA5F3DFD047FF469CBAB8B43EDDCA4CE4%40erratique.ch%3E"
+       TITLE="[ocaml-ctypes] Less copying, a hybrid approach">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Thu Dec 19 15:21:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000032.html">[ocaml-ctypes] ptr ptr argument
+</A></li>
+        <LI>Next message: <A HREF="000034.html">[ocaml-ctypes] Less copying, a hybrid approach
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#33">[ date ]</a>
+              <a href="thread.html#33">[ thread ]</a>
+              <a href="subject.html#33">[ subject ]</a>
+              <a href="author.html#33">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello, 
+
+In certain cases I would really like to avoid copying the data passed to C (see [1]). Main uses cases are strings and arrays and records of unboxed floats (on architectures that have ARCH_ALIGN_DOUBLE undefined, see [2]). Since I don't want to wait on the promise of stub generation I have devised the following approach.
+
+The idea is to use ctypes to get the function pointer and pass it to a regular stub just to apply the function. What's the point will you tell me ? Why don't you immediately make a stub for the function then ? 
+
+First I'm still using &quot;regular&quot; ctypes for other parts of the binding. Second, I'm also using ctypes for the dll functionality, this means that I don't need to handle that in the C part will all the configure business it would entail; I piggyback on a correct install of ctypes for handling that and for the rest of the C that is needed I just need a correct install of ocaml. 
+
+I would like to get feedback on this approach, I think it should work on both 32 bits and 64 bits platform. To make it more easy to implement the only thing that is missing in ctypes now is `val ptr_to_raw_address : unit ptr -&gt; int64`. In my example below I bypassed that by directly using the &quot;ctypes_dlsym&quot; stub.
+
+Below I show the approach on unsetenv(3) at the end of the ml file. Note that you need only one stub per function *type*.
+
+Any thoughts ? 
+
+Daniel
+
+
+[1] <A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/106">https://github.com/ocamllabs/ocaml-ctypes/issues/106</A>
+[2] <A HREF="http://caml.inria.fr/pub/ml-archives/caml-list/2006/01/a8a5a8a9ee7fd2b71cc74835c2f7b924.en.html">http://caml.inria.fr/pub/ml-archives/caml-list/2006/01/a8a5a8a9ee7fd2b71cc74835c2f7b924.en.html</A>
+
+The ml file:
+
+------test.ml---------
+open Ctypes;;
+open Foreign;;
+
+type fun_ptr = int64
+
+external app_str_int : fun_ptr -&gt; string -&gt; int = &quot;mlapp_str_int&quot; &quot;noalloc&quot;
+
+external dlsym : ?handle:Dl.library -&gt; symbol:string -&gt; int64 option = 
+  &quot;ctypes_dlsym&quot;
+
+let unsetenv_fun_ptr : fun_ptr = match dlsym &quot;unsetenv&quot; with 
+|<i> None -&gt; assert false 
+</I>|<i> Some addr -&gt; addr
+</I>
+let unsetenv : string -&gt; int = fun s -&gt; app_str_int unsetenv_fun_ptr s 
+
+let () = 
+  assert (try ignore (Sys.getenv &quot;HOME&quot;); true with Not_found -&gt; false);
+  assert (unsetenv &quot;HOME&quot; = 0); 
+  assert (try ignore (Sys.getenv &quot;HOME&quot;); false with Not_found -&gt; true);
+  ()
+
+-------------
+
+The C stub:
+
+------test_stub.c---------
+#include &lt;caml/mlvalues.h&gt;
+
+typedef int (*str_int)(char *);
+
+value mlapp_str_int (value *fun_ptr, value *str)
+{  
+  str_int f = *(str_int)(Int64_val(fun_ptr)); 
+  char *s = String_val(str);
+  return Val_int(f (s));
+}
+
+------------------------------
+
+
+
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000032.html">[ocaml-ctypes] ptr ptr argument
+</A></li>
+	<LI>Next message: <A HREF="000034.html">[ocaml-ctypes] Less copying, a hybrid approach
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#33">[ date ]</a>
+              <a href="thread.html#33">[ thread ]</a>
+              <a href="subject.html#33">[ subject ]</a>
+              <a href="author.html#33">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN coherently
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Using%20Cstubs.Types.TYPE%20and%20Cstubs.FOREIGN%20coherently&In-Reply-To=%3C20150429114013.GA13701%40morbo%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000164.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN coherently</H1>
+    <B>Si Beaumont</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Using%20Cstubs.Types.TYPE%20and%20Cstubs.FOREIGN%20coherently&In-Reply-To=%3C20150429114013.GA13701%40morbo%3E"
+       TITLE="[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN coherently">simon.beaumont at citrix.com
+       </A><BR>
+    <I>Wed Apr 29 12:40:13 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000164.html">[ocaml-ctypes] calling a dynamically generated function
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#165">[ date ]</a>
+              <a href="thread.html#165">[ thread ]</a>
+              <a href="subject.html#165">[ subject ]</a>
+              <a href="author.html#165">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+I've been looking to use Ctypes to create bindings to libpci and use
+stub-generation. I was hoping to generate stubs for both the foreign function
+bindings and also for the struct layouts (including inlining of `#define`d
+constants from the library).
+
+I successfully got stub generation working for the functions and for the
+structures by creating a functor taking a module with signature Cstubs.FOREIGN
+as per the examples I've seen in the Ctypes repo[1] and even got that working
+with OASIS by creating an executable using the Cstubs.write_{c,ml} functions
+and using this as a &quot;BuildTool&quot; following some other examples I found
+(ocaml-gsasl[2] and onanomsg[3]).
+
+However, I wanted to also be able to get the struct layout and constant
+definitions only available to the C preprocesor without me having to transcribe
+them into my library (libpci like many other libraries `#define`s a whole bunch
+of values for flags that need to be passed into functions). FWICT to get this
+to work I need to create a second functor taking a module with signature
+Cstubs.Types.TYPE and then use Cstubs.Type.write_c. This will generate
+a C program which needs to be compiled. This compiled C program can then be run
+to generate an OCaml module which can be used with my original Bindings
+functor (gleanings from a few days of hacking and from ctypes
+mailing-list[4][5]).
+
+It seems this pipeline is going to be quite difficult to integrate into a build
+system like OASIS since I need to compile an auto-generated C program half way
+through. My final bit of research landed me on an open Bountysource issue[6] on
+which it looks like there's a plan to smooth this out to make the workflow more
+like the stub generation for foreign function bindings:
+
+&gt;<i> We can address both these concerns with an alternative workflow for
+</I>&gt;<i> Cstubs_structs.TYPE that follows the same pattern as stub generation for
+</I>&gt;<i> functions: generate C and ML directly from the functor containing your
+</I>&gt;<i> bindings, then link the generated C and ML into your program.
+</I>
+This sounds fantastic! I was wondering if there is any branch of Ctypes with
+this functionality yet that I could try out or if there is any expectation to
+add this in the near-term?
+
+For now, I think I'll have to use just the stub generation for the functions
+(and for the structures that I've transcribed) and have to hardcode the
+`#define`d constants and enums.
+
+TIA,
+
+- Si
+[1]: <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/f7d8f63d/examples/ncurses/stub-generation/bindings/ncurses_bindings.ml">https://github.com/ocamllabs/ocaml-ctypes/blob/f7d8f63d/examples/ncurses/stub-generation/bindings/ncurses_bindings.ml</A>
+[2]: <A HREF="https://github.com/nojb/ocaml-gsasl/blob/a96c7b94/_oasis">https://github.com/nojb/ocaml-gsasl/blob/a96c7b94/_oasis</A>
+[3]: <A HREF="https://github.com/rgrinberg/onanomsg/blob/4d09e396/_oasis">https://github.com/rgrinberg/onanomsg/blob/4d09e396/_oasis</A>
+[4]: <A HREF="http://lists.ocaml.org/pipermail/ctypes/2015-January/000143.html">http://lists.ocaml.org/pipermail/ctypes/2015-January/000143.html</A>
+[5]: <A HREF="http://lists.ocaml.org/pipermail/ctypes/2015-February/000153.html">http://lists.ocaml.org/pipermail/ctypes/2015-February/000153.html</A>
+[6]: <A HREF="https://www.bountysource.com/issues/8206607-new-constant-function-is-hard-to-use">https://www.bountysource.com/issues/8206607-new-constant-function-is-hard-to-use</A>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000164.html">[ocaml-ctypes] calling a dynamically generated function
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#165">[ date ]</a>
+              <a href="thread.html#165">[ thread ]</a>
+              <a href="subject.html#165">[ subject ]</a>
+              <a href="author.html#165">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

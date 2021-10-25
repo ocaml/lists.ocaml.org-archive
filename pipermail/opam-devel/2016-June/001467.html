@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 2.0 features
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C3121607.FQDh2oZuuF%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001466.html">
+   <LINK REL="Next"  HREF="001468.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 2.0 features</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C3121607.FQDh2oZuuF%40maitake%3E"
+       TITLE="[opam-devel] OPAM 2.0 features">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Fri Jun  3 08:52:52 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001466.html">[opam-devel] OPAM 2.0 features
+</A></li>
+        <LI>Next message: <A HREF="001468.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1467">[ date ]</a>
+              <a href="thread.html#1467">[ thread ]</a>
+              <a href="subject.html#1467">[ subject ]</a>
+              <a href="author.html#1467">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> Biggest feedback at the moment is that compilers-as-a-package is a fabulous
+</I>&gt;<i> innovation &#8211; I had originally expected to need to add lots of horrid
+</I>&gt;<i> Windows (and OCaml, therefore)-specific stuff to the OPAM program, but in
+</I>&gt;<i> fact all I've had to do is add generic features to OPAM and then handle the
+</I>&gt;<i> rest in the package itself, which is great!
+</I>
+That's good to hear :)
+ 
+&gt;<i> &gt; The &quot;target-filename&quot; part being optional. See for example
+</I>&gt;<i> &gt; <A HREF="http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam">http://opam.ocaml.org/2.0~dev/packages/ocaml/ocaml.4.01.0+BER/opam</A>
+</I>&gt;<i> 
+</I>&gt;<i> Ta, I came across it subsequently too! I've extended it (or rather, will
+</I>&gt;<i> shortly extend it), to allow it to refer to the URL of another package, as
+</I>&gt;<i> the ocaml package needs to pick up the sources of the flexdll package
+</I>&gt;<i> installed just before it in order to bootstrap correctly.
+</I> 
+Hm, that seems a bit ad-hoc and introduces metadata dependencies of a new 
+kind. What if flexdll has a git url or is pinned locally ?
+
+&gt;<i> I've gone with the command line options for now (with an error check to
+</I>&gt;<i> ensure that they're only given when installing a switch). At the moment,
+</I>&gt;<i> they define three global variables switch-cc, switch-libc and switch-arch
+</I>&gt;<i> which are only available during the switch installation, so if they want to
+</I>&gt;<i> be kept, the compiler package has to capture them in its own .config file.
+</I>&gt;<i> ocaml.system remains a horrible hack under this mechanism (the script
+</I>&gt;<i> identifies that it's in a switch named &quot;system&quot; and uses that fact to probe
+</I>&gt;<i> switch-cc, switch-libc, and switch-arch...)
+</I>
+That would likely break `opam switch foo --alias-of system`. Adding `--set-
+variables &lt;bindings&gt;` to `opam switch install` would be a good first step, and 
+if we find suitable sugar later on we may add it.
+ 
+&gt;<i> It's not particularly pretty, but it does seem to work in the absence of
+</I>&gt;<i> something more general for now. In particular, I've restructured the base
+</I>&gt;<i> packages and added a package called compiler whose purpose is to store
+</I>&gt;<i> variables (in particular, compiler:o, compiler:so and compiler:a giving
+</I>&gt;<i> important file extensions for object files, etc., which are necessary for
+</I>&gt;<i> writing generic package specifications). The only bug I had to fix with
+</I>&gt;<i> that so far is to thread the config files correctly through parallel_apply
+</I>&gt;<i> (before they were only re-loaded at the end of the installation), but there
+</I>&gt;<i> is a comment in the code that you already aware of problems there!
+</I>
+hm, forgot about that TBH, I'll need to check :) 
+
+&gt;<i> &gt; Yes, just philosophical, there is no constraint here besides the
+</I>&gt;<i> &gt; arbitrary
+</I>&gt;<i> &gt; &quot;I don't want to recompile the compiler, ever&quot;.
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> I've spent the last couple of days working through this, and I think it's
+</I>&gt;<i> definitely worth relaxing that restriction. I've altered opam switch so
+</I>&gt;<i> that only the root package is the compiler package &#8211; so only ocaml.version
+</I>&gt;<i> is in the compiler section of switch-state. Have a look at this
+</I>&gt;<i> transcript:
+</I>&gt;<i> [snip]
+</I>&gt;<i> 
+</I>&gt;<i> That seems a potentially very useful thing to be able to do &#8211; and you don't
+</I>&gt;<i> lose the safety of the &quot;compiler&quot; packages &#8211; opam remove flexdll (or
+</I>&gt;<i> base-unix, etc.) will still complain that this would involve removing the
+</I>&gt;<i> compiler:
+</I> 
+&gt;<i> [opam:4.02.0] [git:windows] C:\DRA\opam\src&gt;opam remove flexdll
+</I>&gt;<i> Your request can't be satisfied:
+</I>&gt;<i>   - Package ocaml is part of the base for this compiler and can't be
+</I>&gt;<i> changed
+</I> 
+&gt;<i> No solution found, exiting
+</I>
+Note, though that even with the current system, the restriction that compiler 
+packages are immutable is somewhat lifted if you pin the package: so the above 
+should work without changes (I haven't tested pinning one package of the 
+&quot;compiler packages&quot; set and recompiling its compiler dependents though)
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001466.html">[opam-devel] OPAM 2.0 features
+</A></li>
+	<LI>Next message: <A HREF="001468.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1467">[ date ]</a>
+              <a href="thread.html#1467">[ thread ]</a>
+              <a href="subject.html#1467">[ subject ]</a>
+              <a href="author.html#1467">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

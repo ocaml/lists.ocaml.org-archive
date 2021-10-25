@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Cheating%20on%20Foreign.foreign%20to%20use%20Unix.stat%20stubs&In-Reply-To=%3C544E35C7.1060003%40le.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000127.html">
+   <LINK REL="Next"  HREF="000130.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs</H1>
+    <B>Andrea Giugliano</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Cheating%20on%20Foreign.foreign%20to%20use%20Unix.stat%20stubs&In-Reply-To=%3C544E35C7.1060003%40le.ac.uk%3E"
+       TITLE="[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs">ag400 at leicester.ac.uk
+       </A><BR>
+    <I>Mon Oct 27 12:08:39 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000127.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+        <LI>Next message: <A HREF="000130.html">[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat	stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#129">[ date ]</a>
+              <a href="thread.html#129">[ thread ]</a>
+              <a href="subject.html#129">[ subject ]</a>
+              <a href="author.html#129">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello everyone,
+
+I am using ctypes in order to passing null pointers as input of Unix 
+syscalls.
+So far we used the Unix OCaml library to use syscalls (open, chdir, stat),
+but it does not allow passing null pointers as input paths of the 
+syscalls (i.e. mkdir NULL is not possible using OCaml Unix.mkdir).
+
+The thing is I would like to avoid implementing again the logic of Unix 
+operations after having create ctypes stubs,
+instead I was successful so far in using the Unix stubs as my C 
+functions. For instance I can have:
+
+let my_mkdir = Foreign.foreign &quot;unix_mkdir&quot; ~checkerrno:true (string_opt 
+@-&gt; returning int)
+
+Now this does not work with the stat syscall, because it returns a data 
+structure.
+The data structure returned is an OCaml type (indeed it is a Unix C stub 
+I am using),
+ctypes expects a C structure, and I convert the expected C structure in 
+a OCaml type again.
+
+The question is: did anyone of you try to cheat too?
+Is that just a completely wrong use case of ctypes (poor -lazy- me I 
+must implement again the logic of Unix!)?
+Thanks a lot,
+
+Andrea
+
+P.S: I attach the code I was trying to run for the stat function: it 
+worst case it can be used as &quot;don't do this!&quot;
+-------------- next part --------------
+open Ctypes
+open PosixTypes
+open Unsigned
+
+type stats
+let stats : stats structure typ = structure &quot;Stat&quot;
+let ( -:* ) s x = field stats s x
+let st_dev = &quot;st_dev&quot; -:* dev_t
+let st_ino = &quot;st_ino&quot; -:* int
+let st_kind= &quot;st_kind&quot; -:* int
+let st_perm= &quot;st_perm&quot; -:* int
+let st_nlink = &quot;st_nlink&quot; -:* int
+let st_uid = &quot;st_uid&quot; -:* int
+let st_gid = &quot;st_gid&quot; -:* int
+let st_rdev = &quot;st_rdev&quot; -:* int
+let st_size = &quot;st_size&quot; -:* int64_t
+let st_atime = &quot;st_atime&quot; -:* double
+let st_mtime = &quot;st_mtime&quot; -:* double
+let st_ctime = &quot;st_ctime&quot; -:* double
+let () = seal stats
+
+let st_dev_int s = UInt64.to_int (coerce dev_t uint64_t (getf s st_dev))
+let st_ino_int s =  (getf s st_ino)
+let st_nlink_int s = (getf s st_nlink)
+let st_perm_int s = (getf s st_perm)
+let st_kind_kind s = match (getf s st_kind) with | _ -&gt; S_REG
+let st_uid_int s =   (getf s st_uid)
+let st_gid_int s =  (getf s st_gid)
+let st_rdev_int s = (getf s st_rdev)
+let st_size_int s = (getf s st_size)
+let st_atime_float s = (getf s st_atime)
+let st_mtime_float s = (getf s st_mtime)
+let st_ctime_float s =  (getf s st_ctime)
+
+
+let to_unix t = Ctypes.(Unix.LargeFile.({
+                                         st_dev  = st_dev_int t;
+                                         st_ino  = st_ino_int t;
+                                         st_kind = st_kind_kind t;
+                                         st_perm = st_perm_int t;
+                                         st_nlink= st_nlink_int t;
+                                         st_uid  = st_uid_int t;
+                                         st_gid  = st_gid_int t;
+                                         st_rdev = st_rdev_int t;
+                                         st_size = st_size_int t;
+                                         st_atime= st_atime_float t;
+                                         st_mtime= st_mtime_float t;
+                                         st_ctime= st_ctime_float t;
+                                       }))
+let stat = Foreign.foreign &quot;unix_stat_64&quot; ~check_errno:true
+                           (string_opt @-&gt; returning (ptr stats))
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000127.html">[ocaml-ctypes] Lifecycle of a callback?
+</A></li>
+	<LI>Next message: <A HREF="000130.html">[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat	stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#129">[ date ]</a>
+              <a href="thread.html#129">[ thread ]</a>
+              <a href="subject.html#129">[ subject ]</a>
+              <a href="author.html#129">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

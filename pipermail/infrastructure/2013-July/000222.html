@@ -1,0 +1,227 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-infra] Redesigning OCaml.org - Using Markdown
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20Redesigning%20OCaml.org%20-%20Using%20Markdown&In-Reply-To=%3C1F76C994-B0E7-4BC9-AFE7-C1D5A585575C%40cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000218.html">
+   <LINK REL="Next"  HREF="000217.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-infra] Redesigning OCaml.org - Using Markdown</H1>
+    <B>Philippe Wang</B> 
+    <A HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20Redesigning%20OCaml.org%20-%20Using%20Markdown&In-Reply-To=%3C1F76C994-B0E7-4BC9-AFE7-C1D5A585575C%40cl.cam.ac.uk%3E"
+       TITLE="[ocaml-infra] Redesigning OCaml.org - Using Markdown">philippe.wang at cl.cam.ac.uk
+       </A><BR>
+    <I>Tue Jul  9 14:59:11 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000218.html">[ocaml-infra] Redesigning OCaml.org - Using Markdown
+</A></li>
+        <LI>Next message: <A HREF="000217.html">[ocaml-infra] OCaml.org - License easier to find
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#222">[ date ]</a>
+              <a href="thread.html#222">[ thread ]</a>
+              <a href="subject.html#222">[ subject ]</a>
+              <a href="author.html#222">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear all,
+
+In addition to Amir's email (From: Amir Chaudhry &lt;<A HREF="http://lists.ocaml.org/listinfo/infrastructure">amc79 at cam.ac.uk</A>&gt;, Date: Thu, Jul 4, 2013 at 9:54 AM),
+here are some details to help you understand where we're heading to.
+Please feel free to comment on it.
+
+(The text below uses markdown syntax and ASCII-based schemas, so it's best viewed using a markdown viewer but using a fixed-width font should be fine too.)
+
+We're trying to  make the new ocaml.org website  as simple to maintain
+and  build as  possible, in  the  sense that  one should  not have  to
+understand the whole process in  order to intervene on a tiny specific
+part of the website.
+An example of how this might work is in the schematic below.
+
+**We are not heading to  a website entirely written in OCaml.**
+In  particular, pages  will be  written using  the  Markdown language,
+which  is more  human-friendly than  HTML.  Where  needed, it  will be
+possible to  use HTML, but parts  written in HTML  should almost never
+change (that means that validation  of HTML should be easily done with
+an external  tool).  The site being  mostly static is  the main reason
+why we're not considering writing  the whole website using OCaml: it's
+not worth the effort.  Indeed, having  to write some OCaml code is not
+much  more  human-friendly  than  having  to  write  some  HTML  code,
+especially compared to using Markdown.
+
+Some Markdown files will be  written by humans, and some others partly
+or entirely generated.   Any of them may contain  HTML parts.  We will
+use tools  to allow the  generation of Markdown files  from &quot;enriched&quot;
+Markdown files.   This means that  we may write special  directives in
+&quot;enriched&quot;  Markdown files in  order to,  for instance,  include OCaml
+code from existing  .ml files. We may also want  to include the result
+of the compilation of some OCaml code.
+
+In an enriched Markdown file, we may write, for instance
+{{ format-ocaml &quot;ocaml -I blah&quot; foo.ml }}
+and this would be replaced by the top-level's output when given the 
+contents of the file foo.ml.
+
+It could also be
+{{ format-ocamlc &quot;ocamlc -I blah&quot;  foo.ml }}
+and this would be replaced by the output of the ocamlc compiler.
+
+This approach allows  the author of a page to have  control of how the
+code  is  processed without  having  to  understand  the rest  of  the
+transformation  chain (i.e., what  happens once  the Markdown  file is
+produced). That has to be true for the entire website: not having to 
+understand all of it seems to be crucial.
+
+
+
+# Schematic
+
+```
+                                                           Building the ocaml.org website
+
+                                                          --------------------------------                                          
+      static generation                                   |     the ocaml.org website    |            dynamic generation            
+      -----------------                                   |     ---------------------    |            ------------------            
+                                                          |            ||                |                                          
+[Markdown]-----conv--------&gt;[HTML]----------,             |            ||                |                                          
+ (data)                                     |             |            ||                |                                          
+                                           {1}------------+--&gt;[HTML/CSS/JS]=core         |                                          
+                                            |             |            ||                |                                          
+[LESS]---------Less--------&gt;[CSS/JS]--------'             |            ||                |                                          
+ (style)                                                  |            ||                |                                          
+                                                          |            ||                |                                          
+[OCaml]-----Js_of_ocaml----&gt;[JS]-----------{2}------------+--&gt;[JS]=components+lib        |                                          
+ (scripts)                                                |            ||      `---------+---request--------------,                 
+                                                          |            ||                |                        |                 
+                                                          |            ||                |                        v                 
+                                                          |         dynamic data=[DOM]&lt;--+--{4}----response--[OPAM package list]    
+                                                          |            ||                |                   [OCamlOT]              
+[Markdown+OCaml]---conv----&gt;[Markdown]------,             |            ||                |                                          
+ (examples, exercises)                      |             |            ||                |                                          
+                                           {3}--conv------+--&gt;[HTML/CSS/JS]=exercices    |                                          
+                                            |             |            ||    &amp; demo      |                                          
+[TryOCaml]----------------------------------'             |            ||                |                                          
+ (execution environment)                                  |            ||                |                                          
+                                                          |       other components       |                                          
+                                                          |            ||                |                                          
+                                                          --------------------------------                                          
+```
+`[`Format of the source code`]`
+
+`||`: Backbone (link to all components), yet to be precisely defined.
+
+`{1}`: The  core of  the ocaml.org  website. It consists  of a  bunch of
+Markdown and LESS files that are converted into HTML.
+
+`{2}`:  The dynamic part  of the  ocaml.org website.  Dynamic components
+should be written in OCaml. For instance, they may include a component
+that, on the client side, fetches  a list of OPAM packages (e.g., most
+recent ones) and prints it on the page.
+
+`{3}`: A kind of richer version of `{1}` (so it does also use CSS/JS).
+Tutorials,  and more  generally  exercises, are  Markdown files  which
+include  at some  point some  OCaml code.   The OCaml  code  should be
+processed in order  to be embedded into some  Markdown files; this can
+be easily done using MPP. For instance, we can process the OCaml parts
+in order  to have the  output given by  the OCaml compiler  (ocamlc or
+ocamlopt)  or interactive  top-level  (ocaml). We  may  also embed  an
+interactive   top-level  (e.g.,  TryOCaml)   and  make   the  examples
+interactive and (locally) editable by the website visitors.
+
+
+`[A]---conv---&gt;[B]`: Some  files written  using the A  language are
+converted  by  some tools  (to  be defined)  into  files  using the  B
+language. 
+Pandoc may be used to convert Markdown files into HTML.
+MPP may be used to (pre)process any textual file.
+
+
+
+
+```
+                   Building the web pages (don't ignore the &quot;List.iter&quot;)
+
+let build_the_main_ocamlorg_pages (all_pages) =
+  List.iter ~l:(all_pages) ~f:(fun a.md.mpp) -&gt;
+,-------------------------------------------------------------------------------------------------------,
+|<i>                                                                                                       |    
+</I>|<i>                                                                                                       |    
+</I>|<i>                                                                                                       |    
+</I>|<i>      ,----------,             ,----------------,                                                      |    
+</I>|<i>      | a.md.mpp |             | head.html.tpl  |                                                      |    
+</I>|<i>      |          |             |                |                                                      |    
+</I>|<i>      |          |             | title          |                                                      |    
+</I>|<i>      |          |--,          | author         |                                                      |    
+</I>|<i>      |          |   \         | style          |                                                      |    
+</I>|<i>      |          |    |        | and            |                                                      |    
+</I>|<i>      |          |    |---X---&gt;| other metadata |----,                                                 |    
+</I>|<i>      '----------'    |        |                |     \       /------------------------\               |    
+</I>|<i>                      |        '----------------'      |      |  a.html                |               |    
+</I>|<i>                      |                                |      |                        |               |                 
+</I>|<i>                      |        ,----------------,      |      |  generated             |               |    
+</I>|<i>                      |        | body.html.tpl  |      |      |  web page              |               |    
+</I>|<i>                      |        |                |      |      |  (HTML/CSS/JS)         |               |    
+</I>|<i>                      |        | contents of    |      |      |                        |               |    
+</I>|<i>                      |        | the body       |      |      |                        |               |    
+</I>|<i>                       `--X---&gt;|                |------+-----&gt;|                        |               |    
+</I>|<i>                               '----------------'      |      |                        |               |    
+</I>|<i>                               ,----------------,      |      |                        |               |  
+</I>|<i>                               | common.html.tpl|      |      |                        |               |
+</I>|<i>                               |                |      |      |                        |               |
+</I>|<i>                               | shared by      |-----/       |                        |               | 
+</I>|<i>                               | most pages     |             |                        |               |
+</I>|<i>                               |                |             \------------------------/               |
+</I>|<i>                               '----------------'                                                      |
+</I>|<i>  X: extraction                                                                                        |
+</I>`-------------------------------------------------------------------------------------------------------'
+```                                                                                                 
+
+Please feel free to edit the ASCII-based schemas.
+
+
+Best,
+Philippe Wang
+
+
+
+
+
+
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/infrastructure/attachments/20130709/0d48000f/attachment-0001.html">http://lists.ocaml.org/pipermail/infrastructure/attachments/20130709/0d48000f/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000218.html">[ocaml-infra] Redesigning OCaml.org - Using Markdown
+</A></li>
+	<LI>Next message: <A HREF="000217.html">[ocaml-infra] OCaml.org - License easier to find
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#222">[ date ]</a>
+              <a href="thread.html#222">[ thread ]</a>
+              <a href="subject.html#222">[ subject ]</a>
+              <a href="author.html#222">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/infrastructure">More information about the Infrastructure
+mailing list</a><br>
+</body></html>

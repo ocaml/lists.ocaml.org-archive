@@ -1,0 +1,560 @@
+diff -rN -u old-utop/myocamlbuild.ml new-utop/myocamlbuild.ml
+--- old-utop/myocamlbuild.ml	2012-10-04 17:35:35.086476649 +0200
++++ new-utop/myocamlbuild.ml	2012-10-04 17:35:35.094476699 +0200
+@@ -30,6 +30,8 @@
+              (* Use -linkpkg for creating toplevels *)
+              flag ["ocaml"; "link"; "toplevel"] & A"-linkpkg";
+ 
++             flag ["ocaml"; "link"; "toplevel"] & S[A "-predicates"; A "create_toploop"];
++
+              (* Optcomp *)
+              flag ["ocaml"; "compile"; "pa_optcomp"] & S[A"-ppopt"; A "syntax/pa_optcomp.cmo"];
+              flag ["ocaml"; "ocamldep"; "pa_optcomp"] & S[A"-ppopt"; A "syntax/pa_optcomp.cmo"];
+diff -rN -u old-utop/_oasis new-utop/_oasis
+--- old-utop/_oasis	2012-10-04 17:35:35.086476649 +0200
++++ new-utop/_oasis	2012-10-04 17:35:35.094476699 +0200
+@@ -44,7 +44,7 @@
+     UTop_token,
+     UTop_complete,
+     UTop_styles
+-  BuildDepends: findlib, lambda-term (>= 1.2), lwt.syntax, threads
++  BuildDepends: findlib, lambda-term (>= 1.2), lwt.syntax, threads, compiler-libs.bytecomp
+   XMETADescription: utop configuration
+   XMETARequires: findlib, lambda-term
+ 
+@@ -57,20 +57,28 @@
+   XMETAType: syntax
+   XMETADescription: Camlp4 integration
+ 
+-Executable utop
+-  Install: true
+-  Path: src/top
+-  CompiledObject: byte
+-  MainIs: uTop_top.ml
+-  BuildDepends: utop, findlib, lambda-term, lwt.syntax, threads
+-  DataFiles: utop.el ($datadir/emacs/site-lisp)
++# Executable utop
++#   Install: true
++#   Path: src/top
++#   CompiledObject: byte
++#   MainIs: uTop_top.ml
++#   BuildDepends: utop, findlib, lambda-term, lwt.syntax, threads
++#   DataFiles: utop.el ($datadir/emacs/site-lisp)
++
++# Executable "utop-full"
++#   Install: true
++#   Path: src/top
++#   CompiledObject: byte
++#   MainIs: uTop_top_full.ml
++#   BuildDepends: utop, findlib, lambda-term, lwt.syntax, threads
++#   DataFiles: utop.el ($datadir/emacs/site-lisp)
+ 
+-Executable "utop-full"
++Executable "utop-nat"
+   Install: true
+   Path: src/top
+-  CompiledObject: byte
+-  MainIs: uTop_top_full.ml
+-  BuildDepends: utop, findlib, lambda-term, lwt.syntax, threads
++  CompiledObject: native
++  MainIs: uTop_start.ml
++  BuildDepends: utop, findlib, lambda-term, lwt.syntax, threads, compiler-libs.opttoplevel
+   DataFiles: utop.el ($datadir/emacs/site-lisp)
+ 
+ # +-------------------------------------------------------------------+
+diff -rN -u old-utop/src/camlp4/uTop_camlp4.ml new-utop/src/camlp4/uTop_camlp4.ml
+--- old-utop/src/camlp4/uTop_camlp4.ml	2012-10-04 17:35:35.086476649 +0200
++++ new-utop/src/camlp4/uTop_camlp4.ml	2012-10-04 17:35:35.094476699 +0200
+@@ -85,6 +85,6 @@
+   UTop.parse_toplevel_phrase := parse_toplevel_phrase;
+   (* Force camlp4 to display its welcome message. *)
+   try
+-    ignore (!Toploop.parse_toplevel_phrase (Lexing.from_string ""))
++    ignore (!Opttoploop.parse_toplevel_phrase (Lexing.from_string ""))
+   with _ ->
+     ()
+diff -rN -u old-utop/src/camlp5/uTop_camlp5.ml new-utop/src/camlp5/uTop_camlp5.ml
+--- old-utop/src/camlp5/uTop_camlp5.ml	2012-10-04 17:35:35.090476673 +0200
++++ new-utop/src/camlp5/uTop_camlp5.ml	2012-10-04 17:35:35.094476699 +0200
+@@ -61,6 +61,6 @@
+   UTop.parse_toplevel_phrase := parse_toplevel_phrase;
+   (* Force camlp5 to display its welcome message. *)
+   try
+-    ignore (!Toploop.parse_toplevel_phrase (Lexing.from_string ""))
++    ignore (!Opttoploop.parse_toplevel_phrase (Lexing.from_string ""))
+   with _ ->
+     ()
+diff -rN -u old-utop/src/lib/uTop_complete.ml new-utop/src/lib/uTop_complete.ml
+--- old-utop/src/lib/uTop_complete.ml	2012-10-04 17:35:35.090476673 +0200
++++ new-utop/src/lib/uTop_complete.ml	2012-10-04 17:35:35.098476725 +0200
+@@ -256,12 +256,12 @@
+        (fun dir kind map ->
+           let suffix =
+             match kind with
+-              | Toploop.Directive_none _ -> phrase_terminator
+-              | Toploop.Directive_string _ -> " \""
+-              | Toploop.Directive_bool _  | Toploop.Directive_int _ | Toploop.Directive_ident _ -> " "
++              | Opttoploop.Directive_none _ -> phrase_terminator
++              | Opttoploop.Directive_string _ -> " \""
++              | Opttoploop.Directive_bool _  | Opttoploop.Directive_int _ | Opttoploop.Directive_ident _ -> " "
+           in
+           String_map.add dir suffix map)
+-       Toploop.directive_table
++       Opttoploop.directive_table
+        String_map.empty)
+ 
+ (* +-----------------------------------------------------------------+
+@@ -381,7 +381,7 @@
+                add_names_of_type decl (add (Ident.name id) acc))
+         String_set.empty decls
+   | Mty_ident path -> begin
+-      match lookup_env Env.find_modtype path !Toploop.toplevel_env with
++      match lookup_env Env.find_modtype path !Opttoploop.toplevel_env with
+         | Some Modtype_abstract -> String_set.empty
+         | Some Modtype_manifest module_type -> names_of_module_type module_type
+         | None -> String_set.empty
+@@ -404,7 +404,7 @@
+                add_fields_of_type decl acc)
+         String_set.empty decls
+   | Mty_ident path -> begin
+-      match lookup_env Env.find_modtype path !Toploop.toplevel_env with
++      match lookup_env Env.find_modtype path !Opttoploop.toplevel_env with
+         | Some Modtype_abstract -> String_set.empty
+         | Some Modtype_manifest module_type -> fields_of_module_type module_type
+         | None -> String_set.empty
+@@ -429,7 +429,7 @@
+                add_names_of_type decl (add (Ident.name id) acc))
+         String_set.empty decls
+   | Tmty_ident path -> begin
+-      match lookup_env Env.find_modtype path !Toploop.toplevel_env with
++      match lookup_env Env.find_modtype path !Opttoploop.toplevel_env with
+         | Some Tmodtype_abstract -> String_set.empty
+         | Some Tmodtype_manifest module_type -> names_of_module_type module_type
+         | None -> String_set.empty
+@@ -452,7 +452,7 @@
+                add_fields_of_type decl acc)
+         String_set.empty decls
+   | Tmty_ident path -> begin
+-      match lookup_env Env.find_modtype path !Toploop.toplevel_env with
++      match lookup_env Env.find_modtype path !Opttoploop.toplevel_env with
+         | Some Tmodtype_abstract -> String_set.empty
+         | Some Tmodtype_manifest module_type -> fields_of_module_type module_type
+         | None -> String_set.empty
+@@ -466,7 +466,7 @@
+   try
+     Longident_map.find longident !local_names_by_longident
+   with Not_found ->
+-    match lookup_env Env.lookup_module longident !Toploop.toplevel_env with
++    match lookup_env Env.lookup_module longident !Opttoploop.toplevel_env with
+       | Some(path, module_type) ->
+           let names = names_of_module_type module_type in
+           local_names_by_path := Path_map.add path names !local_names_by_path;
+@@ -480,7 +480,7 @@
+   try
+     Longident_map.find longident !local_fields_by_longident
+   with Not_found ->
+-    match lookup_env Env.lookup_module longident !Toploop.toplevel_env with
++    match lookup_env Env.lookup_module longident !Opttoploop.toplevel_env with
+       | Some(path, module_type) ->
+           let fields = fields_of_module_type module_type in
+           local_fields_by_path := Path_map.add path fields !local_fields_by_path;
+@@ -512,7 +512,7 @@
+           | Some names ->
+               loop (String_set.union acc names) summary
+           | None ->
+-              match lookup_env Env.find_module path !Toploop.toplevel_env with
++              match lookup_env Env.find_module path !Opttoploop.toplevel_env with
+                 | Some module_type ->
+                     let names = names_of_module_type module_type in
+                     local_names_by_path := Path_map.add path names !local_names_by_path;
+@@ -522,7 +522,7 @@
+                     loop acc summary
+   in
+   (* Add names of the environment: *)
+-  let acc = loop String_set.empty (Env.summary !Toploop.toplevel_env) in
++  let acc = loop String_set.empty (Env.summary !Opttoploop.toplevel_env) in
+   (* Add accessible modules: *)
+   List.fold_left add_modules_from_directory acc !Config.load_path
+ 
+@@ -548,7 +548,7 @@
+           | Some fields ->
+               loop (String_set.union acc fields) summary
+           | None ->
+-              match lookup_env Env.find_module path !Toploop.toplevel_env with
++              match lookup_env Env.find_module path !Opttoploop.toplevel_env with
+                 | Some module_type ->
+                     let fields = fields_of_module_type module_type in
+                     local_fields_by_path := Path_map.add path fields !local_fields_by_path;
+@@ -558,7 +558,7 @@
+                     loop acc summary
+   in
+   (* Add fields of the environment: *)
+-  let acc = loop String_set.empty (Env.summary !Toploop.toplevel_env) in
++  let acc = loop String_set.empty (Env.summary !Opttoploop.toplevel_env) in
+   (* Add accessible modules: *)
+   List.fold_left add_modules_from_directory acc !Config.load_path
+ 
+@@ -605,7 +605,7 @@
+     | Tpoly (type_expr, _) ->
+         find_method meth type_expr
+     | Tconstr (path, _, _) -> begin
+-        match lookup_env Env.find_type path !Toploop.toplevel_env with
++        match lookup_env Env.find_type path !Opttoploop.toplevel_env with
+           | None
+           | Some { type_manifest = None } ->
+               None
+@@ -626,7 +626,7 @@
+     | Tpoly (type_expr, _) ->
+         methods_of_type acc type_expr
+     | Tconstr (path, _, _) -> begin
+-        match lookup_env Env.find_type path !Toploop.toplevel_env with
++        match lookup_env Env.find_type path !Opttoploop.toplevel_env with
+           | None
+           | Some { type_manifest = None } ->
+               acc
+@@ -648,7 +648,7 @@
+               None
+ 
+ let methods_of_object longident meths =
+-  match lookup_env Env.lookup_value longident !Toploop.toplevel_env with
++  match lookup_env Env.lookup_value longident !Opttoploop.toplevel_env with
+     | None ->
+         []
+     | Some (path, { val_type = type_expr }) ->
+@@ -676,7 +676,7 @@
+         else
+           labels_of_type (String_map.add label Required acc) te
+     | Tconstr(path, _, _) -> begin
+-        match lookup_env Env.find_type path !Toploop.toplevel_env with
++        match lookup_env Env.find_type path !Opttoploop.toplevel_env with
+           | None
+           | Some { type_manifest = None } ->
+               String_map.bindings acc
+@@ -687,7 +687,7 @@
+         String_map.bindings acc
+ 
+ let labels_of_function longident meths =
+-  match lookup_env Env.lookup_value longident !Toploop.toplevel_env with
++  match lookup_env Env.lookup_value longident !Opttoploop.toplevel_env with
+     | None ->
+         []
+     | Some (path, { val_type = type_expr }) ->
+@@ -698,7 +698,7 @@
+               labels_of_type String_map.empty type_expr
+ 
+ let labels_of_newclass longident =
+-  match lookup_env Env.lookup_class longident !Toploop.toplevel_env with
++  match lookup_env Env.lookup_class longident !Opttoploop.toplevel_env with
+     | None ->
+         []
+     | Some (path, { cty_new = None }) ->
+@@ -842,29 +842,29 @@
+     (* Generic completion on directives. *)
+     | [(Symbol "#", _); ((Lident dir | Uident dir), _); (Blanks, { idx2 = stop })] ->
+         (stop,
+-         match try Some (Hashtbl.find Toploop.directive_table dir) with Not_found -> None with
+-           | Some (Toploop.Directive_none _) -> [(phrase_terminator, "")]
+-           | Some (Toploop.Directive_string _) -> [(" \"", "")]
+-           | Some (Toploop.Directive_bool _) -> [(true_name, phrase_terminator); (false_name, phrase_terminator)]
+-           | Some (Toploop.Directive_int _) -> []
+-           | Some (Toploop.Directive_ident _) -> List.map (fun w -> (w, "")) (String_set.elements (global_names syntax))
++         match try Some (Hashtbl.find Opttoploop.directive_table dir) with Not_found -> None with
++           | Some (Opttoploop.Directive_none _) -> [(phrase_terminator, "")]
++           | Some (Opttoploop.Directive_string _) -> [(" \"", "")]
++           | Some (Opttoploop.Directive_bool _) -> [(true_name, phrase_terminator); (false_name, phrase_terminator)]
++           | Some (Opttoploop.Directive_int _) -> []
++           | Some (Opttoploop.Directive_ident _) -> List.map (fun w -> (w, "")) (String_set.elements (global_names syntax))
+            | None -> [])
+     | (Symbol "#", _) :: ((Lident dir | Uident dir), _) :: tokens -> begin
+-        match try Some (Hashtbl.find Toploop.directive_table dir) with Not_found -> None with
+-          | Some (Toploop.Directive_none _) ->
++        match try Some (Hashtbl.find Opttoploop.directive_table dir) with Not_found -> None with
++          | Some (Opttoploop.Directive_none _) ->
+               (0, [])
+-          | Some (Toploop.Directive_string _) ->
++          | Some (Opttoploop.Directive_string _) ->
+               (0, [])
+-          | Some (Toploop.Directive_bool _) -> begin
++          | Some (Opttoploop.Directive_bool _) -> begin
+               match tokens with
+                 | [(Lident id, { idx1 = start })] ->
+                     (start, lookup_assoc id [(true_name, phrase_terminator); (false_name, phrase_terminator)])
+                 | _ ->
+                     (0, [])
+             end
+-          | Some (Toploop.Directive_int _) ->
++          | Some (Opttoploop.Directive_int _) ->
+               (0, [])
+-          | Some (Toploop.Directive_ident _) -> begin
++          | Some (Opttoploop.Directive_ident _) -> begin
+               match parse_longident (List.rev tokens) with
+                 | Some (Value, None, start, id) ->
+                     (start, List.map (fun w -> (w, "")) (lookup id (String_set.elements (global_names syntax))))
+diff -rN -u old-utop/src/lib/uTop_main.ml new-utop/src/lib/uTop_main.ml
+--- old-utop/src/lib/uTop_main.ml	2012-10-04 17:35:35.090476673 +0200
++++ new-utop/src/lib/uTop_main.ml	2012-10-04 17:35:35.098476725 +0200
+@@ -110,7 +110,7 @@
+         Zed_macro.add self#macro LTerm_read_line.Accept;
+         (* Try to parse the input. *)
+         let input = Zed_rope.to_string (Zed_edit.text self#edit) in
+-        (* Toploop does that: *)
++        (* Opttoploop does that: *)
+         Location.reset ();
+         try
+           let result = parse_and_check input false in
+@@ -252,7 +252,7 @@
+ let insert_lwt_main_run phrase =
+   match phrase with
+     | Parsetree.Ptop_def pstr ->
+-        let env = !Toploop.toplevel_env in
++        let env = !Opttoploop.toplevel_env in
+         let lwt_main_run_is_the_real_one =
+           try
+             match Env.lookup_value longident_lwt_main_run env with
+@@ -354,7 +354,7 @@
+         let pp = Format.formatter_of_buffer buffer in
+         Format.pp_set_margin pp (LTerm.size term).cols;
+         (try
+-           ignore (Toploop.execute_phrase true pp phrase);
++           ignore (Opttoploop.execute_phrase true pp phrase);
+            (* Flush everything. *)
+            Format.pp_print_flush Format.std_formatter ();
+            Format.pp_print_flush Format.err_formatter ();
+@@ -565,7 +565,7 @@
+           (* Add Lwt_main.run to toplevel evals. *)
+           let phrase = if UTop.get_auto_run_lwt () then insert_lwt_main_run phrase else phrase in
+           try
+-            ignore (Toploop.execute_phrase true Format.std_formatter phrase)
++            ignore (Opttoploop.execute_phrase true Format.std_formatter phrase)
+           with exn ->
+             (* The only possible errors are directive errors. *)
+             let msg = UTop.get_message Errors.report_error exn in
+@@ -673,7 +673,7 @@
+           loop_commands history_prev history_next
+       | Some ("require", package) -> begin
+         try
+-          Topfind.load_deeply [package]
++          Opttopfind.load_deeply [package]
+         with Fl_package_base.No_such_package(pkg, reason) ->
+           send "no-such-package" pkg
+       end;
+@@ -691,10 +691,10 @@
+ let preload_objects = ref []
+ 
+ let prepare () =
+-  Toploop.set_paths ();
++  Opttoploop.set_paths ();
+   try
+-    let res = List.for_all (Topdirs.load_file Format.err_formatter) (List.rev !preload_objects) in
+-    !Toploop.toplevel_startup_hook ();
++    let res = List.for_all (Opttopdirs.load_file Format.err_formatter) (List.rev !preload_objects) in
++    !Opttoploop.toplevel_startup_hook ();
+     res
+   with exn ->
+     try
+@@ -706,7 +706,7 @@
+ 
+ let read_script_from_stdin () =
+   let args = Array.sub Sys.argv !Arg.current (Array.length Sys.argv - !Arg.current) in
+-  if prepare () && Toploop.run_script Format.err_formatter "" args then
++  if prepare () && Opttoploop.run_script Format.err_formatter "" args then
+     exit 0
+   else
+     exit 2
+@@ -716,7 +716,7 @@
+     preload_objects := name :: !preload_objects
+   else begin
+     let args = Array.sub Sys.argv !Arg.current (Array.length Sys.argv - !Arg.current) in
+-    if prepare () && Toploop.run_script Format.err_formatter name args then
++    if prepare () && Opttoploop.run_script Format.err_formatter name args then
+       exit 0
+     else
+       exit 2
+@@ -772,7 +772,7 @@
+ 
+ let common_init () =
+   (* Initializes toplevel environment. *)
+-  Toploop.initialize_toplevel_env ();
++  Opttoploop.initialize_toplevel_env ();
+   (* Set the global input name. *)
+   Location.input_name := UTop.input_name;
+   (* Make sure SIGINT is catched while executing OCaml code. *)
+@@ -781,16 +781,16 @@
+   (match !Clflags.init_file with
+      | Some fn ->
+          if Sys.file_exists fn then
+-           ignore (Toploop.use_silently Format.err_formatter fn)
++           ignore (Opttoploop.use_silently Format.err_formatter fn)
+          else
+            Printf.eprintf "Init file not found: \"%s\".\n" fn
+      | None ->
+          if Sys.file_exists ".ocamlinit" then
+-           ignore (Toploop.use_silently Format.err_formatter ".ocamlinit")
++           ignore (Opttoploop.use_silently Format.err_formatter ".ocamlinit")
+          else
+            let fn = Filename.concat LTerm_resources.home ".ocamlinit" in
+            if Sys.file_exists fn then
+-             ignore (Toploop.use_silently Format.err_formatter fn));
++             ignore (Opttoploop.use_silently Format.err_formatter fn));
+   (* Load history after the initialization file so the user can change
+      the history file name. *)
+   Lwt_main.run (init_history ());
+@@ -846,8 +846,8 @@
+     end else begin
+       (* Use the standard toplevel. Just make sure that Lwt threads can
+          run while reading phrases. *)
+-      Toploop.read_interactive_input := read_input_classic;
+-      Toploop.loop Format.std_formatter
++      Opttoploop.read_interactive_input := read_input_classic;
++      Opttoploop.loop Format.std_formatter
+     end
+   end;
+   (* Don't let the standard toplevel run... *)
+diff -rN -u old-utop/src/lib/uTop.ml new-utop/src/lib/uTop.ml
+--- old-utop/src/lib/uTop.ml	2012-10-04 17:35:35.090476673 +0200
++++ new-utop/src/lib/uTop.ml	2012-10-04 17:35:35.094476699 +0200
+@@ -278,7 +278,7 @@
+         } in
+         (* Backup. *)
+         let snap = Btype.snapshot () in
+-        let env = !Toploop.toplevel_env in
++        let env = !Opttoploop.toplevel_env in
+         (* Construct "module _(_ : sig end) = struct <items> end" in
+            order to test the typing and compilation of [items] without
+            evaluating them. *)
+@@ -300,14 +300,14 @@
+         } in
+         let check_phrase = Parsetree.Ptop_def [top_def] in
+         try
+-          let _ = discard_formatters [Format.err_formatter] (fun () -> Toploop.execute_phrase false null check_phrase) in
++          let _ = discard_formatters [Format.err_formatter] (fun () -> Opttoploop.execute_phrase false null check_phrase) in
+           (* The phrase is safe. *)
+-          Toploop.toplevel_env := env;
++          Opttoploop.toplevel_env := env;
+           Btype.backtrack snap;
+           None
+         with exn ->
+           (* The phrase contains errors. *)
+-          Toploop.toplevel_env := env;
++          Opttoploop.toplevel_env := env;
+           Btype.backtrack snap;
+           let loc, msg = get_ocaml_error_message exn in
+           Some ([loc], msg)
+@@ -416,8 +416,8 @@
+ module Keys_map = Map.Make (struct type t = LTerm_key.t list let compare = compare end)
+ 
+ let () =
+-  Hashtbl.add Toploop.directive_table "utop_help"
+-    (Toploop.Directive_none
++  Hashtbl.add Opttoploop.directive_table "utop_help"
++    (Opttoploop.Directive_none
+        (fun () ->
+           print_endline "If colors look too bright, try: UTop.set_profile UTop.Light
+ 
+@@ -428,8 +428,8 @@
+ 
+ For a complete description of utop, look at the utop(1) manual page."));
+ 
+-  Hashtbl.add Toploop.directive_table "utop_bindings"
+-    (Toploop.Directive_none
++  Hashtbl.add Opttoploop.directive_table "utop_bindings"
++    (Opttoploop.Directive_none
+        (fun () ->
+           let make_lines keys actions acc =
+             match actions with
+@@ -490,8 +490,8 @@
+           List.iter format_line table;
+           flush stdout));
+ 
+-  Hashtbl.add Toploop.directive_table "utop_macro"
+-    (Toploop.Directive_none
++  Hashtbl.add Opttoploop.directive_table "utop_macro"
++    (Opttoploop.Directive_none
+        (fun () ->
+           let macro = Zed_macro.contents LTerm_read_line.macro in
+           List.iter
+@@ -534,8 +534,8 @@
+         set_syntax Camlp4o;
+         set_phrase_terminator ";;";
+         try
+-          Topfind.syntax "camlp4o";
+-          Topfind.load_deeply ["utop.camlp4"]
++          Opttopfind.syntax "camlp4o";
++          Opttopfind.load_deeply ["utop.camlp4"]
+         with exn ->
+           handle_findlib_error exn
+       end
+@@ -544,23 +544,23 @@
+         set_phrase_terminator ";";
+         add_keyword "value";
+         try
+-          Topfind.syntax "camlp4r";
+-          Topfind.load_deeply ["utop.camlp4"]
++          Opttopfind.syntax "camlp4r";
++          Opttopfind.load_deeply ["utop.camlp4"]
+         with exn ->
+           handle_findlib_error exn
+       end
+ 
+ let () =
+   Hashtbl.add
+-    Toploop.directive_table
++    Opttoploop.directive_table
+     "camlp4o"
+-    (Toploop.Directive_none
++    (Opttoploop.Directive_none
+        (fun () -> set_syntax Camlp4o));
+ 
+   Hashtbl.add
+-    Toploop.directive_table
++    Opttoploop.directive_table
+     "camlp4r"
+-    (Toploop.Directive_none
++    (Opttoploop.Directive_none
+        (fun () -> set_syntax Camlp4r))
+ 
+ (* +-----------------------------------------------------------------+
+@@ -570,12 +570,15 @@
+ let () =
+   (* "utop" is an internal library so it is not passed as "-package"
+      to "ocamlfind ocamlmktop". *)
+-  Topfind.don't_load ["utop"];
+-  (* Add findlib path so Topfind is available and it won't be
++  Opttopfind.don't_load ["utop"];
++  (* Add findlib path so Opttopfind is available and it won't be
+      initialized twice if the user does [#use "topfind"]. *)
+-  Topdirs.dir_directory (Findlib.package_directory "findlib");
++  Opttopdirs.dir_directory (Findlib.package_directory "findlib");
+   (* Make UTop accessible. *)
+-  Topdirs.dir_directory (Findlib.package_directory "utop")
++  Opttopdirs.dir_directory (Findlib.package_directory "utop")
++
++let () =
++  Opttopfind.don't_load_deeply ["findlib"; "lambda-term"; "threads"; "compiler-libs.opttoplevel"]
+ 
+ (* +-----------------------------------------------------------------+
+    | Deprecated                                                      |
+diff -rN -u old-utop/src/lib/uTop.mli new-utop/src/lib/uTop.mli
+--- old-utop/src/lib/uTop.mli	2012-10-04 17:35:35.090476673 +0200
++++ new-utop/src/lib/uTop.mli	2012-10-04 17:35:35.094476699 +0200
+@@ -214,7 +214,7 @@
+       [phrase] is OK and an error message otherwise.
+ 
+       If the result is [None] it is guaranteed that
+-      [Toploop.execute_phrase] won't raise any exception. *)
++      [Opttoploop.execute_phrase] won't raise any exception. *)
+ 
+ val collect_formatters : Buffer.t -> Format.formatter list -> (unit -> 'a) -> 'a
+   (** [collect_formatters buf pps f] executes [f] and redirect
+diff -rN -u old-utop/_tags new-utop/_tags
+--- old-utop/_tags	2012-10-04 17:35:35.086476649 +0200
++++ new-utop/_tags	2012-10-04 17:35:35.094476699 +0200
+@@ -12,5 +12,8 @@
+ # Use camlp5
+ <src/camlp5/**/*.ml{,i}>: use_camlp5
+ 
++# For building the toplevel
++<src/top/uTop_start.*>: linkall, toplevel
++
+ # OASIS_START
+ # OASIS_STOP

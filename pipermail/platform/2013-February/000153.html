@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512CFFEE.1010509%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000149.html">
+   <LINK REL="Next"  HREF="000156.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512CFFEE.1010509%40lexifi.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Tue Feb 26 18:33:18 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000149.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000156.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#153">[ date ]</a>
+              <a href="thread.html#153">[ thread ]</a>
+              <a href="subject.html#153">[ subject ]</a>
+              <a href="author.html#153">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/26/2013 6:03 PM, Leo White wrote:
+&gt;<i> 1. Alain's proposal does not include a notion of opening a namespace.
+</I>&gt;<i> The    ability to only open a namespace when actually using it (e.g. a
+</I>&gt;<i> local    open) would be very useful. For example, this means that the
+</I>&gt;<i> proposal    provides no assistance for handling multiple standard
+</I>&gt;<i> libraries in the    same program: you can either make &quot;List&quot; equal
+</I>&gt;<i> &quot;Core_List&quot; everywhere or
+</I>&gt;<i>     you can make it equal &quot;Stdlib_List&quot; everywhere. I see no real reason
+</I>&gt;<i>     why Alain's namespaces could not be extended with a namespace
+</I>&gt;<i> opening    feature.
+</I>
+Yes, my initial proposal was about adding a &quot;(local) namespace opening&quot; 
+statement to the language:
+
+   open namespace Core
+
+   let open namespace Core in ....
+
+(Both would look for a core.ns file on the search path.)
+
+I've simplified it even further by restricting its use to entire unit 
+and putting the directive it on the command-line instead of the source 
+code.  If the need for controlling locally which namespaces are used is 
+felt, I won't object to it.  But I'm not yet convinced that this is so 
+useful (and it complicates things, such as decicing how to display a 
+nice type name in case of type error, because this depends on the 
+location in your module).
+
+&gt;<i> 2. Alain's proposal provides no means of aliasing namespaces. Similar to
+</I>&gt;<i>     opening a namespace, it would be useful to be able to say &quot;open
+</I>&gt;<i> Core.Std as CS&quot; and then refer to Core_Std_Mutex as &quot;CS#Mutex&quot;
+</I>
+I believe that aliasing modules is what matters.  Since I don't 
+understand the need for a dedicated notion of namespace yet (with some 
+operations on namespaces) I also don't see the need for aliasing them.
+
+&gt;<i> 2. A module's name depends on other files. A module's name (by which I
+</I>&gt;<i>     mean its namespaced name) depends on the &quot;.ns&quot; file, this could
+</I>&gt;<i> definitely be confusing.
+</I>
+I don't agree with this interpretation: the name of the module depends 
+only on its file name, and we provide a convenient way for client code 
+to refer to these modules with shorter names, locally.  It is a big 
+advantage, for me, that client code could always be written without 
+&quot;namespaces&quot;, if required.
+
+&gt;<i> 3. They require you to manage an &quot;.ns&quot; file. Not a major burden, but it
+</I>&gt;<i> is    one more place to look for errors. It also must be included in all
+</I>&gt;<i>     calls to the compiler.
+</I>
+For any serious use of the compiler with some third-party libraries, the 
+command-line is not built by hand, but by your build system and/or 
+ocamlfind.
+
+&gt;<i> 4. To me they put the namespace information in the wrong place. A
+</I>&gt;<i> component should define its own names, it should also not have to open
+</I>&gt;<i>     its own namespace.
+</I>
+I guess this is a matter of taste, and corresponds to a conception of 
+what namespaces should be as an identified notion, rather than solving 
+an actual need or addressing a concrete problem with my proposal 
+(correct me if I'm wrong).
+
+&gt;<i> As a side note, if people are okay with long filenames, why not support
+</I>&gt;<i> having filenames like &quot;core-std-mutex.mli&quot; and then allow &quot;open
+</I>&gt;<i> namespace Core&quot; and &quot;open namespace Core#Std&quot;.
+</I>&gt;<i>
+</I>&gt;<i> These could be treated as if there were automatically a &quot;core.ns&quot;:
+</I>&gt;<i>
+</I>&gt;<i> namespace Std = &quot;core-std.ns&quot;
+</I>&gt;<i>
+</I>&gt;<i> and &quot;core-std.ns&quot;:
+</I>&gt;<i>
+</I>&gt;<i> module Mutex = &quot;core-std-mutex.mli&quot;
+</I>&gt;<i>
+</I>&gt;<i> that were passed to any compiler invocation that had such files on its
+</I>&gt;<i> search path.
+</I>
+I don't like this implicitness: how can we infer dependencies?  If 
+ocamldep sees a reference to &quot;List&quot; in scope where &quot;open namespace Core&quot; 
+and &quot;open namespace Bar&quot; are both active, it would have to look for both 
+core-list and bar-list files (and there will be a combinatorial 
+explosion in the resolution if you allow opening nested namespaces). 
+Worse: if we use &quot;ocamldep -modules&quot;, this resolution has to be done by 
+the build system, so this complex logic (which depends on the location 
+in the source file) will have to be re-implemented in omake and other 
+build systems around.  It is an important property that &quot;ocamldep 
+-modules&quot; does not need to look for the existence of compiled units on 
+the current tree.
+
+
+Alain
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000149.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000156.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#153">[ date ]</a>
+              <a href="thread.html#153">[ thread ]</a>
+              <a href="subject.html#153">[ subject ]</a>
+              <a href="author.html#153">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

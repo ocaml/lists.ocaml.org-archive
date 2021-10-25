@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DGp%2BXoPvhhErM3HYx3q-vj3KMibHg%2BZQ6_Tkv%2B-iTAt5w%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000185.html">
+   <LINK REL="Next"  HREF="000187.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Best%20practices%20for%20wrapping%20ocaml-ctypes%3F&In-Reply-To=%3CCAAxsn%3DGp%2BXoPvhhErM3HYx3q-vj3KMibHg%2BZQ6_Tkv%2B-iTAt5w%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?">yallop at gmail.com
+       </A><BR>
+    <I>Tue Aug 11 10:41:28 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000185.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+        <LI>Next message: <A HREF="000187.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#186">[ date ]</a>
+              <a href="thread.html#186">[ thread ]</a>
+              <a href="subject.html#186">[ subject ]</a>
+              <a href="author.html#186">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 10/08/2015, Andi McClure &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andi.m.mcclure at gmail.com</A>&gt; wrote:
+&gt;<i> The syntax could use some work :P But never mind that. I've so far got it
+</I>&gt;<i> where when you invoke ffi.c.function, the function specification you
+</I>&gt;<i> provided gets piped into OCaml and turned into this OCaml data structure:
+</I>&gt;<i>
+</I>&gt;<i>     type foreignSpec = { name : string; args : string list; returning:
+</I>&gt;<i> string; }
+</I>&gt;<i>
+</I>&gt;<i> This seems like a straightforward representation of the information @-&gt;
+</I>&gt;<i> encodes; it seems something parsing a header would need to represent the
+</I>&gt;<i> data the same way.
+</I>&gt;<i>
+</I>&gt;<i> My naive impulse is to imagine that this is straightforward, and I need to
+</I>&gt;<i> just build up a typ variable by repeatedly chaining @-&gt;, something like:
+</I>&gt;<i>
+</I>&gt;<i>     let typeConvert = function &quot;void&quot; -&gt; void | &quot;int&quot; -&gt; int | _ -&gt;
+</I>&gt;<i> failwith &quot;??&quot;
+</I>
+Right: it should be possible to do things like that once you've dealt
+with the typing problem you describe.
+
+The easiest approach to dealing with the fact that 'int', 'void', etc.
+have different types is to use an existential type.  Existential types
+in OCaml are a sort of variant, but defined with a different syntax;
+instead of writing something like this:
+
+   type t = A of x
+          | B of y
+
+you give the type signature for each constructor, like this:
+
+   type t = A : x -&gt; t
+          | B : y -&gt; t
+
+By itself that doesn't give you any extra power, and you can actually
+write any variant type definition this way.  The distinctive feature
+of existential types is that you can mention type variables on the
+right of the '=' that don't appear in the type parameters on the left.
+Here's an example:
+
+   type ty = Ty : 'a Ctypes.typ -&gt; ty
+
+As the type signature says, 'Ty' takes a value of type 'a Ctypes.typ'
+for any type 'a' and builds a value of type 'ty'.  You can therefore
+use 'Ty' to wrap Ctypes.typ values of different types up as 'ty'
+values.  For example, you can build a list of typs:
+
+   # [Ty void; Ty int];;
+   - : ty list = [Ty void; Ty int]
+
+and you can wrap the variously-typed results of your 'typeConvert'
+function so that they all have the same type 'ty':
+
+   let typeConvert = function
+       &quot;void&quot; -&gt; Ty void
+     | &quot;int&quot; -&gt; Ty int
+     | _ -&gt; failwith &quot;??&quot;
+
+The same difficulty arises with 'Ctypes.fn' and your 'functionFrom'
+definition, which needs to build function type descriptions of all
+sorts of different types.  Here's a second existential type which
+wraps 'Ctypes.fn':
+
+   type fn = Fn : ('a -&gt; 'b) Ctypes.fn -&gt; fn
+
+This time the type signature says that 'Fn' takes a value of type '(a
+-&gt; b) Ctypes.fn' for any types 'a' and 'b' and builds a value of type
+'fn'.  It should be possible to build something like 'functionFrom'
+that wraps and unwraps intermediate values using 'Ty' and 'Fn' to deal
+with the immediate typing problems (leaving the interesting question
+of how to turn the function returned by 'Foreign.foreign' into
+something that can be called from your interpreter).
+
+I hope that helps a bit.
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000185.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+	<LI>Next message: <A HREF="000187.html">[ocaml-ctypes] Best practices for wrapping ocaml-ctypes?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#186">[ date ]</a>
+              <a href="thread.html#186">[ thread ]</a>
+              <a href="subject.html#186">[ subject ]</a>
+              <a href="author.html#186">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

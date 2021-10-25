@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Runtime Lock
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Runtime%20Lock&In-Reply-To=%3CCAG-KTt9eL63Rx8WMJ6_AnP1VXUnU554xdHunsJ%3DvtoMbqeQhRA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000137.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Runtime Lock</H1>
+    <B>Trevor Smith</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Runtime%20Lock&In-Reply-To=%3CCAG-KTt9eL63Rx8WMJ6_AnP1VXUnU554xdHunsJ%3DvtoMbqeQhRA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Runtime Lock">trevorsummerssmith at gmail.com
+       </A><BR>
+    <I>Tue Dec  2 13:25:24 GMT 2014</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000137.html">[ocaml-ctypes] Runtime Lock
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I thought I'd try to clarify my question.
+
+1) C-function in thread A will be called from OCaml, and places an OCaml
+callback cb onto a queue.
+2) C-function in thread B will asynchronously receive the callback on the
+queue, do some computation, then run cb.
+
+My understanding is that I need to re-acquire the runtime lock when cb is
+ran in thread B. Is that correct? If that is correct, I was thinking one
+could make an OCaml function to call `caml_release_runtime_system` and
+`caml_acquire_runtime_system`, then wrap the user callback cb:
+
+let cb' arg =
+  let () = caml_acquire_runtime_system () in
+  let () = cb arg in
+  caml_release_runtime_system ()
+
+This cb' would then be passed to the thread B, instead of the user's cb.
+
+I think this would work iff the callback returns unit, and we don't want to
+do anything with the return value. Also, my understanding is that the lock
+calls are _not_ reentrant, so the acquire/release set are needed.
+
+Does that make sense? Any thoughts? Thanks!
+
+Trevor
+
+
+On Fri, Nov 28, 2014 at 12:09 PM, Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">trevorsummerssmith at gmail.com</A>
+&gt;<i> wrote:
+</I>
+&gt;<i> Hello,
+</I>&gt;<i>
+</I>&gt;<i> Following up from a thread &quot;Lifecycle of a callback?&quot; discussed on this
+</I>&gt;<i> list: I want to double check my thinking.
+</I>&gt;<i>
+</I>&gt;<i> The C functions I am calling in libuv mostly do one thing: put a struct
+</I>&gt;<i> representing the system call to call, and the callback to run once the
+</I>&gt;<i> system call is called, on a queue that another thread will work on. If my
+</I>&gt;<i> understanding is correct, the runtime lock would need to be re-acquired
+</I>&gt;<i> when the OCaml callback is ran. However, it's not clear to me how to do
+</I>&gt;<i> this.
+</I>&gt;<i>
+</I>&gt;<i> Thoughts? Thanks.
+</I>&gt;<i>
+</I>&gt;<i> Trevor
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20141202/2d70a772/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20141202/2d70a772/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000137.html">[ocaml-ctypes] Runtime Lock
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

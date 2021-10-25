@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam binary snapshot
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGNQxfkmTVgBP-ZbUbF5iq4vJ8fwXn-kMRe3us6vZZAi0A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000251.html">
+   <LINK REL="Next"  HREF="000249.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam binary snapshot</H1>
+    <B>Sylvain Le Gall</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGNQxfkmTVgBP-ZbUbF5iq4vJ8fwXn-kMRe3us6vZZAi0A%40mail.gmail.com%3E"
+       TITLE="[opam-devel] opam binary snapshot">sylvain+ocaml at le-gall.net
+       </A><BR>
+    <I>Tue Nov  5 01:34:39 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000251.html">[opam-devel] opam binary snapshot
+</A></li>
+        <LI>Next message: <A HREF="000249.html">[opam-devel] OPAM 1.1.0 RC2 PPAs available
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#252">[ date ]</a>
+              <a href="thread.html#252">[ thread ]</a>
+              <a href="subject.html#252">[ subject ]</a>
+              <a href="author.html#252">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Made some progress on opam2debian: I can generate an installable
+package, but ocamlfind need some tuning.
+
+You can checkout the github repository:
+<A HREF="https://github.com/gildor478/opam2debian">https://github.com/gildor478/opam2debian</A>
+
+You will need to install jingoo as well:
+<A HREF="https://forge.ocamlcore.org/projects/jingoo/">https://forge.ocamlcore.org/projects/jingoo/</A>
+
+Build opam2debian (and install if you want).
+
+$ ../opam2debian.byte create --name opam2debian-test --verbose --build ounit
+... [do a lot of thing, including building the binary package]
+
+$ sudo dpkg -i opam2debian-test_20131105_amd64.deb
+# The package is 3.1MB but uses system compiler...
+
+$ env OPAMROOT=/opt/opam2debian/opam2debian-test/ opam list -i
+base-bigarray   base  Bigarray library distributed with the OCaml compiler
+base-threads    base  Threads library distributed with the OCaml compiler
+base-unix       base  Unix library distributed with the OCaml compiler
+ocamlfind      1.4.0  A library manager for OCaml
+ounit          2.0.0  Unit testing framework ...
+
+# and to prove that I am not cheating.
+$ opam list -i
+Please run 'opam init' first to initialize the state of OPAM.
+'opam list -i' failed.
+
+However I have still this issue:
+$ /opt/opam2debian/opam2debian-test/system/bin/ocamlfind list
+ocamlfind: Config file not found - neither
+/opt/opam/home/gildor/programmation/opam2debian/tmp/opam2debian-test/system/lib/findlib.conf
+nor the directory
+/opt/opam/home/gildor/programmation/opam2debian/tmp/opam2debian-test/system/lib/findlib.conf.d
+
+I need to figure out why and what I am missing here.
+
+Cheers
+Sylvain
+
+2013/11/4 Sylvain Le Gall &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">sylvain+ocaml at le-gall.net</A>&gt;:
+&gt;<i> 2013/11/4 Mika Illouz &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">mika at illouz.net</A>&gt;:
+</I>&gt;&gt;<i> Hi Everyone,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Thanks for the discussion. A tool which publishes an existing OPAM
+</I>&gt;&gt;<i> installation as one or more deb's would match our internal needs
+</I>&gt;&gt;<i> rather nicely.  Since my knowlege of OPAM's and Debian's package
+</I>&gt;&gt;<i> systems is superficial, I don't understand two technical questions:
+</I>&gt;&gt;<i> First, how would the tool infer the dependencies to non-opam packages
+</I>&gt;&gt;<i> managed by debian?  (Sylvain says this is easy).
+</I>&gt;<i>
+</I>&gt;<i> For runtime dependencies (once the package is built), this is rather
+</I>&gt;<i> easy. Debian maintainer script detect exec and library and compute
+</I>&gt;<i> dependencies from there. I.e:
+</I>&gt;<i>
+</I>&gt;<i> $ ldd /usr/bin/man
+</I>&gt;<i>         linux-vdso.so.1 =&gt;  (0x00007fff7a9ff000)
+</I>&gt;<i>         libmandb-2.6.2.so =&gt; /usr/lib/man-db/libmandb-2.6.2.so
+</I>&gt;<i>         libman-2.6.2.so =&gt; /usr/lib/man-db/libman-2.6.2.so
+</I>&gt;<i>         libgdbm.so.3 =&gt; /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+</I>&gt;<i>         libpipeline.so.1 =&gt; /usr/lib/x86_64-linux-gnu/libpipeline.so.1
+</I>&gt;<i>         libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6
+</I>&gt;<i>         libz.so.1 =&gt; /lib/x86_64-linux-gnu/libz.so.1
+</I>&gt;<i>         /lib64/ld-linux-x86-64.so.2
+</I>&gt;<i>
+</I>&gt;<i> Then you just have to ask the packaging system which package provide
+</I>&gt;<i> the given libraries:
+</I>&gt;<i> $  dpkg -S /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+</I>&gt;<i> libgdbm3:amd64: /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+</I>&gt;<i>
+</I>&gt;<i> Et voila ! You know that /usr/bin/man depends on the package libgdbm3.
+</I>&gt;<i>
+</I>&gt;<i> For OCaml binary:
+</I>&gt;<i> - native: works just as a normal binary:
+</I>&gt;<i> $ ldd /usr/bin/unison-gtk
+</I>&gt;<i>         linux-vdso.so.1 =&gt;  (0x00007fff8efa6000)
+</I>&gt;<i>         libgtk-x11-2.0.so.0 =&gt;  ...
+</I>&gt;<i>
+</I>&gt;<i> - bytecode: the binary itself doesn't have dependencies, but if it has
+</I>&gt;<i> a non-OCaml dependencies, there will be a .so somewhere (stub
+</I>&gt;<i> libraries) that will create the link.
+</I>&gt;<i>
+</I>&gt;<i> All above is what is needed to compute runtime dependencies. We have
+</I>&gt;<i> additional tools to compute dependencies of .cmo/.cmx/.cmxa/.cma but
+</I>&gt;<i> this doesn't apply to what I want to do sine the generated package
+</I>&gt;<i> should be self-contained (except in the case of compiler=system, but I
+</I>&gt;<i> have injected a the usual Debian OCaml Maintainer trick for that by
+</I>&gt;<i> depending on ocaml-nox-${F:OCamlABI}).
+</I>&gt;<i>
+</I>&gt;<i> Now there are remaining problem:
+</I>&gt;<i> - build dependencies cannot be guessed
+</I>&gt;<i> - runtime dependencies on executable cannot be guessed (e.g. if you
+</I>&gt;<i> use Sys.command &quot;patch&quot; it is hard to guess that you depend on patch)
+</I>&gt;<i>
+</I>&gt;<i> I plan to solve this through a small DB, should be enough to start.
+</I>&gt;<i>
+</I>&gt;&gt;<i>  Second, how would it
+</I>&gt;&gt;<i> expose individual OPAM packages as debian packages?  On one extreme,
+</I>&gt;&gt;<i> the entire OPAM installation is packaged as one deb; on the other, a
+</I>&gt;&gt;<i> debian package is created from each corresponding OPAM package.
+</I>&gt;<i>
+</I>&gt;<i> I plan to create on big source package containing a checkout of the
+</I>&gt;<i> repository and a script that allow to build the package on specific
+</I>&gt;<i> architecture. Basically you get:
+</I>&gt;<i> opam2debian-le-gall.net-4.01_20131104.tar.gz
+</I>&gt;<i> opam2debian-le-gall.net-4.01_20131104.dsc
+</I>&gt;<i>
+</I>&gt;<i> This is the bare minimum to have a source package, then on each arch
+</I>&gt;<i> (i386, amd64, armhf) you extract the source package and build it. This
+</I>&gt;<i> will generate:
+</I>&gt;<i> opam2debian-le-gall.net_20131104_amd64.deb (or _i386 or _armhf).
+</I>&gt;<i> opam2debian-le-gall.net_20131104_amd64.changes (or _i386 or _armhf).
+</I>&gt;<i>
+</I>&gt;<i> You just have to sign the changes file before uploading.
+</I>&gt;<i>
+</I>&gt;<i> Note that given the way I built it, you ALSO get a snapshot of the
+</I>&gt;<i> OPAM repository inside the archive! Which means that if you want to
+</I>&gt;<i> build additional packages, you will use the snapshot from inside the
+</I>&gt;<i> debian package you are building!
+</I>&gt;<i>
+</I>&gt;<i> I am trying to see how I will translate the copyright to be nice to
+</I>&gt;<i> upstream contributor (this is a pretty big issue, trying to figure a
+</I>&gt;<i> solution).
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> While this approach calls for a tool separate from OPAM itself, it
+</I>&gt;&gt;<i> preserves OPAM's OS/distribution-neutrality.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Oct 31 2013, Fabrice Le Fessant wrote:
+</I>&gt;&gt;&gt;<i> Is it important to target RPMs and DEBs, or would it be enough to
+</I>&gt;&gt;&gt;<i> have binary packages _inside_ opam ? i.e. &quot;opam install MYPACKAGE&quot;
+</I>&gt;&gt;&gt;<i> would install binary versions instead of source versions of
+</I>&gt;&gt;&gt;<i> MYPACKAGE and all its dependencies ?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Fabrice: I'm not sure I understand what your are proposing.  One of my
+</I>&gt;&gt;<i> goals is to be able to distribute deb's derived from OPAM, but without
+</I>&gt;&gt;<i> requiring OPAM.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Oct 31 2013, Sylvain le Gall wrote:
+</I>&gt;&gt;&gt;<i> Maybe you are talking about directly generating a binary .deb ? (like
+</I>&gt;&gt;&gt;<i> directly an ar archive, but that is super tricky to do)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Sylvain:  I think that's what I want ...
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I could not resist the temptation to start the project:
+</I>&gt;&gt;&gt;<i> <A HREF="https://github.com/gildor478/opam2debian">https://github.com/gildor478/opam2debian</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Cool!
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> thanks
+</I>&gt;&gt;<i> mika illouz
+</I></PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000251.html">[opam-devel] opam binary snapshot
+</A></li>
+	<LI>Next message: <A HREF="000249.html">[opam-devel] OPAM 1.1.0 RC2 PPAs available
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#252">[ date ]</a>
+              <a href="thread.html#252">[ thread ]</a>
+              <a href="subject.html#252">[ subject ]</a>
+              <a href="author.html#252">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

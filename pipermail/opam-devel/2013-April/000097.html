@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam installs package but ocamlfind fails
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20installs%20package%20but%20ocamlfind%20fails&In-Reply-To=%3CDF1429F4-B9F0-447A-BAE9-E62EC917E2BF%40ocamlpro.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000092.html">
+   <LINK REL="Next"  HREF="000111.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam installs package but ocamlfind fails</H1>
+    <B>Thomas Gazagnaire</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20installs%20package%20but%20ocamlfind%20fails&In-Reply-To=%3CDF1429F4-B9F0-447A-BAE9-E62EC917E2BF%40ocamlpro.com%3E"
+       TITLE="[opam-devel] opam installs package but ocamlfind fails">thomas at ocamlpro.com
+       </A><BR>
+    <I>Tue Apr  2 08:52:44 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000092.html">[opam-devel] opam installs package but ocamlfind fails
+</A></li>
+        <LI>Next message: <A HREF="000111.html">[opam-devel] opam installs package but ocamlfind fails
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#97">[ date ]</a>
+              <a href="thread.html#97">[ thread ]</a>
+              <a href="subject.html#97">[ subject ]</a>
+              <a href="author.html#97">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> So my environment variable are out of sync with the current switch.
+</I>
+This can sometimes happen when $OPAMSWITCH is (usually wrongly) set. Try `unset OPAMSWITCH` before running your eval command, you add `--switch=&lt;your-switch&gt;` to the config command. I am aware this is quite annoying, I'm still trying to find a good solution to this which still enables some useful use-cases. But this particular issue should be fixed in master.
+
+The issue is:
+* by default OPAM look at ~/.opam/config to get the value of the current switch
+* if OPAMSWITCH is set, OPAM will consider the value of that variable to be the current switch
+* this can be overwritten by --switch=&lt;..&gt;
+
+When exporting the environment variables (eg. using `opam config env`) OPAM 1.0 always export OPAMSWITCH with the current compiler switch (this was needed to make `opam config exec` works as expected). In master, OPAMSWITCH is not read when we do `opam config env`, which then export the right *global* variables.
+
+&gt;<i> I used to do &quot;eval `opam config eval`&quot; in my login scripts, but I thought the below meant I should now just source ~/.opam/opam-init/init.sh. This can't be right though because, after looking into opam-init.sh, I see that setting environment variables to the 4.00.1 switch (the initial switch I installed) is hardcoded.
+</I>
+In an init script, you don't need to eval `opam config env`, you can just source ~/.opam/opam-config/init.sh. This will simply export the right global environment variables (corresponding to the value of the switch in ~/.opam/config) and will optionally enable auto-completion. It's still correct to run eval though. And after a switch you still need eval, because you want to dynamically rewrite the contents of some of your variables, for instance:
+PATH=~/.opam/foo/bin:XXX
+into
+PATH=~/.opam/bar/bin:XXX
+
+&gt;<i> Could we get some clarification on what the init.sh script is supposed to do exactly. Is calling &quot;eval `opam config eval`&quot; still required in our login scripts? If so, note that `opam init --auto-setup` doesn't do that.
+</I>
+You can look at the init script itself:
+
+$ cat ~/.opam/opam-init/init.sh
+# Load the environment variables
+. /Users/tgazagna/.opam/opam-init/variables.sh
+
+# Load the auto-complete scripts
+. /Users/tgazagna/.opam/opam-init/complete.sh
+
+# Load the opam-switch-eval script
+. /Users/tgazagna/.opam/opam-init/switch_eval.sh
+
+--
+Thomas
+
+&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> On Thu, Mar 14, 2013 at 4:28 PM, Thomas Gazagnaire &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">thomas at ocamlpro.com</A>&gt; wrote:
+</I>&gt;<i> ... 
+</I>&gt;<i> The most visible new feature, which should be useful for beginners with OCaml and OPAM,  is an auto-configuration tool. This tool easily enables all the features of OPAM (auto-completion, fix the loading of scripts for the toplevel, opam-switch-eval alias, etc). This tool runs interactively on each `opam init` invocation. If you don't like OPAM to change your configuration files, use `opam init --no-setup`. If you trust the tool blindly,  use `opam init --auto-setup`. You can later review the setup by doing `opam config setup --list` and call the tool again using `opam config setup` (and you can of course manually edit your ~/.profile (or ~/.zshrc for zsh users), ~/.ocamlinit and ~/.opam/opam-init/*). ...
+</I>&gt;<i>  
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> On Sun, Mar 31, 2013 at 10:01 AM, Nicolas Braud-Santoni &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">nicolas at braud-santoni.eu</A>&gt; wrote:
+</I>&gt;<i> Did you check, using `which ocamlfind`, that you are indeed using the
+</I>&gt;<i> ocamlfind installation from OPAM ?
+</I>&gt;<i> 
+</I>&gt;<i> On 30/03/2013 22:10, Ashish Agarwal wrote:
+</I>&gt;<i> &gt; `opam install pxp` succeeds and `opam info pxp` shows that it is
+</I>&gt;<i> &gt; installed. However,
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; $ ocamlfind query pxp
+</I>&gt;<i> &gt; ocamlfind: Package `pxp' not found
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; This is only happening on one of my computers. On another, ocamlfind
+</I>&gt;<i> &gt; does recognize pxp. I'm installing the same versions of all packages.
+</I>&gt;<i> &gt; How can I investigate further?
+</I>&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000092.html">[opam-devel] opam installs package but ocamlfind fails
+</A></li>
+	<LI>Next message: <A HREF="000111.html">[opam-devel] opam installs package but ocamlfind fails
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#97">[ date ]</a>
+              <a href="thread.html#97">[ thread ]</a>
+              <a href="subject.html#97">[ subject ]</a>
+              <a href="author.html#97">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

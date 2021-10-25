@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCANcqPu4Z_Q5FD3_DKAVMR%2BMgU4NVeby9SJFk4f7WELUCfdLyJA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000254.html">
+   <LINK REL="Next"  HREF="000242.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3CCANcqPu4Z_Q5FD3_DKAVMR%2BMgU4NVeby9SJFk4f7WELUCfdLyJA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] benchmarks">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Tue Feb 12 14:18:02 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000254.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000242.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#256">[ date ]</a>
+              <a href="thread.html#256">[ thread ]</a>
+              <a href="subject.html#256">[ subject ]</a>
+              <a href="author.html#256">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, Feb 12, 2013 at 9:02 AM, Thomas Gazagnaire &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">thomas at ocamlpro.com</A>&gt;wrote:
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I still don't understand. Alain clearly showed my the overhead of ppx
+</I>&gt;<i> compared to bare-bone ocaml compilers using dynamic and static strategies.
+</I>&gt;<i> I understand where are the bottleneck and I'm confident that this will not
+</I>&gt;<i> be a concerned regarding compilation speed. Here I don't understand what
+</I>&gt;<i> you are measuring exactly . So what magic is hidden in your '-pp fan' ?
+</I>&gt;<i> Does it look for some predefined path to dynamically load macros, or is it
+</I>&gt;<i> a self-contained statically-linked compiler ? In the later case, how does
+</I>&gt;<i> it work in practice when people start assembling different pieces of syntax
+</I>&gt;<i> extensions (as it is already the case with camlp4) ?
+</I>&gt;<i>
+</I>It's a statically-linked compiler. I am concerned about performance as much
+as you, since I have to bootstrap Fan itself everytime I add new features.
+Unlike Camlp4, Fan's design encourages static linking or dynamic linking as
+much as you can. When you have different pieces of extensions, the static
+linking or dynamic linking *only registe*r what features it provides, here
+the order does not matter, and it does not have any side effect otherwise,
+the file in src/a.ml specifies which syntax extension it wants to pick
+for example in src/a.ml
+---------------------------------
+#load_syntax [&quot;normal&quot;];;
+#filter [&quot;serialize&quot;];;
+blabla ...
+---------------------------------
+itself states what syntax or ast rewriter it needs, so here you only need
+to supply '-pp fan', it could figure out how to parse and transform the Ast
+by itself as long as those features needed are registered.
+
+
+
+&gt;<i>  Honestly, I don't have a strong opinion on which final syntax/solution
+</I>&gt;<i> this group will pick up (ppx, fan or other with hopefully a light syntax
+</I>&gt;<i> proposal) , I just need concrete arguments to motivate me enough to dig
+</I>&gt;<i> into my old camlp4 code and port it to the new selected tool. Also, I think
+</I>&gt;<i> it's important to understand upfront the impact of this change on how we
+</I>&gt;<i> are building OCaml programs: should we change all of our compilation tools
+</I>&gt;<i> if we want decent compilation performance ? For instance, I think that the
+</I>&gt;<i> way people tend to use camlp4 and ocamlfind is very suboptimal in term of
+</I>&gt;<i> compilation speed, and I think this comes from a design issue in the first
+</I>&gt;<i> place. Let's not do that again please.
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Thomas
+</I>&gt;<i>
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; For our non-trivial code base, our output shows that when compiling with
+</I>&gt;<i> preprocessing by Fan, its performance is 30s compared with 28s without
+</I>&gt;<i> preprocessing, this means with good engineering effort, even preprocessing
+</I>&gt;<i> as powerful as camlp4(Fan provide more features than camlp4) should bring
+</I>&gt;<i> not too much overhead, I did some experiment before, my feeling is that
+</I>&gt;<i> typechecking is the bottleneck in most cases.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; The extra effort for Fan compared with compiling directly is a dumping
+</I>&gt;<i> process which dumps FanAst into Parsetree, since our output is already good
+</I>&gt;<i> enough in practice, I did not tune the GC for better performance.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; Cheers,
+</I>&gt;<i> &gt; &gt; Thomas
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt; On Mon, Feb 11, 2013 at 7:20 AM, Gabriel Scherer &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; &gt;&gt; On the other hand, build systems come and go (and ./configure is like
+</I>&gt;<i> &gt; &gt;&gt; the most horrible part to add logic to in most cases), while ocamlfind
+</I>&gt;<i> &gt; &gt;&gt; has proved a reliable tool as a basis for any OCaml ecosystem so far.
+</I>&gt;<i> &gt; &gt;&gt; If I can shelve some logic there without making the tool more complex
+</I>&gt;<i> &gt; &gt;&gt; or less elegant I think that would be better for everyone.
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt; On Mon, Feb 11, 2013 at 11:56 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt;
+</I>&gt;<i> wrote:
+</I>&gt;<i> &gt; &gt;&gt; &gt; On 11 Feb 2013, at 10:45, Gabriel Scherer &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gabriel.scherer at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; &gt;&gt; &gt;
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; On Mon, Feb 11, 2013 at 11:31 AM, Anil Madhavapeddy &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt; wrote:
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt;&gt; It should work just fine with ppx, and has the advantage of
+</I>&gt;<i> reducing the number of ocamlfind calls per-file (which is a considerable
+</I>&gt;<i> overhead on large projects, since it has to scan the META directories on
+</I>&gt;<i> every invocation).
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; That's of course rather orthogonal to the present discussion, but
+</I>&gt;<i> have
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; you been in contact with Gerd to see if some caching solution
+</I>&gt;<i> would be
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; possible? Intuitively it feels like ocamlfind could easily
+</I>&gt;<i> maintain a
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; cache in /var/run/blah and only clean it on install/remove
+</I>&gt;<i> commands.
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; (An external process invocation would still make some overhead so
+</I>&gt;<i> in
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; you're case you'd still have to go all the way, but that could
+</I>&gt;<i> improve
+</I>&gt;<i> &gt; &gt;&gt; &gt;&gt; the threshold at which such ~hacks become interesting.)
+</I>&gt;<i> &gt; &gt;&gt; &gt;
+</I>&gt;<i> &gt; &gt;&gt; &gt; I don't think it's necessary to put this in ocamlfind, which does
+</I>&gt;<i> the job
+</I>&gt;<i> &gt; &gt;&gt; &gt; it's designed to do very well. Just fix your build systems to run
+</I>&gt;<i> ocamlfind
+</I>&gt;<i> &gt; &gt;&gt; &gt; at configure time, save the results, and apply them to the compiler
+</I>&gt;<i> flags
+</I>&gt;<i> &gt; &gt;&gt; &gt; during the build phase.
+</I>&gt;<i> &gt; &gt;&gt; &gt;
+</I>&gt;<i> &gt; &gt;&gt; &gt; -anil
+</I>&gt;<i> &gt; &gt;&gt; &gt;
+</I>&gt;<i> &gt; &gt;&gt; _______________________________________________
+</I>&gt;<i> &gt; &gt;&gt; wg-camlp4 mailing list
+</I>&gt;<i> &gt; &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> &gt; &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt;
+</I>&gt;<i> &gt; &gt;&gt; --
+</I>&gt;<i> &gt; &gt;&gt; -- Regards, Hongbo
+</I>&gt;<i> &gt; &gt;&gt; _______________________________________________
+</I>&gt;<i> &gt; &gt;&gt; wg-camlp4 mailing list
+</I>&gt;<i> &gt; &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> &gt; &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; --
+</I>&gt;<i> &gt; -- Regards, Hongbo
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130212/6ec7fea0/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130212/6ec7fea0/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000254.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000242.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#256">[ date ]</a>
+              <a href="thread.html#256">[ thread ]</a>
+              <a href="subject.html#256">[ subject ]</a>
+              <a href="author.html#256">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,247 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C51307B4F.4040006%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000199.html">
+   <LINK REL="Next"  HREF="000202.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C51307B4F.4040006%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Fri Mar  1 09:56:31 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000199.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000202.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#201">[ date ]</a>
+              <a href="thread.html#201">[ thread ]</a>
+              <a href="subject.html#201">[ subject ]</a>
+              <a href="author.html#201">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;&gt;<i> The main question whether namespaces are hierarchical or flat is still not
+</I>&gt;&gt;<i> answered, Flat namespaces are not much of an extension to OCaml and do not
+</I>&gt;&gt;<i> raise many questions about their semantics.  This is the benefit of Alain's
+</I>&gt;&gt;<i> proposal---but also its weakness to be limited in expressiveness.
+</I>&gt;<i>
+</I>&gt;<i> I don't really understand the goal of full hierarchical models.  I
+</I>&gt;<i> would have thought that flat namespaces that include auto-open modules
+</I>&gt;<i> would be quite sufficient.
+</I>
+I thought you wanted a hierarchical model!
+And you keep using hierarchical notation in your examples.
+
+         open Core
+         open Std
+or
+         open Core#Std
+
+Isn't this hierarchical?
+Do you mean hierarchical with just two levels?
+If this what you mean by not being fully hierarchical?
+
+But I don't think two levels or unbounded makes a significant difference,
+technically.
+
+&gt;<i> One difference of opinion that I do have is that my intuition about
+</I>&gt;<i> shadowing and dependencies on orders of opens is the opposite of
+</I>&gt;<i> yours.  In particular, shadowing of names seems quite ordinary in
+</I>&gt;<i> OCaml, it's an expected part of the language, and I would prefer for
+</I>&gt;<i> namespaces to share that property.  Indeed, places where shadowing of
+</I>&gt;<i> names is not possible (modules, in particular) have been a point of
+</I>&gt;<i> frustration for us.
+</I>&gt;<i>
+</I>&gt;<i> My inclination is that if you have two namespaces that define the same
+</I>&gt;<i> module, and you open them in sequence, the second should simply shadow
+</I>&gt;<i> the first.
+</I>&gt;<i>
+</I>&gt;<i>     open namespace Core#Std   (* defines a UNIX module *)
+</I>&gt;<i>
+</I>&gt;<i>     ... some code that uses Core's UNIX ....
+</I>&gt;<i>
+</I>&gt;<i>     open namespace Async#Std  (* defines a different UNIX module *)
+</I>&gt;<i>
+</I>&gt;<i>     ... some code that uses Async's UNIX ....
+</I>&gt;<i>
+</I>&gt;<i> I would be quite distressed to find that the namespace system
+</I>&gt;<i> prevented the second open on the ground that it shadowed something in
+</I>&gt;<i> the first.  This is precisely the behavior I would want and expect!
+</I>
+I am not sure of what you exactly want.
+
+In the simplest hierarchical model, namespaces are nodes of a graph whose
+directed edges are names to access sub-namespaces (internal nodes)
+or module objects (leaves).
+
+In this model namespaces are not ordered, i.e. edges leaving from one node
+are not ordered.
+
+This is, I think, an easier model, because you can populate a namespace by
+listing available module objects in a directory---which is not ordered.
+
+In this model:
+
+1) you can open a node, with either a strict semantics (detecting overrides)
+    or an overriding semantics (given priority to the names coming from the
+    open).
+
+2) However, you cannot open several nodes at the same time without
+    specifying an ordering between those nodes.
+
+3) Hence, you cannot do auto-open if you have several auto-open edges
+    leaving from the same node unless auto-open edges are ordered.
+
+If wish to do (3) you would need to order edges (at least auto-open ones) in
+the namespace. You may then wish all edges to be ordered.  However, I think
+this is not a good model.  An intermediate option is to just order auto-open
+nodes when you declare them.  This is better than ordering all nodes---we
+may assume that auto-open nodes are few.  But this mixed model is more
+complicated for the user.  (See at the end of this message while the fully
+ordered model is not good in my opinion.)
+
+&gt;&gt;<i>          ROOT . --Core--&gt; C --Pervasives*--&gt; M
+</I>&gt;&gt;<i>                            \
+</I>&gt;&gt;<i>                              --Std*--&gt; S
+</I>&gt;<i>
+</I>&gt;<i> I apologize, but I just don't understand the example.  Is Pervasives a
+</I>&gt;<i> module or a namespace?  I would assume it would be a module, since
+</I>&gt;<i> I thought only modules are auto-open.  And what is the * for after Std
+</I>&gt;<i> and Pervasives?
+</I>
+Here Pervasives is the name of the edge that goes from namespace C to the
+module object M.  Core is the name of the edge that goes from the toplevel
+name space to the sub-namespace C.  You have to distinct the name and the
+object in the model.  You could have several paths leading to the same
+object.
+
+The * is the auto-open flag, as used in Gabriel's description.
+Sorry for leaving this implicit.
+
+&gt;&gt;<i> Perhaps, an alternative to auto-open would be to allow one to write open
+</I>&gt;&gt;<i> directives in .ns files as well. Then, a file myenv.ns could both build a
+</I>&gt;&gt;<i> namespace and pre-open some of the nodes, including some of its leaves.  The
+</I>&gt;&gt;<i> user could then just put something as concise as
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>          use myenv.ns
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> at the top of his *.ml files. And if he opens myenv.ns he will have a very
+</I>&gt;&gt;<i> clear idea of what names should be visible.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Just an idea, which I don't like so much either.  But is shows that there
+</I>&gt;&gt;<i> are still important details to be thought of and choices to be made.
+</I>&gt;<i>
+</I>&gt;<i> How would the declaration &quot;use myenv.ns&quot; differ from &quot;open namespace
+</I>&gt;<i> Myenv&quot;?
+</I>
+Here Myenv is not a namespace but a file containing namespaces commands.
+Some of the commands would build the environment, and my proposal is that
+namespace file could also contain open commands.  (opening a name space can
+be seen as the construction of a namespace, but opening a module cannot.)
+
+&gt;<i> Are you proposing two different primitives, or would one only
+</I>&gt;<i> have the &quot;use&quot; declaration?
+</I>
+This is syntax. The point is that auto-open complicates things and if the
+only reason to have it is that you do not wish to repeat or have every user
+write the sequence
+
+         open Core (* that contains Pervasives, Std, etc. *)
+         open Pervasives
+         open Std
+
+then you could disallow auto-opens and instead allow a namespace file
+myenv.ns to also contain commands that open modules. They you would only
+invoke this file (with whatever syntax to be chosen) at the beginning of
+your .ml source files.
+
+&gt;<i> I think my mental model of how namespaces should work is quite similar
+</I>&gt;<i> to what you described above.  In particular, I would think that
+</I>&gt;<i> opening a namespace would be the equivalent of adding a collection of
+</I>&gt;<i> module aliases (possibly shadowing existing module names), and opening
+</I>&gt;<i> some collection of modules (possible shadowing yet more module names
+</I>&gt;<i> and other values).  All this should happen in whatever order is
+</I>&gt;<i> described in the namespace definition file.
+</I>
+The last sentence means that namespaces objects are ordered in your mind.
+Not in mine. In my (simplest) model, namespace objects are not ordered,
+but open (module) directives are ordered.
+
+&gt;<i> And in all of this, I view the dependency on order to be a feature,
+</I>&gt;<i> not a bug.   OCaml is through and through full of this kind of
+</I>&gt;<i> dependency, and I can see no justification for breaking that property
+</I>&gt;<i> specifically with namespaces.  We like the behavior for values and
+</I>&gt;<i> types, after all.  Why should namespaces be different?
+</I>
+I think you are talking about dependency on on the order when you open
+things.  This need does not imply a dependency on the order or edges in the
+namespace structure.  If you open things (namespaces or modules) one by one,
+you need not order edges in the namespace structure.
+
+----------------
+
+I think namespaces should be unordered to scale up.
+
+You would like to be able to represent all available libraries in the OCaml
+world as a namespace, with libraries coming from many different sources and
+there is no natural order on these, i.e. no order that could be given a
+meaningful semantics.  Would you put World#JaneStreet before World#Lexify or
+the other way round?
+
+If name spaces are unordered, it is also easy to populate them by reading
+and merging different sources in a strict way: name spaces are meant to
+avoid conflicting names to start with, so if a merge introduces conflicts,
+this is really the right place to fix it by renaming one side or
+reorganizing the hierarchy rather than do some silent overriding.
+
+When getting closer to the leaves, the situation is a bit different, because
+nodes may all come from the same source/library.  Here, it may be desirable
+(yet to be confirmed) to have auto-opens and thus introduce some ordering.
+Ordering towards the leaves is less of a problem in practice and those name
+spaces may be built by explicitly listing all components---rather than
+scanning and merging different sources. So it seems ok in practice.  Still,
+it implies optional ordering of edges and slightly complicates the mental
+model.
+
+Hope this helps,
+
+     Didier
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000199.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000202.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#201">[ date ]</a>
+              <a href="thread.html#201">[ thread ]</a>
+              <a href="subject.html#201">[ subject ]</a>
+              <a href="author.html#201">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

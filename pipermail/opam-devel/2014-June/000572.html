@@ -1,0 +1,112 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On self-upgrade
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20self-upgrade&In-Reply-To=%3C2737598.fmlzsVokcs%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000571.html">
+   <LINK REL="Next"  HREF="000573.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On self-upgrade</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20self-upgrade&In-Reply-To=%3C2737598.fmlzsVokcs%40agaric%3E"
+       TITLE="[opam-devel] On self-upgrade">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Thu Jun 26 09:50:59 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000571.html">[opam-devel] On self-upgrade
+</A></li>
+        <LI>Next message: <A HREF="000573.html">[opam-devel] On self-upgrade
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#572">[ date ]</a>
+              <a href="thread.html#572">[ thread ]</a>
+              <a href="subject.html#572">[ subject ]</a>
+              <a href="author.html#572">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le mercredi 25 juin 2014, 20:22:17 Anil Madhavapeddy a &#233;crit :
+&gt;<i> On 25 Jun 2014, at 20:15, Thomas Gazagnaire &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">thomas at gazagnaire.org</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> &gt; Thanks for you message Louis, it's useful to get some insight of you design.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt;&gt; We've had all sorts of problems in Mirage with having the tool (opam package 'mirage') invoke OPAM to satisfy package dependencies, resulting in OPAM trying to recompile Mirage itself (due to a depopt showing up), but then resulting in a failure due to the classic 'text file busy' error when trying to move the old binary out of the way.
+</I>
+Yes, that's the first thing I tested: renaming the file is normally enough, and `install --backup` takes care of that correctly. As a side note, it seems to be cmdliner that makes the exe &quot;busy&quot;, don't know why, but I noticed I couldn't anymore `make install` my running program once I started using it.
+
+&gt;<i> &gt;&gt; Is there an RT test that goes through the above sequence to simulate an upgrade and downgrade?
+</I>
+Not yet.
+
+&gt;<i> &gt;&gt; I really fear that this route will cause us to ignore system/OS packaging, which is really important to keep up-to-date for a package manager.
+</I>&gt;<i> &gt;&gt; The self-upgrade route from within OPAM should never be the primary way to obtain the latest version of the package manager.
+</I>
+I see. Not at all my intent, and I for one prefer to always go through my system package manager when possible -- Debian is still a quite good quality insurance. I especially don't like when I am left no choice but to enter n steps of self upgrading __after__ installation (hello Steam ! Well I guess when you're an evil DRM engine it makes more sense. Even binary blobs in this case).
+
+So I intended this more as a way to address concerns like &quot;I want the latest OPAM version __now__, what do I do ?&quot; and test new versions a little more widely, never thought this could replace packaging, or even become mandatory. Well then, Anil is the one doing most of the packaging work so I don't want to insist too much :) 
+
+&gt;<i> &gt; Self-upgrade is indeed kind of simple when you have only one channel to get the software you are updating. Louis, do you have any idea in mind on how this will interact with system upgrade (for instance someone doing `brew update` which will install a newer/incompatible version of your self-upgraded package) ?
+</I>
+Quite simply: self-upgrade only lives within an OPAMROOT, system packages live in $PATH, so they won't ever override each other. You always run from the PATH, and opam will pick the latest version of the two. There is a warning if you've got an opsolete self-upgrade installed.
+
+&gt;<i> &gt; I fear that this feature will force us to support all kind of tricky upgrade scenario (1.2 -&gt; 1.3 is ok, but what about 1.2 -&gt; 2.0, or 1.2 -&gt; pin -&gt; 1.1 ?). It's easy to limit these kind of scenario when you control the update channels. When you don't it can quickly become a nightmare.
+</I>
+Not sure I get you exactly, but the current behaviour is pretty strict anyway: OPAM will refuse to load an OPAMROOT when its version ($OPAMROOT/config) is newer than itself, printing a message that it needs to be upgraded. So you're not allowed to downgrade, and people getting in this situation are supposed to have an idea how they got there.
+
+&gt;<i> Yeah, it's worth noting that this did indeed horribly break in the past (the system compiler upgrade from 4.00.1 to 4.01.0 and OPAM from 1.0 to 1.1 didn't work if you did a `brew update` and upgrade both simultaneously).  Upgrading in general is a very tedious, err-prone process that is usually poorly tested, with bugs only biting you a year down the line on release+1 :-)
+</I>&gt;<i> 
+</I>&gt;<i> This might be a little radical, but it's worth considering having a completely separate directory namespace for repo version bumps, and just recompile all the packages on upgrade (it's a very rare situation, after all).
+</I>&gt;<i> 
+</I>&gt;<i> ~/.opam/1.1/&lt;...&gt;
+</I>&gt;<i> ~/.opam/1.2/&lt;...&gt;
+</I>&gt;<i> 
+</I>
+Why not -- but getting a different universe altogether in case of a downgrade could get even more confusing, so I may be in favor of a complete backup with an easy rollback command (stg like &quot;on startup, if $OPAMROOT/config#opam-version &gt; $self-version &amp;&amp; exists $OPAMROOT/backups/$self-version then &lt;print error and propose a (temporary ?) rollback to the backed-up state&gt;&quot;)
+
+
+Actually the thing that's still a little clunky with the current design is that an opam package is not the perfect fit for what we are wanting to do: self-upgrade shouldn't be recompiled in case its dependencies are, and certainly shouldn't be removed if they are -- but that's the build-dep problem. Other packages also shouldn't depend on it, but mostly, it doesn't really make sense to have it belong to a given switch only. That's an issue that has already been raised by people wanting a cross-switch binary directory to install tools though, e.g. for ocp-indent.
+
+
+My current opinion on this is that the feature in itself is OK, but we should be quite careful how and to whom we advertise it. Certainly not in the Quick_install, possibly not even in the FAQ ; just checking how you feel about it.
+
+
+Cheers,
+Louis
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20140626/10b5f8a8/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20140626/10b5f8a8/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000571.html">[opam-devel] On self-upgrade
+</A></li>
+	<LI>Next message: <A HREF="000573.html">[opam-devel] On self-upgrade
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#572">[ date ]</a>
+              <a href="thread.html#572">[ thread ]</a>
+              <a href="subject.html#572">[ subject ]</a>
+              <a href="author.html#572">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

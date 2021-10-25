@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] getting bitstring to work with Core
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20getting%20bitstring%20to%20work%20with%20Core&In-Reply-To=%3CCAK%3DfH%2BgS7FHCwj50%2BDfe%2BcQ3BSgzBDVvSB%3DvN0QaYHq8b_uWaw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000429.html">
+   <LINK REL="Next"  HREF="000431.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] getting bitstring to work with Core</H1>
+    <B>David House</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20getting%20bitstring%20to%20work%20with%20Core&In-Reply-To=%3CCAK%3DfH%2BgS7FHCwj50%2BDfe%2BcQ3BSgzBDVvSB%3DvN0QaYHq8b_uWaw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] getting bitstring to work with Core">dhouse at janestreet.com
+       </A><BR>
+    <I>Mon May 27 12:00:33 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000429.html">[wg-camlp4] getting bitstring to work with Core
+</A></li>
+        <LI>Next message: <A HREF="000431.html">[wg-camlp4] getting bitstring to work with Core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#430">[ date ]</a>
+              <a href="thread.html#430">[ thread ]</a>
+              <a href="subject.html#430">[ subject ]</a>
+              <a href="author.html#430">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I think it's totally reasonable to expose String.unsafe_get.
+
+Char.code is a bit uglier, since we already have Core.to_int. But, we
+could probably put up with it, particularly if it were a temporary
+measure.
+
+On 27 May 2013 11:47, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt; wrote:
+&gt;<i> Core currently hides two functions needed by the Bitstring syntax extension: Char.code and String.unsafe_get.  I'm not sure what the best way to work around this is. Possibilities are:
+</I>&gt;<i>
+</I>&gt;<i> - Core.Std.Caml has the original namespace from OCaml, so add a camlp4 flag to pa_bitstring to locally open Caml if the flag is specified.
+</I>&gt;<i>
+</I>&gt;<i> - Add Char.code and String.unsafe_get to Core -- but there will be more similar incompatibilities lurking.
+</I>&gt;<i>
+</I>&gt;<i> - Do nothing, and wait for the more explicit extension_points to show up.
+</I>&gt;<i>
+</I>&gt;<i> - The below hack to get it to compile. Ugh.
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> open Core.Std
+</I>&gt;<i>
+</I>&gt;<i> module Char = struct
+</I>&gt;<i>   include Char
+</I>&gt;<i>   let code = to_int
+</I>&gt;<i> end
+</I>&gt;<i>
+</I>&gt;<i> module String = struct
+</I>&gt;<i>   include String
+</I>&gt;<i>   let unsafe_get = Caml.String.unsafe_get
+</I>&gt;<i> end
+</I>&gt;<i>
+</I>&gt;<i> let show_gif_info filename () =
+</I>&gt;<i>   let bits = Bitstring.bitstring_of_file filename in
+</I>&gt;<i>
+</I>&gt;<i>   bitmatch bits with
+</I>&gt;<i>   | { (&quot;GIF87a&quot;|&quot;GIF89a&quot;) : 6*8 : string; (* GIF magic. *)
+</I>&gt;<i>       width : 16 : littleendian;
+</I>&gt;<i>       height : 16 : littleendian;
+</I>&gt;<i>       colormap : 1;                     (* Has colormap? *)
+</I>&gt;<i>       colorbits : 3;                    (* Color res = colorbits+1 *)
+</I>&gt;<i>       sortflag : 1;
+</I>&gt;<i>       bps : 3;                          (* Bits/pixel = bps+1 *)
+</I>&gt;<i>       bg : 8;                           (* Background colour. *)
+</I>&gt;<i>       aspectratio : 8 } -&gt;
+</I>&gt;<i>       printf &quot;%s: GIF image:\n&quot; filename;
+</I>&gt;<i>       printf &quot;  size %d %d\n&quot; width height;
+</I>&gt;<i>       printf &quot;  has global colormap? %b\n&quot; colormap;
+</I>&gt;<i>       printf &quot;  colorbits %d\n&quot; (colorbits+1);
+</I>&gt;<i>       printf &quot;  global colormap is sorted? %b\n&quot; sortflag;
+</I>&gt;<i>       printf &quot;  bits/pixel %d\n&quot; (bps+1);
+</I>&gt;<i>       printf &quot;  background color index %d\n&quot; bg;
+</I>&gt;<i>       printf &quot;  aspect ratio %d\n&quot; aspectratio
+</I>&gt;<i>
+</I>&gt;<i>   | { _ } -&gt;
+</I>&gt;<i>       eprintf &quot;%s: Not a GIF image\n&quot; filename
+</I>&gt;<i>
+</I>&gt;<i> let () =
+</I>&gt;<i>   Command.basic ~summary:&quot;Display information about GIF file&quot;
+</I>&gt;<i>     Command.Spec.(
+</I>&gt;<i>       empty +&gt;
+</I>&gt;<i>       anon (&quot;filename&quot; %: file)
+</I>&gt;<i>     )
+</I>&gt;<i>     show_gif_info
+</I>&gt;<i>   |&gt; Command.run
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000429.html">[wg-camlp4] getting bitstring to work with Core
+</A></li>
+	<LI>Next message: <A HREF="000431.html">[wg-camlp4] getting bitstring to work with Core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#430">[ date ]</a>
+              <a href="thread.html#430">[ thread ]</a>
+              <a href="subject.html#430">[ subject ]</a>
+              <a href="author.html#430">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

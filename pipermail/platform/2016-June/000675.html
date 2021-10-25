@@ -1,0 +1,266 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Is%20it%20taking%20too%20long%20for%20OCaml%20software%20to%0A%20become%204.03-compatible%3F%20Would%20release%20process%20changes%20help%3F&In-Reply-To=%3CCAPFanBEkx3pwaWVC7-4tDZUZ2Gc5qWPWA%3DpgSumVudrqj1B7Rg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000674.html">
+   <LINK REL="Next"  HREF="000676.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Is%20it%20taking%20too%20long%20for%20OCaml%20software%20to%0A%20become%204.03-compatible%3F%20Would%20release%20process%20changes%20help%3F&In-Reply-To=%3CCAPFanBEkx3pwaWVC7-4tDZUZ2Gc5qWPWA%3DpgSumVudrqj1B7Rg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Wed Jun 29 20:39:06 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000674.html">[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?
+</A></li>
+        <LI>Next message: <A HREF="000676.html">[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#675">[ date ]</a>
+              <a href="thread.html#675">[ thread ]</a>
+              <a href="subject.html#675">[ subject ]</a>
+              <a href="author.html#675">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>TL;DR:
+1. We need to have a &quot;test:&quot; field in OPAM metadata and get packages to use
+it.
+2. We should do a weekly build of OPAM using the ocaml *trunk* version, to
+help find and fix (with the cooperation of compiler developers upstream)
+issues before the actual release.
+3. If such a weekly build is effective, the policy of &quot;stay in beta as long
+as allegedly-installable OPAM packages fail to build on the new release&quot;
+would be much easier to accept. We could target *all* opam-repository
+packages instead of any subset, and it could take less than a month -- say
+two weeks.
+4. It would be nice to have an automated tool to add a given version bound
+on a set of opam files. (And that is easy to implement.)
+
+
+Simon Cruanes wrote:
+
+&gt;<i> As usual, the issue is: what set of packages is monitored, and who
+</I>&gt;<i> chooses?
+</I>
+
+In this case there is a canonical answer: all of them (on the
+public/central OPAM repository).
+
+Note that OWS only tests installability from metadata, which is a useful
+metric, but doesn't help when the metadata is wrong and build actually
+fails. Damien has a script to compile all of OPAM that could give
+buildability result.
+
+Which gets us to the next point: we really should use a &quot;test:&quot; field in
+opam metadata and use that. In the atdgen case for example, the software
+would compile fine, but it would segfault at usage -- already in the
+testsuite. I think that introducing such a &quot;test:&quot; field should be among
+our priorities to improve the quality of the OPAM repository.
+
+I agree with the workflow you propose, as long as the beta-testing period
+is long enough -- I suggested &quot;one month&quot; and I think it's a good proposal.
+Because we could do this with the one-week-long beta period we had in 4.03,
+and it would amount to just adding an upper bound on all software, and that
+would better for users but only marginally so -- they don't get a crippled
+opam-repository, they get a crippled release with no installable software.
+
+In fact I think we should go further and try to make all of OPAM work with
+trunk OCaml versions. We could have a weekly build of all-opam from trunk
+and collectively fix the issues. This would help ocaml-trunk development
+(being able to compile software to test trunk changes is one pain point
+right now), and this would help have working software by the release time
+-- maybe we wouldn't even need such a long beta period if we did this
+effectively.
+
+I don't add upper bounds myself on my own packages (too tedious to do it on
+&gt;<i> 15 old releases), so it should probably be automated.
+</I>&gt;<i>
+</I>
+I agree; this should be very easy to do using existing opam scripting
+capabilities. Any volunteers?
+
+Thomas Gazagnaire wrote:
+
+&gt;<i> The main issue with 4.03 is that killing camlp4 took a bit longer than
+</I>&gt;<i> expected. [...] The jump from 4.01 to 4.02 was much easier in comparison. I
+</I>&gt;<i> think that&#8217;s instability is a one-off.
+</I>&gt;<i>
+</I>
+I don't buy it. I think the rate of OCaml change is accelerating rather
+than slowing down. Think of what will happen if we merge some form of
+multicore-ocaml in the future; all FFI code will break loose (well maybe
+not all, but like Obj.magic in 4.03, enough will).
+
+Martin Jambon:
+
+&gt;<i> Bugs due to incompatibilities with newer versions of OCaml have been
+</I>&gt;<i> reported and sometimes fixed by others, and while this is great, I'd rather
+</I>&gt;<i> (1) not have these bugs in the first place and (2) fix the bugs before they
+</I>&gt;<i> start affecting users. I must say I really lack the motivation for such
+</I>&gt;<i> maintenance, compared to developing a new feature that I need.
+</I>&gt;<i>
+</I>
+I agree. I think that staring testing packages using trunk rather than
+waiting for the release could help with that. First, if the breakage is
+under the eyes of the upstream OCaml devs, it may be easier for them to
+understand the cause and find the fix -- in my experience helping people
+un-break software after a new OCaml version, having a deep knowledge of
+said software was rarely necessary, and understanding the compiler was more
+useful. Plus it may also encourage people to revert or tame changes that
+break user software, reducing the number of changes required of package
+maintainers.
+
+
+On Wed, Jun 29, 2016 at 2:09 PM, Martin Jambon &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">martin at mjambon.com</A>&gt; wrote:
+
+&gt;<i> First, thank you Gabriel, Damien, and others who've been working hard on
+</I>&gt;<i> improving package quality with each new release of OCaml.
+</I>&gt;<i>
+</I>&gt;<i> I have the chance to be most of the time a passive user of OCaml, i.e. we
+</I>&gt;<i> develop a commercial application, and we typically upgrade OCaml only when
+</I>&gt;<i> it becomes necessary. Also it's normally not a problem for us to wait for 6
+</I>&gt;<i> months to a year to upgrade. We have really no complaints there. I feel
+</I>&gt;<i> however that it's a missed opportunity to contribute back to the community.
+</I>&gt;<i> We generally don't mind bugs in features that we start using, but we're
+</I>&gt;<i> really afraid of regression. So it would be good for us to confidently
+</I>&gt;<i> upgrade OCaml as soon as we know it's unlikely to break our application,
+</I>&gt;<i> but not delay the upgrade out of fear.
+</I>&gt;<i>
+</I>&gt;<i> I'm also involved in maintaining a small number of public tools because I
+</I>&gt;<i> started them. Bugs due to incompatibilities with newer versions of OCaml
+</I>&gt;<i> have been reported and sometimes fixed by others, and while this is great,
+</I>&gt;<i> I'd rather (1) not have these bugs in the first place and (2) fix the bugs
+</I>&gt;<i> before they start affecting users. I must say I really lack the motivation
+</I>&gt;<i> for such maintenance, compared to developing a new feature that I need.
+</I>&gt;<i>
+</I>&gt;<i> What could be useful is a few user-visible stats on what's installable and
+</I>&gt;<i> what's usable in opam, for a given OCaml version. It's the same idea as
+</I>&gt;<i> labeling an OCaml/opam distribution as beta, but finer-grained. Each
+</I>&gt;<i> package known to have version-specific problems would be labeled as such. A
+</I>&gt;<i> package could be in one of a few states such as: OK, Usable but has some
+</I>&gt;<i> version-specific bugs, Uninstallable. For the opam user wondering whether
+</I>&gt;<i> they should upgrade OCaml, it would be useful to get the percentage of
+</I>&gt;<i> packages in each state for a given OCaml version, as well as the list of
+</I>&gt;<i> packages in each state and links to the relevant bug reports. Hopefully
+</I>&gt;<i> this would help users be more adventurous and make informed decisions on
+</I>&gt;<i> whether to upgrade.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On 06/29/2016 09:40 AM, Gabriel Scherer wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Dear platform,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> TL;DR: I propose that we change the OCaml release process to remain in
+</I>&gt;&gt;<i> &quot;beta&quot; stage while there remain OPAM packages that are broken by the new
+</I>&gt;&gt;<i> releases and their version bounds have not been updated.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I'm a bit frustrated with the time it takes for the OCaml ecosystem to
+</I>&gt;&gt;<i> catch up with the 4.03 release -- which has been released two months ago
+</I>&gt;&gt;<i> now, on April 25.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> A large chunk of my personal hacking time following the release was
+</I>&gt;&gt;<i> spent on updating Batteries, with a 4.03-compatible release happening on
+</I>&gt;&gt;<i> May 12, so two weeks after the release -- a time I would still consider
+</I>&gt;&gt;<i> too long for our downstream users waiting to try the 4.03 goodness but
+</I>&gt;&gt;<i> held back by a Batteries dependency. I recently helped make atdgen
+</I>&gt;&gt;<i> compatible with 4.03 (it's a dependency of IOCaml for example), and just
+</I>&gt;&gt;<i> today found out that Coq releases (or its CoqIDE part) did not work on
+</I>&gt;&gt;<i> 4.03 (with no upper-bound in opam, it would just miscompile).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I find it frustrating because that means that there is a large time
+</I>&gt;&gt;<i> window where we advertise (externally, to beginners, etc.) that the best
+</I>&gt;&gt;<i> OCaml versions ever is 4.03.0, while running opam from this switch to
+</I>&gt;&gt;<i> install any major software whatsoever feels like playing a rigged
+</I>&gt;&gt;<i> russian roulette. I feel bad whenever I'm informed that my software (or
+</I>&gt;&gt;<i> anyone else's, in fact) does not work by end-users that would rather
+</I>&gt;&gt;<i> have spent their day doing something else than trying broken software.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Do you agree that this is a problem? What could we do to fix that?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> When I started writing this email I intended to send it to Damien
+</I>&gt;&gt;<i> Doligez, as the release manager of the compiler distribution, with the
+</I>&gt;&gt;<i> following suggestion: maybe we could have a *much longer* beta-testing
+</I>&gt;&gt;<i> period for OCaml versions that would be used not (only) for finding bugs
+</I>&gt;&gt;<i> in the new version, but also to let important pieces of the ecosystem
+</I>&gt;&gt;<i> update to the new version. Say, at least a month. We could have a fixed
+</I>&gt;&gt;<i> set of software that we monitor, or in fact all of what's in OPAM, and
+</I>&gt;&gt;<i> delay the release until they get updated/fixed or their OPAM version
+</I>&gt;&gt;<i> bounds get fixed. (Aha, a Platform indeed!)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Does that sound like a reasonable idea to you? Should we monitor all
+</I>&gt;&gt;<i> OPAM, or only a subset?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This suggestion is rooted in the idea that when we announce the release
+</I>&gt;&gt;<i> to our end-users, stuff should just work -- or refuse to install itself.
+</I>&gt;&gt;<i> Maybe this is an old idea of the SVN times and we're now in the era of
+</I>&gt;&gt;<i> continuously-released, always-broken stuff?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Finally, there has been all this work on the &quot;OPAM weather services&quot;,
+</I>&gt;&gt;<i> continuous build of opam packages etc., plus the work that Damien is
+</I>&gt;&gt;<i> doing around release time. It doesn't seem to have worked very well for
+</I>&gt;&gt;<i> 4.03. Who is monitoring this stuff? Do we need to fix them to make them
+</I>&gt;&gt;<i> work better, or to fix our process to use them better? To be honest, I'm
+</I>&gt;&gt;<i> never looking at these services -- I just don't think of using them. Can
+</I>&gt;&gt;<i> I get an email whenever they detect that my stuff is broken? Say I'm a
+</I>&gt;&gt;<i> new package manager, are there guidelines somewhere on what the best
+</I>&gt;&gt;<i> practices are and what I should do?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/platform/attachments/20160629/40de50a6/attachment.html">http://lists.ocaml.org/pipermail/platform/attachments/20160629/40de50a6/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000674.html">[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?
+</A></li>
+	<LI>Next message: <A HREF="000676.html">[ocaml-platform] Is it taking too long for OCaml software to become 4.03-compatible? Would release process changes help?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#675">[ date ]</a>
+              <a href="thread.html#675">[ thread ]</a>
+              <a href="subject.html#675">[ subject ]</a>
+              <a href="author.html#675">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

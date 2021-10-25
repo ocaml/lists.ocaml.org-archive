@@ -1,0 +1,1331 @@
+From anil at recoil.org  Thu Sep  3 18:34:17 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 3 Sep 2015 10:34:17 -0700
+Subject: [opam-devel] Container based Travis CI service
+In-Reply-To: <8AC34ECC-FAF6-4F46-B97D-FE3E8B0A9C6A@gmail.com>
+References: <8AC34ECC-FAF6-4F46-B97D-FE3E8B0A9C6A@gmail.com>
+Message-ID: <BA334058-32CB-42CF-A1D7-26AFA597631B@recoil.org>
+
+Thanks for posting this to the list, Michael.  We definitely need to do
+something about Travis, since the legacy infrastructure is failing regularly
+with network timeouts.
+
+If I understand it right, it won't be suitable for completely replacing
+depexts, since they specify OS dependencies for binary packages.  However,
+it can eliminate the need for the ["source" "linux"] depext which currently
+downloads a shell script and runs it.  For instance, the MaxminDB bindings
+just posted could use a way to install the C library, but there are no
+Ubuntu packages available: https://github.com/ocaml/opam-repository/pull/4754
+
+-anil
+
+> On 19 Aug 2015, at 07:25, Michael Gr?newald <michipili at gmail.com> wrote:
+> 
+> Dear opam-devel?lers,
+> 
+> for a few days I moved my OCaml repositories to the new container-based
+> continuous integration service from Travis.  I had a brief off-list
+> exchange with Anil, who meant this topic would be interesting to
+> list members, especially for depexts.
+> 
+> In my setting I can use Travis's cache to store several switches and
+> run my test-suite for each of these switches.  I wrote a blog article
+> describing the setup, if you did not read it already, it is here:
+> 
+>  http://unix-workstation.blogspot.de/2015/08/opam-and-bsd-owl-support-for-travis-ci.html
+> 
+> 
+> As an appetiser, here is the script running the test suite, as you
+> can expect it, the TRAVIS_OCAML_VERSION is defined in .travis.yml
+> as part of the test matrix environment.
+> 
+>  INSTALL_PREFIX="${HOME}/.local"
+>  eval $(opam config env --switch ${TRAVIS_OCAML_VERSION})
+>  autoconf
+>  ./configure --prefix="${INSTALL_PREFIX}"
+>  bmake -I "${INSTALL_PREFIX}/share/bsdowl? all
+> 
+> The setup introduces a special .travis.opam file enumerating the
+> switches that need to be installed and the dependencies of the opam
+> package being tested.  Packages can be installed using their definition
+> in the repository or by pinning a git repository.
+> 
+> Behind the scenes, a script from the Anvil package is at work:
+> 
+>  https://github.com/michipili/anvil/blob/master/subr/anvil_travisci_autoinstall.sh
+> 
+> 
+> Besides the blog link above, here are a list of repositories using
+> this new setup:
+> 
+>  https://github.com/michipili/broken
+>  https://github.com/michipili/mixture
+>  https://github.com/michipili/lemonade
+>  https://github.com/michipili/getopts
+>  https://github.com/michipili/configuration
+> 
+> @Anil ? Am I right understanding it would be interesting to move
+> depext CI setup to the container-based version?  If so, I could
+> probably take a look at before the end of the week.
+> 
+> 
+> Best,
+> Michael
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From michipili at gmail.com  Sun Sep  6 19:09:49 2015
+From: michipili at gmail.com (=?utf-8?Q?Michael_Gr=C3=BCnewald?=)
+Date: Sun, 6 Sep 2015 20:09:49 +0200
+Subject: [opam-devel] Container based Travis CI service
+In-Reply-To: <BA334058-32CB-42CF-A1D7-26AFA597631B@recoil.org>
+References: <8AC34ECC-FAF6-4F46-B97D-FE3E8B0A9C6A@gmail.com>
+ <BA334058-32CB-42CF-A1D7-26AFA597631B@recoil.org>
+Message-ID: <2147C163-5F3F-422A-88F2-186501705B7E@gmail.com>
+
+
+> On 03 Sep 2015, at 19:34, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+> Thanks for posting this to the list, Michael.  We definitely need to do
+> something about Travis, since the legacy infrastructure is failing regularly
+> with network timeouts.
+
+I am completely new to depexts so let me describe the problem in
+few words, just to be sure I got it right: the opam-repository
+has a Travis CI script which will build each PR (typically,
+a package update or a new package) and depext (the opam plugin)
+kicks in to install missing dependencies living outside the
+opam world, typically using the host OS package manager.
+
+Then the setup I wrote about is definitely not a replacement
+tool for the depext plugin, at least for the opam-repository.
+For a ?normal? repository ? whose test suite does not need to
+install arbitrary packages dynamically ? the setup I describe
+can easily me mimicked to switch to the new container infrastructure,
+also taking advantage of caching!
+
+I had some thought about the special case of the opam-repository
+and it looks like we will have a hard time unless some amenagements
+are made to the Travis infrastructure.  The most promising
+solutions I could figure out involves the fakeroot command
+or a tool similar to strace to trace system calls, but I
+am not sure how good this is supported in Travis CI containers.
+I am also not a Linux user and I am therefore not familiar with
+the intricate details of the fakeroot command but at a first glance
+it seems, that we could setup a new, container-based, continuous
+integration environment according to the following lines:
+
+1. Installation step:
+
+  1.1 install all Ubuntu packages needed by
+      all packages in the opam repository
+
+  1.2 install all the needed versions from OCaml using
+      opam; be sure to cache this!
+
+2. Test step for package *foo*
+
+  2.1 acquire the list of depexts for *foo* and add it
+      ocaml, opam and maybe some other essential packages.
+
+  2.2 query the package database to obtain a list of all files
+      owned by packages in the list prepare in the
+      previous step; be sure to include config files, if
+      appropriate.
+
+  2.3 prepare a fakeroot environment replicating the files
+      listed in the previous steps, with hard links.
+
+  2.4 jump in the fakeroot environment and test the package
+
+Of course, the point of steps 2.1-2.4 is to hide packages
+not found in the depexts spec from the scope of the build,
+to ensure that this list is comprehensive.
+
+An alternative to 2.3-2.4 would be
+
+  2.3? test the package under strace or a similar
+       facility in Ubuntu
+
+  2.4? confront the results of strace with the list of
+       authorised files found in 2.2, if we see that the
+       test accessed other files, then reject it.
+
+If no strace alternative is easily usable in Travis CI,
+we could run the build script with customised open(2) and
+stat(2) functions, to throw an error when a forbidden file
+is accessed.  This relatively easy to do, using the
+LD_PRELOAD mechanism, as illustrated here:
+
+  http://stackoverflow.com/questions/6083337/overriding-malloc-using-the-ld-preload-mechanism
+
+
+I think the ease of implementation of these solutions are,
+from the easier to the harder:
+
+  1. use a strace-alike mechanism
+  2. use customised system calls open(2), stat(2), and
+     all their cousins
+  3. build a suitable fakeroot environment
+
+Best,
+Michael
+
+
+From mmatalka at gmail.com  Sun Sep  6 19:49:57 2015
+From: mmatalka at gmail.com (Malcolm Matalka)
+Date: Sun, 06 Sep 2015 18:49:57 +0000
+Subject: [opam-devel] What context do install an remove run in?
+Message-ID: <86si6rcrhm.fsf@gmail.com>
+
+This is unclear to be from the documentation, but what context to the
+commands `install` and `remove` sections of an opam file run in?  I
+would assume `install` runs in the directory of the built source, but
+does `remove` have that same guarantee?  Would that also mean that the
+built source is kept around with the package?  I ask because I would
+like to simplify my opam files by having a 'make remove' entry.
+
+/Malcolm
+
+From anil at recoil.org  Mon Sep  7 11:48:36 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 7 Sep 2015 11:48:36 +0100
+Subject: [opam-devel] What context do install an remove run in?
+In-Reply-To: <86si6rcrhm.fsf@gmail.com>
+References: <86si6rcrhm.fsf@gmail.com>
+Message-ID: <4090129D-8813-444B-AB89-E1F315A79372@recoil.org>
+
+On 6 Sep 2015, at 19:49, Malcolm Matalka <mmatalka at gmail.com> wrote:
+> 
+> This is unclear to be from the documentation, but what context to the
+> commands `install` and `remove` sections of an opam file run in?  I
+> would assume `install` runs in the directory of the built source, but
+> does `remove` have that same guarantee?  Would that also mean that the
+> built source is kept around with the package?  I ask because I would
+> like to simplify my opam files by having a 'make remove' entry.
+
+They run in an unpacked source tree as the pwd.  However, this is not
+cached across build runs -- instead, the source is freshly unpacked and
+made available to the remove target.  So you just need to make sure
+that you run the `configure` script if relevant.
+
+There's a special case for `ocamlfind remove` that doesn't do this;
+this will likely have to be generalised as OPAM moves the OCaml-specific
+logic into a separate plugin.
+
+-anil
+
+
+From mmatalka at gmail.com  Mon Sep  7 22:32:23 2015
+From: mmatalka at gmail.com (Malcolm Matalka)
+Date: Mon, 07 Sep 2015 21:32:23 +0000
+Subject: [opam-devel] What context do install an remove run in?
+In-Reply-To: <4090129D-8813-444B-AB89-E1F315A79372@recoil.org> (Anil
+ Madhavapeddy's message of "Mon, 7 Sep 2015 11:48:36 +0100")
+References: <86si6rcrhm.fsf@gmail.com>
+ <4090129D-8813-444B-AB89-E1F315A79372@recoil.org>
+Message-ID: <86d1xtdifs.fsf@gmail.com>
+
+Anil Madhavapeddy <anil at recoil.org> writes:
+
+> On 6 Sep 2015, at 19:49, Malcolm Matalka <mmatalka at gmail.com> wrote:
+>> 
+>> This is unclear to be from the documentation, but what context to the
+>> commands `install` and `remove` sections of an opam file run in?  I
+>> would assume `install` runs in the directory of the built source, but
+>> does `remove` have that same guarantee?  Would that also mean that the
+>> built source is kept around with the package?  I ask because I would
+>> like to simplify my opam files by having a 'make remove' entry.
+>
+> They run in an unpacked source tree as the pwd.  However, this is not
+> cached across build runs -- instead, the source is freshly unpacked and
+> made available to the remove target.  So you just need to make sure
+> that you run the `configure` script if relevant.
+>
+> There's a special case for `ocamlfind remove` that doesn't do this;
+> this will likely have to be generalised as OPAM moves the OCaml-specific
+> logic into a separate plugin.
+
+Can I tell opam to figure this out via ocamlfind on its own or do is the
+special case just checking if the command is "ocamlfind remove ..."?
+Basically, I'm trying to make all of my opam files almost exactly the
+same, except for deps, and push the unique actions into the package
+itself, like install and remove.  The hope is to simplify making opam
+packages of my tools.
+
+>
+> -anil
+
+From thomas at gazagnaire.org  Tue Sep  8 11:07:08 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 8 Sep 2015 11:07:08 +0100
+Subject: [opam-devel] What context do install an remove run in?
+In-Reply-To: <86d1xtdifs.fsf@gmail.com>
+References: <86si6rcrhm.fsf@gmail.com>
+ <4090129D-8813-444B-AB89-E1F315A79372@recoil.org> <86d1xtdifs.fsf@gmail.com>
+Message-ID: <11809087-168E-4611-B393-9AF5507C241F@gazagnaire.org>
+
+>>> This is unclear to be from the documentation, but what context to the
+>>> commands `install` and `remove` sections of an opam file run in?  I
+>>> would assume `install` runs in the directory of the built source, but
+>>> does `remove` have that same guarantee?  Would that also mean that the
+>>> built source is kept around with the package?  I ask because I would
+>>> like to simplify my opam files by having a 'make remove' entry.
+>> 
+>> They run in an unpacked source tree as the pwd.  However, this is not
+>> cached across build runs -- instead, the source is freshly unpacked and
+>> made available to the remove target.  So you just need to make sure
+>> that you run the `configure` script if relevant.
+>> 
+>> There's a special case for `ocamlfind remove` that doesn't do this;
+>> this will likely have to be generalised as OPAM moves the OCaml-specific
+>> logic into a separate plugin.
+> 
+> Can I tell opam to figure this out via ocamlfind on its own or do is the
+> special case just checking if the command is "ocamlfind remove ..."?
+> Basically, I'm trying to make all of my opam files almost exactly the
+> same, except for deps, and push the unique actions into the package
+> itself, like install and remove.  The hope is to simplify making opam
+> packages of my tools.
+
+The easiest way to handle uninstall is to generate an <pkg.install> file. Otherwise, there is indeed a special syntactic treatment for "ocamlfind remove" commands (where the tarball is not downloaded and extracted again). If you really want to have a "make remove" command, as Anil said you should do "./configure --prefix=... && make remove"
+
+Thomas
+
+
+From louis.gesbert at ocamlpro.com  Fri Sep 11 01:26:19 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 11 Sep 2015 09:26:19 +0900
+Subject: [opam-devel] What context do install an remove run in?
+In-Reply-To: <11809087-168E-4611-B393-9AF5507C241F@gazagnaire.org>
+References: <86si6rcrhm.fsf@gmail.com> <86d1xtdifs.fsf@gmail.com>
+ <11809087-168E-4611-B393-9AF5507C241F@gazagnaire.org>
+Message-ID: <1540528.2UdpgyEPt8@agaric>
+
+Note that this special treatment -- not getting the unpacked source -- is triggered:
+
+- "magically" when the remove commands are detected to all be "ocamlfind remove", which is a hack, but also
+- when there are no remove commands. This is reasonable when using a <pkg>.install file (http://opam.ocaml.org/doc/Manual.html#packagenameinstall)
+- when the package definition specifies `flags: light-uninstall` (http://opam.ocaml.org/doc/Manual.html#opamflag-light-uninstall)
+
+Best,
+Louis
+
+> - Thomas Gazagnaire, 08/09/2015 11:07 -
+> >>> This is unclear to be from the documentation, but what context to the
+> >>> commands `install` and `remove` sections of an opam file run in?  I
+> >>> would assume `install` runs in the directory of the built source, but
+> >>> does `remove` have that same guarantee?  Would that also mean that the
+> >>> built source is kept around with the package?  I ask because I would
+> >>> like to simplify my opam files by having a 'make remove' entry.
+> >> 
+> >> They run in an unpacked source tree as the pwd.  However, this is not
+> >> cached across build runs -- instead, the source is freshly unpacked and
+> >> made available to the remove target.  So you just need to make sure
+> >> that you run the `configure` script if relevant.
+> >> 
+> >> There's a special case for `ocamlfind remove` that doesn't do this;
+> >> this will likely have to be generalised as OPAM moves the OCaml-specific
+> >> logic into a separate plugin.
+> > 
+> > Can I tell opam to figure this out via ocamlfind on its own or do is the
+> > special case just checking if the command is "ocamlfind remove ..."?
+> > Basically, I'm trying to make all of my opam files almost exactly the
+> > same, except for deps, and push the unique actions into the package
+> > itself, like install and remove.  The hope is to simplify making opam
+> > packages of my tools.
+> 
+> The easiest way to handle uninstall is to generate an <pkg.install> file. Otherwise, there is indeed a special syntactic treatment for "ocamlfind remove" commands (where the tarball is not downloaded and extracted again). If you really want to have a "make remove" command, as Anil said you should do "./configure --prefix=... && make remove"
+> 
+> Thomas
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150911/c641c158/attachment.sig>
+
+From tim at gfxmonk.net  Sat Sep 12 08:49:50 2015
+From: tim at gfxmonk.net (Tim Cuthbertson)
+Date: Sat, 12 Sep 2015 17:49:50 +1000
+Subject: [opam-devel] Managing $PKG_CONFIG_PATH in opam
+Message-ID: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+
+On the MirageOS mailing list, I submitted some patches[0] to make some
+mirage libraries build without assuming a strict `opam` destination
+directory layout. Mainly this was about the build scripts explicitly
+setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+When building in a nixpkgs environment (using the `opam2nix` tool I'm
+building[1]), there is no such path, but that's OK - the build
+environment will have already set $PKG_CONFIG_PATH correctly.
+
+[0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+[1] https://github.com/gfxmonk/opam2nix
+
+It was generally agreed that having the build scripts perform this
+task is not ideal, and Thomas Leonard suggested we could change `opam`
+itself to export $PKG_CONFIG_PATH, rather than having build scripts
+assume too much about their environment. That way a build script can
+assume its pkg-config dependencies are available without caring
+exactly where they live.
+
+This seems like a good idea to me, and I've written up a fairly simple
+patch which (I think) will do so:
+
+https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+
+I have only superficially tested it, but in thinking about that it
+seems like this almost certainly won't be enough. All "pure" opam
+packages providing pkg-config libraries should work just fine, however
+there exist a large number of opam packages (conf-*) which exist
+solely to force installation of system packages, and therefore most of
+them actually rely on the system $PKG_CONFIG_PATH being used.
+
+We could make `opam` prefix the opam pkgconfig path with the system
+one, but this could lead to accidental impurity (in the case of these
+mirage libraries, it would mean that dependencies might accidentally
+be provided by the system rather than opam deps, which makes builds
+fragile).
+
+Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+scripts don't have to?
+
+(I've sent this to both the mirage & opam lists - apologies if that
+causes too much noise, but I figure it affects both projects).
+
+Cheers,
+ - Tim.
+
+From talex5 at gmail.com  Sun Sep 13 14:07:50 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Sun, 13 Sep 2015 14:07:50 +0100
+Subject: [opam-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+Message-ID: <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+
+On 12 September 2015 at 08:49, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+> On the MirageOS mailing list, I submitted some patches[0] to make some
+> mirage libraries build without assuming a strict `opam` destination
+> directory layout. Mainly this was about the build scripts explicitly
+> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+> building[1]), there is no such path, but that's OK - the build
+> environment will have already set $PKG_CONFIG_PATH correctly.
+>
+> [0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+> [1] https://github.com/gfxmonk/opam2nix
+>
+> It was generally agreed that having the build scripts perform this
+> task is not ideal, and Thomas Leonard suggested we could change `opam`
+> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+> assume too much about their environment. That way a build script can
+> assume its pkg-config dependencies are available without caring
+> exactly where they live.
+>
+> This seems like a good idea to me, and I've written up a fairly simple
+> patch which (I think) will do so:
+>
+> https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+>
+> I have only superficially tested it, but in thinking about that it
+> seems like this almost certainly won't be enough. All "pure" opam
+> packages providing pkg-config libraries should work just fine, however
+> there exist a large number of opam packages (conf-*) which exist
+> solely to force installation of system packages, and therefore most of
+> them actually rely on the system $PKG_CONFIG_PATH being used.
+>
+> We could make `opam` prefix the opam pkgconfig path with the system
+> one, but this could lead to accidental impurity (in the case of these
+> mirage libraries, it would mean that dependencies might accidentally
+> be provided by the system rather than opam deps, which makes builds
+> fragile).
+
+Since the opam environment is also the user's shell environment, we
+should always add to the path, I think. Using opam shouldn't prevent
+compiling non-OCaml software.
+
+> Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+> scripts don't have to?
+>
+> (I've sent this to both the mirage & opam lists - apologies if that
+> causes too much noise, but I figure it affects both projects).
+>
+> Cheers,
+>  - Tim.
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From anil at recoil.org  Mon Sep 14 14:36:14 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 14 Sep 2015 14:36:14 +0100
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+Message-ID: <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+
+On 13 Sep 2015, at 14:07, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> On 12 September 2015 at 08:49, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+>> On the MirageOS mailing list, I submitted some patches[0] to make some
+>> mirage libraries build without assuming a strict `opam` destination
+>> directory layout. Mainly this was about the build scripts explicitly
+>> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+>> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+>> building[1]), there is no such path, but that's OK - the build
+>> environment will have already set $PKG_CONFIG_PATH correctly.
+>> 
+>> [0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+>> [1] https://github.com/gfxmonk/opam2nix
+>> 
+>> It was generally agreed that having the build scripts perform this
+>> task is not ideal, and Thomas Leonard suggested we could change `opam`
+>> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+>> assume too much about their environment. That way a build script can
+>> assume its pkg-config dependencies are available without caring
+>> exactly where they live.
+>> 
+>> This seems like a good idea to me, and I've written up a fairly simple
+>> patch which (I think) will do so:
+>> 
+>> https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+>> 
+>> I have only superficially tested it, but in thinking about that it
+>> seems like this almost certainly won't be enough. All "pure" opam
+>> packages providing pkg-config libraries should work just fine, however
+>> there exist a large number of opam packages (conf-*) which exist
+>> solely to force installation of system packages, and therefore most of
+>> them actually rely on the system $PKG_CONFIG_PATH being used.
+>> 
+>> We could make `opam` prefix the opam pkgconfig path with the system
+>> one, but this could lead to accidental impurity (in the case of these
+>> mirage libraries, it would mean that dependencies might accidentally
+>> be provided by the system rather than opam deps, which makes builds
+>> fragile).
+> 
+> Since the opam environment is also the user's shell environment, we
+> should always add to the path, I think. Using opam shouldn't prevent
+> compiling non-OCaml software.
+
+Agreed.  It's ok to substitute a PATH if it was inserted by OPAM, but
+the environment should otherwise be unchanged.
+
+Note that OPAM does scrub some variables during the invocation of a
+subshell (MAKEFLAGS in particular) to prevent environment parallel
+flags to propagate to packages, but nothing like this happens in the
+PATH.
+
+>> Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+>> scripts don't have to?
+>> 
+>> (I've sent this to both the mirage & opam lists - apologies if that
+>> causes too much noise, but I figure it affects both projects).
+
+I think we could definitely use an answer to pkg-config management,
+but not one that's entwined into the core of OPAM itself. If something
+could be figured out that fits in with the compilers-as-packages
+feature so that packages could extend the environment, this would
+make cross-OS portability much easier.
+
+In general, how important is pkg-config for library tracking?  Is 
+our interest in it the consequence of some third-party packages
+using it, or do we want it to be the defacto mechanism for handling
+system link flags (a bit like ocamlfind for OCaml)?  If the latter,
+then quite a bit of work needs to be done for straggling system
+libraries that aren't packaged up using pkg-config, which I fear is
+a neverending task.  I'm also curious to know how it works in a
+Nix-like environment in terms of the composibility of PKG_CONFIG_PATH.
+
+-a
+
+
+ 
+
+From talex5 at gmail.com  Mon Sep 14 15:05:29 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Mon, 14 Sep 2015 15:05:29 +0100
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+Message-ID: <CAG4opy8sqijFs=2xjr2s-t3nZsAVxNXKYaVL=T=Ks1GU-LQ74Q@mail.gmail.com>
+
+On 14 September 2015 at 14:36, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 13 Sep 2015, at 14:07, Thomas Leonard <talex5 at gmail.com> wrote:
+>>
+>> On 12 September 2015 at 08:49, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+>>> On the MirageOS mailing list, I submitted some patches[0] to make some
+>>> mirage libraries build without assuming a strict `opam` destination
+>>> directory layout. Mainly this was about the build scripts explicitly
+>>> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+>>> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+>>> building[1]), there is no such path, but that's OK - the build
+>>> environment will have already set $PKG_CONFIG_PATH correctly.
+>>>
+>>> [0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+>>> [1] https://github.com/gfxmonk/opam2nix
+>>>
+>>> It was generally agreed that having the build scripts perform this
+>>> task is not ideal, and Thomas Leonard suggested we could change `opam`
+>>> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+>>> assume too much about their environment. That way a build script can
+>>> assume its pkg-config dependencies are available without caring
+>>> exactly where they live.
+>>>
+>>> This seems like a good idea to me, and I've written up a fairly simple
+>>> patch which (I think) will do so:
+>>>
+>>> https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+>>>
+>>> I have only superficially tested it, but in thinking about that it
+>>> seems like this almost certainly won't be enough. All "pure" opam
+>>> packages providing pkg-config libraries should work just fine, however
+>>> there exist a large number of opam packages (conf-*) which exist
+>>> solely to force installation of system packages, and therefore most of
+>>> them actually rely on the system $PKG_CONFIG_PATH being used.
+>>>
+>>> We could make `opam` prefix the opam pkgconfig path with the system
+>>> one, but this could lead to accidental impurity (in the case of these
+>>> mirage libraries, it would mean that dependencies might accidentally
+>>> be provided by the system rather than opam deps, which makes builds
+>>> fragile).
+>>
+>> Since the opam environment is also the user's shell environment, we
+>> should always add to the path, I think. Using opam shouldn't prevent
+>> compiling non-OCaml software.
+>
+> Agreed.  It's ok to substitute a PATH if it was inserted by OPAM, but
+> the environment should otherwise be unchanged.
+>
+> Note that OPAM does scrub some variables during the invocation of a
+> subshell (MAKEFLAGS in particular) to prevent environment parallel
+> flags to propagate to packages, but nothing like this happens in the
+> PATH.
+>
+>>> Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+>>> scripts don't have to?
+>>>
+>>> (I've sent this to both the mirage & opam lists - apologies if that
+>>> causes too much noise, but I figure it affects both projects).
+>
+> I think we could definitely use an answer to pkg-config management,
+> but not one that's entwined into the core of OPAM itself. If something
+> could be figured out that fits in with the compilers-as-packages
+> feature so that packages could extend the environment, this would
+> make cross-OS portability much easier.
+>
+> In general, how important is pkg-config for library tracking?  Is
+> our interest in it the consequence of some third-party packages
+> using it, or do we want it to be the defacto mechanism for handling
+> system link flags (a bit like ocamlfind for OCaml)?  If the latter,
+> then quite a bit of work needs to be done for straggling system
+> libraries that aren't packaged up using pkg-config, which I fear is
+> a neverending task.  I'm also curious to know how it works in a
+> Nix-like environment in terms of the composibility of PKG_CONFIG_PATH.
+
+I'm not sure I understand what you're saying here. pkg-config is like
+ocamlfind for C libraries, and very widely used (try "pkg-config
+--list-all" to see your installed packages). For libraries that use
+it, it is usually the only way to get the flags you need.
+
+C packages distributed via opam will normally want to install
+per-switch .pc files, just as OCaml programs want to install ocamlfind
+META files. Either every package extends PKG_CONFIG_PATH with its own
+directory in lib, or opam should provide a common directory for them
+all (as it already does for binaries, man-pages, etc).
+
+0install takes the approach of adding each library to PKG_CONFIG_PATH,
+because it separates the files of different packages completely.
+However, it can only do this because it sets up the build environment
+for each build itself, with just the libraries needed for that build.
+For opam, which likes to put everything into the user's default
+environment, PKG_CONFIG_PATH would get very long.
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From anil at recoil.org  Mon Sep 14 15:15:19 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 14 Sep 2015 15:15:19 +0100
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <CAG4opy8sqijFs=2xjr2s-t3nZsAVxNXKYaVL=T=Ks1GU-LQ74Q@mail.gmail.com>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+ <CAG4opy8sqijFs=2xjr2s-t3nZsAVxNXKYaVL=T=Ks1GU-LQ74Q@mail.gmail.com>
+Message-ID: <5CAA9342-7BDD-419B-8F4C-AA0BCFC2374B@recoil.org>
+
+
+> On 14 Sep 2015, at 15:05, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> On 14 September 2015 at 14:36, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> On 13 Sep 2015, at 14:07, Thomas Leonard <talex5 at gmail.com> wrote:
+>>> 
+>>> On 12 September 2015 at 08:49, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+>>>> On the MirageOS mailing list, I submitted some patches[0] to make some
+>>>> mirage libraries build without assuming a strict `opam` destination
+>>>> directory layout. Mainly this was about the build scripts explicitly
+>>>> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+>>>> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+>>>> building[1]), there is no such path, but that's OK - the build
+>>>> environment will have already set $PKG_CONFIG_PATH correctly.
+>>>> 
+>>>> [0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+>>>> [1] https://github.com/gfxmonk/opam2nix
+>>>> 
+>>>> It was generally agreed that having the build scripts perform this
+>>>> task is not ideal, and Thomas Leonard suggested we could change `opam`
+>>>> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+>>>> assume too much about their environment. That way a build script can
+>>>> assume its pkg-config dependencies are available without caring
+>>>> exactly where they live.
+>>>> 
+>>>> This seems like a good idea to me, and I've written up a fairly simple
+>>>> patch which (I think) will do so:
+>>>> 
+>>>> https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+>>>> 
+>>>> I have only superficially tested it, but in thinking about that it
+>>>> seems like this almost certainly won't be enough. All "pure" opam
+>>>> packages providing pkg-config libraries should work just fine, however
+>>>> there exist a large number of opam packages (conf-*) which exist
+>>>> solely to force installation of system packages, and therefore most of
+>>>> them actually rely on the system $PKG_CONFIG_PATH being used.
+>>>> 
+>>>> We could make `opam` prefix the opam pkgconfig path with the system
+>>>> one, but this could lead to accidental impurity (in the case of these
+>>>> mirage libraries, it would mean that dependencies might accidentally
+>>>> be provided by the system rather than opam deps, which makes builds
+>>>> fragile).
+>>> 
+>>> Since the opam environment is also the user's shell environment, we
+>>> should always add to the path, I think. Using opam shouldn't prevent
+>>> compiling non-OCaml software.
+>> 
+>> Agreed.  It's ok to substitute a PATH if it was inserted by OPAM, but
+>> the environment should otherwise be unchanged.
+>> 
+>> Note that OPAM does scrub some variables during the invocation of a
+>> subshell (MAKEFLAGS in particular) to prevent environment parallel
+>> flags to propagate to packages, but nothing like this happens in the
+>> PATH.
+>> 
+>>>> Any ideas how we can have opam manage PKG_CONFIG_PATH so that build
+>>>> scripts don't have to?
+>>>> 
+>>>> (I've sent this to both the mirage & opam lists - apologies if that
+>>>> causes too much noise, but I figure it affects both projects).
+>> 
+>> I think we could definitely use an answer to pkg-config management,
+>> but not one that's entwined into the core of OPAM itself. If something
+>> could be figured out that fits in with the compilers-as-packages
+>> feature so that packages could extend the environment, this would
+>> make cross-OS portability much easier.
+>> 
+>> In general, how important is pkg-config for library tracking?  Is
+>> our interest in it the consequence of some third-party packages
+>> using it, or do we want it to be the defacto mechanism for handling
+>> system link flags (a bit like ocamlfind for OCaml)?  If the latter,
+>> then quite a bit of work needs to be done for straggling system
+>> libraries that aren't packaged up using pkg-config, which I fear is
+>> a neverending task.  I'm also curious to know how it works in a
+>> Nix-like environment in terms of the composibility of PKG_CONFIG_PATH.
+> 
+> I'm not sure I understand what you're saying here. pkg-config is like
+> ocamlfind for C libraries, and very widely used (try "pkg-config
+> --list-all" to see your installed packages). For libraries that use
+> it, it is usually the only way to get the flags you need.
+
+Right -- when pkg-config works, it works pretty well.  However, many
+libraries don't use pkg-config, or even worse, install broken .pc files
+(MacOS X is terrible for this).  In these situations, we will then need
+to bypass them and get the compiler flags in some other way.
+
+So when it comes to support for it in OPAM, it would be nice to not
+embed pkg-config support directly in the core tool, but to add a slightly
+more general mechanism for extending environment variables in such a
+way that OS-specific quirks can be dealt with within the repository
+rather than by patching OPAM itself.
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Tue Sep 15 03:08:02 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 15 Sep 2015 11:08:02 +0900
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+Message-ID: <15511691.gMh3aqzvEv@agaric>
+
+
+> I think we could definitely use an answer to pkg-config management,
+> but not one that's entwined into the core of OPAM itself. If something
+> could be figured out that fits in with the compilers-as-packages
+> feature so that packages could extend the environment, this would
+> make cross-OS portability much easier.
+
+I don't want to promise too much, as the design is mostly unwritten yet, but that's part of my plans.
+Note that compiler descriptions already have an `env:` field:
+
+    env: [[CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"]]
+
+that propagates to the user environment (i.e. `opam config env`)
+
+We also already have some specific operators to dictate environment variable updates, documented at http://opam.ocaml.org/doc/Manual.html#Environmentupdates
+
+From louis.gesbert at ocamlpro.com  Tue Sep 15 11:45:37 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 15 Sep 2015 19:45:37 +0900
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+Message-ID: <15852876.eUFaHsgKIr@agaric>
+
+
+> I think we could definitely use an answer to pkg-config management,
+> but not one that's entwined into the core of OPAM itself. If something
+> could be figured out that fits in with the compilers-as-packages
+> feature so that packages could extend the environment, this would
+> make cross-OS portability much easier.
+
+I don't want to promise too much, as the design is mostly unwritten yet, but that's part of my plans.
+Note that compiler descriptions already have an `env:` field:
+
+    env: [[CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"]]
+
+that propagates to the user environment (i.e. `opam config env`)
+
+We also already have some specific operators to dictate environment variable updates, documented at http://opam.ocaml.org/doc/Manual.html#Environmentupdates
+
+From dra-news at metastack.com  Tue Sep 15 12:31:07 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Tue, 15 Sep 2015 12:31:07 +0100
+Subject: [opam-devel] OPAM on Native Windows - Status update
+Message-ID: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+
+As previously mentioned, I've been devoting a little time to porting the
+master branch of OPAM to work on native Windows (i.e. in a Command or
+PowerShell Prompt rather than in Cygwin).
+
+I had the chance to sync with a few people in Cambridge at the end of
+August, and as a result a few of us had a presentation/discussion at
+Microsoft Research Cambridge yesterday about the work I've done so far and
+what still needs doing. The (PDF) slides from my talk are available at
+http://1drv.ms/1QeD746
+
+I refer in the slides to various things where Proof-of-Concept (PoC) work
+has been done, and I've now shared these on GitHub at
+https://github.com/dra27/opam-experiments
+
+I mention at the end that the port is not particularly exciting at this
+stage, as you can only get as far as a not terribly polished opam init. My
+plan is by mid-October to have opam config env working so that we have a
+very, very pre-alpha "release" which may be able to install some packages
+into the system switch only.
+
+Anyone is of course welcome to try building what's on the windows branch in
+the meantime, and I'm very happy to provide assistance/receive bug reports
+on the build process so far. There's documentation on the detailed
+requirements for the build environment in README.md (see
+https://github.com/dra27/opam/blob/windows/README.md#compiling-on-native-win
+dows)
+
+I have also shared my OneNote scribblings and notes on the port at
+http://1drv.ms/1QeDkV0 (opens in OneNote Online). Please be aware that this
+document contains paged-out portions of my brain, which is both a
+highly-disorganised place and also sometimes expresses opinions more
+strongly than are necessary!
+
+Continuing towards the OCaml/OPAM Windows Dream...
+
+
+David
+
+
+From gabriel.scherer at gmail.com  Tue Sep 15 12:45:25 2015
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Tue, 15 Sep 2015 13:45:25 +0200
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+Message-ID: <CAPFanBHoJj-k4_q_adqH+by9vgxxxogY3NOHhgBsR4pwYJrK8A@mail.gmail.com>
+
+Could you provide more information on what changes/fixes you need from
+upstream? By looking at the slides I see that you mention
+  http://caml.inria.fr/mantis/view.php?id=4034
+  http://caml.inria.fr/mantis/view.php?id=6120
+
+Are both equally important? Is it easy to workaround not having them, or a
+deal-breaker for your work? Which other upstream issues would you need
+solved?
+
+
+On Tue, Sep 15, 2015 at 1:31 PM, David Allsopp <dra-news at metastack.com>
+wrote:
+
+> As previously mentioned, I've been devoting a little time to porting the
+> master branch of OPAM to work on native Windows (i.e. in a Command or
+> PowerShell Prompt rather than in Cygwin).
+>
+> I had the chance to sync with a few people in Cambridge at the end of
+> August, and as a result a few of us had a presentation/discussion at
+> Microsoft Research Cambridge yesterday about the work I've done so far and
+> what still needs doing. The (PDF) slides from my talk are available at
+> http://1drv.ms/1QeD746
+>
+> I refer in the slides to various things where Proof-of-Concept (PoC) work
+> has been done, and I've now shared these on GitHub at
+> https://github.com/dra27/opam-experiments
+>
+> I mention at the end that the port is not particularly exciting at this
+> stage, as you can only get as far as a not terribly polished opam init. My
+> plan is by mid-October to have opam config env working so that we have a
+> very, very pre-alpha "release" which may be able to install some packages
+> into the system switch only.
+>
+> Anyone is of course welcome to try building what's on the windows branch in
+> the meantime, and I'm very happy to provide assistance/receive bug reports
+> on the build process so far. There's documentation on the detailed
+> requirements for the build environment in README.md (see
+>
+> https://github.com/dra27/opam/blob/windows/README.md#compiling-on-native-win
+> dows)
+>
+> I have also shared my OneNote scribblings and notes on the port at
+> http://1drv.ms/1QeDkV0 (opens in OneNote Online). Please be aware that
+> this
+> document contains paged-out portions of my brain, which is both a
+> highly-disorganised place and also sometimes expresses opinions more
+> strongly than are necessary!
+>
+> Continuing towards the OCaml/OPAM Windows Dream...
+>
+>
+> David
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150915/f884cfb2/attachment.html>
+
+From tim at gfxmonk.net  Tue Sep 15 12:49:55 2015
+From: tim at gfxmonk.net (Tim Cuthbertson)
+Date: Tue, 15 Sep 2015 21:49:55 +1000
+Subject: [opam-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+Message-ID: <CAC-LLDjDnyLk6m1VsmnwC==FBJcSey8w6SARMPH8mFNjXCq8uQ@mail.gmail.com>
+
+On Sun, Sep 13, 2015 at 11:07 PM, Thomas Leonard <talex5 at gmail.com> wrote:
+> On 12 September 2015 at 08:49, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+>> On the MirageOS mailing list, I submitted some patches[0] to make some
+>> mirage libraries build without assuming a strict `opam` destination
+>> directory layout. Mainly this was about the build scripts explicitly
+>> setting PKG_CONFIG_PATH to `opam config var prefix`/lib/pkgconfig.
+>> When building in a nixpkgs environment (using the `opam2nix` tool I'm
+>> building[1]), there is no such path, but that's OK - the build
+>> environment will have already set $PKG_CONFIG_PATH correctly.
+>>
+>> [0] http://lists.xenproject.org/archives/html/mirageos-devel/2015-09/msg00000.html
+>> [1] https://github.com/gfxmonk/opam2nix
+>>
+>> It was generally agreed that having the build scripts perform this
+>> task is not ideal, and Thomas Leonard suggested we could change `opam`
+>> itself to export $PKG_CONFIG_PATH, rather than having build scripts
+>> assume too much about their environment. That way a build script can
+>> assume its pkg-config dependencies are available without caring
+>> exactly where they live.
+>>
+>> This seems like a good idea to me, and I've written up a fairly simple
+>> patch which (I think) will do so:
+>>
+>> https://github.com/ocaml/opam/compare/master...gfxmonk:pkg-config
+>>
+>> I have only superficially tested it, but in thinking about that it
+>> seems like this almost certainly won't be enough. All "pure" opam
+>> packages providing pkg-config libraries should work just fine, however
+>> there exist a large number of opam packages (conf-*) which exist
+>> solely to force installation of system packages, and therefore most of
+>> them actually rely on the system $PKG_CONFIG_PATH being used.
+>>
+>> We could make `opam` prefix the opam pkgconfig path with the system
+>> one, but this could lead to accidental impurity (in the case of these
+>> mirage libraries, it would mean that dependencies might accidentally
+>> be provided by the system rather than opam deps, which makes builds
+>> fragile).
+>
+> Since the opam environment is also the user's shell environment, we
+> should always add to the path, I think. Using opam shouldn't prevent
+> compiling non-OCaml software.
+
+One of the main points in favour of the current approach is that a
+build script setting `PKG_CONFIG_PATH=`opam config var
+prefix`/lib/pkgconfig` ensures that all dependencies are satisfied by
+opam (and not accidentally satisfied by system dependencies). You lose
+that assurance with my patches, and also if you go the approach of
+only adding to the path. So would this actually be acceptable to those
+mirage packages? Or would you still want to explicitly override
+$PKG_CONFIG_PATH to get this additional assurance?
+
+Cheers,
+ - Tim.
+
+From tim at gfxmonk.net  Tue Sep 15 12:50:11 2015
+From: tim at gfxmonk.net (Tim Cuthbertson)
+Date: Tue, 15 Sep 2015 21:50:11 +1000
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <15511691.gMh3aqzvEv@agaric>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org> <15511691.gMh3aqzvEv@agaric>
+Message-ID: <CAC-LLDg-UEFBu9EAE2EQTBXKAB+uyjhDokfhFbPwapA0t-Zrbw@mail.gmail.com>
+
+On Tue, Sep 15, 2015 at 12:08 PM, Louis Gesbert
+<louis.gesbert at ocamlpro.com> wrote:
+>
+>> I think we could definitely use an answer to pkg-config management,
+>> but not one that's entwined into the core of OPAM itself. If something
+>> could be figured out that fits in with the compilers-as-packages
+>> feature so that packages could extend the environment, this would
+>> make cross-OS portability much easier.
+>
+> I don't want to promise too much, as the design is mostly unwritten yet, but that's part of my plans.
+> Note that compiler descriptions already have an `env:` field:
+>
+>     env: [[CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"]]
+>
+> that propagates to the user environment (i.e. `opam config env`)
+>
+> We also already have some specific operators to dictate environment variable updates, documented at http://opam.ocaml.org/doc/Manual.html#Environmentupdates
+
+I'm not quite clear on what's done here and what remains - it sounds
+like this already works for compilers, and you're considering adding
+it for packages too? If that's true, then that sounds great, as then
+all packages providing .pc files could depend on some `pkgconfig`
+opampackage which defines:
+
+env: [[PKG_CONFIG_PATH += "%{lib}%"]]
+
+And hopefully some way of dealing with the default pkg-config, for
+when $PKG_CONFIG_PATH is not set. It sounds like := will be able to
+cover that, but the exact syntax is not obvious to me from those docs.
+
+Cheers,
+ - Tim.
+
+From dra-news at metastack.com  Tue Sep 15 13:04:44 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Tue, 15 Sep 2015 12:04:44 +0000
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <CAPFanBHoJj-k4_q_adqH+by9vgxxxogY3NOHhgBsR4pwYJrK8A@mail.gmail.com>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+ <CAPFanBHoJj-k4_q_adqH+by9vgxxxogY3NOHhgBsR4pwYJrK8A@mail.gmail.com>
+Message-ID: <9752EA39-D1F3-4E67-BDDE-8FBB20BAE651@metastack.com>
+
+On 15 Sep 2015, at 12:46, Gabriel Scherer <gabriel.scherer at gmail.com<mailto:gabriel.scherer at gmail.com>> wrote:
+Could you provide more information on what changes/fixes you need from upstream? By looking at the slides I see that you mention
+  http://caml.inria.fr/mantis/view.php?id=4034
+  http://caml.inria.fr/mantis/view.php?id=6120
+
+Are both equally important? Is it easy to workaround not having them, or a deal-breaker for your work? Which other upstream issues would you need solved?
+
+4034 is complicated which is why it's sat unfixed - it doesn't need fixing for OPAM, I simply wrapped the Windows API call in OPAM directly to solve its use case.
+
+6120 is critical for building dose3 directly (if you compile using lib-ext, it doesn't matter) but not critical, therefore. I was going to update its Mantis page with a note that I expect to finish the patch in October (and so hopefully get it into 4.03). The make compiler route of my Windows OPAM port already includes this patch.
+
+I'm not aware of any other OCaml fixes needed - I don't expect any, either, as OCaml of course works well on Windows already!
+
+
+David
+
+
+
+
+On Tue, Sep 15, 2015 at 1:31 PM, David Allsopp <dra-news at metastack.com<mailto:dra-news at metastack.com>> wrote:
+As previously mentioned, I've been devoting a little time to porting the
+master branch of OPAM to work on native Windows (i.e. in a Command or
+PowerShell Prompt rather than in Cygwin).
+
+I had the chance to sync with a few people in Cambridge at the end of
+August, and as a result a few of us had a presentation/discussion at
+Microsoft Research Cambridge yesterday about the work I've done so far and
+what still needs doing. The (PDF) slides from my talk are available at
+http://1drv.ms/1QeD746
+
+I refer in the slides to various things where Proof-of-Concept (PoC) work
+has been done, and I've now shared these on GitHub at
+https://github.com/dra27/opam-experiments
+
+I mention at the end that the port is not particularly exciting at this
+stage, as you can only get as far as a not terribly polished opam init. My
+plan is by mid-October to have opam config env working so that we have a
+very, very pre-alpha "release" which may be able to install some packages
+into the system switch only.
+
+Anyone is of course welcome to try building what's on the windows branch in
+the meantime, and I'm very happy to provide assistance/receive bug reports
+on the build process so far. There's documentation on the detailed
+requirements for the build environment in README.md (see
+https://github.com/dra27/opam/blob/windows/README.md#compiling-on-native-win
+dows)
+
+I have also shared my OneNote scribblings and notes on the port at
+http://1drv.ms/1QeDkV0 (opens in OneNote Online). Please be aware that this
+document contains paged-out portions of my brain, which is both a
+highly-disorganised place and also sometimes expresses opinions more
+strongly than are necessary!
+
+Continuing towards the OCaml/OPAM Windows Dream...
+
+
+David
+
+_______________________________________________
+opam-devel mailing list
+opam-devel at lists.ocaml.org<mailto:opam-devel at lists.ocaml.org>
+http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150915/d16f10ed/attachment-0001.html>
+
+From louis.gesbert at ocamlpro.com  Tue Sep 15 15:20:05 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 15 Sep 2015 23:20:05 +0900
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+Message-ID: <2647368.ESHJFMUQWT@agaric>
+
+
+> I think we could definitely use an answer to pkg-config management,
+> but not one that's entwined into the core of OPAM itself. If something
+> could be figured out that fits in with the compilers-as-packages
+> feature so that packages could extend the environment, this would
+> make cross-OS portability much easier.
+
+I don't want to promise too much, as the design is mostly unwritten yet, but that's part of my plans.
+Note that compiler descriptions already have an `env:` field:
+
+    env: [[CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"]]
+
+that propagates to the user environment (i.e. `opam config env`)
+
+We also already have some specific operators to dictate environment variable updates, documented at http://opam.ocaml.org/doc/Manual.html#Environmentupdates
+
+From anil at recoil.org  Wed Sep 16 14:59:46 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 16 Sep 2015 14:59:46 +0100
+Subject: [opam-devel] [MirageOS-devel] Managing $PKG_CONFIG_PATH in opam
+In-Reply-To: <CAC-LLDg-UEFBu9EAE2EQTBXKAB+uyjhDokfhFbPwapA0t-Zrbw@mail.gmail.com>
+References: <CAC-LLDhi5jkQ6=cuM9z36xS4cGDGq=kgDyzNOg1dWSSP7LFSpQ@mail.gmail.com>
+ <CAG4opy86DYekdODSVeCSFs2tDcG6bBSsKntf1RxAJmhxPAPRLA@mail.gmail.com>
+ <AD6064B5-F6C3-4619-8782-61E66BB29042@recoil.org>
+ <15511691.gMh3aqzvEv@agaric>
+ <CAC-LLDg-UEFBu9EAE2EQTBXKAB+uyjhDokfhFbPwapA0t-Zrbw@mail.gmail.com>
+Message-ID: <7077ADD0-CAE4-4EA1-A58B-59FD8400B07F@recoil.org>
+
+On 15 Sep 2015, at 12:50, Tim Cuthbertson <tim at gfxmonk.net> wrote:
+> 
+> On Tue, Sep 15, 2015 at 12:08 PM, Louis Gesbert
+> <louis.gesbert at ocamlpro.com> wrote:
+>> 
+>>> I think we could definitely use an answer to pkg-config management,
+>>> but not one that's entwined into the core of OPAM itself. If something
+>>> could be figured out that fits in with the compilers-as-packages
+>>> feature so that packages could extend the environment, this would
+>>> make cross-OS portability much easier.
+>> 
+>> I don't want to promise too much, as the design is mostly unwritten yet, but that's part of my plans.
+>> Note that compiler descriptions already have an `env:` field:
+>> 
+>>    env: [[CAML_LD_LIBRARY_PATH = "%{lib}%/stublibs"]]
+>> 
+>> that propagates to the user environment (i.e. `opam config env`)
+>> 
+>> We also already have some specific operators to dictate environment variable updates, documented at http://opam.ocaml.org/doc/Manual.html#Environmentupdates
+> 
+> I'm not quite clear on what's done here and what remains - it sounds
+> like this already works for compilers, and you're considering adding
+> it for packages too? If that's true, then that sounds great, as then
+> all packages providing .pc files could depend on some `pkgconfig`
+> opampackage which defines:
+> 
+> env: [[PKG_CONFIG_PATH += "%{lib}%"]]
+> 
+> And hopefully some way of dealing with the default pkg-config, for
+> when $PKG_CONFIG_PATH is not set. It sounds like := will be able to
+> cover that, but the exact syntax is not obvious to me from those docs.
+
+This sounds about right to me.  The feature is not fully documented
+at the moment, but I seem to remember some syntax for setting the variable
+if it wasn't set (in addition to the additive one).
+
+The main blocker is probably the OPAM 1.2 -> 1.1 rewrite scripts, since
+this almost certainly wasn't present in OPAM 1.1.  Yet another reason
+to kick off the deprecation of the OPAM 1.1 repository...
+
+-anil
+
+From ygrek at autistici.org  Sat Sep 26 00:57:20 2015
+From: ygrek at autistici.org (ygrek)
+Date: Fri, 25 Sep 2015 16:57:20 -0700
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+Message-ID: <20150925165720.03934151@kiwi.local.tld>
+
+On Tue, 15 Sep 2015 12:31:07 +0100
+"David Allsopp" <dra-news at metastack.com> wrote:
+
+> I had the chance to sync with a few people in Cambridge at the end of
+> August, and as a result a few of us had a presentation/discussion at
+> Microsoft Research Cambridge yesterday about the work I've done so far and
+> what still needs doing. The (PDF) slides from my talk are available at
+> http://1drv.ms/1QeD746
+
+Any chance to access this without microsoft login? 
+
+-- 
+
+From daniel.buenzli at erratique.ch  Sat Sep 26 01:22:23 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 26 Sep 2015 01:22:23 +0100
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <20150925165720.03934151@kiwi.local.tld>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+ <20150925165720.03934151@kiwi.local.tld>
+Message-ID: <2A90802D64E04486BB62F47833CB9397@erratique.ch>
+
+Le samedi, 26 septembre 2015 ? 00:57, ygrek a ?crit :
+> Any chance to access this without microsoft login?
+
+Works without one here.  
+
+Daniel
+
+
+
+From ygrek at autistici.org  Sat Sep 26 01:33:47 2015
+From: ygrek at autistici.org (ygrek)
+Date: Fri, 25 Sep 2015 17:33:47 -0700
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <20150925165720.03934151@kiwi.local.tld>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+ <20150925165720.03934151@kiwi.local.tld>
+Message-ID: <20150925173347.708be994@kiwi.local.tld>
+
+On Fri, 25 Sep 2015 16:57:20 -0700
+ygrek <ygrek at autistici.org> wrote:
+
+> On Tue, 15 Sep 2015 12:31:07 +0100
+> "David Allsopp" <dra-news at metastack.com> wrote:
+> 
+> > I had the chance to sync with a few people in Cambridge at the end of
+> > August, and as a result a few of us had a presentation/discussion at
+> > Microsoft Research Cambridge yesterday about the work I've done so far and
+> > what still needs doing. The (PDF) slides from my talk are available at
+> > http://1drv.ms/1QeD746
+> 
+> Any chance to access this without microsoft login? 
+
+errr, it requires login in Iceweasel, but shows alright in Chromium...
+
+-- 
+
+From ygrek at autistici.org  Sat Sep 26 03:21:49 2015
+From: ygrek at autistici.org (ygrek)
+Date: Fri, 25 Sep 2015 19:21:49 -0700
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+Message-ID: <20150925192149.3ac2d1cd@kiwi.local.tld>
+
+On Tue, 15 Sep 2015 12:31:07 +0100
+"David Allsopp" <dra-news at metastack.com> wrote:
+
+From the slides :
+
+>  ?Integrate libcurl directly (PoC already done)
+
+I am curious if that uses ocurl and if you had any problems on windows with it?
+
+-- 
+
+From dra-news at metastack.com  Sat Sep 26 08:37:17 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Sat, 26 Sep 2015 07:37:17 +0000
+Subject: [opam-devel] OPAM on Native Windows - Status update
+In-Reply-To: <20150925192149.3ac2d1cd@kiwi.local.tld>
+References: <000f01d0efaa$03f94150$0bebc3f0$@metastack.com>
+ <20150925192149.3ac2d1cd@kiwi.local.tld>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9EF7CA8@Remus.metastack.local>
+
+ygrek wrote:
+> On Fri, 25 Sep 2015 16:57:20 -0700
+> ygrek <ygrek at autistici.org> wrote:
+> 
+> > On Tue, 15 Sep 2015 12:31:07 +0100
+> > "David Allsopp" <dra-news at metastack.com> wrote:
+> >
+> > > I had the chance to sync with a few people in Cambridge at the end
+> > > of August, and as a result a few of us had a presentation/discussion
+> > > at Microsoft Research Cambridge yesterday about the work I've done
+> > > so far and what still needs doing. The (PDF) slides from my talk are
+> > > available at
+> > > http://1drv.ms/1QeD746
+> >
+> > Any chance to access this without microsoft login?
+> 
+> errr, it requires login in Iceweasel, but shows alright in Chromium...
+
+That's very strange - it doesn't require login in Firefox on my (Windows) box, either!
+
+ygrek wrote:
+> On Tue, 15 Sep 2015 12:31:07 +0100
+> "David Allsopp" <dra-news at metastack.com> wrote:
+> 
+> From the slides :
+> 
+> >  ?Integrate libcurl directly (PoC already done)
+> 
+> I am curious if that uses ocurl and if you had any problems on windows
+> with it?
+
+Yes, it does use ocurl. The proof-of-concept in this case was part of downloading the Cygwin repository (see https://github.com/dra27/opam-experiments/blob/master/cygwin-repository/CygRepository.ml#L355-L542).
+
+There were various issues, but you merged my pull request for dealing with them: https://github.com/ygrek/ocurl/pull/8
+
+I expect there will be a few more (minor) issues when I build it using the Microsoft C Compiler (I only did this experiment using mingw), but I'll submit that back to you as-and-when.
+
+
+David
+

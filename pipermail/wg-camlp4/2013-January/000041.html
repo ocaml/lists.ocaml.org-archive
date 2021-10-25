@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Matching on concrete syntax (was: Re:  Camlp4 uses)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20%20Camlp4%20uses%29&In-Reply-To=%3C5106AA6A.8090006%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000026.html">
+   <LINK REL="Next"  HREF="000094.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Matching on concrete syntax (was: Re:  Camlp4 uses)</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20%20Camlp4%20uses%29&In-Reply-To=%3C5106AA6A.8090006%40frisch.fr%3E"
+       TITLE="[wg-camlp4] Matching on concrete syntax (was: Re:  Camlp4 uses)">alain at frisch.fr
+       </A><BR>
+    <I>Mon Jan 28 16:42:18 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000026.html">[wg-camlp4] Camlp4 uses
+</A></li>
+        <LI>Next message: <A HREF="000094.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#41">[ date ]</a>
+              <a href="thread.html#41">[ thread ]</a>
+              <a href="subject.html#41">[ subject ]</a>
+              <a href="author.html#41">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/28/2013 04:17 PM, Xavier Clerc wrote:
+&gt;<i>    3- in Mascot (style tool), camlp4 is used to get either
+</I>&gt;<i>       a stream of lexical tokens or an AST, both being used
+</I>&gt;<i>       to detect code smells;
+</I>...
+&gt;<i> Case 3 may appear as a perfect fit for ppx, but indeed
+</I>&gt;<i> it is quite pleasant to write some code smell in OCaml
+</I>&gt;<i> syntax (through quotations), rather than by matching
+</I>&gt;<i> against a bare AST. The latter becomes very verbose,
+</I>&gt;<i> and very hard to read/maintain to say the least.
+</I>
+I've the intuition that matching AST with patterns in a concrete syntax 
+is a source of never lasting problems.  But it seems you disagree, so 
+I'm very much interested in your experience!
+
+Let me explain my point.
+
+First, the parsing (concrete syntax -&gt; AST) has some built-in 
+ambiguities and resolution mechanism that the programmer does not even 
+need to be aware of.  For instance, I cannot tell how a pattern like &quot;p1 
+|<i> p2 | p3&quot; or an expression &quot;e1 || e2 || e3&quot; is parsed without looking 
+</I>at the parser (or most probably, playing with -dparsetree).  Is the 
+pattern parsed like &quot;(p1 | p2) | p3&quot; or &quot;p1 | (p2 | p3)&quot;?  The problem 
+is that you might need to know such information if you write AST 
+transformation/matching with concrete syntax.
+
+Second, you need some special extra &quot;concrete&quot; syntax to be able to 
+specify whether you care or not about some features.  For instance, you 
+need to be able to write a pattern which matches a recursive let 
+binding, or non-recursive let binding, or any kind of let binding 
+(recursive or not).  In the latter case, you probably want to be able to 
+extract the recursive flag for later use.  You need to introduce some 
+syntax for that.  Similarly, we need some expert knowledge and specific 
+syntax to know exactly what your &quot;free variables&quot; stand for: you need to 
+be able to say that you want to match an arbitrary constructor or a 
+constructor with no module prefix.  This is the source for a lot of 
+complexity related to anti-quotations in camlp4, in my opinion.
+
+Third, working on concrete syntax gives a false feeling that you don't 
+need to master the abstract syntax, but this is wrong.  You need to know 
+if &quot;M.(e)&quot; and &quot;let open M in e&quot; map to the same AST or not, if record 
+punning is implemented in the parser or if is represented in the AST 
+(exercise: define a &quot;code smell rule&quot; to detect missed punning 
+opportunity, i.e. an instance of a record field &quot;l = l&quot;), etc.
+
+Fourth, working with concrete syntax requires to master a new 
+sub-language (with quotations, anti-quotations), which is far from 
+trivial, and which looks like the real OCaml syntax but is not really 
+the same.  There is a learning curve here, which should not be neglected.
+
+
+At the end of the day, I find it both simpler and more robust to work on 
+abstract syntax, even if this is marginally more verbose.  Some actions 
+can reduce the syntactic overhead of working with abstract syntax: 
+cleaning up the Parsetree (and removing prefixes) and improvements to 
+our beloved host language itself (such as 
+<A HREF="http://caml.inria.fr/mantis/view.php?id=5667">http://caml.inria.fr/mantis/view.php?id=5667</A> or even more ambitious 
+extensions).  I'd rather see time invested in such improvements than on 
+providing support for working with (almost-)concrete syntax.  But YMMV, 
+and I'm very much interested to hear about the opinion and experience of 
+other people on this topic.  (And of course, once quotations are 
+supported, nothing prevent some -ppx rewriter to provide support for 
+concrete-syntax matching, to be used for compiling other -ppx rewriters...)
+
+
+
+Alain
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000026.html">[wg-camlp4] Camlp4 uses
+</A></li>
+	<LI>Next message: <A HREF="000094.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#41">[ date ]</a>
+              <a href="thread.html#41">[ thread ]</a>
+              <a href="subject.html#41">[ subject ]</a>
+              <a href="author.html#41">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

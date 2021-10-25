@@ -1,0 +1,320 @@
+From yallop at gmail.com  Mon Aug  1 16:11:23 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 1 Aug 2016 16:11:23 +0100
+Subject: [ocaml-ctypes] Removing ctypes.foreign.{threaded,unthreaded}
+Message-ID: <CAAxsn=EYdsK4kWF5seAcFyPLRsGvqU3OzNHG5e6gFZNOgvS=_w@mail.gmail.com>
+
+Current releases of ctypes include two implementations of the Foreign
+module, available in findlib subpackages:
+
+   - ctypes.foreign.threaded
+   - ctypes.foreign.unthreaded
+
+The appropriate implementation is selected automatically, depending on
+whether threads are in use.
+
+I'd like to remove these subpackages, replacing them with a single
+implementation of Foreign which always depends on the threads library.
+
+If this change is likely to cause problems for you, please speak up,
+either here or on the GitHub PR:
+
+    https://github.com/ocamllabs/ocaml-ctypes/pull/419
+
+From daniel.buenzli at erratique.ch  Mon Aug  1 16:22:27 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 1 Aug 2016 17:22:27 +0200
+Subject: [ocaml-ctypes] Removing ctypes.foreign.{threaded,unthreaded}
+In-Reply-To: <CAAxsn=EYdsK4kWF5seAcFyPLRsGvqU3OzNHG5e6gFZNOgvS=_w@mail.gmail.com>
+References: <CAAxsn=EYdsK4kWF5seAcFyPLRsGvqU3OzNHG5e6gFZNOgvS=_w@mail.gmail.com>
+Message-ID: <9E733D5FEADD450788EB678E40DE2E33@erratique.ch>
+
+Le lundi, 1 ao?t 2016 ? 17:11, Jeremy Yallop a ?crit :
+> I'd like to remove these subpackages, replacing them with a single
+> implementation of Foreign which always depends on the threads library.
+
+
+What happens if you have an ocaml compiler configured with `-no-pthread `?
+
+Best,
+
+Daniel
+  
+
+
+
+From yallop at gmail.com  Tue Aug  2 10:57:43 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 2 Aug 2016 10:57:43 +0100
+Subject: [ocaml-ctypes] Removing ctypes.foreign.{threaded,unthreaded}
+In-Reply-To: <9E733D5FEADD450788EB678E40DE2E33@erratique.ch>
+References: <CAAxsn=EYdsK4kWF5seAcFyPLRsGvqU3OzNHG5e6gFZNOgvS=_w@mail.gmail.com>
+ <9E733D5FEADD450788EB678E40DE2E33@erratique.ch>
+Message-ID: <CAAxsn=HUuwQ-FjyJLOKY0r2gKY8G3DqYPCaShL2DANWLKjmTSg@mail.gmail.com>
+
+On 1 August 2016 at 16:22, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Le lundi, 1 ao?t 2016 ? 17:11, Jeremy Yallop a ?crit :
+>> I'd like to remove these subpackages, replacing them with a single
+>> implementation of Foreign which always depends on the threads library.
+>
+> What happens if you have an ocaml compiler configured with `-no-pthread `?
+
+That's a good point.  I don't think ctypes will work out-of-the-box
+with -no-pthread even now, but removing the unthreaded subpackage
+might add further obstacles.
+
+From andre at digirati.com.br  Wed Aug 10 21:20:17 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Wed, 10 Aug 2016 17:20:17 -0300
+Subject: [ocaml-ctypes] Build help
+Message-ID: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+
+Hi
+
+I have working ctypes bindings for MariaDB's libmysqlclient at
+
+  https://github.com/andrenth/ocaml-mariadb
+
+I basically copied and adapted the project structure from
+
+  https://github.com/simonjbeaumont/ocaml-flock
+
+to get stub generation working. Currently I'm doing
+
+  let foreign name typ = foreign name typ
+    ~from:Dl.(dlopen ~filename:"libmysqlclient.so" ~flags:[RTLD_NOW])
+
+to avoid getting a build error:
+
+  Fatal error: exception
+Dl.DL_error("/home/andre/.opam/4.03.0/lib/stublibs/dllctypes-foreign-base_stubs.so:
+undefined symbol: mysql_server_init")
+
+I'd like to get rid of that, and from googling I found the suggestion of
+adding "CCOpt: -Wl,-no-as-needed" (I'm on Ubuntu) to the _oasis file,
+but that didn't seem to make a difference.
+
+I'm also not sure if that suggestion if still current, and the
+repositories I found on github with a similar structure don't seem to be
+using that option. They don't seem to be using the dlopen trick either,
+so I'm guessing there's some other way to fix this.
+
+Any help would be greatly appreciated.
+
+Best regards,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160810/3ba52049/attachment.sig>
+
+From yallop at gmail.com  Mon Aug 15 12:34:59 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 15 Aug 2016 12:34:59 +0100
+Subject: [ocaml-ctypes] Build help
+In-Reply-To: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+References: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+Message-ID: <CAAxsn=FLicyp8ckg0+7GxhYidPGc=Ct3N=eQLF4B+5X8Tr8sfg@mail.gmail.com>
+
+Dear Andre,
+
+On 10 August 2016 at 21:20, Andre Nathan <andre at digirati.com.br> wrote:
+> I have working ctypes bindings for MariaDB's libmysqlclient at
+>
+>   https://github.com/andrenth/ocaml-mariadb
+>
+> I basically copied and adapted the project structure from
+>
+>   https://github.com/simonjbeaumont/ocaml-flock
+>
+> to get stub generation working. Currently I'm doing
+>
+>   let foreign name typ = foreign name typ
+>     ~from:Dl.(dlopen ~filename:"libmysqlclient.so" ~flags:[RTLD_NOW])
+>
+> to avoid getting a build error:
+
+If you're using stub generation (which I recommend), then you
+typically don't need to use the Dl module at all.  The usual approach
+is to use the 'foreign' function that comes from the argument to your
+bindings functor instead of the function from the top-level Foreign
+module.  In other words, instead of this:
+
+   module Foreign_bindings = struct
+     open Foreign
+
+     let foreign name typ = foreign name typ
+       ~from:Dl.(dlopen ~filename:"libmysqlclient.so" ~flags:[RTLD_NOW])
+
+     let mysql_library_init = foreign "mysql_server_init"
+       (int @-> ptr_opt (ptr char) @-> ptr_opt (ptr char) @-> returning int)
+
+you'd write something like this:
+
+   module Foreign_bindings(F: Cstubs.FOREIGN) = struct
+     open F
+
+     let mysql_library_init = foreign "mysql_server_init"
+       (int @-> ptr_opt (ptr char) @-> ptr_opt (ptr char) @-> returning int)
+
+In this second snippet 'foreign' refers to 'F.foreign', not 'Foreign.foreign'.
+
+Linking is generally much easier with this second approach.  Since
+names are resolved statically by the standard C toolchain there's no
+need to pass `-Wl,-no-as-needed`, set up LD_LIBRARY_PATH, etc.
+
+Kind regards,
+
+Jeremy.
+
+From andre at digirati.com.br  Mon Aug 15 21:41:17 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Mon, 15 Aug 2016 17:41:17 -0300
+Subject: [ocaml-ctypes] Build help
+In-Reply-To: <CAAxsn=FLicyp8ckg0+7GxhYidPGc=Ct3N=eQLF4B+5X8Tr8sfg@mail.gmail.com>
+References: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+ <CAAxsn=FLicyp8ckg0+7GxhYidPGc=Ct3N=eQLF4B+5X8Tr8sfg@mail.gmail.com>
+Message-ID: <75b5466a-2d6d-4c37-6067-a4cf09d22809@digirati.com.br>
+
+Hi Jeremy
+
+On 08/15/2016 08:34 AM, Jeremy Yallop wrote:
+> you'd write something like this:
+> 
+>    module Foreign_bindings(F: Cstubs.FOREIGN) = struct
+>      open F
+> 
+>      let mysql_library_init = foreign "mysql_server_init"
+>        (int @-> ptr_opt (ptr char) @-> ptr_opt (ptr char) @-> returning int)
+> 
+> In this second snippet 'foreign' refers to 'F.foreign', not 'Foreign.foreign'.
+
+In this case a binding that had type "a -> b" now became
+
+  (a -> b F.return) F.result
+
+For example, this binding:
+
+  let mysql_init = foreign "mysql_init"
+    (T.mysql_opt @-> returning T.mysql_opt)
+
+had type "T.mysql_opt -> T.mysql_opt" but after the change it became
+
+  (T.mysql_opt -> T.mysql_opt F.return) F.result
+
+This way I can't use it as a function anymore. Is this expected?
+
+Thanks,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160815/fe7a2c5a/attachment.sig>
+
+From yallop at gmail.com  Tue Aug 16 07:28:29 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 16 Aug 2016 07:28:29 +0100
+Subject: [ocaml-ctypes] Build help
+In-Reply-To: <75b5466a-2d6d-4c37-6067-a4cf09d22809@digirati.com.br>
+References: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+ <CAAxsn=FLicyp8ckg0+7GxhYidPGc=Ct3N=eQLF4B+5X8Tr8sfg@mail.gmail.com>
+ <75b5466a-2d6d-4c37-6067-a4cf09d22809@digirati.com.br>
+Message-ID: <CAAxsn=EeKO5JDVZEa7ZGKERKAo9T9=Kei9xEAU8+Y6yrVg2sQA@mail.gmail.com>
+
+On 15 August 2016 at 21:41, Andre Nathan <andre at digirati.com.br> wrote:
+> On 08/15/2016 08:34 AM, Jeremy Yallop wrote:
+>> you'd write something like this:
+>>
+>>    module Foreign_bindings(F: Cstubs.FOREIGN) = struct
+>>      open F
+>>
+>>      let mysql_library_init = foreign "mysql_server_init"
+>>        (int @-> ptr_opt (ptr char) @-> ptr_opt (ptr char) @-> returning int)
+>>
+>> In this second snippet 'foreign' refers to 'F.foreign', not 'Foreign.foreign'.
+>
+> In this case a binding that had type "a -> b" now became
+>
+>   (a -> b F.return) F.result
+>
+> For example, this binding:
+>
+>   let mysql_init = foreign "mysql_init"
+>     (T.mysql_opt @-> returning T.mysql_opt)
+>
+> had type "T.mysql_opt -> T.mysql_opt" but after the change it became
+>
+>   (T.mysql_opt -> T.mysql_opt F.return) F.result
+>
+> This way I can't use it as a function anymore. Is this expected?
+
+It's expected, but it's not the problem that it initially appears to be.
+
+*Inside* the functor the binding has non-function type: it's not
+available for calling at that point, since it hasn't yet been linked
+together with the generated code.
+
+*Outside* the functor, once you've applied the functor to the module
+that ctypes generates, the function becomes available for calling.
+
+For example, here's the bindings functor from the unix-dirent package,
+which binds opendir, readdir, etc.:
+
+    https://github.com/dsheets/ocaml-unix-dirent/blob/71590346/lib_gen/unix_dirent_bindings.ml#L40-L56
+
+(Note that the functor contains only bindings for functions, not calls
+to those bindings.)
+
+And here's the line of code that links together the bindings functor
+with the generated module:
+
+    https://github.com/dsheets/ocaml-unix-dirent/blob/71590346/unix/dirent_unix.ml#L19
+
+A little further down, the code makes calls to the bindings:
+
+    https://github.com/dsheets/ocaml-unix-dirent/blob/71590346/unix/dirent_unix.ml#L39
+
+Kind regards,
+
+Jeremy.
+
+From andre at digirati.com.br  Tue Aug 16 12:24:31 2016
+From: andre at digirati.com.br (Andre Nathan)
+Date: Tue, 16 Aug 2016 08:24:31 -0300
+Subject: [ocaml-ctypes] Build help
+In-Reply-To: <CAAxsn=EeKO5JDVZEa7ZGKERKAo9T9=Kei9xEAU8+Y6yrVg2sQA@mail.gmail.com>
+References: <ded331f4-a9bb-931d-db8f-54908d3caa75@digirati.com.br>
+ <CAAxsn=FLicyp8ckg0+7GxhYidPGc=Ct3N=eQLF4B+5X8Tr8sfg@mail.gmail.com>
+ <75b5466a-2d6d-4c37-6067-a4cf09d22809@digirati.com.br>
+ <CAAxsn=EeKO5JDVZEa7ZGKERKAo9T9=Kei9xEAU8+Y6yrVg2sQA@mail.gmail.com>
+Message-ID: <5aeb3d47-4971-d7b0-bd18-c75a8c91e800@digirati.com.br>
+
+On 08/16/2016 03:28 AM, Jeremy Yallop wrote:
+> On 15 August 2016 at 21:41, Andre Nathan <andre at digirati.com.br> wrote: 
+> *Inside* the functor the binding has non-function type: it's not
+> available for calling at that point, since it hasn't yet been linked
+> together with the generated code.
+
+Thanks. I had some wrappers for the bindings defined in the same module
+which caused the problem when I moved the code into the functor. After
+some reorganization it's working now :)
+
+Best,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20160816/439473f7/attachment.sig>
+

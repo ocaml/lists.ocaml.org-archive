@@ -1,0 +1,558 @@
+From lpw25 at cam.ac.uk  Wed Oct  1 14:37:00 2014
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Wed, 01 Oct 2014 14:37:00 +0100
+Subject: [compiler-hacking] Compiler hacking
+Message-ID: <86k34jj4hv.fsf@cam.ac.uk>
+
+Hi all,
+
+Thank you to everyone who came to the compiler hacking evening last
+night. I just wanted to issue a quick apology for the very late arrival
+of the pizza, especially to those who had to leave before it arrived.
+We'll make sure to order it much earlier in future. Also, apologies for
+the poor WiFi at the venue this time, we'll make sure that better
+arrangements are in place before returning to the PostDoc centre. Hope
+everyone still had an enjoyable time (and maybe even did some compiler
+hacking).
+
+Regards,
+
+Leo
+
+From ns441 at cam.ac.uk  Wed Oct  8 14:01:32 2014
+From: ns441 at cam.ac.uk (Nik Sultana)
+Date: Wed, 08 Oct 2014 14:01:32 +0100
+Subject: [compiler-hacking] =?utf-8?q?useful_feature=3F?=
+Message-ID: <495f674c5a6a94ae5de46fbe035d778b@cam.ac.uk>
+
+Hi all, not sure if this is a valid suggestion for a feature that could 
+be tackled during one of the the compiler hacking sessions. (It's more 
+to do with Lwt than the compiler.)
+
+The problem was described by Thomas under "Error handling in key 
+look-ups" at
+http://roscidus.com/blog/blog/2013/11/28/asynchronous-python-vs-ocaml/
+
+The problem occurs when "try..with" is used instead of the Lwt 
+counterparts for handling exceptions.
+
+My idea consists of emitting a warning each time the following two 
+conditions are both met:
+1. if we have an AST that contains "try EXP with (VAR, EXP')+", and
+2. the type of EXP, and the type of each EXP' is "tp Lwt.t" for some 
+type tp.
+
+I'm not sure if this is entirely reasonable or useful, nor can I judge 
+how difficult it is to implement since I don't know what the codebase 
+looks like, but thought I'd offer it up for your judgement.
+
+Best wishes,
+Nik
+
+
+From lpw25 at cam.ac.uk  Fri Oct 17 14:05:18 2014
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Fri, 17 Oct 2014 14:05:18 +0100
+Subject: [compiler-hacking] useful feature?
+In-Reply-To: <495f674c5a6a94ae5de46fbe035d778b@cam.ac.uk> (Nik Sultana's
+ message of "Wed, 08 Oct 2014 14:01:32 +0100")
+References: <495f674c5a6a94ae5de46fbe035d778b@cam.ac.uk>
+Message-ID: <y2asiim26ep.fsf@kingston.cl.cam.ac.uk>
+
+> Hi all, not sure if this is a valid suggestion for a feature that could be tackled during one of the the compiler
+> hacking sessions. (It's more to do with Lwt than the compiler.)
+>
+> The problem was described by Thomas under "Error handling in key look-ups" at
+> http://roscidus.com/blog/blog/2013/11/28/asynchronous-python-vs-ocaml/
+>
+> The problem occurs when "try..with" is used instead of the Lwt counterparts for handling exceptions.
+
+This certainly seems a valid suggestion for the compiler-hacking
+sessions. I also think that this list is a good place to discuss such
+suggestions, so thank you for starting us off with an interesting one.
+
+> My idea consists of emitting a warning each time the following two conditions are both met:
+> 1. if we have an AST that contains "try EXP with (VAR, EXP')+", and
+> 2. the type of EXP, and the type of each EXP' is "tp Lwt.t" for some type tp.
+>
+> I'm not sure if this is entirely reasonable or useful, nor can I judge how difficult it is to implement since I don't
+> know what the codebase looks like, but thought I'd offer it up for your judgement.
+
+Firstly, you don't want to add specific knowledge of Lwt to the compiler
+itself, so the feature would need to be something more general which
+could be triggered by Lwt's camlp4/ppx preprocessor.
+
+The basic thing that you are suggesting is a way to tell the compiler:
+"if this expression has the type `foo` then please warn me". You could
+imagine supporting this through an attribute like:
+
+    (try
+        ...
+    with Not_found -> ...) [@warn_if_type: 'a Lwt.t]
+
+which could be inserted on all try expressions by the Lwt camlp4/ppx
+preprocessor.
+
+The first difficulty with this is deciding what it means for an
+expression to have type `'a Lwt.t`. Does it mean "could be `'a Lwt.t`" or
+"definitely has type `'a Lwt.t`"? This matters because
+polymorphism/abstraction means we cannot always tell whether or not
+something has type `'a Lwt.t`.
+
+Consider the function
+
+    let f (g : unit -> 'a) =
+      (try
+          g ()
+      with Not_found -> raise Invalid_argument) [@warn_if_type: 'a Lwt.t]
+
+Should this emit the warning or not? If it does then there will be many
+false positives, but if it doesn't then you will not detect cases like:
+
+    f (fun () -> return 5)
+
+which clearly does wrap an `'a Lwt.t` in a regular exception handler.
+
+Similarly module abstraction prevents you knowing whether or not an
+expression has type `'a Lwt.t`. For example:
+
+    module M : sig
+      type 'a t
+      val x : int t
+      val f : int t -> int t
+    end = struct
+
+      type 'a t = 'a Lwt.t
+
+      let x = return 1
+
+      let f x =
+        Lwt.bind x
+          (fun x ->
+             if x <= 1 then raise Not_found
+             else return (x - 1))
+
+    end
+
+    let y =
+      try
+        M.f M.x
+      with Not_found -> M.x
+
+Here again we have wrapped an Lwt.t in a regular exception handler, but
+cannot tell that we have done.
+
+It is quite possible that real Lwt code does not encounter these
+problems, or that the warning is still useful even though it is not 100%
+accurate, but these kinds of issues should probably be considered before
+attempting to implement something.
+
+Regards,
+
+Leo
+
+From yallop at gmail.com  Thu Oct 30 14:37:25 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 30 Oct 2014 14:37:25 +0000
+Subject: [compiler-hacking] @inline attribute?
+Message-ID: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+
+I'm interested in people's thoughts on adding an @inline attribute,
+along the lines of GHC's {-# INLINE #-}:
+
+   https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+
+It'd be useful to have a way of encouraging the compiler to inline
+functions which its own heuristics might discount as too large or
+otherwise too expensive.
+
+For example, ctypes can generate a large function, "foreign", which
+I'd like inlined and then further reduced.  The generated function
+immediately matches its arguments, its arguments are usually manifest
+values, and the continuations of the match are usually simple values,
+so inlining the function will usually resolve in smaller and more
+efficient code:
+
+  (* definition of "foreign" in generated code *)
+  let foreign x y = match x, y with
+   | "x", Function (Int, Returning Int) ->
+      fun v -> primitive v
+   | (* lots more match cases *)
+
+  (* call to foreign *)
+  let f = foreign "x" (Function (Int, Returning Int))
+
+It'd be nice if the above code compiled down to the equivalent of this:
+
+  let f = fun v -> primitive v
+
+There are a few steps besides inlining needed to accomplish this, but
+it seems likely that a way to guide the inliner is likely to be
+useful, both for the current compiler and once Pierre's new inliner is
+complete.
+
+From lpw25 at cam.ac.uk  Thu Oct 30 14:42:06 2014
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Thu, 30 Oct 2014 14:42:06 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ (Jeremy Yallop's message of "Thu, 30 Oct 2014 14:37:25 +0000")
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+Message-ID: <8638a5hb5t.fsf@cam.ac.uk>
+
+> I'm interested in people's thoughts on adding an @inline attribute,
+> along the lines of GHC's {-# INLINE #-}:
+>
+>    https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+>
+> It'd be useful to have a way of encouraging the compiler to inline
+> functions which its own heuristics might discount as too large or
+> otherwise too expensive.
+
+I'd like it to go one step further and give a warning or error if
+inlining could not be done for some reason (e.g. .cmx file not
+present). I think this is very much inline with OCaml's philosophy of
+predictable performance -- rather than just hope that the compiler
+inlines something I can be certain of it.
+
+Regards,
+
+Leo
+
+From pierre.chambart at ocamlpro.com  Thu Oct 30 14:57:33 2014
+From: pierre.chambart at ocamlpro.com (Pierre Chambart)
+Date: Thu, 30 Oct 2014 15:57:33 +0100
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <8638a5hb5t.fsf@cam.ac.uk>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+Message-ID: <545251DD.2090402@ocamlpro.com>
+
+On 30/10/2014 15:42, Leo White wrote:
+>> I'm interested in people's thoughts on adding an @inline attribute,
+>> along the lines of GHC's {-# INLINE #-}:
+>>
+>>    https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+>>
+>> It'd be useful to have a way of encouraging the compiler to inline
+>> functions which its own heuristics might discount as too large or
+>> otherwise too expensive.
+> I'd like it to go one step further and give a warning or error if
+> inlining could not be done for some reason (e.g. .cmx file not
+> present). I think this is very much inline with OCaml's philosophy of
+> predictable performance -- rather than just hope that the compiler
+> inlines something I can be certain of it.
+>
+> Regards,
+>
+> Leo
+>
+It is certainly something that will get added at some point. Alain is
+also interested in something like that.
+-- 
+Pierre
+
+From anil at recoil.org  Thu Oct 30 16:01:19 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 30 Oct 2014 16:01:19 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <8638a5hb5t.fsf@cam.ac.uk>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+Message-ID: <E8F15CD0-2037-4818-9D32-E23F04E29E6F@recoil.org>
+
+On 30 Oct 2014, at 14:42, Leo White <lpw25 at cam.ac.uk> wrote:
+> 
+>> I'm interested in people's thoughts on adding an @inline attribute,
+>> along the lines of GHC's {-# INLINE #-}:
+>> 
+>>   https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+>> 
+>> It'd be useful to have a way of encouraging the compiler to inline
+>> functions which its own heuristics might discount as too large or
+>> otherwise too expensive.
+> 
+> I'd like it to go one step further and give a warning or error if
+> inlining could not be done for some reason (e.g. .cmx file not
+> present). I think this is very much inline with OCaml's philosophy of
+> predictable performance -- rather than just hope that the compiler
+> inlines something I can be certain of it.
+
+I agree.  I would also like the reverse mode: a compiler mode that
+annotates existing source code with @inline attributes where it
+does actually take place, so that the programmer can get a sense
+of where it has happened in existing code.
+
+This might better be supported through Merlin or something, but I
+always liked how ocamlprof rewrote the source code with comments.
+
+Another hopefully simple option that would be handy is a compiler
+flag that flags a missing .cmx as an error for the purposes of
+cross-module inlining in ocamlopt, to prevent silently missing
+inlining opportunities due to build system bugs.
+
+-anil
+
+From jdimino at janestreet.com  Thu Oct 30 16:15:28 2014
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Thu, 30 Oct 2014 16:15:28 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <8638a5hb5t.fsf@cam.ac.uk>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+Message-ID: <CANhEzE4MqC+fJTyyH7Ad+mcjCVEb-RssWtNgg4DLGgbjmpM_uA@mail.gmail.com>
+
+On Thu, Oct 30, 2014 at 2:42 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+
+> I'd like it to go one step further and give a warning or error if
+> inlining could not be done for some reason (e.g. .cmx file not
+> present). I think this is very much inline with OCaml's philosophy of
+> predictable performance -- rather than just hope that the compiler
+> inlines something I can be certain of it.
+>
+
+Agreed. And an opposite attribute to ensure a function is not inlined would
+be useful too.
+
+-- 
+Jeremie
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20141030/7b4d3193/attachment.html>
+
+From pierre.chambart at ocamlpro.com  Thu Oct 30 16:19:29 2014
+From: pierre.chambart at ocamlpro.com (Pierre Chambart)
+Date: Thu, 30 Oct 2014 17:19:29 +0100
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <CANhEzE4MqC+fJTyyH7Ad+mcjCVEb-RssWtNgg4DLGgbjmpM_uA@mail.gmail.com>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>	<8638a5hb5t.fsf@cam.ac.uk>
+ <CANhEzE4MqC+fJTyyH7Ad+mcjCVEb-RssWtNgg4DLGgbjmpM_uA@mail.gmail.com>
+Message-ID: <54526511.1040001@ocamlpro.com>
+
+On 30/10/2014 17:15, Jeremie Dimino wrote:
+> On Thu, Oct 30, 2014 at 2:42 PM, Leo White <lpw25 at cam.ac.uk
+> <mailto:lpw25 at cam.ac.uk>> wrote:
+>
+>     I'd like it to go one step further and give a warning or error if
+>     inlining could not be done for some reason (e.g. .cmx file not
+>     present). I think this is very much inline with OCaml's philosophy of
+>     predictable performance -- rather than just hope that the compiler
+>     inlines something I can be certain of it.
+>
+>
+> Agreed. And an opposite attribute to ensure a function is not inlined
+> would be useful too.
+>
+> -- 
+> Jeremie
+Why would you need something like that ?
+-- 
+Pierre
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20141030/719fe445/attachment.html>
+
+From pierre.chambart at ocamlpro.com  Thu Oct 30 16:22:34 2014
+From: pierre.chambart at ocamlpro.com (Pierre Chambart)
+Date: Thu, 30 Oct 2014 17:22:34 +0100
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <E8F15CD0-2037-4818-9D32-E23F04E29E6F@recoil.org>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk> <E8F15CD0-2037-4818-9D32-E23F04E29E6F@recoil.org>
+Message-ID: <545265CA.7010805@ocamlpro.com>
+
+On 30/10/2014 17:01, Anil Madhavapeddy wrote:
+> On 30 Oct 2014, at 14:42, Leo White <lpw25 at cam.ac.uk> wrote:
+>>> I'm interested in people's thoughts on adding an @inline attribute,
+>>> along the lines of GHC's {-# INLINE #-}:
+>>>
+>>>   https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+>>>
+>>> It'd be useful to have a way of encouraging the compiler to inline
+>>> functions which its own heuristics might discount as too large or
+>>> otherwise too expensive.
+>> I'd like it to go one step further and give a warning or error if
+>> inlining could not be done for some reason (e.g. .cmx file not
+>> present). I think this is very much inline with OCaml's philosophy of
+>> predictable performance -- rather than just hope that the compiler
+>> inlines something I can be certain of it.
+> I agree.  I would also like the reverse mode: a compiler mode that
+> annotates existing source code with @inline attributes where it
+> does actually take place, so that the programmer can get a sense
+> of where it has happened in existing code.
+>
+> This might better be supported through Merlin or something, but I
+> always liked how ocamlprof rewrote the source code with comments.
+>
+> Another hopefully simple option that would be handy is a compiler
+> flag that flags a missing .cmx as an error for the purposes of
+> cross-module inlining in ocamlopt, to prevent silently missing
+> inlining opportunities due to build system bugs.
+>
+> -anil
+It may be quite difficult to do something like that in the general case:
+
+let f g x =
+  g x
+
+If f is inlined in different contexts, in some cases g can be inlined in f
+and not in other cases.
+-- 
+Pierre
+
+From mark at three-tuns.net  Thu Oct 30 16:27:08 2014
+From: mark at three-tuns.net (Mark Shinwell)
+Date: Thu, 30 Oct 2014 16:27:08 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <54526511.1040001@ocamlpro.com>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+ <CANhEzE4MqC+fJTyyH7Ad+mcjCVEb-RssWtNgg4DLGgbjmpM_uA@mail.gmail.com>
+ <54526511.1040001@ocamlpro.com>
+Message-ID: <20141030162708.GP19476@three-tuns.net>
+
+On Thu, Oct 30, 2014 at 05:19:29PM +0100, Pierre Chambart wrote:
+> > Agreed. And an opposite attribute to ensure a function is not inlined
+> > would be useful too.
+>
+> Why would you need something like that ?
+
+For a function where 99% of the time it takes a short code path, and for
+1% of the time takes the long one, it's probably going to give better
+cache performance if the 1% code path is taken out into another,
+non-inlinable function.
+
+To Anil's point: I've wondered about a mode (using the allocation profiling
+compiler) in Merlin or the like where allocations would be highlighted in
+the editor.  The idea of inlining feedback seems as if it might require
+similar infrastructure.  Could be very cool.
+
+Mark
+
+From anil at recoil.org  Thu Oct 30 16:38:31 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 30 Oct 2014 16:38:31 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <545265CA.7010805@ocamlpro.com>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk> <E8F15CD0-2037-4818-9D32-E23F04E29E6F@recoil.org>
+ <545265CA.7010805@ocamlpro.com>
+Message-ID: <5EF28816-CCF5-4EBE-B3EE-DC60841BBA33@recoil.org>
+
+On 30 Oct 2014, at 16:22, Pierre Chambart <pierre.chambart at ocamlpro.com> wrote:
+> 
+> On 30/10/2014 17:01, Anil Madhavapeddy wrote:
+>> On 30 Oct 2014, at 14:42, Leo White <lpw25 at cam.ac.uk> wrote:
+>>>> I'm interested in people's thoughts on adding an @inline attribute,
+>>>> along the lines of GHC's {-# INLINE #-}:
+>>>> 
+>>>>  https://www.haskell.org/ghc/docs/7.0.2/html/users_guide/pragmas.html#inline-noinline-pragma
+>>>> 
+>>>> It'd be useful to have a way of encouraging the compiler to inline
+>>>> functions which its own heuristics might discount as too large or
+>>>> otherwise too expensive.
+>>> I'd like it to go one step further and give a warning or error if
+>>> inlining could not be done for some reason (e.g. .cmx file not
+>>> present). I think this is very much inline with OCaml's philosophy of
+>>> predictable performance -- rather than just hope that the compiler
+>>> inlines something I can be certain of it.
+>> I agree.  I would also like the reverse mode: a compiler mode that
+>> annotates existing source code with @inline attributes where it
+>> does actually take place, so that the programmer can get a sense
+>> of where it has happened in existing code.
+>> 
+>> This might better be supported through Merlin or something, but I
+>> always liked how ocamlprof rewrote the source code with comments.
+>> 
+>> Another hopefully simple option that would be handy is a compiler
+>> flag that flags a missing .cmx as an error for the purposes of
+>> cross-module inlining in ocamlopt, to prevent silently missing
+>> inlining opportunities due to build system bugs.
+>> 
+>> -anil
+> It may be quite difficult to do something like that in the general case:
+> 
+> let f g x =
+>  g x
+> 
+> If f is inlined in different contexts, in some cases g can be inlined in f
+> and not in other cases.
+
+Right, but I was thinking specifically of the case where the compiler
+finds a .cmxa but not the .cmx, and silently skips cross-module inlining.
+If it doesn't do inlining at all then that's fine, but we spent almost
+three years silently missing it in Mirage due to OASIS not installing
+.cmx files...
+
+-anil
+
+From jdimino at janestreet.com  Thu Oct 30 16:47:06 2014
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Thu, 30 Oct 2014 16:47:06 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <20141030162708.GP19476@three-tuns.net>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+ <CANhEzE4MqC+fJTyyH7Ad+mcjCVEb-RssWtNgg4DLGgbjmpM_uA@mail.gmail.com>
+ <54526511.1040001@ocamlpro.com>
+ <20141030162708.GP19476@three-tuns.net>
+Message-ID: <CANhEzE6GM0B18La7zyO44Ofaxrb0x63Y7s3OMQOZR3ACyv7C_A@mail.gmail.com>
+
+On Thu, Oct 30, 2014 at 4:27 PM, Mark Shinwell <mark at three-tuns.net> wrote:
+
+> > Why would you need something like that ?
+>
+> For a function where 99% of the time it takes a short code path, and for
+> 1% of the time takes the long one, it's probably going to give better
+> cache performance if the 1% code path is taken out into another,
+> non-inlinable function.
+>
+
+Yeah, for instance Hashtbl.find and growing the table.
+
+-- 
+Jeremie
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20141030/05f207eb/attachment.html>
+
+From yallop at gmail.com  Thu Oct 30 17:09:35 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 30 Oct 2014 17:09:35 +0000
+Subject: [compiler-hacking] @inline attribute?
+In-Reply-To: <8638a5hb5t.fsf@cam.ac.uk>
+References: <CAAxsn=GXK4f9DFN4qHSg8M0ZczHnQw1w1s0ywpfXgkB_VZ87PQ@mail.gmail.com>
+ <8638a5hb5t.fsf@cam.ac.uk>
+Message-ID: <CAAxsn=GpjU1wFNurJw1hJFkrOhKPO_fRa0Aoe2pQZCBboHFufg@mail.gmail.com>
+
+On 30 October 2014 14:42, Leo White <lpw25 at cam.ac.uk> wrote:
+>> It'd be useful to have a way of encouraging the compiler to inline
+>> functions which its own heuristics might discount as too large or
+>> otherwise too expensive.
+>
+> I'd like it to go one step further and give a warning or error if
+> inlining could not be done for some reason (e.g. .cmx file not
+> present). I think this is very much inline with
+
+Ha.
+
+> OCaml's philosophy of
+> predictable performance -- rather than just hope that the compiler
+> inlines something I can be certain of it.
+
+Agreed: it'd be useful to have a diagnostic, in the same vein as Simon
+Cruanes' @tailcall implementation
+(https://github.com/ocaml/ocaml/pull/111).
+
+It also seems that it'd be useful to have @inline at both definition
+and call sites.  GHC supports both, via different mechanisms: the
+INLINE pragma for definitions and the special function
+`GHC.Exts.inline` for calls:
+
+   {-# INLINE foo #-}
+   foo x y = x + y
+
+   bar x = inline foo 2 3
+
+In OCaml we might as well use attributes in both cases.
+

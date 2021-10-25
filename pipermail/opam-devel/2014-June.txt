@@ -1,0 +1,915 @@
+From anil at recoil.org  Fri Jun  6 12:31:21 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 6 Jun 2014 12:31:21 +0100
+Subject: [opam-devel] [MirageOS-devel] experimental opam bulk build logs
+	on GitHub
+In-Reply-To: <2298736.WurJKiYHeE@agaric>
+References: <463F65D7-9C75-458B-A046-99DBE57ACFBD@recoil.org>
+ <2298736.WurJKiYHeE@agaric>
+Message-ID: <1655D67C-31EC-4939-A4C3-5B9199EAFA2D@recoil.org>
+
+I was discussing this very problem with Thomas in fact!  Right now we deliberately do a separate opam install for each package, and do not cover depopts at all.
+
+The plan is to integrate the scripts into using Irmin to record the log outputs, since git is hitting congestion collapse with >20 workers (GitHub rejects the push due to another process having the lock).  With Irmin, we can record all the logs into a memory instance, and have one pushing process to GitHub.
+
+When we do have Irmin support, we can calculate a static schedule of all the packages that should be built, and just have spare CPUs pick up some work.  It would be great to build the risky packages (i.e. early up the dependency chain) first, and then move to the leaf packages.
+
+I'm not sure if re-using packages and snapshotting is a good idea in general, but it's very useful for common ones like ocamlfind, Lwt or Core.  Depopts are a big problem here though, particularly for Lwt...
+
+-anil
+
+On 23 May 2014, at 09:50, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+
+> Very nice !
+>  
+> I am wondering, do you 'opam install' every package individually ? We may play some clever tricks with the solver here, like `opam upgrade --criteria=-notuptodate,+new` which will attempt to install as many packages as possible, after which we could iterate on a universe reduced to the not-yet-installed packages. Depopts would be less predictable, but we can't realistically test all possible combinations of those anyway.
+>  
+> Would be nice to find a common place to aggregate such results.
+>  
+> Best,
+> Louis
+>  
+>  
+> Le mardi 20 mai 2014, 17:40:04 Anil Madhavapeddy a ?crit :
+> > Hi,
+> > 
+> > I've written some scripts that use Docker and OPAM to run bulk builds across the entire package repository, and the results are logged and pushed to GitHub daily.
+> > 
+> > If anyone wants to improve the health of the repository, please look at:
+> > 
+> >    https://github.com/ocaml/opam-bulk-logs 
+> > 
+> > in the err/ directories, and submit pull requests fix the failures.
+> > 
+> > Source scripts are still in my personal GitHub; I'll move these to the ocaml/ repo.
+> > 
+> > cheers,
+> > Anil
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+>  
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140606/cf9d2069/attachment.html>
+
+From mika at illouz.net  Fri Jun 13 02:43:11 2014
+From: mika at illouz.net (Mika Illouz)
+Date: Thu, 12 Jun 2014 18:43:11 -0700
+Subject: [opam-devel] ocamlc.opt and pthreads
+Message-ID: <CANvDa5hVoC=m5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ@mail.gmail.com>
+
+Dear OPAM-ers,
+
+I have two systems on which opam is installed.  System A runs Ubuntu
+11.10 (ancient, I know) and opam 1.0.0, with the 4.00.1 ocaml compiler.
+
+A $ lsb_release -i -c
+Distributor ID: Ubuntu
+Codename:       natty
+A $ opam --version
+1.0.0
+
+I have a second system, system B, running Ubuntu 13.10 (less ancient)
+and opam 1.1.1, with the 3.12.1 and 4.01.0 compilers
+
+B $ lsb_release -i -c
+Distributor ID: Ubuntu
+Codename:       saucy
+B $ opam --version
+1.1.1
+
+I will try to compile a simple ocaml program into bytecode, on both
+systems, and for the heck of it, link against system threads library:
+A $ echo "let _ = print_endline \"hi\"" > /tmp/x.ml
+A $ /home/mika/.opam/4.00.1/bin/ocamlc -thread
+/home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+A $ /home/mika/.opam/4.00.1/bin/ocamlc.opt -thread
+/home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+
+No problem so far.
+
+Now on system B:
+B $ echo "let _ = print_endline \"hi\"" > /tmp/x.ml
+B $ /home/mika/.opam/3.12.1/bin/ocamlc -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+B $ /home/mika/.opam/3.12.1/bin/ocamlc.opt -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+File "/tmp/x.ml", line 1, characters 0-1:
+Error: Error on dynamically loaded library:
+/home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so:
+/home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: undefined symbol:
+pthread_sigmask
+
+On system B, ocamlc.opt seems to have trouble, whereas ocamlc does
+not.  (4.01.0 also has the identical issue).  Trying to figure out
+why, I looked at the DLL dependencies of the ocamlc.opt's :
+
+A $ ldd /home/mika/.opam/4.00.1/bin/ocamlc.opt
+        linux-vdso.so.1 =>  (0x00007fffa29ff000)
+        libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fad8291b000)
+        libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fad82717000)
+        libncurses.so.5 => /lib/libncurses.so.5 (0x00007fad824d2000)
+        libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0
+(0x00007fad822b4000)
+        libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fad81f1c000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007fad82bc7000)
+
+B $ ldd /home/mika/.opam/3.12.1/bin/ocamlc.opt
+        linux-vdso.so.1 =>  (0x00007fff8affe000)
+        libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f128410c000)
+        libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f1283f08000)
+        libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1283b3f000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f128441c000)
+
+The critical difference seems to be that system A's ocamlc.opt is linked
+against libpthread.so (and libncurses.so, for whatever reason), and
+system B's does not.  In fact, compilation succeeds on system B if I
+use LD_PRELOAD:
+
+B $ LD_PRELOAD=/lib/x86_64-linux-gnu/libpthread.so.0
+ /home/mika/.opam/3.12.1/bin/ocamlc -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+
+Incidentally, if I compile ocaml from Inria's tarball, compilation
+using ocamlc.opt also fails on system B, unless I configure the the
+compilation of the compiler with "./configure -libs -lpthread" .
+
+The ocaml installed through opam on system A seems to do the right
+thing.  Does anyone have any idea how I can make system B's compiler
+behave similarly?
+
+thanks
+mika
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140612/d454ac6f/attachment.html>
+
+From anil at recoil.org  Fri Jun 13 10:55:23 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 13 Jun 2014 10:55:23 +0100
+Subject: [opam-devel] ocamlc.opt and pthreads
+In-Reply-To: <CANvDa5hVoC=m5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ@mail.gmail.com>
+References: <CANvDa5hVoC=m5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ@mail.gmail.com>
+Message-ID: <1D0468AA-C28C-42C3-B793-0EE6B57F2FB8@recoil.org>
+
+Without looking closely at the specifics, this does seem like a configure script
+issue.  I suspect it would be better reported on Mantis with the configure outputs
+pasted into the report, as that should take care of linking pthread or not depending
+on the OS it's running on.
+
+-anil
+
+On 13 Jun 2014, at 02:43, Mika Illouz <mika at illouz.net> wrote:
+
+> Dear OPAM-ers,
+> 
+> I have two systems on which opam is installed.  System A runs Ubuntu
+> 11.10 (ancient, I know) and opam 1.0.0, with the 4.00.1 ocaml compiler.
+> 
+> A $ lsb_release -i -c
+> Distributor ID: Ubuntu
+> Codename:       natty
+> A $ opam --version
+> 1.0.0
+> 
+> I have a second system, system B, running Ubuntu 13.10 (less ancient)
+> and opam 1.1.1, with the 3.12.1 and 4.01.0 compilers
+> 
+> B $ lsb_release -i -c
+> Distributor ID: Ubuntu
+> Codename:       saucy
+> B $ opam --version
+> 1.1.1
+> 
+> I will try to compile a simple ocaml program into bytecode, on both
+> systems, and for the heck of it, link against system threads library:
+> A $ echo "let _ = print_endline \"hi\"" > /tmp/x.ml
+> A $ /home/mika/.opam/4.00.1/bin/ocamlc -thread /home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+> A $ /home/mika/.opam/4.00.1/bin/ocamlc.opt -thread /home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+> 
+> No problem so far.
+> 
+> Now on system B:
+> B $ echo "let _ = print_endline \"hi\"" > /tmp/x.ml
+> B $ /home/mika/.opam/3.12.1/bin/ocamlc -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+> B $ /home/mika/.opam/3.12.1/bin/ocamlc.opt -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+> File "/tmp/x.ml", line 1, characters 0-1:
+> Error: Error on dynamically loaded library: /home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: /home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: undefined symbol: pthread_sigmask
+> 
+> On system B, ocamlc.opt seems to have trouble, whereas ocamlc does
+> not.  (4.01.0 also has the identical issue).  Trying to figure out
+> why, I looked at the DLL dependencies of the ocamlc.opt's :
+> 
+> A $ ldd /home/mika/.opam/4.00.1/bin/ocamlc.opt
+>         linux-vdso.so.1 =>  (0x00007fffa29ff000)
+>         libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fad8291b000)
+>         libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fad82717000)
+>         libncurses.so.5 => /lib/libncurses.so.5 (0x00007fad824d2000)
+>         libpthread.so.0 => /lib/x86_64-linux-gnu/libpthread.so.0 (0x00007fad822b4000)
+>         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fad81f1c000)
+>         /lib64/ld-linux-x86-64.so.2 (0x00007fad82bc7000)
+> 
+> B $ ldd /home/mika/.opam/3.12.1/bin/ocamlc.opt
+>         linux-vdso.so.1 =>  (0x00007fff8affe000)
+>         libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f128410c000)
+>         libdl.so.2 => /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f1283f08000)
+>         libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1283b3f000)
+>         /lib64/ld-linux-x86-64.so.2 (0x00007f128441c000)
+> 
+> The critical difference seems to be that system A's ocamlc.opt is linked
+> against libpthread.so (and libncurses.so, for whatever reason), and
+> system B's does not.  In fact, compilation succeeds on system B if I
+> use LD_PRELOAD:
+> 
+> B $ LD_PRELOAD=/lib/x86_64-linux-gnu/libpthread.so.0  /home/mika/.opam/3.12.1/bin/ocamlc -thread /home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+> 
+> Incidentally, if I compile ocaml from Inria's tarball, compilation
+> using ocamlc.opt also fails on system B, unless I configure the the
+> compilation of the compiler with "./configure -libs -lpthread" .
+> 
+> The ocaml installed through opam on system A seems to do the right
+> thing.  Does anyone have any idea how I can make system B's compiler
+> behave similarly?
+> 
+> thanks
+> mika
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140613/d252ff87/attachment.html>
+
+From mika at illouz.net  Fri Jun 13 17:45:51 2014
+From: mika at illouz.net (Mika Illouz)
+Date: Fri, 13 Jun 2014 09:45:51 -0700
+Subject: [opam-devel] ocamlc.opt and pthreads
+In-Reply-To: <1D0468AA-C28C-42C3-B793-0EE6B57F2FB8@recoil.org>
+References: <CANvDa5hVoC=m5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ@mail.gmail.com>
+ <1D0468AA-C28C-42C3-B793-0EE6B57F2FB8@recoil.org>
+Message-ID: <CANvDa5gDh81a1vKTymP8MK2gS4GyrSHwSabSJinduyuLcHtYBA@mail.gmail.com>
+
+On Fri, Jun 13, 2014 at 2:55 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>
+> Without looking closely at the specifics, this does seem like a configure script
+> issue.  I suspect it would be better reported on Mantis with the configure outputs
+> pasted into the report, as that should take care of linking pthread or not depending
+> on the OS it's running on.
+
+Ok, thanks Anil.
+
+Could the installation of any particular opam package trigger the
+recompilation of the compiler itself, with a set of ./configure flags
+that would make ocamlc.opt work ?  I'm trying to figure out why one
+system A, things work as expected.
+
+mika
+
+From anil at recoil.org  Sat Jun 14 09:50:14 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 14 Jun 2014 09:50:14 +0100
+Subject: [opam-devel] ocamlc.opt and pthreads
+In-Reply-To: <CANvDa5gDh81a1vKTymP8MK2gS4GyrSHwSabSJinduyuLcHtYBA@mail.gmail.com>
+References: <CANvDa5hVoC=m5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ@mail.gmail.com>
+ <1D0468AA-C28C-42C3-B793-0EE6B57F2FB8@recoil.org>
+ <CANvDa5gDh81a1vKTymP8MK2gS4GyrSHwSabSJinduyuLcHtYBA@mail.gmail.com>
+Message-ID: <3A071FE4-602A-41C8-A71F-6408D314C9C8@recoil.org>
+
+On 13 Jun 2014, at 17:45, Mika Illouz <mika at illouz.net> wrote:
+
+> On Fri, Jun 13, 2014 at 2:55 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> 
+>> Without looking closely at the specifics, this does seem like a configure script
+>> issue.  I suspect it would be better reported on Mantis with the configure outputs
+>> pasted into the report, as that should take care of linking pthread or not depending
+>> on the OS it's running on.
+> 
+> Ok, thanks Anil.
+> 
+> Could the installation of any particular opam package trigger the
+> recompilation of the compiler itself, with a set of ./configure flags
+> that would make ocamlc.opt work ?  I'm trying to figure out why one
+> system A, things work as expected.
+
+The compiler is always explicit in OPAM (either via the preinstalled 
+system one or a switch).  So the easiest way to track this down would
+be to look in the compilers/ directory in:
+  https://github.com/ocaml/opam-repository
+
+...where the build steps are in the relevant .comp file for the switch
+that you're using.
+
+-anil
+
+
+
+
+From louis.gesbert at ocamlpro.com  Wed Jun 25 16:56:14 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 25 Jun 2014 17:56:14 +0200
+Subject: [opam-devel] On self-upgrade
+Message-ID: <4120039.pts5KrIoLS@ocp-dell>
+
+Hi all,
+
+
+The self-upgrade feature was introduced on March 20 [1], and there has been very little feedback so far, yet I have been told it raises some concerns so let me summarise the (simple) idea behind it and how it's expected to work. Note that it opens the gate for self-upgrades but the feature in itself doesn't trigger any new behaviour. I've more recently been adding version-checks [2] and a companion opam self-upgrade package [3].
+
+* At startup, as soon as possible, OPAM checks if there is an 'opam' exe and 'opam.version' file in OPAMROOT.
+* If the version is newer than current, OPAM exec()s it.
+* We pass information through the environment to make sure that only happens once.
+* You can bypass it with OPAMNOSELFUPGRADE=1 or --no-self-upgrade
+* Information about what happens is present in several places to avoid surprises:
+  - at the beginning of the debug log
+  - in `opam config report`
+  - as a warning if the system version is not a release
+* This is opt-in: the idea is to provide the opam and opam.version files through an opam package, that the user explicitely installs [3]. The package should explain what happens to the user (eg. via descr and post-messages).
+* It can already be tested with `opam pin opam-bin git://github.com/ocaml/opam`. You need a recent version.
+* It follows that upgrades may come through the opam-repository, or git if pinned.
+
+I've attempted to make this as fool-proof as possible, and put good grounds first to enable further fixes within the opam package. The worst scenario I can think of is that your opam-self package is removed (failed to build, upgrade interrupted, or whatever reason). We then fallback to the system OPAM, that should still work ; if the repo format changed in the meantime, opam will advertise that it needs a newer version at startup, and you'll need to go through another channel to get it back. Annoying but not a critical failure, and we could mitigate this eg. with a backup advertised in the post_messages.
+
+This feature has long been asked for [4] and I do think it is a useful one, if done right: it makes deployment of new versions faster and easier, helps people try out bleeding-edge versions if they want to, and generally makes upgrading easier for the user. Besides, people are expecting it.
+
+Cheers,
+Louis
+
+
+PS: I'm currently going through the bug-tracker and preparing a 1.2.0-beta
+
+
+
+[1] https://github.com/ocaml/opam/pull/1257
+[2] https://github.com/ocaml/opam/pull/1440
+[3] https://github.com/ocaml/opam/pull/1467
+[4] https://github.com/ocaml/opam/issues/528
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140625/9cea5658/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Wed Jun 25 19:07:36 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 25 Jun 2014 20:07:36 +0200
+Subject: [opam-devel] On self-upgrade
+Message-ID: <2897924.M6T5UqZMQv@ocp-dell>
+
+Hi all,
+
+
+The self-upgrade feature was introduced on March 20 [1], and there has been very little feedback so far, yet I have been told it raises some concerns so let me summarise the (simple) idea behind it and how it's expected to work. Note that it opens the gate for self-upgrades but the feature in itself doesn't trigger any new behaviour. I've more recently been adding version-checks [2] and a companion opam self-upgrade package [3].
+
+* At startup, as soon as possible, OPAM checks if there is an 'opam' exe and 'opam.version' file in OPAMROOT.
+* If the version is newer than current, OPAM exec()s it.
+* We pass information through the environment to make sure that only happens once.
+* You can bypass it with OPAMNOSELFUPGRADE=1 or --no-self-upgrade
+* Information about what happens is present in several places to avoid surprises:
+  - at the beginning of the debug log
+  - in `opam config report`
+  - as a warning if the system version is not a release
+* This is opt-in: the idea is to provide the opam and opam.version files through an opam package, that the user explicitely installs [3]. The package should explain what happens to the user (eg. via descr and post-messages).
+* It can already be tested with `opam pin opam-bin git://github.com/ocaml/opam`. You need a recent version.
+* It follows that upgrades may come through the opam-repository, or git if pinned.
+
+I've attempted to make this as fool-proof as possible, and put good grounds first to enable further fixes within the opam package. The worst scenario I can think of is that your opam-self package is removed (failed to build, upgrade interrupted, or whatever reason). We then fallback to the system OPAM, that should still work ; if the repo format changed in the meantime, opam will advertise that it needs a newer version at startup, and you'll need to go through another channel to get it back. Annoying but not a critical failure, and we could mitigate this eg. with a backup advertised in the post_messages.
+
+This feature has long been asked for [4] and I do think it is a useful one, if done right: it makes deployment of new versions faster and easier, helps people try out bleeding-edge versions if they want to, and generally makes upgrading easier for the user. Besides, people are expecting it.
+
+Cheers,
+Louis
+
+
+PS: I'm currently going through the bug-tracker and preparing a 1.2.0-beta
+
+
+
+[1] https://github.com/ocaml/opam/pull/1257
+[2] https://github.com/ocaml/opam/pull/1440
+[3] https://github.com/ocaml/opam/pull/1467
+[4] https://github.com/ocaml/opam/issues/528
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140625/042bb1f5/attachment.html>
+
+From anil at recoil.org  Wed Jun 25 19:25:23 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 25 Jun 2014 19:25:23 +0100
+Subject: [opam-devel] On self-upgrade
+In-Reply-To: <2897924.M6T5UqZMQv@ocp-dell>
+References: <2897924.M6T5UqZMQv@ocp-dell>
+Message-ID: <7326DB4F-DE8D-4F68-B6D4-964198B9AB79@recoil.org>
+
+On 25 Jun 2014, at 19:07, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+
+> I've attempted to make this as fool-proof as possible, and put good grounds first to enable further fixes within the opam package. The worst scenario I can think of is that your opam-self package is removed (failed to build, upgrade interrupted, or whatever reason). We then fallback to the system OPAM, that should still work ; if the repo format changed in the meantime, opam will advertise that it needs a newer version at startup, and you'll need to go through another channel to get it back. Annoying but not a critical failure, and we could mitigate this eg. with a backup advertised in the post_messages.
+> 
+
+We've had all sorts of problems in Mirage with having the tool (opam package 'mirage') invoke OPAM to satisfy package dependencies, resulting in OPAM trying to recompile Mirage itself (due to a depopt showing up), but then resulting in a failure due to the classic 'text file busy' error when trying to move the old binary out of the way.
+
+Is there an RT test that goes through the above sequence to simulate an upgrade and downgrade?  I really fear that this route will cause us to ignore system/OS packaging, which is really important to keep up-to-date for a package manager.  The self-upgrade route from within OPAM should never be the primary way to obtain the latest version of the package manager.
+
+-anil
+
+From thomas at gazagnaire.org  Wed Jun 25 20:15:27 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 25 Jun 2014 20:15:27 +0100
+Subject: [opam-devel] On self-upgrade
+In-Reply-To: <7326DB4F-DE8D-4F68-B6D4-964198B9AB79@recoil.org>
+References: <2897924.M6T5UqZMQv@ocp-dell>
+ <7326DB4F-DE8D-4F68-B6D4-964198B9AB79@recoil.org>
+Message-ID: <F0862585-EC53-4E05-9878-D5B2A9D01AEF@gazagnaire.org>
+
+Thanks for you message Louis, it's useful to get some insight of you design.
+
+> We've had all sorts of problems in Mirage with having the tool (opam package 'mirage') invoke OPAM to satisfy package dependencies, resulting in OPAM trying to recompile Mirage itself (due to a depopt showing up), but then resulting in a failure due to the classic 'text file busy' error when trying to move the old binary out of the way.
+> 
+> Is there an RT test that goes through the above sequence to simulate an upgrade and downgrade?  I really fear that this route will cause us to ignore system/OS packaging, which is really important to keep up-to-date for a package manager.  The self-upgrade route from within OPAM should never be the primary way to obtain the latest version of the package manager.
+
+Self-upgrade is indeed kind of simple when you have only one channel to get the software you are updating. Louis, do you have any idea in mind on how this will interact with system upgrade (for instance someone doing `brew update` which will install a newer/incompatible version of your self-upgraded package) ?
+
+I fear that this feature will force us to support all kind of tricky upgrade scenario (1.2 -> 1.3 is ok, but what about 1.2 -> 2.0, or 1.2 -> pin -> 1.1 ?). It's easy to limit these kind of scenario when you control the update channels. When you don't it can quickly become a nightmare.
+
+Thomas
+
+
+
+From anil at recoil.org  Wed Jun 25 20:22:17 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 25 Jun 2014 20:22:17 +0100
+Subject: [opam-devel] On self-upgrade
+In-Reply-To: <F0862585-EC53-4E05-9878-D5B2A9D01AEF@gazagnaire.org>
+References: <2897924.M6T5UqZMQv@ocp-dell>
+ <7326DB4F-DE8D-4F68-B6D4-964198B9AB79@recoil.org>
+ <F0862585-EC53-4E05-9878-D5B2A9D01AEF@gazagnaire.org>
+Message-ID: <1C87C164-7A4B-4349-A61C-79C879884DF1@recoil.org>
+
+On 25 Jun 2014, at 20:15, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+
+> Thanks for you message Louis, it's useful to get some insight of you design.
+> 
+>> We've had all sorts of problems in Mirage with having the tool (opam package 'mirage') invoke OPAM to satisfy package dependencies, resulting in OPAM trying to recompile Mirage itself (due to a depopt showing up), but then resulting in a failure due to the classic 'text file busy' error when trying to move the old binary out of the way.
+>> 
+>> Is there an RT test that goes through the above sequence to simulate an upgrade and downgrade?  I really fear that this route will cause us to ignore system/OS packaging, which is really important to keep up-to-date for a package manager.  The self-upgrade route from within OPAM should never be the primary way to obtain the latest version of the package manager.
+> 
+> Self-upgrade is indeed kind of simple when you have only one channel to get the software you are updating. Louis, do you have any idea in mind on how this will interact with system upgrade (for instance someone doing `brew update` which will install a newer/incompatible version of your self-upgraded package) ?
+> 
+> I fear that this feature will force us to support all kind of tricky upgrade scenario (1.2 -> 1.3 is ok, but what about 1.2 -> 2.0, or 1.2 -> pin -> 1.1 ?). It's easy to limit these kind of scenario when you control the update channels. When you don't it can quickly become a nightmare.
+
+Yeah, it's worth noting that this did indeed horribly break in the past (the system compiler upgrade from 4.00.1 to 4.01.0 and OPAM from 1.0 to 1.1 didn't work if you did a `brew update` and upgrade both simultaneously).  Upgrading in general is a very tedious, err-prone process that is usually poorly tested, with bugs only biting you a year down the line on release+1 :-)
+
+This might be a little radical, but it's worth considering having a completely separate directory namespace for repo version bumps, and just recompile all the packages on upgrade (it's a very rare situation, after all).
+
+~/.opam/1.1/<...>
+~/.opam/1.2/<...>
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Thu Jun 26 09:50:59 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 26 Jun 2014 10:50:59 +0200
+Subject: [opam-devel] On self-upgrade
+In-Reply-To: <1C87C164-7A4B-4349-A61C-79C879884DF1@recoil.org>
+References: <2897924.M6T5UqZMQv@ocp-dell>
+ <F0862585-EC53-4E05-9878-D5B2A9D01AEF@gazagnaire.org>
+ <1C87C164-7A4B-4349-A61C-79C879884DF1@recoil.org>
+Message-ID: <2737598.fmlzsVokcs@agaric>
+
+Le mercredi 25 juin 2014, 20:22:17 Anil Madhavapeddy a ?crit :
+> On 25 Jun 2014, at 20:15, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+> > Thanks for you message Louis, it's useful to get some insight of you design.
+> > 
+> >> We've had all sorts of problems in Mirage with having the tool (opam package 'mirage') invoke OPAM to satisfy package dependencies, resulting in OPAM trying to recompile Mirage itself (due to a depopt showing up), but then resulting in a failure due to the classic 'text file busy' error when trying to move the old binary out of the way.
+
+Yes, that's the first thing I tested: renaming the file is normally enough, and `install --backup` takes care of that correctly. As a side note, it seems to be cmdliner that makes the exe "busy", don't know why, but I noticed I couldn't anymore `make install` my running program once I started using it.
+
+> >> Is there an RT test that goes through the above sequence to simulate an upgrade and downgrade?
+
+Not yet.
+
+> >> I really fear that this route will cause us to ignore system/OS packaging, which is really important to keep up-to-date for a package manager.
+> >> The self-upgrade route from within OPAM should never be the primary way to obtain the latest version of the package manager.
+
+I see. Not at all my intent, and I for one prefer to always go through my system package manager when possible -- Debian is still a quite good quality insurance. I especially don't like when I am left no choice but to enter n steps of self upgrading __after__ installation (hello Steam ! Well I guess when you're an evil DRM engine it makes more sense. Even binary blobs in this case).
+
+So I intended this more as a way to address concerns like "I want the latest OPAM version __now__, what do I do ?" and test new versions a little more widely, never thought this could replace packaging, or even become mandatory. Well then, Anil is the one doing most of the packaging work so I don't want to insist too much :) 
+
+> > Self-upgrade is indeed kind of simple when you have only one channel to get the software you are updating. Louis, do you have any idea in mind on how this will interact with system upgrade (for instance someone doing `brew update` which will install a newer/incompatible version of your self-upgraded package) ?
+
+Quite simply: self-upgrade only lives within an OPAMROOT, system packages live in $PATH, so they won't ever override each other. You always run from the PATH, and opam will pick the latest version of the two. There is a warning if you've got an opsolete self-upgrade installed.
+
+> > I fear that this feature will force us to support all kind of tricky upgrade scenario (1.2 -> 1.3 is ok, but what about 1.2 -> 2.0, or 1.2 -> pin -> 1.1 ?). It's easy to limit these kind of scenario when you control the update channels. When you don't it can quickly become a nightmare.
+
+Not sure I get you exactly, but the current behaviour is pretty strict anyway: OPAM will refuse to load an OPAMROOT when its version ($OPAMROOT/config) is newer than itself, printing a message that it needs to be upgraded. So you're not allowed to downgrade, and people getting in this situation are supposed to have an idea how they got there.
+
+> Yeah, it's worth noting that this did indeed horribly break in the past (the system compiler upgrade from 4.00.1 to 4.01.0 and OPAM from 1.0 to 1.1 didn't work if you did a `brew update` and upgrade both simultaneously).  Upgrading in general is a very tedious, err-prone process that is usually poorly tested, with bugs only biting you a year down the line on release+1 :-)
+> 
+> This might be a little radical, but it's worth considering having a completely separate directory namespace for repo version bumps, and just recompile all the packages on upgrade (it's a very rare situation, after all).
+> 
+> ~/.opam/1.1/<...>
+> ~/.opam/1.2/<...>
+> 
+
+Why not -- but getting a different universe altogether in case of a downgrade could get even more confusing, so I may be in favor of a complete backup with an easy rollback command (stg like "on startup, if $OPAMROOT/config#opam-version > $self-version && exists $OPAMROOT/backups/$self-version then <print error and propose a (temporary ?) rollback to the backed-up state>")
+
+
+Actually the thing that's still a little clunky with the current design is that an opam package is not the perfect fit for what we are wanting to do: self-upgrade shouldn't be recompiled in case its dependencies are, and certainly shouldn't be removed if they are -- but that's the build-dep problem. Other packages also shouldn't depend on it, but mostly, it doesn't really make sense to have it belong to a given switch only. That's an issue that has already been raised by people wanting a cross-switch binary directory to install tools though, e.g. for ocp-indent.
+
+
+My current opinion on this is that the feature in itself is OK, but we should be quite careful how and to whom we advertise it. Certainly not in the Quick_install, possibly not even in the FAQ ; just checking how you feel about it.
+
+
+Cheers,
+Louis
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140626/10b5f8a8/attachment.html>
+
+From thomas at gazagnaire.org  Thu Jun 26 11:14:14 2014
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 26 Jun 2014 11:14:14 +0100
+Subject: [opam-devel] On self-upgrade
+In-Reply-To: <1C87C164-7A4B-4349-A61C-79C879884DF1@recoil.org>
+References: <2897924.M6T5UqZMQv@ocp-dell>
+ <7326DB4F-DE8D-4F68-B6D4-964198B9AB79@recoil.org>
+ <F0862585-EC53-4E05-9878-D5B2A9D01AEF@gazagnaire.org>
+ <1C87C164-7A4B-4349-A61C-79C879884DF1@recoil.org>
+Message-ID: <5655EF73-9641-4542-9304-960CB714CBA2@gazagnaire.org>
+
+> This might be a little radical, but it's worth considering having a completely separate directory namespace for repo version bumps, and just recompile all the packages on upgrade (it's a very rare situation, after all).
+> 
+> ~/.opam/1.1/<...>
+> ~/.opam/1.2/<...>
+
+That's maybe a bit too much :p
+
+
+From markus.mottl at gmail.com  Thu Jun 26 17:58:21 2014
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 26 Jun 2014 12:58:21 -0400
+Subject: [opam-devel] Stable archive checksums
+Message-ID: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+
+Hi,
+
+since a lot of OPAM packagers are using Github, to which I'm
+transitioning my projects, I just wondered how you are dealing with
+the problem of downloading archives with stable checksums.
+
+The online information is rather confusing, but it is my impression
+that there is no guarantee that downloading an archive from Github
+will give you files with equivalent checksums.  Github apparently
+doesn't support download pages with fixed files anymore unlike
+Bitbucket, which I'm currently using.  AFAIK, Github cleans out
+generated archive files if not downloaded again soon enough so there
+is some chance that changes to e.g. git, tar, or gzip could screw up
+archive checksums.
+
+Any suggestions on how to best interact with Github for downloading
+stable packages via OPAM?
+
+Regards,
+Markus
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From anil at recoil.org  Thu Jun 26 20:22:15 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 26 Jun 2014 20:22:15 +0100
+Subject: [opam-devel] Stable archive checksums
+In-Reply-To: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+References: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+Message-ID: <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+
+On 26 Jun 2014, at 17:58, Markus Mottl <markus.mottl at gmail.com> wrote:
+
+> Hi,
+> 
+> since a lot of OPAM packagers are using Github, to which I'm
+> transitioning my projects, I just wondered how you are dealing with
+> the problem of downloading archives with stable checksums.
+> 
+> The online information is rather confusing, but it is my impression
+> that there is no guarantee that downloading an archive from Github
+> will give you files with equivalent checksums.  Github apparently
+> doesn't support download pages with fixed files anymore unlike
+> Bitbucket, which I'm currently using.  AFAIK, Github cleans out
+> generated archive files if not downloaded again soon enough so there
+> is some chance that changes to e.g. git, tar, or gzip could screw up
+> archive checksums.
+> 
+> Any suggestions on how to best interact with Github for downloading
+> stable packages via OPAM?
+
+GitHub does support downloadable binary archives, but it's called
+"Releases".  See for example:
+
+https://github.com/ocaml/opam/releases
+
+for the binary uploads against a tag.
+
+API is here:
+https://developer.github.com/v3/repos/releases/
+
+My OCaml GitHub bindings have a little command line utility to upload stuff via the command-line (you can probably do the same with Curl as well).
+
+```
+opam install github
+git-upload-release --help
+```
+
+cheers,
+Anil
+
+From agarwal1975 at gmail.com  Thu Jun 26 20:33:57 2014
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 26 Jun 2014 15:33:57 -0400
+Subject: [opam-devel] Stable archive checksums
+In-Reply-To: <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+References: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+ <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+Message-ID: <CAMu2m2KpmbM_K62neEaG653b8RvtL4nyoqmxxNxxryE6DyLomA@mail.gmail.com>
+
+A quick grep through the current 2,383 url files gives me 970 that are
+pointing to github.com. Of that, 810 have "/archive/" in the url, which I
+believe indicates that they are pointing to the tarballs automatically
+generated for a commit. Doesn't this indicate a potential big problem if
+github changes the way they generate tarballs. All of these checksums will
+fail.
+
+Only 10 of the 970 have "/releases/" in their url, which I think indicates
+a fixed binary file.
+
+
+
+On Thu, Jun 26, 2014 at 3:22 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> On 26 Jun 2014, at 17:58, Markus Mottl <markus.mottl at gmail.com> wrote:
+>
+> > Hi,
+> >
+> > since a lot of OPAM packagers are using Github, to which I'm
+> > transitioning my projects, I just wondered how you are dealing with
+> > the problem of downloading archives with stable checksums.
+> >
+> > The online information is rather confusing, but it is my impression
+> > that there is no guarantee that downloading an archive from Github
+> > will give you files with equivalent checksums.  Github apparently
+> > doesn't support download pages with fixed files anymore unlike
+> > Bitbucket, which I'm currently using.  AFAIK, Github cleans out
+> > generated archive files if not downloaded again soon enough so there
+> > is some chance that changes to e.g. git, tar, or gzip could screw up
+> > archive checksums.
+> >
+> > Any suggestions on how to best interact with Github for downloading
+> > stable packages via OPAM?
+>
+> GitHub does support downloadable binary archives, but it's called
+> "Releases".  See for example:
+>
+> https://github.com/ocaml/opam/releases
+>
+> for the binary uploads against a tag.
+>
+> API is here:
+> https://developer.github.com/v3/repos/releases/
+>
+> My OCaml GitHub bindings have a little command line utility to upload
+> stuff via the command-line (you can probably do the same with Curl as well).
+>
+> ```
+> opam install github
+> git-upload-release --help
+> ```
+>
+> cheers,
+> Anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140626/f765cbe1/attachment.html>
+
+From anil at recoil.org  Thu Jun 26 20:37:26 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 26 Jun 2014 20:37:26 +0100
+Subject: [opam-devel] Stable archive checksums
+In-Reply-To: <CAMu2m2KpmbM_K62neEaG653b8RvtL4nyoqmxxNxxryE6DyLomA@mail.gmail.com>
+References: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+ <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+ <CAMu2m2KpmbM_K62neEaG653b8RvtL4nyoqmxxNxxryE6DyLomA@mail.gmail.com>
+Message-ID: <B68175A4-B155-416D-AAEC-589786E4500E@recoil.org>
+
+GitHub archives are stable in my experience except under one notable change: if you do a repo transfer to another organization, the redirect from the old one points to releases with a new checksum.  This is a fairly rare event, but it's worth keeping in mind.
+
+Markus, have you spotted other cases where checksums change?
+
+-anil
+
+On 26 Jun 2014, at 20:33, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+
+> A quick grep through the current 2,383 url files gives me 970 that are pointing to github.com. Of that, 810 have "/archive/" in the url, which I believe indicates that they are pointing to the tarballs automatically generated for a commit. Doesn't this indicate a potential big problem if github changes the way they generate tarballs. All of these checksums will fail.
+> 
+> Only 10 of the 970 have "/releases/" in their url, which I think indicates a fixed binary file.
+> 
+> 
+> 
+> On Thu, Jun 26, 2014 at 3:22 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 26 Jun 2014, at 17:58, Markus Mottl <markus.mottl at gmail.com> wrote:
+> 
+> > Hi,
+> >
+> > since a lot of OPAM packagers are using Github, to which I'm
+> > transitioning my projects, I just wondered how you are dealing with
+> > the problem of downloading archives with stable checksums.
+> >
+> > The online information is rather confusing, but it is my impression
+> > that there is no guarantee that downloading an archive from Github
+> > will give you files with equivalent checksums.  Github apparently
+> > doesn't support download pages with fixed files anymore unlike
+> > Bitbucket, which I'm currently using.  AFAIK, Github cleans out
+> > generated archive files if not downloaded again soon enough so there
+> > is some chance that changes to e.g. git, tar, or gzip could screw up
+> > archive checksums.
+> >
+> > Any suggestions on how to best interact with Github for downloading
+> > stable packages via OPAM?
+> 
+> GitHub does support downloadable binary archives, but it's called
+> "Releases".  See for example:
+> 
+> https://github.com/ocaml/opam/releases
+> 
+> for the binary uploads against a tag.
+> 
+> API is here:
+> https://developer.github.com/v3/repos/releases/
+> 
+> My OCaml GitHub bindings have a little command line utility to upload stuff via the command-line (you can probably do the same with Curl as well).
+> 
+> ```
+> opam install github
+> git-upload-release --help
+> ```
+> 
+> cheers,
+> Anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140626/db3662e3/attachment.html>
+
+From markus.mottl at gmail.com  Thu Jun 26 21:35:53 2014
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 26 Jun 2014 16:35:53 -0400
+Subject: [opam-devel] Stable archive checksums
+In-Reply-To: <B68175A4-B155-416D-AAEC-589786E4500E@recoil.org>
+References: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+ <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+ <CAMu2m2KpmbM_K62neEaG653b8RvtL4nyoqmxxNxxryE6DyLomA@mail.gmail.com>
+ <B68175A4-B155-416D-AAEC-589786E4500E@recoil.org>
+Message-ID: <CAP_800qy42wJSp5ea3+P4xfsrcNv5F2j5tWGdur1_gJiHqUFoA@mail.gmail.com>
+
+Thanks for pointing me to the GitHub OCaml-bindings, this is likely
+going to be helpful for automating releases.
+
+I ran into checksum problems with Mercurial a long time ago when using
+version control tags to obtain archives on the fly, which is why I
+want to avoid this issue with GitHub.
+
+I think OPAM-contributors should be aware that tool upgrades at GitHub
+(e.g. git, tar, gzip) could potentially break checksums across all
+versions of all their packages, which would surely cause a lot of
+headaches.  Using the "Releases"-feature on GitHub to upload fixed
+tarballs may be the only reliable way around this.  It seems only 10
+packages are getting this right as of now...
+
+Regards,
+Markus
+
+On Thu, Jun 26, 2014 at 3:37 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> GitHub archives are stable in my experience except under one notable change:
+> if you do a repo transfer to another organization, the redirect from the old
+> one points to releases with a new checksum.  This is a fairly rare event,
+> but it's worth keeping in mind.
+>
+> Markus, have you spotted other cases where checksums change?
+>
+> -anil
+>
+> On 26 Jun 2014, at 20:33, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+>
+> A quick grep through the current 2,383 url files gives me 970 that are
+> pointing to github.com. Of that, 810 have "/archive/" in the url, which I
+> believe indicates that they are pointing to the tarballs automatically
+> generated for a commit. Doesn't this indicate a potential big problem if
+> github changes the way they generate tarballs. All of these checksums will
+> fail.
+>
+> Only 10 of the 970 have "/releases/" in their url, which I think indicates a
+> fixed binary file.
+>
+>
+>
+> On Thu, Jun 26, 2014 at 3:22 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>>
+>> On 26 Jun 2014, at 17:58, Markus Mottl <markus.mottl at gmail.com> wrote:
+>>
+>> > Hi,
+>> >
+>> > since a lot of OPAM packagers are using Github, to which I'm
+>> > transitioning my projects, I just wondered how you are dealing with
+>> > the problem of downloading archives with stable checksums.
+>> >
+>> > The online information is rather confusing, but it is my impression
+>> > that there is no guarantee that downloading an archive from Github
+>> > will give you files with equivalent checksums.  Github apparently
+>> > doesn't support download pages with fixed files anymore unlike
+>> > Bitbucket, which I'm currently using.  AFAIK, Github cleans out
+>> > generated archive files if not downloaded again soon enough so there
+>> > is some chance that changes to e.g. git, tar, or gzip could screw up
+>> > archive checksums.
+>> >
+>> > Any suggestions on how to best interact with Github for downloading
+>> > stable packages via OPAM?
+>>
+>> GitHub does support downloadable binary archives, but it's called
+>> "Releases".  See for example:
+>>
+>> https://github.com/ocaml/opam/releases
+>>
+>> for the binary uploads against a tag.
+>>
+>> API is here:
+>> https://developer.github.com/v3/repos/releases/
+>>
+>> My OCaml GitHub bindings have a little command line utility to upload
+>> stuff via the command-line (you can probably do the same with Curl as well).
+>>
+>> ```
+>> opam install github
+>> git-upload-release --help
+>> ```
+>>
+>> cheers,
+>> Anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+>
+
+
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From markus.mottl at gmail.com  Fri Jun 27 23:08:10 2014
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Fri, 27 Jun 2014 18:08:10 -0400
+Subject: [opam-devel] Stable archive checksums
+In-Reply-To: <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+References: <CAP_800rdag7RjAjew=N5uO1GJwv2Z0zGk7QEKhT2cE_cOPy0eA@mail.gmail.com>
+ <F1A58619-8EE3-4A65-B346-3E20894F2AE2@recoil.org>
+Message-ID: <CAP_800rKzYXZZDKdPG2oZHzTRRscbrS6kiUZS7kG-Jd3k4u-0w@mail.gmail.com>
+
+On Thu, Jun 26, 2014 at 3:22 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> My OCaml GitHub bindings have a little command line utility to upload stuff via the command-line (you can probably do the same with Curl as well).
+
+I've just forked ocaml-github and added a new application
+"git-create-release", which does the obvious.  It also allows you to
+upload multiple assets (e.g. tarballs) in one call.  This should make
+it easier to script the process of making a new release.  E.g. you
+could grep the latest version of your software via "git tag", create a
+stable tarball for it, and then create the new release on GitHub.  You
+may even want to create a new OPAM package (with the correct SHA-1
+sum) automatically for it then.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+

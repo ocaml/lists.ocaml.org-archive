@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3CF752EE6A90A04D38AC27EB6FE988BC89%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001442.html">
+   <LINK REL="Next"  HREF="001444.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%5BRFC%5D%20OPAM%20files%20as%20%2Athe%2A%20OCaml%20package%20metadata%0A%20format&In-Reply-To=%3CF752EE6A90A04D38AC27EB6FE988BC89%40erratique.ch%3E"
+       TITLE="[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Thu Apr 14 13:30:19 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001442.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+        <LI>Next message: <A HREF="001444.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1443">[ date ]</a>
+              <a href="thread.html#1443">[ thread ]</a>
+              <a href="subject.html#1443">[ subject ]</a>
+              <a href="author.html#1443">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le jeudi, 14 avril 2016 &#224; 10:04, Louis Gesbert a &#233;crit :
+&gt;<i> Yup, 2.0~alpha is getting rolled out. I'll be grateful if you are ready to
+</I>&gt;<i> take the risk, as you have been most helpful with your reports on previous  
+</I>&gt;<i> releases.
+</I>
+What kind of time frame to envision ? Should I write topkg directly against 2.0 ? For example the existence of x-fields may have an impact on the actual package description API (I'd like to specify the location of the readme, change log and license files there rather than in the topkg package description as this may be useful to other consumers, e.g. doc indexers) and topkg's description API should not be changed too often.
+
+Also depending on what 2.0 the tool provides some aspects of topkg may be simplified. Namely I need #2446 (opam query) to avoid an ipc call from the package description to topkg the tool on pinned topkg packages (see note [1] if you are interested why).  
+
+&gt;<i> The granularity of opam libs for manipulating these files has been much
+</I>&gt;<i> improved, but it could probably still be improved. Feel free to suggest such  
+</I>&gt;<i> changes (OpamFile should probably be split; it would be better to do these  
+</I>&gt;<i> _before_ everyone migrates to the new APIs). Also, the data handling is done  
+</I>&gt;<i> through the new lens-like OpamFormat module (in lib opam-format).
+</I>
+I think it would be nice to have an independent library with simple deps that handles the data formats (e.g. opam-installer should use this). Anil suggested somewhere else that opam-lib as it stands is not so easy to install due to the dependency cone.
+
+  
+&gt;<i> &gt; 1. Where should those be installed in `lib:` (like METAs) or `etc:` (seems
+</I>&gt;<i> &gt; more logical) or &#8230; ?
+</I>&gt;<i>  
+</I>&gt;<i> Two things:
+</I>&gt;<i> - opam now puts all its metadata into a .opam-switch/ subdir below the switch  
+</I>&gt;<i> prefix. This is cleaner.
+</I>
+Why is the directory hidden ?  
+  
+If I'm not mistaken these two things do not help me at all with the request which is to be able to handle non opam-managed scenarios. Basically the workflow I see for for OS package managers and topkg packages is the following:
+
+1) Download the distribution archive of the package.
+2) Build the package according to the build instructions of the OPAM file present in the archive
+3) Process the generated OPAM install file for installing the package (e.g. using opam-installer).
+
+Now 3) should install the OPAM file present in the archive aswell so that tooling external to opam can easily access package metadata stored in OPAM files.
+  
+&gt;<i> Unless you use overlay files (`files/xxx` that get added to the archive),
+</I>&gt;<i> which should really only be used for hot-patching in the repo and not on  
+</I>&gt;<i> development packages, you can now put everything within a single opam file:
+</I>&gt;<i>  
+</I>&gt;<i> - For the description, use a `descr:` field, and a simple string. The new  
+</I>&gt;<i> `&quot;&quot;&quot;`-delimited syntax for strings makes this more convenient.
+</I>
+Would it please be possible to split `descr` into `synopsis` (the one-line tagline) and `descr` (the long description) ?  
+  
+&gt;<i> &gt; Daniel:
+</I>&gt;<i> &gt; 1) There's no support at the moment for such directories in OPAM install
+</I>&gt;<i> &gt; file
+</I>&gt;<i>  
+</I>&gt;<i> This can easily be added if we get a consensus
+</I>
+FWIW I'm not interested in arguing where this should live, I have already too many other things to decide on. Just tell me where these OPAM files should get installed and provide me with support for the location in OPAM install files...
+
+&gt;<i> &gt; Build tool link helpers, documentation indexer, finder and viewers, etc.
+</I>&gt;<i> The repository maintainers will probably have to put some guidelines on what
+</I>&gt;<i> should or should not be within these files, when they are part of the official  
+</I>&gt;<i> repository ?
+</I>
+Which files are you talking about ?
+
+Best,  
+
+Daniel
+
+[1] The reason for this is that topkg the lib, that packages depend upon, has no dependency, hence no opam-lib.  
+
+On pins I need to be able to access the fields of the opam file to perform the source watermaking process that is performed on releases (which handles e.g. version substitution, but also allow substitution of variables with the value of arbitrary opam field).  
+
+The idea is that if you have topkg-care installed when you pin, which has the topkg tool and depends on opam lib, the watermarking process will be performed correctly: the package description calls topkg the tool to get the field (otherwise we just substitute with undefined and warn). Now of course if #2446 exists I can just call opam and always be correct.
+
+
+
+
+
+
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001442.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+	<LI>Next message: <A HREF="001444.html">[opam-devel] [RFC] OPAM files as *the* OCaml package metadata format
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1443">[ date ]</a>
+              <a href="thread.html#1443">[ thread ]</a>
+              <a href="subject.html#1443">[ subject ]</a>
+              <a href="author.html#1443">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

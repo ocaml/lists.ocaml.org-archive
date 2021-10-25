@@ -1,0 +1,63 @@
+From bobzhang1988 at gmail.com  Sun Dec  1 03:59:33 2013
+From: bobzhang1988 at gmail.com (Bob Zhang)
+Date: Sat, 30 Nov 2013 22:59:33 -0500
+Subject: [wg-camlp4] Monadic computation in Fan
+Message-ID: <CANcqPu4UsfisaYvpBiiWeNhUhO4YaWAtre5kq3wURVppXGoTPw@mail.gmail.com>
+
+Dear List
+
+     I am very glad to let you know that I have incorporated a very
+cool feature in Fan. a new DDSL l 'local_extend', which mutate the
+parser inside the quotation, but restored all the parser it mutated
+outside the quotation.
+    The use case is when you really need to mutate a tiny part of the
+grammar -- copy alone can not work, since parsers are mutually
+recursive -- now we can limit  the mutation scope, however.
+
+The ten lines below show how we introduce computation expression (F#
+style) in Fan by *local_extend* DDSL, the introduced DDSL is called
+"cexp"
+
+```
+  let f (loc:Locf.t) meta content =
+    let module_name =
+    match meta with
+    | None -> Locf.failf loc "cexp module name must be specified via @"
+    | Some x -> String.capitalize x in
+  %local_extend{
+    exp: 10 RA
+    ["let"; "!" ; bind as bi ; "in"; exp as x %{
+     let pat_exps  =  Ast_basic.list_of_and bi [] in
+     List.fold_right
+       (fun pat_exp acc ->
+         match pat_exp with
+         | %bind{ $p = $e} ->
+             %exp{$uid:module_name.bind $e (fun $p -> $acc)}
+         | _ -> assert false
+                     ) pat_exps x }
+   ]
+    ${Gramlib.parse_string_eoi exp ~loc content}}
+
+ let d = Ns.lang in
+  begin
+    Ast_quotation.add {domain = d; name="cexp";} Dyn_tag.exp f;
+  end
+```
+
+Test case
+```
+let v = %cexp at option{
+ let! a = Some 3  in
+ let! b = Some 4 in
+ Some (a + b)
+ }
+```
+--
+Regards
+-- Bob
+
+
+-- 
+Regards
+-- Bob
+

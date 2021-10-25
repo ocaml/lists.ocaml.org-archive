@@ -1,0 +1,212 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3CCAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000368.html">
+   <LINK REL="Next"  HREF="000370.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3CCAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Mar 29 13:46:47 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000368.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+        <LI>Next message: <A HREF="000370.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#369">[ date ]</a>
+              <a href="thread.html#369">[ thread ]</a>
+              <a href="subject.html#369">[ subject ]</a>
+              <a href="author.html#369">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Would it be possible to use the extension mechanism itself for lightweight
+quasiquotations?
+
+I did a small experiment with -ppx recently (
+<A HREF="http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/smartcatch_ppx.ml,">http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/smartcatch_ppx.ml,</A>
+as a contribution to Jacques-Henri Jourdan's work on
+<A HREF="http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/">http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/</A> ), and
+frankly the absence of quasiquotations felt like a pain in the ass. Compare
+the camlp4 part of the relevant code:
+
+  let add_debug_expr _loc patvar e =
+    &lt;:expr&lt;
+        let _ = ExceptionHandling.register $lid:patvar$ in
+        $e$
+    &gt;&gt;
+
+with the Ast_rewriter equivalent (the recommended solution alongside -ppx
+right now):
+
+let add_register patvar body =
+  let open Ast_mapper in
+  let register_fun = Location.mknoloc (Longident.parse
+&quot;ExceptionHandling.register&quot;) in
+  (* let _ = &lt;register_fun&gt; &lt;patvar&gt; in &lt;body&gt; *)
+  E.(let_ Nonrecursive
+       [P.any (), apply (ident register_fun)  [&quot;&quot;, ident patvar]]
+       body)
+
+There is a gap of readability, maintainability but also writability between
+the two approaches. I suspect that the Ast_mapper.E domain-specific
+language could be improved to reduce it, but I'm not sure quasiquotations
+are not the best long-term solution. But maybe we can have quasiquotations
+with the current extension mechanism?
+
+let add_register patvar body =
+  [%quote
+    let _ = ExceptionHandling.register [%anti patvar] in [%anti body]
+  ]
+
+
+I'm rather interested in getting ideas of how this actually would work and
+fleshing it out.
+
+(Note that the problem here is to have a convenient way to write little
+pieces of OCaml AST when you program AST-to-AST filters of any kind. This
+is a restricted use case as compared to Camlp4 quasiquotations conventions,
+that offer facilities for antiquotations inside foreign quotations
+implementing a completely different syntax. I used the latter in Macaque,
+and they are exposed to end-users, so user-friendliness of the
+antiquotation syntax was important. Here it's only for extension *writers*,
+so it's ok if it's *a bit* heavy.)
+
+On Fri, Mar 29, 2013 at 2:04 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt;wrote:
+
+&gt;<i> On 01/29/2013 05:22 PM, Alain Frisch wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> On 01/29/2013 04:37 PM, Xavier Clerc wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> However, during development,
+</I>&gt;&gt;&gt;<i> it was a time-saver to be able to easily express and experiment new
+</I>&gt;&gt;&gt;<i> ideas by manipulating &quot;bits of the actual language&quot;. Camlp4 was kind
+</I>&gt;&gt;&gt;<i> enough to translate them for me into AST code which I had to check.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What about having a tool (either stand-alone or part of the compilers)
+</I>&gt;&gt;<i> which dumps the Parsetree representation of some code fragment in as
+</I>&gt;&gt;<i> textual OCaml values (probably without locations)?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So you can type your &quot;model&quot; as source code and obtain quickly the
+</I>&gt;&gt;<i> Parsetree representation, copy/paste it into a nice pattern and replace
+</I>&gt;&gt;<i> some parts with variables.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I've hacked a quick implementation of such a tool, reusing the generic
+</I>&gt;<i> value printer from the toplevel:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/branches/**">http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/branches/**</A>
+</I>&gt;<i> extension_points/tools/dump_**ast.ml?revision=HEAD&amp;view=**markup&lt;<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/tools/dump_ast.ml?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/tools/dump_ast.ml?revision=HEAD&amp;view=markup</A>&gt;
+</I>&gt;<i>
+</I>&gt;<i> It parses either command-line arguments (currently, as types, expressions
+</I>&gt;<i> or patterns) or external .ml/.mli files, and shows the internal Parsetree
+</I>&gt;<i> representation.  By default, location and empty attribute fields are
+</I>&gt;<i> removed (they can be restored with command-line flags: -locs and
+</I>&gt;<i> -emptyattrs).
+</I>&gt;<i>
+</I>&gt;<i> Examples:
+</I>&gt;<i>
+</I>&gt;<i> $ ./ocamlast -w 50 -e &quot;1 + x [@attr] * 2&quot;
+</I>&gt;<i> {pexp_desc =
+</I>&gt;<i>   Pexp_apply
+</I>&gt;<i>    ({pexp_desc = Pexp_ident {txt = Lident &quot;*&quot;}},
+</I>&gt;<i>    [(&quot;&quot;,
+</I>&gt;<i>      {pexp_desc =
+</I>&gt;<i>        Pexp_apply
+</I>&gt;<i>         ({pexp_desc =
+</I>&gt;<i>            Pexp_ident {txt = Lident &quot;+&quot;}},
+</I>&gt;<i>         [(&quot;&quot;,
+</I>&gt;<i>           {pexp_desc =
+</I>&gt;<i>             Pexp_constant (Const_int 1)});
+</I>&gt;<i>          (&quot;&quot;,
+</I>&gt;<i>           {pexp_desc =
+</I>&gt;<i>             Pexp_ident {txt = Lident &quot;x&quot;}})]);
+</I>&gt;<i>       pexp_attributes =
+</I>&gt;<i>        [(&quot;attr&quot;,
+</I>&gt;<i>          {pexp_desc =
+</I>&gt;<i>            Pexp_construct ({txt = Lident &quot;()&quot;},
+</I>&gt;<i>             None, false)})]});
+</I>&gt;<i>     (&quot;&quot;,
+</I>&gt;<i>      {pexp_desc = Pexp_constant (Const_int 2)})])}
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> $ ./ocamlast -w 50 -emptyattrs -t &quot;int list * string&quot;
+</I>&gt;<i> {ptyp_desc =
+</I>&gt;<i>   Ptyp_tuple
+</I>&gt;<i>    [{ptyp_desc =
+</I>&gt;<i>       Ptyp_constr ({txt = Lident &quot;list&quot;},
+</I>&gt;<i>        [{ptyp_desc =
+</I>&gt;<i>           Ptyp_constr ({txt = Lident &quot;int&quot;}, []);
+</I>&gt;<i>          ptyp_attributes = []}]);
+</I>&gt;<i>      ptyp_attributes = []};
+</I>&gt;<i>     {ptyp_desc =
+</I>&gt;<i>       Ptyp_constr ({txt = Lident &quot;string&quot;}, []);
+</I>&gt;<i>      ptyp_attributes = []}];
+</I>&gt;<i>  ptyp_attributes = []}
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This should should simplify the learning curve of the Parsetree, and even
+</I>&gt;<i> allow quick copy/paste to write patterns/expressions on Parsetree.  That
+</I>&gt;<i> said, creating Parsetree fragments manually is quite tedious, and I've
+</I>&gt;<i> created a module to make this easier:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/branches/**">http://caml.inria.fr/cgi-bin/**viewvc.cgi/ocaml/branches/**</A>
+</I>&gt;<i> extension_points/parsing/ast_**helper.mli?revision=HEAD&amp;view=**markup&lt;<A HREF="http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/ast_helper.mli?revision=HEAD&amp;view=markup">http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/ast_helper.mli?revision=HEAD&amp;view=markup</A>&gt;
+</I>&gt;<i>
+</I>&gt;<i> Currently, this module exposes &quot;builder functions&quot; which are very close to
+</I>&gt;<i> Parsetree constructors/records (making locations and attributes optional),
+</I>&gt;<i> but one can easily improve its interface (either by changing the existing
+</I>&gt;<i> functions, e.g. to use optional and labelled arguments, or by exposing
+</I>&gt;<i> other function to cover common cases).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>&gt;<i> ______________________________**_________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/**listinfo/wg-camlp4&lt;http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/**listinfo/wg-camlp4&lt;http://lists.ocaml.org/listinfo/wg-camlp4</A>&gt;
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130329/467e1def/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130329/467e1def/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000368.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+	<LI>Next message: <A HREF="000370.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#369">[ date ]</a>
+              <a href="thread.html#369">[ thread ]</a>
+              <a href="subject.html#369">[ subject ]</a>
+              <a href="author.html#369">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

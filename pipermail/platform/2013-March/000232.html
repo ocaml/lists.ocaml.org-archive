@@ -1,0 +1,145 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Unique file names
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Unique%20file%20names&In-Reply-To=%3C5135CE27.7090409%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000230.html">
+   <LINK REL="Next"  HREF="000233.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Unique file names</H1>
+    <B>Romain Bardou</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Unique%20file%20names&In-Reply-To=%3C5135CE27.7090409%40inria.fr%3E"
+       TITLE="[ocaml-platform] Unique file names">romain.bardou at inria.fr
+       </A><BR>
+    <I>Tue Mar  5 10:51:19 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000230.html">[ocaml-platform] Unique file names
+</A></li>
+        <LI>Next message: <A HREF="000233.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#232">[ date ]</a>
+              <a href="thread.html#232">[ thread ]</a>
+              <a href="subject.html#232">[ subject ]</a>
+              <a href="author.html#232">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le 05/03/2013 11:10, Alain Frisch a &#233;crit :
+&gt;<i> On 03/05/2013 03:48 AM, Yaron Minsky wrote:
+</I>&gt;&gt;<i> Could all of these benefits be obtained by having longer names for
+</I>&gt;&gt;<i> files generated as part of the compilation (.cmx, .cmo, .cmi, etc.),
+</I>&gt;&gt;<i> but keep the source file names short? i.e., one could imagine that if
+</I>&gt;&gt;<i> you put &quot;-put-in-namespace core&quot; on the command-line to ocamlc, it
+</I>&gt;&gt;<i> would generate &quot;core_list.ml&quot; when given the file &quot;list.ml&quot;. The onus
+</I>&gt;&gt;<i> would be on the build system to provide said flags, but it would seem
+</I>&gt;&gt;<i> to simplify things thereupon.
+</I>&gt;<i>
+</I>&gt;<i> This would simplify the life of the library developer a little bit, but
+</I>&gt;<i> it would not really give the same benefits:
+</I>&gt;<i>
+</I>&gt;<i> - If you get an error message (or an output from a tool, such as Bisect
+</I>&gt;<i> or a dead code detector) with a long name, it's more difficult to find
+</I>&gt;<i> the corresponding source file (e.g. to look the .mli file).
+</I>&gt;<i>
+</I>&gt;<i> - You need to adapt all tools (ocamldep, ocamldoc and also third party
+</I>&gt;<i> tools), and this might change their interface (e.g. for ocamldoc, you
+</I>&gt;<i> will need to specify for each source file what's its implicit prefix).
+</I>&gt;<i>
+</I>&gt;<i> - Generic rules (e.g. in Makefiles) are more difficult to write.
+</I>&gt;<i>
+</I>&gt;<i> - You can deploy compiled files for several libraries in the same
+</I>&gt;<i> directory, but not the corresponding .mli files (for documentation
+</I>&gt;<i> purpose).
+</I>
+Is there a character which is not valid in module names, but which is 
+valid in all file systems on all platforms, without the risk of being 
+understood as a special shell character?
+
+Let's assume '@' has this property. (Now that I think about it, '-' is 
+probably a good candidate as well.) If unit &quot;quadtree&quot; is compiled with 
+prefix &quot;video&quot;, one could name the .cmx &quot;<A HREF="http://lists.ocaml.org/listinfo/platform">video at quadtree</A>&quot;. Then it should 
+not be too hard to remove what's before the '@' in documentation and 
+errors, but keep it everywhere as the internal name. To find the file, 
+one would search for &quot;*@quadtree.cmx&quot;.
+
+You do need to adapt all tools though:
+- (mandatory) check that the separator character is accepted by the tool;
+- (optional) look for &quot;*@quadtree.cmx&quot; if &quot;quadtree.cmx&quot; cannot be found 
+(useful for Makefiles, see below);
+- (optional) change error and documentation pretty-printers.
+If the latter is not done, the tools should still work, but it would 
+print the long names and it might confuse the user slightly.
+
+The Makefile issue has several solutions:
+- for Makefiles which call OCamlbuild: nothing to do if OCamlbuild is 
+adapted to look for prefixed files;
+- for Makefiles which call ocamlfind: nothing to do if ocamlfind knows 
+the actual prefixed names;
+- for generic Makefiles which do not use any tool except ocamldep: maybe 
+the user would have to add prefixes to dependencies, or maybe ocamldep 
+or even ocaml could be adapted to make it so it is not even needed.
+
+I'm sure there are issues with this though. In particular, searching for 
+&quot;*@quadtree.cmx&quot; may lead to problems (takes time if there are too many 
+files? what if there are several candidates?).
+
+Cheers,
+
+-- 
+Romain Bardou
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000230.html">[ocaml-platform] Unique file names
+</A></li>
+	<LI>Next message: <A HREF="000233.html">[ocaml-platform] Unique file names
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#232">[ date ]</a>
+              <a href="thread.html#232">[ thread ]</a>
+              <a href="subject.html#232">[ subject ]</a>
+              <a href="author.html#232">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

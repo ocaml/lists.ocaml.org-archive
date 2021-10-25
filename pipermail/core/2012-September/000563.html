@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Missing comments?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Missing%20comments%3F&In-Reply-To=%3CCAK%3DfH%2BiGBK%2BnBRFxF0ioX%3DACWPHkykcwxuTayh%3DqhmOFn9A4dw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000562.html">
+   <LINK REL="Next"  HREF="000564.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Missing comments?</H1>
+    <B>David House</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Missing%20comments%3F&In-Reply-To=%3CCAK%3DfH%2BiGBK%2BnBRFxF0ioX%3DACWPHkykcwxuTayh%3DqhmOFn9A4dw%40mail.gmail.com%3E"
+       TITLE="Missing comments?">dhouse at janestreet.com
+       </A><BR>
+    <I>Thu Sep 20 08:22:18 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000562.html">Missing comments?
+</A></li>
+        <LI>Next message: <A HREF="000564.html">Missing comments?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#563">[ date ]</a>
+              <a href="thread.html#563">[ thread ]</a>
+              <a href="subject.html#563">[ subject ]</a>
+              <a href="author.html#563">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Sigh, this is out of date. This was probably written before we split
+async into three parts: the core, the unix-dependent bits, and
+&quot;extra&quot;, everything else.
+
+So one might imagine that reading each of
+async/{core,unix,extra}/std.ml might be a good idea. But it turns out
+they're basically commentless.
+
+I didn't realise quite how bad the state of our documentation was --
+I'll try to find some time to work on it.
+
+There is some stuff in examples/, but sadly some of that is out of
+date as well. It's not worthless though, especially if you consider a
+couple of points that might help modernise the code:
+
+1. Prefer pipes over streams -- they have different semantics, but
+Pipe's are nicer, and it can be pretty easy to make mistakes with
+Streams.
+
+2. Prefer &gt;&gt;= over upon/&gt;&gt;&gt;. There is a pretty simple translation:
+
+foo
+&gt;&gt;&gt;<i> fun a -&gt;
+</I>bar
+&gt;&gt;&gt;<i> fun b -&gt;
+</I>baz
+&gt;&gt;&gt;<i> fun c -&gt;
+</I>quux
+
+-&gt;
+
+foo
+&gt;&gt;<i>= fun a -&gt;
+</I>bar
+&gt;&gt;<i>= fun b -&gt;
+</I>baz
+&gt;&gt;|<i> fun c -&gt;
+</I>quux
+
+This gives the whole block a deferred result type. For library
+functions, this is only really a good thing, since your callers can
+bind on the result, or can throw it away with [whenever] if they don't
+want to wait for your function to finish (whenever is soon to be
+renamed don't_wait_for).
+
+For blocks at the top-level of your code, there isn't as much benefit
+(you don't have any callers), but it's still nice to do it for
+consistency.
+
+[A bit more background for the interested:
+
+It used to be the case that recursive loops written with bind, e.g.:
+
+  let loop () =
+    if predicate then Deferred.unit else
+      Clock.after (sec 1.)
+      &gt;&gt;= fun () -&gt;
+      loop ()
+
+would take space proportional to the depth of recursion. So one would
+have to write using upon, where
+
+  let loop () =
+    if predicate then () else
+      Clock.after (sec 1.)
+      &gt;&gt;&gt; fun () -&gt;
+      loop ()
+
+and you had no way of telling when the loop was done -- if you wanted
+to do that, you had to create the deferred explicitly:
+
+  Deferred.create (fun ivar -&gt;
+    let loop () =
+      if predicate then Ivar.fill ivar () else
+        Clock.after (sec 1.)
+        &gt;&gt;&gt; fun () -&gt;
+        loop ()))
+
+But this is no longer necessary, and the bind loop should be
+considered the best style in almost all circumstances. The reason is a
+really neat trick, but this email is already too long -- I'll try to
+write a blog post about it.
+]
+
+On Thu, Sep 20, 2012 at 7:52 AM, Rudi Grinberg &lt;<A HREF="http://lists.ocaml.org/listinfo/core">rudi.grinberg at gmail.com</A>&gt; wrote:
+&gt;<i> The dummies guide to async says: &quot;Start by looking at
+</I>&gt;<i> async/lib/std.ml, which has comments that should guide you through
+</I>&gt;<i> reading the rest of it.&quot;
+</I>&gt;<i>
+</I>&gt;<i> However, looking at:
+</I>&gt;<i> <A HREF="https://bitbucket.org/yminsky/ocaml-core/raw/8808e3a2571f/base/async/lib/std.ml">https://bitbucket.org/yminsky/ocaml-core/raw/8808e3a2571f/base/async/lib/std.ml</A>
+</I>&gt;<i>  I don't see anything.
+</I>&gt;<i>
+</I>&gt;<i> Is this the wrong file? I can't find the comments anywhere else either.
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000562.html">Missing comments?
+</A></li>
+	<LI>Next message: <A HREF="000564.html">Missing comments?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#563">[ date ]</a>
+              <a href="thread.html#563">[ thread ]</a>
+              <a href="subject.html#563">[ subject ]</a>
+              <a href="author.html#563">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

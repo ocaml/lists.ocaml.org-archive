@@ -1,0 +1,180 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Wrapping string into Bigarray
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Wrapping%20string%20into%20Bigarray&In-Reply-To=%3C5664655D.80002%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Wrapping string into Bigarray</H1>
+    <B>Matthieu Dubuget</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Wrapping%20string%20into%20Bigarray&In-Reply-To=%3C5664655D.80002%40gmail.com%3E"
+       TITLE="[ocaml-ctypes] Wrapping string into Bigarray">matthieu.dubuget at gmail.com
+       </A><BR>
+    <I>Sun Dec  6 16:42:05 GMT 2015</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#192">[ date ]</a>
+              <a href="thread.html#192">[ thread ]</a>
+              <a href="subject.html#192">[ subject ]</a>
+              <a href="author.html#192">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+Hello,
+
+I'm posting here some code samples that helped me a lot, hoping they
+could be of any help to somebody else. They were kindly provided by
+Jeremy Yallop
+(<A HREF="https://github.com/yallop/ocaml-ctypes-inverted-stubs-example/issues/11">https://github.com/yallop/ocaml-ctypes-inverted-stubs-example/issues/11</A>).
+
+I have an OCaml function returning a string, and I wanted to deliver
+this function through a shared library to be called by a foreign language.
+
+My first naive try was to do something like this (see
+<A HREF="https://github.com/yallop/ocaml-ctypes-inverted-stubs-example">https://github.com/yallop/ocaml-ctypes-inverted-stubs-example</A> for a
+complete example of how to wrap OCaml code in a shared library):
+
+```OCaml
+let () = I.internal &quot;compute&quot; (string @-&gt; returning string)
+MyLibrary.my_function
+```
+
+The problem with this solution is that the interface of the `compute`
+function is:
+
+```C
+char* compute(char* x17);
+```
+
+There is no contract on how to free the memory after it has been used,
+which is problematic.
+
+Since I'm a bit lazy, instead of registering the string as a gc root,
+and exposing a deallocation function to C, I decided to delegate all
+the work (allocation/deallocation) to the client of my library. The
+interface being something like:
+
+```C
+int compute(char * question, char * answer_buffer, size_t buffer_sz);
+```
+
+Jeremy proposed two solutions. The first one makes use of Bigarrays:
+
+```OCaml
+let compute question buffer buffer_sz =
+  let int_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.(bigarray_of_ptr array1) int_sz Bigarray.char
+buffer in
+  let computed_size = ... in
+  if computed_size &gt; int_sz then null
+  else  ...
+```
+
+and the second one is based on Ctypes.CArray module:
+
+```OCaml
+let compute question buffer buffer_sz =
+  let int_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.CArray.from_ptr buffer int_sz in
+  let computed_size = ... in
+  if computed_size &gt; int_sz then null
+  else ...
+```
+
+I choosed the first approach with great success. Since my function is
+to be called more than once, I choosed to have the client allocate two
+buffers to be reused. 1 for the question, and another to be filled
+with the answer:
+
+```OCaml
+(* char Ctypes.ptr -&gt; Unsigned.Size_t.t -&gt; char Ctypes.ptr -&gt;
+Unsigned.Size_t.t -&gt; int *)
+let calcul_buffers question question_sz buffer buffer_sz =
+
+  let ans = string_from_ptr question ~length:(Unsigned.Size_t.to_int
+question_sz)
+                 |&gt; Calcback.traite in
+  let ans_sz = Bytes.length ans in
+
+  let int_buffer_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.(bigarray_of_ptr array1) int_buffer_sz
+Bigarray.Char buffer in
+
+  for i = 0 to pred (min int_buffer_sz ans_sz) do
+    Bigarray.Array1.set ba_buffer i ans.[i]
+  done;
+
+  ans_sz
+```
+
+The returned `int` is the size needed to return the complete answer:
+this is also the job of the client to increase the size of the buffer
+if needed.
+
+In order to avoid the for loop, I tried to wrap `(ans:string)` into a
+Bigarray, in order to use a `blit` (I may be wrong, but I think it
+ends as a memcopy, instead of a char by char copy).
+
+The trick was to coerce the string into a `(ptr char)`.
+
+```OCaml
+let compute question question_sz buffer buffer_sz =
+  let ans =
+    string_from_ptr question ~length:(Unsigned.Size_t.to_int question_sz)
+    |&gt; MyLibrary.my_function in
+  let ans_sz = Bytes.length ans in
+
+  let int_buffer_sz = Unsigned.Size_t.to_int buffer_sz in
+  let size_transmitted = min int_buffer_sz ans_sz in
+
+  Bigarray.Array1.blit
+    (bigarray_of_ptr array1 size_transmitted Bigarray.char (coerce
+string (ptr char) ans))
+    (bigarray_of_ptr array1 size_transmitted Bigarray.Char buffer);
+
+  ans_sz
+```
+
+Ctypes is really nice. And I thank Jeremy for his kind support.
+
+Happy hacking.
+
+-- 
+Matthieu Dubuget
+Guide d&#8217;autod&#233;fense num&#233;rique : <A HREF="http://guide.boum.org">http://guide.boum.org</A>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#192">[ date ]</a>
+              <a href="thread.html#192">[ thread ]</a>
+              <a href="subject.html#192">[ subject ]</a>
+              <a href="author.html#192">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,194 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Editor support for syntax extensions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Editor%20support%20for%20syntax%20extensions&In-Reply-To=%3C510901C2.2050603%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000156.html">
+   <LINK REL="Next"  HREF="000126.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Editor support for syntax extensions</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Editor%20support%20for%20syntax%20extensions&In-Reply-To=%3C510901C2.2050603%40etorok.net%3E"
+       TITLE="[wg-camlp4] Editor support for syntax extensions">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Wed Jan 30 11:19:30 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000156.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000126.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#121">[ date ]</a>
+              <a href="thread.html#121">[ thread ]</a>
+              <a href="subject.html#121">[ subject ]</a>
+              <a href="author.html#121">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/30/2013 11:12 AM, Alain Frisch wrote:
+&gt;<i> On 01/30/2013 03:34 AM, Hongbo Zhang wrote:
+</I>&gt;&gt;<i> let rec token enc =  {:lex|
+</I>&gt;&gt;<i>     &quot;&lt;utf8&gt;&quot; -&gt; begin enc := Ulexing.Utf8; token enc lexbuf end
+</I>&gt;&gt;<i>    | &quot;&lt;latin1&gt;&quot; -&gt; begin enc := Ulexing.Latin1; token enc lexbuf end
+</I>&gt;&gt;<i>    | xml_letter+ -&gt; Printf.sprintf &quot;word(%s)&quot; (Ulexing.utf8_lexeme lexbuf)
+</I>&gt;&gt;<i>    | number -&gt; &quot;number&quot;
+</I>&gt;&gt;<i>    | eof -&gt; exit 0
+</I>&gt;&gt;<i>    | [1234-1246] -&gt; &quot;bla&quot;
+</I>&gt;&gt;<i>    | &quot;(&quot; -&gt;  begin
+</I>&gt;&gt;<i>        Ulexing.rollback lexbuf; (* Puts the lexeme back into the buffer *)
+</I>&gt;&gt;<i>        {| &quot;(&quot; [^ '(']* &quot;)&quot; -&gt; Ulexing.utf8_lexeme lexbuf |} lexbuf
+</I>&gt;&gt;<i>        (* Note the use of an inline lexer *)
+</I>&gt;&gt;<i>    end
+</I>&gt;&gt;<i>    | &quot;(*&quot; -&gt; begin comment lexbuf; &quot;comment&quot; end
+</I>&gt;&gt;<i>    | ' ' -&gt; &quot;whitespace&quot;
+</I>&gt;&gt;<i>    | _ -&gt; &quot;???&quot; |}
+</I>&gt;&gt;<i> and comment = {:lex|
+</I>&gt;&gt;<i>     &quot;*)&quot; -&gt; ()
+</I>&gt;&gt;<i>    | eof -&gt; failwith &quot;comment&quot;
+</I>&gt;&gt;<i>    | _ -&gt; let _lexeme = Ulexing.lexeme lexbuf in
+</I>&gt;&gt;<i>      comment lexbuf |}
+</I>&gt;<i> 
+</I>&gt;<i> This looks very bad to me:
+</I>&gt;<i> 
+</I>&gt;<i> 1. You loose all support from your editor (indentation, coloring, parentheses matching).  Am I the only one who finds this really problematic?  With quotations, my emacs looks like notepad...
+</I>
+I still get syntax highlighting and matching parens in both vim and emacs for the above (although maybe antiquotations would confuse it):
+<A HREF="http://www.pasteall.org/pic/show.php?id=44586">http://www.pasteall.org/pic/show.php?id=44586</A>
+<A HREF="http://www.pasteall.org/pic/show.php?id=44587">http://www.pasteall.org/pic/show.php?id=44587</A>
+
+I do agree that editor support is less reliable once you start using syntax extensions. A common way to define quotations and anti-quotations could probably
+help editors cope with syntax extensions better though.
+
+&gt;<i> Indentation and coloring do find typos on the fly; automatic indentation makes it easy to copy/paste code from one context to another one.
+</I>
+Editor support is something that I meant discuss.
+
+1. Auto-completion support.
+
+This already exists for Emacs in the form of Typerex's ocp-complete I think.
+It might be possible to adapt it for Vim, for example see how ClangComplete works here for C: <A HREF="http://llvm.org/viewvc/llvm-project/llvm/trunk/utils/vim/vimrc?view=markup.">http://llvm.org/viewvc/llvm-project/llvm/trunk/utils/vim/vimrc?view=markup.</A>
+
+I'd like to have this idea extended to syntax extensions too, where the syntax extension *itself* provides the possible completions.
+For example: a lexer/parser extensions could provide completion based on available tokens, a monadic syntax extensions would provide completion
+based on available monad variables, etc.
+
+And of course once you go back to original OCaml syntax inside a quotation it should provide the regular OCaml completions.
+
+2. Syntax highlighting support
+
+Currently each editor has its own syntax highlighting rules, but there are some (corner) cases
+where even with no syntax extensions it gets it wrong (ok, maybe I should file bugs about those).
+
+What I had in mind is that (optionally) the Vim syntax highlighter script passes the source code through an external process and gets back
+markers for syntax highlighting, and it uses that to override its built-in highlighter:
+@1,5-1,17 Keyword
+@1,17-3,28 Comment
+...
+
+Not sure how hard would it be to write such a Vim (or Emacs) script, and how well it'd work in practice (you probably
+wouldn't want to do this for every character the user types, maybe only do this on file load/during idle times/after entering a complete line/saving/etc.).
+This is again probably similar to what Typerex already does for the OCaml syntax.
+
+As for the external process, it'd use compiler-libs to parse the source code, run any -ppx/camlp4 extensions on it, take the locations from the original parsetree
+and output these syntax markers.
+
+To take your IFDEF example:
+    | {pmod_desc = Pmod_apply(
+         {pmod_desc = Pmod_apply(
+          {pmod_desc = Pmod_apply(
+           {pmod_desc = Pmod_ident {txt = Lident &quot;IFDEF&quot;}, pmod_loc = ifdef_loc},
+           {pmod_desc = Pmod_ident {txt = Lident sym}}
+          )},
+          body_def)}, body_not_def)} -&gt;
+            self#highlight ifdef_loc `Keyword;
+            if getenv sym &lt;&gt; &quot;&quot; then this # module_expr body_def
+            else this # module_expr body_not_def
+ ....
+
+Then astmapper could have two kinds of outputs:
+* by default it outputs the new parsetree
+* if there is a '--highlight' command-line it throws away the parsetree and prints instead the highlight marker collected by self#highlight, and then uses default
+OCaml highlighting to output markers for parsetree nodes that didn't get self#highlight called.
+
+3. Syntax checking support
+
+Something similar to gcc's -fsyntax-only, but better. Currently you need to compile a fake .cmi or ask for a fake .inferred.mli to get syntax + type errors for the current file,
+which is time consuming sometimes.
+
+The above tool could have a flag to also output syntax errors (since it has to parse the source code anyway, and it knows what syntax extensions are used), _and_
+it could also try to show type errors based on the current file, and any already existing .cmi files.
+
+4. What syntax extensions to use =&gt; define in the source code
+
+This has already been mentioned that the source file could define what syntax extensions it uses, so it works for all build systems (ocamlbuild, makefiles, omake), etc.
+It may not even need special support from the compiler: there could be a -ppx that finds these pragmas and loads those other -ppx on its own!
+
+Best regards,
+--Edwin
+
+
+
+
+
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000156.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000126.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#121">[ date ]</a>
+              <a href="thread.html#121">[ thread ]</a>
+              <a href="subject.html#121">[ subject ]</a>
+              <a href="author.html#121">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

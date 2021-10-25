@@ -1,0 +1,157 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> My linking issue with unix_stubs
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20My%20linking%20issue%20with%20unix_stubs&In-Reply-To=%3CCAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001273.html">
+   <LINK REL="Next"  HREF="001281.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>My linking issue with unix_stubs</H1>
+    <B>Yury Sulsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20My%20linking%20issue%20with%20unix_stubs&In-Reply-To=%3CCAEDxudz33Js21FvOS2yKRRcjvizszFoHv3vZEGOEySJfDrAntg%40mail.gmail.com%3E"
+       TITLE="My linking issue with unix_stubs">yury.sulsky at gmail.com
+       </A><BR>
+    <I>Thu May 31 21:59:32 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001273.html">My linking issue with unix_stubs
+</A></li>
+        <LI>Next message: <A HREF="001281.html">My linking issue with unix_stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1280">[ date ]</a>
+              <a href="thread.html#1280">[ thread ]</a>
+              <a href="subject.html#1280">[ subject ]</a>
+              <a href="author.html#1280">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Thanks very much Kadaku! If you look at:
+
+$ ocamlobjinfo $(ocamlfind query core)/core.cma|grep 'Extra C object files'
+Extra C object files: -lrt -lcore_stubs
+
+Which is the wrong order. I wonder if gcc or ld have become stricter
+in this respect. We'll push a patch to fix this. In the meantime, you
+can apply this one:
+
+--- a/base/core/myocamlbuild.ml 2012-05-31 16:57:05.000000000 -0400
++++ b/base/core/myocamlbuild.ml 2012-05-31 16:55:52.000000000 -0400
+@@ -656,12 +656,12 @@
+     flag [&quot;mlh&quot;; &quot;ocaml&quot;; &quot;ocamldep&quot;] (S[A&quot;-ppopt&quot;; A&quot;-Ilib/&quot;]);
+     flag [&quot;mlh&quot;; &quot;ocaml&quot;; &quot;compile&quot;]  (S[A&quot;-ppopt&quot;; A&quot;-Ilib/&quot;]);
+
++    dispatch_default e;
++
+     if test &quot;ld -lrt -shared -o /dev/null 2&gt;/dev/null&quot; then begin
+       flag [&quot;ocamlmklib&quot;; &quot;c&quot;]                      (S[A&quot;-lrt&quot;]);
+       flag [&quot;use_libcore_stubs&quot;; &quot;link&quot;] (S[A&quot;-cclib&quot;; A&quot;-lrt&quot;]);
+-    end;
+-
+-    dispatch_default e;
++    end
+   | e -&gt; dispatch_default e
+
+ let () = Ocamlbuild_plugin.dispatch dispatch
+
+
+On Wed, May 30, 2012 at 12:18 PM, Kakadu &lt;<A HREF="http://lists.ocaml.org/listinfo/core">kakadu.hafanana at gmail.com</A>&gt; wrote:
+&gt;<i> Yaron,
+</I>&gt;<i>
+</I>&gt;<i> The same with tarballs. Btw, I've discoverd that it is 32bit only bug.
+</I>&gt;<i>
+</I>&gt;<i> Kakadu
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On Wednesday, May 30, 2012 5:29:57 PM UTC+4, Yaron Minsky wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Have you tried the release tarballs? &#160;Do they build and install cleanly?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Wed, May 30, 2012 at 7:20 AM, Kakadu &lt;<A HREF="http://lists.ocaml.org/listinfo/core">kakadu.hafanana at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; &#160;Ubuntu 12.04 32bit. Core from bitbucket. OCaml from ubuntu.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; Best wishes,
+</I>&gt;&gt;<i> &gt; Kakadu
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; On Wednesday, May 30, 2012 2:54:22 PM UTC+4, Yaron Minsky wrote:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; More details please! &#160;What platform are you running on?
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; On Wed, May 30, 2012 at 5:49 AM, Kakadu &lt;<A HREF="http://lists.ocaml.org/listinfo/core">kakadu.hafanana at gmail.com</A>&gt;
+</I>&gt;&gt;<i> &gt;&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt; &gt; Hallo, list!
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; I have problem with using core. It seems that solution is very simple
+</I>&gt;&gt;<i> &gt;&gt; &gt; but I
+</I>&gt;&gt;<i> &gt;&gt; &gt; haven't found it yet.
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; Best wishes,
+</I>&gt;&gt;<i> &gt;&gt; &gt; Kakadu
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; $ ocamlfind opt -thread -package unix,core,threads -linkpkg -ccopt
+</I>&gt;&gt;<i> &gt;&gt; &gt; -lrt
+</I>&gt;&gt;<i> &gt;&gt; &gt; main.ml
+</I>&gt;&gt;<i> &gt;&gt; &gt; /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In
+</I>&gt;&gt;<i> &gt;&gt; &gt; function
+</I>&gt;&gt;<i> &gt;&gt; &gt; `unix_clock_gettime':
+</I>&gt;&gt;<i> &gt;&gt; &gt; /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:823:
+</I>&gt;&gt;<i> &gt;&gt; &gt; undefined reference to `clock_gettime'
+</I>&gt;&gt;<i> &gt;&gt; &gt; /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In
+</I>&gt;&gt;<i> &gt;&gt; &gt; function
+</I>&gt;&gt;<i> &gt;&gt; &gt; `unix_clock_settime':
+</I>&gt;&gt;<i> &gt;&gt; &gt; /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:834:
+</I>&gt;&gt;<i> &gt;&gt; &gt; undefined reference to `clock_settime'
+</I>&gt;&gt;<i> &gt;&gt; &gt; /usr/local/lib/ocaml/3.12.1/core/libcore_stubs.a(unix_stubs.o): In
+</I>&gt;&gt;<i> &gt;&gt; &gt; function
+</I>&gt;&gt;<i> &gt;&gt; &gt; `unix_clock_getres':
+</I>&gt;&gt;<i> &gt;&gt; &gt; /home/kakaduqt/prog/ocaml-core/base/core/_build/lib/unix_stubs.c:842:
+</I>&gt;&gt;<i> &gt;&gt; &gt; undefined reference to `clock_getres'
+</I>&gt;&gt;<i> &gt;&gt; &gt; collect2: ld returned 1 exit status
+</I>&gt;&gt;<i> &gt;&gt; &gt; File &quot;caml_startup&quot;, line 1, characters 0-1:
+</I>&gt;&gt;<i> &gt;&gt; &gt; Error: Error during linking
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; $ cat main.ml
+</I>&gt;&gt;<i> &gt;&gt; &gt; open Core.Linux_ext
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; let f = Clock.get_time
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>&gt;&gt;<i> &gt;&gt; &gt; $
+</I>&gt;&gt;<i> &gt;&gt; &gt;
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001273.html">My linking issue with unix_stubs
+</A></li>
+	<LI>Next message: <A HREF="001281.html">My linking issue with unix_stubs
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1280">[ date ]</a>
+              <a href="thread.html#1280">[ thread ]</a>
+              <a href="subject.html#1280">[ subject ]</a>
+              <a href="author.html#1280">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

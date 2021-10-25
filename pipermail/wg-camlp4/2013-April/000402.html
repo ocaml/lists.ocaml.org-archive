@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Extension developers: we need you!
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Extension%20developers%3A%20we%20need%20you%21&In-Reply-To=%3CCAPFanBHqUrYRkQSjrsH4qCXANvyuT4UE8S87TRN4ba9aTt%3DY8A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000401.html">
+   <LINK REL="Next"  HREF="000384.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Extension developers: we need you!</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Extension%20developers%3A%20we%20need%20you%21&In-Reply-To=%3CCAPFanBHqUrYRkQSjrsH4qCXANvyuT4UE8S87TRN4ba9aTt%3DY8A%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Extension developers: we need you!">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Fri Apr 12 10:43:13 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000401.html">[wg-camlp4] Extension developers: we need you!
+</A></li>
+        <LI>Next message: <A HREF="000384.html">[wg-camlp4] About 'a loc in the Parsetree
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#402">[ date ]</a>
+              <a href="thread.html#402">[ thread ]</a>
+              <a href="subject.html#402">[ subject ]</a>
+              <a href="author.html#402">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>A small remark requesting no immediate action, but maybe suggestions
+of things to work on (not necessarily for Alain) in the future.
+
+I remarked in a recent extension example by Alain (
+<A HREF="https://github.com/ocaml/ocaml/commit/f7fee51ae33e357714b03f7f9b025a1a48182549">https://github.com/ocaml/ocaml/commit/f7fee51ae33e357714b03f7f9b025a1a48182549</A>
+) that a non-neglectible portion of the code logic is dedicated to
+&quot;option processing&quot;. Alain uses optional attributes to tune the code
+generation of his -ppx extension, and he has to process them very much
+like command-line options in an application: get the value of them,
+turn that into program-specific logic, handle options that don't make
+sense when provided both at the same time, etc.
+
+&gt;<i>From his commit:
+</I>
++(*
+[...]
++  We recognize some special attributes on record fields (or their associated
++  type) and on constructor argument types:
++
++  - [@label id]: specify a label for the parameter of the builder function
++    (for records, it is set automatically from the label name
++    but it can be overridden).
++
++  - [@opt]: the parameter is optional (this assume that the field/argument
++    has an option type).
++
++  - [@default expr]: the parameter is optional, with a default value
++    (cannot be used with [@opt]).
++*)
+
+[...]
+
++  let param named name loc attrs =
++    let default = find_attr &quot;default&quot; attrs in
++    let opt = has_attr &quot;opt&quot; attrs in
++    let label =
++      match find_attr &quot;label&quot; attrs with
++      | None -&gt; if named then name else &quot;&quot;
++      | Some e -&gt;
++          match get_lid e with
++          | Some s -&gt; s
++          | None -&gt; fatal e.pexp_loc &quot;'label' attribute must be a
+string literal&quot;
++    in
++    let label =
++      if default &lt;&gt; None || opt then
++        if label = &quot;&quot; then fatal loc &quot;Optional arguments must be
+named&quot; else &quot;?&quot; ^ label
++      else label
++    in
++    if default &lt;&gt; None &amp;&amp; opt then fatal loc &quot;Cannot have both 'opt'
+and 'default' attributes&quot;;
++    lam ~label ?default (pvar name), (name, evar name)
+
+I expect that we will see similarly-looking pieces of code in most
+extensions using attributes to tune behavior, and that would be a good
+candidate for a proper library abstraction allowing a more declarative
+style of programming.
+
+What are the right abstraction to describe such optional attributes?
+Can we reuse libraries dedicated to command-line processing, or only
+their ideas?
+
+As far as I know, the most advanced work in this direction in the
+OCaml community is Daniel B&#252;nzli's Cmdliner library:
+  <A HREF="http://erratique.ch/software/cmdliner/doc/Cmdliner">http://erratique.ch/software/cmdliner/doc/Cmdliner</A>
+Can we reuse Cmdliner for -ppx extensions?
+
+(On the paper that is work that would also apply to Camlp4/Fan
+extensions, but in practice I haven't encountered this kind of
+optional parametrizations in mainstream Camlp4 extension, and I
+suspect Alain's attribute model is a necessary and sufficient feature
+for them to gain wider use.)
+
+Consider this email as a TODO list item: at some point, we would need
+someone to invest time to think about that, and produce a reusable
+library for this aspect of extension development.
+
+PS: Alain, type-driven code generation is a terrible name to qualify
+this particular extension, as I was expecting code generation driven
+by type information in a typedtree. This is code generated from
+(syntactic) type *definitions*. If &quot;type-definition-driven code
+generation&quot; is too long, maybe &quot;deriving-style extension&quot; would be
+reasonable.
+
+On Wed, Apr 3, 2013 at 7:16 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> Now is a good time to start collecting more concrete feedback from extension
+</I>&gt;<i> developers on the current proposal (ppx + extension_points). Are there
+</I>&gt;<i> people on this list interested in porting their existing extensions (or
+</I>&gt;<i> other tools which can benefit from attributes)?   This will be greatly
+</I>&gt;<i> helpful if the current design can be validated by real extension developers.
+</I>&gt;<i> Porting real extensions will also help to isolate a good set of
+</I>&gt;<i> &quot;convenience&quot; functions to build or deconstruct AST fragments in a light
+</I>&gt;<i> way.
+</I>&gt;<i>
+</I>&gt;<i> (Disclaimer: there will still be some more cleanups to the Parsetree
+</I>&gt;<i> definition and helper modules (Ast_mapper, Ast_helper), so the code written
+</I>&gt;<i> now will need to be adjusted for the final version, but I expect those
+</I>&gt;<i> changes to be quite easy.)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> -- Alain
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000401.html">[wg-camlp4] Extension developers: we need you!
+</A></li>
+	<LI>Next message: <A HREF="000384.html">[wg-camlp4] About 'a loc in the Parsetree
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#402">[ date ]</a>
+              <a href="thread.html#402">[ thread ]</a>
+              <a href="subject.html#402">[ subject ]</a>
+              <a href="author.html#402">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

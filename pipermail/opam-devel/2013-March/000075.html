@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel]  lablgl.1.04
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%20lablgl.1.04&In-Reply-To=%3CCAE1DttBpkZ16nEy8oCqTUi%3DXVfLxKtymEsNSLHrujyh1DrwJmg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000073.html">
+   <LINK REL="Next"  HREF="000076.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel]  lablgl.1.04</H1>
+    <B>Florent Monnier</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%20lablgl.1.04&In-Reply-To=%3CCAE1DttBpkZ16nEy8oCqTUi%3DXVfLxKtymEsNSLHrujyh1DrwJmg%40mail.gmail.com%3E"
+       TITLE="[opam-devel]  lablgl.1.04">monnier.florent at gmail.com
+       </A><BR>
+    <I>Sat Mar 30 15:47:09 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000073.html">[opam-devel] lablgl.20120306
+</A></li>
+        <LI>Next message: <A HREF="000076.html">[opam-devel] lablgl.1.04
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#75">[ date ]</a>
+              <a href="thread.html#75">[ thread ]</a>
+              <a href="subject.html#75">[ subject ]</a>
+              <a href="author.html#75">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+On my Windows test environment I can not use &quot;lablgl-20120306&quot; because
+of the glShader module that I myself provided before I get a Windows
+test environment.
+
+But the vanilla &quot;lablgl-1.04&quot; works fine.
+
+If I've understood correctly Opam is a source package manager, so
+maybe opam could provide &quot;lablgl.1.04&quot; for Windows users that have a
+similar environment than mine ?
+
+My windows test environment is:
+Windows 7 starter with protz's ocaml version 4.00.1
+
+Well in this environment only lablgl itself compiles out of the box.
+LablGlut does not.
+Togl (Tk) does not either.
+(I think that the devel libs for both glut and tkgl are there)
+
+LablGlut and Togl are for windowing, so if we use OCamlSDL instead
+this is just fine we don't need these. OCamlSDL1 compiles out of the
+box in my win env.
+
+In this environment I compile the Vanilla LablGL like this:
+
+cp Makefile.config.mingw Makefile.config
+# need to add -I/usr/include, the patch below does this:
+patch &lt; Makefile.config-cygwin-needs-I_usr_include.patch
+
+# don't build anything else than lablgl itself or we get errors:
+make lib
+make libopt
+
+LABLGL_INSTALLDIR=&quot;/tmp/mylblgl0&quot;
+make install INSTALLDIR=&quot;$LABLGL_INSTALLDIR&quot;
+# it seems that the file &quot;dlllablgl.dll&quot; is not installed, so:
+cp src/dlllablgl.dll &quot;$LABLGL_INSTALLDIR&quot;/
+
+Now a hello-world works fine.
+(I'm providing this hello at the end after the config patch)
+
+===============
+
+$ cat Makefile.config-cygwin-needs-I_usr_include.patch
++++ Makefile.config~    2013-03-12 18:11:58.945140000 +0100
+--- Makefile.config     2013-03-30 13:55:08.524315300 +0100
+@@ -35,7 +35,7 @@
+   -lws2_32 -luser32 -lgdi32
+
+ # Where to find OpenGL/Mesa/Glut headers and libraries
+-GLINCLUDES = -DHAS_GLEXT_H -DGL_GLEXT_PROTOTYPES -DGLU_VERSION_1_3
++GLINCLUDES = -I/usr/include -DHAS_GLEXT_H -DGL_GLEXT_PROTOTYPES
+-DGLU_VERSION_1_3
+ GLLIBS = -lglu32 -lopengl32
+ GLLIBS0 = $(GLLIBS)
+ GLUTLIBS = -lglut32
+
+
+============
+
+$ cat lblgl_hello.ml
+let display () =
+  GlClear.color (0.0, 0.0, 0.0);
+  GlClear.clear [`color];
+  GlDraw.color (1.0, 1.0, 0.0);
+  GlMat.mode `projection;
+  GlMat.load_identity ();
+  GlMat.ortho ~x:(-1.0,1.0) ~y:(-1.0,1.0) ~z:(-1.0,1.0);
+  GlDraw.begins `polygon;
+  GlDraw.vertex ~x:(-0.5) ~y:(-0.5) ();
+  GlDraw.vertex ~x:(-0.5) ~y:(0.5) ();
+  GlDraw.vertex ~x:(0.5) ~y:(0.5) ();
+  GlDraw.vertex ~x:(0.5) ~y:(-0.5) ();
+  GlDraw.ends ();
+  Gl.flush ()
+
+let () =
+  Sdl.init [`EVERYTHING];
+  let _ =
+    Sdlvideo.set_video_mode ~w:640 ~h:400
+      [`HWSURFACE; `DOUBLEBUF; `OPENGL; `RESIZABLE]
+  in
+  for i = 1 to 6 do
+    display ();
+    Sdlgl.swap_buffers ();
+    Sdltimer.delay 1000;
+  done;
+  Sdl.quit ()
+
+
+# using full windows path, because protz's ocaml doesn't like cygwin ones:
+$ ocaml bigarray.cma -I +site-lib/sdl sdl.cma -I
+C:/cygwin/tmp/mylblgl0 lablgl.cma lblgl_hello.ml
+
+
+===========
+
+# completely untested, just copied and modified from &quot;lablgl.20120306&quot;
+
+$ cat opam
+
+opam-version: &quot;1&quot;
+maintainer: &quot;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">contact at ocamlpro.com</A>&quot;
+homepage: &quot;<A HREF="https://forge.ocamlcore.org/projects/lablgl/">https://forge.ocamlcore.org/projects/lablgl/</A>&quot;
+authors: [
+  &quot;Jacques Garrigue&quot;
+  &quot;Isaac Trotts&quot;
+  &quot;Erick Tryzelaar&quot;
+  &quot;Christophe Raffali&quot;
+]
+# &quot;Jon Harrop&quot; contributed the files &quot;gluTess.ml&quot; / &quot;ml_glutess.c&quot;
+# should he be considered as one of the authors? or just a contributor?
+build: [
+  [&quot;cp&quot; &quot;Makefile.config.ex&quot; &quot;Makefile.config&quot;]
+  [&quot;cp&quot; &quot;Makefile.config.osx&quot; &quot;Makefile.config&quot;] {&quot;%{os}%&quot; = &quot;darwin&quot;}
+  [&quot;cp&quot; &quot;Makefile.config.mingw&quot; &quot;Makefile.config&quot;] {&quot;%{os}%&quot; =
+&quot;windows 7 starter with protz's ocaml 4&quot;}
+
+  [&quot;mkdir&quot; &quot;-p&quot; &quot;%{bin}%&quot;]
+
+#  [make &quot;glut&quot;]  ### do not build this one, it doesn't compile out of
+the box in my W env
+#  [make &quot;glutopt&quot;]  ### do not build this one, it doesn't compile out
+of the box in my W env
+
+### in my W env, only build lablgl.{cma,cmxa}
+  [make &quot;lib&quot;]
+  [make &quot;libopt&quot;]
+
+  [make &quot;install&quot; &quot;-C&quot; &quot;src&quot; &quot;BINDIR=%{bin}%&quot;
+&quot;INSTALLDIR=%{lib}%/lablgl&quot; &quot;DLLDIR=%{lib}%/stublibs&quot;]
+  # it seems that the makefile forgets to install this one:
+  [&quot;cp&quot; &quot;src/dlllablgl.dll&quot; &quot;DLLDIR=%{lib}%/stublibs&quot;] {&quot;%{os:env}%&quot; =
+&quot;win7::protz&quot;}
+
+### do not install LablGlut, it doesn't compile out of the box in my W env
+### [make &quot;install&quot; &quot;-C&quot; &quot;LablGlut/src&quot; &quot;BINDIR=%{bin}%&quot;
+&quot;INSTALLDIR=%{lib}%/lablgl&quot; &quot;DLLDIR=%{lib}%/stublibs&quot;]
+]
+
+-- 
+Cheers
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000073.html">[opam-devel] lablgl.20120306
+</A></li>
+	<LI>Next message: <A HREF="000076.html">[opam-devel] lablgl.1.04
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#75">[ date ]</a>
+              <a href="thread.html#75">[ thread ]</a>
+              <a href="subject.html#75">[ subject ]</a>
+              <a href="author.html#75">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

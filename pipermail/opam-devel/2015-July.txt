@@ -1,0 +1,576 @@
+From talex5 at gmail.com  Thu Jul  2 15:08:53 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 2 Jul 2015 15:08:53 +0100
+Subject: [opam-devel] Test packages before importing into opam repository?
+Message-ID: <CAG4opy-bpatfRt1pYi1ybF_OyUL1PArR1Wvd0xoYFv7x27Ryuw@mail.gmail.com>
+
+I've had a few problems recently with my Travis builds failing because
+one of my dependencies has a failing unit test. How about having the
+opam repository Travis script check that the new program's tests pass
+before importing it?
+
+e.g. here's a PR fixing one such bug with ocaml-git:
+
+  https://github.com/ocaml/opam-repository/pull/4234
+
+But the Travis build for the original import PR passed:
+
+  https://travis-ci.org/ocaml/opam-repository/builds/66523206
+
+It would also help to have https://github.com/ocaml/opam/issues/2190
+fixed, so that I could test my package without testing everything it
+depends on (in fact, in my particular case, my package didn't depend
+on ocaml-git, but it did depend on a package whose unit-tests depended
+on ocaml-git...). This would probably make the Travis tests faster
+too...
+
+Thanks,
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From thomas at gazagnaire.org  Sun Jul  5 15:28:42 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Sun, 5 Jul 2015 15:28:42 +0100
+Subject: [opam-devel] Test packages before importing into opam
+	repository?
+In-Reply-To: <CAG4opy-bpatfRt1pYi1ybF_OyUL1PArR1Wvd0xoYFv7x27Ryuw@mail.gmail.com>
+References: <CAG4opy-bpatfRt1pYi1ybF_OyUL1PArR1Wvd0xoYFv7x27Ryuw@mail.gmail.com>
+Message-ID: <CD2FDF13-C0D3-44BB-A2C6-31C25D71839B@gazagnaire.org>
+
+That's a great idea! PR is welcome: this means adding an `opam install -t` after the basic installation test here: https://github.com/ocaml/opam-repository/blob/master/.travis-ci.sh#L114
+
+> On 2 Jul 2015, at 15:08, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> I've had a few problems recently with my Travis builds failing because
+> one of my dependencies has a failing unit test. How about having the
+> opam repository Travis script check that the new program's tests pass
+> before importing it?
+> 
+> e.g. here's a PR fixing one such bug with ocaml-git:
+> 
+>  https://github.com/ocaml/opam-repository/pull/4234
+> 
+> But the Travis build for the original import PR passed:
+> 
+>  https://travis-ci.org/ocaml/opam-repository/builds/66523206
+> 
+> It would also help to have https://github.com/ocaml/opam/issues/2190
+> fixed, so that I could test my package without testing everything it
+> depends on (in fact, in my particular case, my package didn't depend
+> on ocaml-git, but it did depend on a package whose unit-tests depended
+> on ocaml-git...). This would probably make the Travis tests faster
+> too...
+> 
+> Thanks,
+> 
+> 
+> -- 
+> Dr Thomas Leonard        http://roscidus.com/blog/
+> GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From daniel.buenzli at erratique.ch  Tue Jul  7 18:19:20 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 7 Jul 2015 18:19:20 +0100
+Subject: [opam-devel] [RFC] Switch and package configuration variables
+Message-ID: <7AF65651F1E446EF9DF10FE8B4EFDA36@erratique.ch>
+
+Hello,  
+
+It seems we sometimes need to let package expose some of their configuration abilities to end-user (case in point nocrypto using the cpu extensions or not). 
+
+It should also be easier to define per switch configuration variables (which e.g. may help the recent non-discussion about windows ports and cross-compilation). 
+
+Since I was thinking about how this could be integrated with assemblage this lead me to write down a proposal here:
+
+https://github.com/ocaml/opam/issues/2247
+
+I'm really not fond of the input/output configuration variable naming scheme I used, maybe user/state configuration variable would be better ? 
+
+Feedback welcome, 
+
+Daniel
+
+
+
+
+
+From martin at lucina.net  Thu Jul  9 11:03:45 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Thu, 9 Jul 2015 12:03:45 +0200
+Subject: [opam-devel] 'opam install' fails when it should(?) downgrade
+	packages
+Message-ID: <20150709100345.GA6718@nodbug.lucina.net>
+
+Hi,
+
+after reinstalling my OPAM installation that I use for working on the
+cross-compiled packages for rumprun [1], and thus updating to the latest
+OPAM upstream repository I can no longer install mirage drivers
+cross-compiled for rumprun:
+
+$ opam install mirage-console-rumprun mirage-unix-rumprun
+The following dependencies couldn't be met:
+  - ipaddr-rumprun -> sexplib-rumprun -> sexplib = 112.24.01
+Your request can't be satisfied:
+  - No package matches sexplib.112.24.01.
+
+The requirement for an older sexplib is expected, since my sexplib-rumprun
+package has not been updated to the latest version. However, I would expect
+'opam install' to resolve this by downgrading sexplib and any dependencies.
+
+If I try to install the older version of sexplib manually, the result is:
+
+The following actions will be performed:
+  ?  downgrade ocamlfind     1.5.5 to 1.5.4          [required by sexplib]
+  ?  install   ounit         1.1.2                   [required by cstruct]
+  ?  downgrade ipaddr        2.5.0 to 1.0.0          [uses ocamlfind]
+  ?  downgrade cmdliner      0.9.7 to 0.9.5          [uses ocamlfind]
+  ?  install   base-bytes    base                    [required by ocplib-endian]
+  ?  recompile ocaml-rumprun 4.02.1                  [uses ocamlfind]
+  ?  recompile camlp4        4.02+6                  [uses ocamlfind]
+  ?  downgrade depext        0.6 to 0.4              [uses cmdliner]
+  ?  downgrade crunch        1.4.0 to 1.0.0          [uses ocamlfind]
+  ?  upgrade   re            1.2.2 to 1.3.2          [uses ocamlfind]
+  ?  downgrade type_conv     112.01.02 to 112.01.00  [required by sexplib]
+  ?  recompile optcomp       1.6                     [uses ocamlfind]
+  ?  recompile lwt           2.4.5                   [uses ocamlfind]
+  ?  downgrade sexplib       112.35.00 to 112.24.01
+  ?  upgrade   ocplib-endian 0.4 to 0.6              [uses ocamlfind]
+  ?  downgrade cstruct       1.6.0 to 1.2.0          [uses ocamlfind]
+  ?  downgrade io-page       1.5.1 to 1.5.0          [uses ocamlfind]
+  ?  downgrade mirage-types  2.3.0 to 2.1.1          [uses sexplib]
+  ?  downgrade mirage        2.5.0+rumprun to 2.1.1  [uses sexplib]
+
+This is not correct either; I can't see anything in the older sexplib that
+would cause all of the downgrades above, and the solution is incorrect in
+downgrading mirage from 2.5.0+rumprun to 2.1.1.
+
+How can I debug this? Is there a way to get more information from the
+dependency solver about why it is choosing the above solution?
+
+Thanks,
+
+Martin
+
+[1] https://github.com/mato/opam-rumprun
+
+From sheets at alum.mit.edu  Thu Jul  9 11:07:28 2015
+From: sheets at alum.mit.edu (David Sheets)
+Date: Thu, 9 Jul 2015 11:07:28 +0100
+Subject: [opam-devel] 'opam install' fails when it should(?) downgrade
+	packages
+In-Reply-To: <20150709100345.GA6718@nodbug.lucina.net>
+References: <20150709100345.GA6718@nodbug.lucina.net>
+Message-ID: <CAAWM5TxJJGD_NiVJ_20uvx6zDEXK3He_OSQ5RfXqE2K94EyGsA@mail.gmail.com>
+
+On Thu, Jul 9, 2015 at 11:03 AM, Martin Lucina <martin at lucina.net> wrote:
+> Hi,
+>
+> after reinstalling my OPAM installation that I use for working on the
+> cross-compiled packages for rumprun [1], and thus updating to the latest
+> OPAM upstream repository I can no longer install mirage drivers
+> cross-compiled for rumprun:
+>
+> $ opam install mirage-console-rumprun mirage-unix-rumprun
+> The following dependencies couldn't be met:
+>   - ipaddr-rumprun -> sexplib-rumprun -> sexplib = 112.24.01
+> Your request can't be satisfied:
+>   - No package matches sexplib.112.24.01.
+>
+> The requirement for an older sexplib is expected, since my sexplib-rumprun
+> package has not been updated to the latest version. However, I would expect
+> 'opam install' to resolve this by downgrading sexplib and any dependencies.
+>
+> If I try to install the older version of sexplib manually, the result is:
+>
+> The following actions will be performed:
+>   ?  downgrade ocamlfind     1.5.5 to 1.5.4          [required by sexplib]
+>   ?  install   ounit         1.1.2                   [required by cstruct]
+>   ?  downgrade ipaddr        2.5.0 to 1.0.0          [uses ocamlfind]
+>   ?  downgrade cmdliner      0.9.7 to 0.9.5          [uses ocamlfind]
+>   ?  install   base-bytes    base                    [required by ocplib-endian]
+>   ?  recompile ocaml-rumprun 4.02.1                  [uses ocamlfind]
+>   ?  recompile camlp4        4.02+6                  [uses ocamlfind]
+>   ?  downgrade depext        0.6 to 0.4              [uses cmdliner]
+>   ?  downgrade crunch        1.4.0 to 1.0.0          [uses ocamlfind]
+>   ?  upgrade   re            1.2.2 to 1.3.2          [uses ocamlfind]
+>   ?  downgrade type_conv     112.01.02 to 112.01.00  [required by sexplib]
+>   ?  recompile optcomp       1.6                     [uses ocamlfind]
+>   ?  recompile lwt           2.4.5                   [uses ocamlfind]
+>   ?  downgrade sexplib       112.35.00 to 112.24.01
+>   ?  upgrade   ocplib-endian 0.4 to 0.6              [uses ocamlfind]
+>   ?  downgrade cstruct       1.6.0 to 1.2.0          [uses ocamlfind]
+>   ?  downgrade io-page       1.5.1 to 1.5.0          [uses ocamlfind]
+>   ?  downgrade mirage-types  2.3.0 to 2.1.1          [uses sexplib]
+>   ?  downgrade mirage        2.5.0+rumprun to 2.1.1  [uses sexplib]
+>
+> This is not correct either; I can't see anything in the older sexplib that
+> would cause all of the downgrades above, and the solution is incorrect in
+> downgrading mirage from 2.5.0+rumprun to 2.1.1.
+>
+> How can I debug this? Is there a way to get more information from the
+> dependency solver about why it is choosing the above solution?
+
+Do you have aspcud installed? If not (or one of the other supported
+external solvers), then you are using opam's approximate (and often
+bad/wrong) internal solver.
+
+David
+
+> Thanks,
+>
+> Martin
+>
+> [1] https://github.com/mato/opam-rumprun
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From martin at lucina.net  Thu Jul  9 11:12:06 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Thu, 9 Jul 2015 12:12:06 +0200
+Subject: [opam-devel] 'opam install' fails when it should(?) downgrade
+ packages
+In-Reply-To: <CAAWM5TxJJGD_NiVJ_20uvx6zDEXK3He_OSQ5RfXqE2K94EyGsA@mail.gmail.com>
+References: <20150709100345.GA6718@nodbug.lucina.net>
+ <CAAWM5TxJJGD_NiVJ_20uvx6zDEXK3He_OSQ5RfXqE2K94EyGsA@mail.gmail.com>
+Message-ID: <20150709101206.GB6718@nodbug.lucina.net>
+
+On Thursday, 09.07.2015 at?11:07, David Sheets wrote:
+> > How can I debug this? Is there a way to get more information from the
+> > dependency solver about why it is choosing the above solution?
+> 
+> Do you have aspcud installed? If not (or one of the other supported
+> external solvers), then you are using opam's approximate (and often
+> bad/wrong) internal solver.
+
+Aha, that was the culprit. I also upgraded my Debian installation to jessie
+and removed aspcud somewhere along the way.
+
+Perhaps OPAM should print a warning if it is running without aspcud
+installed?
+
+Thanks,
+
+Martin
+
+From daniel.buenzli at erratique.ch  Fri Jul 17 11:26:02 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 17 Jul 2015 11:26:02 +0100
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+Message-ID: <3D6425393B9549ED892DE814251B3530@erratique.ch>
+
+Le mardi, 30 juin 2015 ? 18:52, Daniel B?nzli a ?crit :
+> Le mardi, 30 juin 2015 ? 18:13, David Allsopp a ?crit :
+> > $OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc.
+>  
+
+It seems that `ocamlc -config` doesn't output this variable. Could anyone confirm me that `ocamlc -config | grep ccomp_type` gives the information (and how).  
+
+Besides regarding the initial discussion I think the only reasonable option would be:  
+
+b) Distinguish an OS for the mingw ports
+
+However I would like to get feedback from windows users if it makes sense to do this, in the sense that a lot of things have to be done differently build-wise with mingw compared to a plain win32 and that it's useful in build systems to be able to get that information without having to grep `ocamlc -config`. Because if it's only for the file extension business maybe it's not such a good idea to define an os value for it.
+
+Best,
+
+Daniel
+
+
+
+From anil at recoil.org  Tue Jul 21 19:52:09 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 21 Jul 2015 19:52:09 +0100
+Subject: [opam-devel] fwd: Cron job update-opam failed on opam.ocaml.org
+References: <E1YRWix-0006AJ-0a@www-ocaml-serv1>
+Message-ID: <BAB57A22-1076-4C9E-9FE3-FFD1D0C8DEC0@recoil.org>
+
+Looks like recent opam-lib may have broken the cron jobs.
+
+> Begin forwarded message:
+> 
+> ocamlfind ocamlopt -package unix,extlib,re,re.emacs,re.str,re.perl,re.pcre,re.glob,cmdliner,ocamlgraph,cudf,dose3,jsonm -c -g -w +a-4-9-32-41-44-45-48 -I core -I solver -I repositories -I client -I client/ client/opamArg.ml
+> File "client/opamArg.ml", line 242, characters 17-34:
+> Error: Unbound value Arg.doc_alts_enum
+> make[4]: *** [client/opamArg.cmx] Error 2
+
+
+From daniel.buenzli at erratique.ch  Tue Jul 21 20:05:19 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 21 Jul 2015 20:05:19 +0100
+Subject: [opam-devel] fwd: Cron job update-opam failed on opam.ocaml.org
+In-Reply-To: <BAB57A22-1076-4C9E-9FE3-FFD1D0C8DEC0@recoil.org>
+References: <E1YRWix-0006AJ-0a@www-ocaml-serv1>
+ <BAB57A22-1076-4C9E-9FE3-FFD1D0C8DEC0@recoil.org>
+Message-ID: <9572E9015C1B4038A36FAD917429DFDB@erratique.ch>
+
+Le mardi, 21 juillet 2015 ? 19:52, Anil Madhavapeddy a ?crit :
+> Looks like recent opam-lib may have broken the cron jobs.
+> > Begin forwarded message:
+> >  
+> > ocamlfind ocamlopt -package unix,extlib,re,re.emacs,re.str,re.perl,re.pcre,re.glob,cmdliner,ocamlgraph,cudf,dose3,jsonm -c -g -w +a-4-9-32-41-44-45-48 -I core -I solver -I repositories -I client -I client/ client/opamArg.ml
+> > File "client/opamArg.ml", line 242, characters 17-34:
+> > Error: Unbound value Arg.doc_alts_enum
+> > make[4]: *** [client/opamArg.cmx] Error 2
+>  
+
+This looks like a cmdliner version specification error. Arg.doc_alts_enum was introduced in v0.9.6
+
+Daniel
+
+
+
+From dra-news at metastack.com  Thu Jul 23 19:55:50 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Thu, 23 Jul 2015 19:55:50 +0100
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+	systems & cross compiling distinctions
+In-Reply-To: <3D6425393B9549ED892DE814251B3530@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+Message-ID: <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+
+Daniel B?nzli wrote:
+> Le mardi, 30 juin 2015 ? 18:52, Daniel B?nzli a ?crit :
+> > Le mardi, 30 juin 2015 ? 18:13, David Allsopp a ?crit :
+> > > $OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which
+> gives mingw or msvc.
+> >
+> 
+> It seems that `ocamlc -config` doesn't output this variable. Could anyone
+> confirm me that `ocamlc -config | grep ccomp_type` gives the information
+> (and how).
+
+utils/config.mlp shows that the output will be the CCOMPTYPE variable OCaml was configured with; config/Makefile.{msvc,msvc64,mingw,mingw64} show that is "msvc" for the first two and "cc" for the second two.
+ 
+> Besides regarding the initial discussion I think the only reasonable
+> option would be:
+> 
+> b) Distinguish an OS for the mingw ports
+
+That looks an abuse to me! The operating system for all four ports is Win32 (yes, it may sound strange that the OS for a 64-bit port is also Win32, but that's actually how the parlance works and isn't unique to OCaml...). The operating system for the Cygwin ports is *not* Windows, hence the different output.
+
+Additionally, while new code out there may be taking advantage of Sys.win32, I expect there's a lot of code still reasonably expecting that Sys.os_type = "Win32" will work forever. Adding Sys.comp_type would be handy, of course... but then having the entire Config module as Sys.Config would be generally quite useful!
+
+> However I would like to get feedback from windows users if it makes sense
+> to do this, in the sense that a lot of things have to be done differently
+> build-wise with mingw compared to a plain win32 and that it's useful in
+> build systems to be able to get that information without having to grep
+> `ocamlc -config`. Because if it's only for the file extension business
+> maybe it's not such a good idea to define an os value for it.
+
+I'm not sure what you're getting at here - what build system differences are you referring to? 
+
+
+David
+
+
+From daniel.buenzli at erratique.ch  Thu Jul 23 21:39:15 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 23 Jul 2015 21:39:15 +0100
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+ <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+Message-ID: <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+
+Le jeudi, 23 juillet 2015 ? 19:55, David Allsopp a ?crit :
+> utils/config.mlp shows that the output will be the CCOMPTYPE variable OCaml was configured with; config/Makefile.{msvc,msvc64,mingw,mingw64} show that is "msvc" for the first two and "cc" for the second two.
+
+Thanks very much, that's useful information on where to look at things.
+
+> Additionally, while new code out there may be taking advantage of Sys.win32, I expect there's a lot of code still reasonably expecting that Sys.os_type = "Win32" will work forever.
+I'm not suggesting to change that in OCaml I'm suggesting that for the *opam* os variable so that build systems can condition on it an behave accordingly. The opam os variable is already quite different from Sys.os_type which is not precise enough, see [1].
+  
+> Adding Sys.comp_type would be handy, of course... but then having the entire Config module as Sys.Config would be generally quite useful!
+
+As already mentioned that doesn't help much in cross-compiling scenarios.
+  
+> I'm not sure what you're getting at here - what build system differences are you referring to?
+
+Well the build system needs to adapt file extensions for one thing (which is quite annoying). Hence my question is it *only this* that differs in the mingw and msvc ports or are there also other differences at the build level (e.g. build rules) as if this is the case it would make sense to distinguish the ports using the os variable in order to have a good bulk variable to condition on, otherwise, if it's only the file extensions I don't think it's worth it.
+
+Best,
+
+Daniel
+
+[1] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+
+
+
+From dra-news at metastack.com  Fri Jul 24 11:58:57 2015
+From: dra-news at metastack.com (David Allsopp)
+Date: Fri, 24 Jul 2015 10:58:57 +0000
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+ <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+ <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9E9D4915E@Remus.metastack.local>
+
+Daniel B?nzli wrote:
+> Le jeudi, 23 juillet 2015 ? 19:55, David Allsopp a ?crit :
+> > utils/config.mlp shows that the output will be the CCOMPTYPE variable
+> OCaml was configured with; config/Makefile.{msvc,msvc64,mingw,mingw64}
+> show that is "msvc" for the first two and "cc" for the second two.
+> 
+> Thanks very much, that's useful information on where to look at things.
+> 
+> > Additionally, while new code out there may be taking advantage of
+> > Sys.win32, I expect there's a lot of code still reasonably expecting that
+> > Sys.os_type = "Win32" will work forever.
+> I'm not suggesting to change that in OCaml I'm suggesting that for the
+> *opam* os variable so that build systems can condition on it an behave
+> accordingly. The opam os variable is already quite different from
+> Sys.os_type which is not precise enough, see [1].
+
+Sorry - poor context-switching on my part! However, my comment still stands - mingw and msvc are not operating (sub-)systems ? even the sub-splitting in that function still gives you operating systems. Having something akin to the comp_type seems better to me than (ab)using the notion of os.
+
+This may play differently in an OPAM which fully supports cross-compilation, but would you expect that os variable to be the same across all switches? One thing that is certainly interesting (and which I'm doing in my Windows port of OPAM[*]) is being able to use all four native Windows ports in the same OPAM installation.
+
+<snip>
+
+> > I'm not sure what you're getting at here - what build system differences
+> are you referring to?
+> 
+> Well the build system needs to adapt file extensions for one thing (which
+> is quite annoying). Hence my question is it *only this* that differs in
+> the mingw and msvc ports or are there also other differences at the build
+> level (e.g. build rules) as if this is the case it would make sense to
+> distinguish the ports using the os variable in order to have a good bulk
+> variable to condition on, otherwise, if it's only the file extensions I
+> don't think it's worth it.
+
+Oh, I see - yes, the way the compilers and linkers are invoked is totally different (I for some reason thought you were meaning were different build systems themselves required). In GNU make, I use a function and $(call ...) to differentiate them - see, for example, https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/configure.ac#L85-L100 and https://github.com/dra27/opam/blob/0130db82f6bc49245b164d3136308531d96c786c/src/Makefile#L276.
+
+If you have comparch = cc on virtually everything (Cygwin, Mingw, most/all Unices) and comparch = msvc for the Microsoft compilers and also os being Win32, Cygwin or a variety of Unices then you have:
+
+comparch = msvc -> immediately .obj, .lib, .dll, .exe (and Microsoft invocation rules)
+comparch = cc -> immediately gives you .o and .a and then os <> Win32 gives you .so or .dll+.exe (and CC/GCC invocation rules)
+
+Best,
+
+
+D
+
+
+[*] which is, of course, a) not finished and b) not necessarily going to be merged!
+
+
+From daniel.buenzli at erratique.ch  Fri Jul 24 13:59:43 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 24 Jul 2015 13:59:43 +0100
+Subject: [opam-devel] [wg-windows] Identifying windows ports for build
+ systems & cross compiling distinctions
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9D4915E@Remus.metastack.local>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+ <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+ <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9D4915E@Remus.metastack.local>
+Message-ID: <5FC0BE0F5534411B99B1D89D414AE590@erratique.ch>
+
+Le vendredi, 24 juillet 2015 ? 11:58, David Allsopp a ?crit :
+> Sorry - poor context-switching on my part! However, my comment still stands - mingw and msvc are not operating (sub-)systems ? even the sub-splitting in that function still gives you operating systems. Having something akin to the comp_type seems better to me than (ab)using the notion of os.
+
+Ok.
+   
+> This may play differently in an OPAM which fully supports cross-compilation, but would you expect that os variable to be the same across all switches?
+
+Since that os variable should formally be taken for host-os no.
+  
+> One thing that is certainly interesting (and which I'm doing in my Windows port of OPAM[*]) is being able to use all four native Windows ports in the same OPAM installation.
+
+Yes, there should be no problem with this I think.
+
+> comparch = msvc -> immediately .obj, .lib, .dll, .exe (and Microsoft invocation rules)
+> comparch = cc -> immediately gives you .o and .a and then os <> Win32 gives you .so or .dll+.exe (and CC/GCC invocation rules)
+
+You meant comp_type I guess. Ok thanks, that's clear. It seems effectively less contrived than introducing an os for mingw.  
+
+> [*] which is, of course, a) not finished and b) not necessarily going to be merged!  
+You should try to sync and plot with Louis, I'm sure he's interested.  
+
+Best,
+
+Daniel
+
+From vb at luminar.eu.org  Wed Jul 29 16:20:44 2015
+From: vb at luminar.eu.org (Vincent Bernardoff)
+Date: Wed, 29 Jul 2015 17:20:44 +0200
+Subject: [opam-devel] Fwd: [lwt] What version of OPAM is the LWT project
+	supporting? (#177)
+In-Reply-To: <ocsigen/lwt/issues/177@github.com>
+References: <ocsigen/lwt/issues/177@github.com>
+Message-ID: <55B8EF4C.6020103@luminar.eu.org>
+
+Hi,
+
+I got this bug report below, probably an OPAM without aspcud issue.
+
+It should be written in red somewhere on OPAM website that it does not
+work without aspcud installed.
+
+Cheers,
+Vincent
+
+
+-------- Forwarded Message --------
+Subject: 	[lwt] What version of OPAM is the LWT project supporting? (#177)
+Date: 	Wed, 29 Jul 2015 08:15:51 -0700
+From: 	Rich Neswold <notifications at github.com>
+Reply-To: 	ocsigen/lwt
+<reply+000c2b8d7778b5ab4ae3e1552ca79d446d944ee570161a0492cf0000000111d0b02792a169ce05d6bfc3 at reply.github.com>
+To: 	ocsigen/lwt <lwt at noreply.github.com>
+
+
+
+I have OPAM 1.2.0 installed. When I try to install |lwt|, I get:
+
+|$ opam install lwt Your request can't be satisfied: - lwt.2.4.5 is in
+conflict with ssl.0.5.0 No solution found, exiting |
+
+|opam info lwt| shows version 2.5.0 is available (along with many other
+versions) but when I try to install it, I get:
+
+|$ opam install lwt.2.5.0 Your request can't be satisfied: - No package
+matches lwt. No solution found, exiting |
+
+I get the same error if I try to install version 2.4.8. This seems like
+the OPAM config for |lwt| may have a bug. Can anyone else install the
+latest |lwt| using OPAM 1.2.x?
+
+?
+Reply to this email directly or view it on GitHub
+<https://github.com/ocsigen/lwt/issues/177>.
+
+
+
+

@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20mingw%2C%20ocamlopt%20and%20%22input%20line%20is%20too%20long%22&In-Reply-To=%3Cnllar2%24ugo%241%40ger.gmane.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000064.html">
+   <LINK REL="Next"  HREF="000066.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;</H1>
+    <B>Andreas Hauptmann</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20mingw%2C%20ocamlopt%20and%20%22input%20line%20is%20too%20long%22&In-Reply-To=%3Cnllar2%24ugo%241%40ger.gmane.org%3E"
+       TITLE="[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;">andreashauptmann at t-online.de
+       </A><BR>
+    <I>Thu Jul  7 11:27:46 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000064.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+        <LI>Next message: <A HREF="000066.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#65">[ date ]</a>
+              <a href="thread.html#65">[ thread ]</a>
+              <a href="subject.html#65">[ subject ]</a>
+              <a href="author.html#65">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, 7 Jul 2016 09:18:09 +0200
+Andre Maroneze wrote:
+&gt;<i> ** Use cygpath: true
+</I>&gt;<i> ** Search path: .... (lots of directories, one per line)
+</I>[....]
+&gt;<i> (lots of -I and -L, plus some extra flags, and this line is slightly 
+</I>&gt;<i> larger than 8k characters)
+</I>&gt;<i> La ligne de commande est trop longue.
+</I>&gt;<i> ** Fatal error: Error during linking
+</I>&gt;<i> 
+</I>&gt;<i> So it's that call to i686-w64-mingw32-gcc that fails. Is there a way
+</I>&gt;<i> to use a response file for that command as well?
+</I>
+Ok, I think I've identified the problem. Flexlink already writes the
+command to a file and execute this file with bash, if the command line
+is too long. Since both bash and gcc are linked against cygwin-1.dll,
+there aren't any limits beside your main memory (cygwin programs use
+shared memory to pass command line arguments and environment variables
+around, if they hit a limit imposed by windows).
+
+However there are at least two problems:
+- the decision to use bash or not is based on a gross estimation, not
+the real command line length (It looks at your object files, not your
+include directories)
+- The wrong quote function is used to write the shell script
+(Filename.quote quotes for cmd, not a unix shell,...)
+
+Try:
+<A HREF="https://www.dropbox.com/s/570bs4205llxqwt/flexlink32.exe">https://www.dropbox.com/s/570bs4205llxqwt/flexlink32.exe</A>
+or
+<A HREF="https://www.dropbox.com/s/ki1bvfdld27vlwb/flexlink64.exe">https://www.dropbox.com/s/ki1bvfdld27vlwb/flexlink64.exe</A>
+
+as replacement for your current flexlink.exe. 
+
+I&#8217;m not sure, if my guess (and patch) is correct. When I&#8217;ve tried to
+use a opam switch under a location with long filenames, I fail much
+earlier because of the filename length limit of 260 - not because of
+flexlink. (If you want to use more than 260 chars, you have to use the
+unicode api and always use absolute paths &#8211; of course no commonly used
+build system can deal with such limitations.)
+
+
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000064.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+	<LI>Next message: <A HREF="000066.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#65">[ date ]</a>
+              <a href="thread.html#65">[ thread ]</a>
+              <a href="subject.html#65">[ subject ]</a>
+              <a href="author.html#65">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

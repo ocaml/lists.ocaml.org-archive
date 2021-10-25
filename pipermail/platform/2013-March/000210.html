@@ -1,0 +1,316 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jR%3DXHwc78UkKqk0rLVSxGQnEfP%2B70fN4D-KP%3DLiXHrLNw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000207.html">
+   <LINK REL="Next"  HREF="000212.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jR%3DXHwc78UkKqk0rLVSxGQnEfP%2B70fN4D-KP%3DLiXHrLNw%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Fri Mar  1 15:28:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000207.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000212.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#210">[ date ]</a>
+              <a href="thread.html#210">[ thread ]</a>
+              <a href="subject.html#210">[ subject ]</a>
+              <a href="author.html#210">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Fri, Mar 1, 2013 at 8:18 AM, Didier Remy &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Didier.Remy at inria.fr</A>&gt; wrote:
+&gt;&gt;&gt;<i> 2) However, you cannot open several nodes at the same time without
+</I>&gt;&gt;&gt;<i>     specifying an ordering between those nodes.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What does it mean to open several nodes &quot;at the same time&quot;?  I would
+</I>&gt;&gt;<i> have thought that opening of nodes would always be ordered, since the
+</I>&gt;&gt;<i> open statements would need to be written in some order.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> If Core has two auto-open subnodes (e.g Std and Pervasives), then opening
+</I>&gt;<i> core will open the two auto-open subnodes at the same time. This is what I
+</I>&gt;<i> meant.
+</I>
+Got it.  In my thinking, these auto-opens could only be modules, to be
+clear, not namespaces.  So i'm thinking about this all as very flat,
+much as Alain is.
+
+&gt;<i> In this case, you write with the auto-open semantics
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>
+</I>&gt;<i> and what happens is equivalent to (without the auto-open semantics)
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>         open Std
+</I>&gt;<i>         open Pervasives
+</I>&gt;<i> or
+</I>&gt;<i>         open Core
+</I>&gt;<i>         open Std
+</I>&gt;<i>         open Pervasives
+</I>&gt;<i>
+</I>&gt;<i> So the edges Std and Pervasives need both leaving from Core need to be
+</I>&gt;<i> ordered in the namespace.
+</I>
+Yup.
+
+&gt;&gt;&gt;<i> The * is the auto-open flag, as used in Gabriel's description.
+</I>&gt;&gt;&gt;<i> Sorry for leaving this implicit.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Got it.  That's quite helpful, though I'm still a little lost about
+</I>&gt;&gt;<i> the problem you're describing.  It sounds to me like the issue dervies
+</I>&gt;&gt;<i> from the fact that you're proposing opening up a parent namespace as
+</I>&gt;&gt;<i> an operation that opens all children as well.  Is that right?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Yes, an operation that opens all children marked auto-open.
+</I>&gt;<i>
+</I>&gt;&gt;<i> I hadn't even begun to imagine wanting that feature, so maybe that isn't a
+</I>&gt;&gt;<i> real issue at all?  Or perhaps I'm just confused....
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I thought this is what you where asked for when saying that you want
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>
+</I>&gt;<i> to behaves as
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>         open Std
+</I>&gt;<i>         open Pervasives
+</I>&gt;<i>
+</I>&gt;<i> because you have marked Std and Pervasives as auto-open.
+</I>
+Maybe the difference is, I was only imagining this one level deep:
+single-level namespaces, and namespaces contain list of module
+aliases, plus a list of module opens, all of which are in a single
+total order.
+
+&gt;&gt;&gt;<i> I think namespaces should be unordered to scale up.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> You would like to be able to represent all available libraries in
+</I>&gt;&gt;&gt;<i> the OCaml world as a namespace, with libraries coming from many
+</I>&gt;&gt;&gt;<i> different sources and there is no natural order on these, i.e. no
+</I>&gt;&gt;&gt;<i> order that could be given a meaningful semantics.  Would you put
+</I>&gt;&gt;&gt;<i> World#JaneStreet before World#Lexify or the other way round?
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> If name spaces are unordered, it is also easy to populate them by
+</I>&gt;&gt;&gt;<i> reading and merging different sources in a strict way: name spaces
+</I>&gt;&gt;&gt;<i> are meant to avoid conflicting names to start with, so if a merge
+</I>&gt;&gt;&gt;<i> introduces conflicts, this is really the right place to fix it by
+</I>&gt;&gt;&gt;<i> renaming one side or reorganizing the hierarchy rather than do
+</I>&gt;&gt;&gt;<i> some silent overriding.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I wonder if this all comes down to different thoughts about hierarchy.
+</I>&gt;&gt;<i> I guess I wouldn't think the namespace World#JaneStreet would be
+</I>&gt;&gt;<i> ordered compared to World#Lexify, but the module aliases and opens
+</I>&gt;&gt;<i> contained in a namespace would, I thought, have been ordered.  And
+</I>&gt;&gt;<i> surely, when you open multiple namespaces in your environment, you can
+</I>&gt;&gt;<i> be including the same name multiple times, at which point I believe
+</I>&gt;&gt;<i> the proper semantics is shadowing.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Here, you are reasoning in Alain's model where a namespace file is
+</I>&gt;<i> just a sequence of operations (alias or open).  So you don't have a
+</I>&gt;<i> proper notion of namespace model and instead understand a namespace
+</I>&gt;<i> file as its immediate action on the current scope.
+</I>
+Correct.
+
+&gt;<i> This is find to reason in the small, to reason about the imports of a
+</I>&gt;<i> module source file.
+</I>&gt;<i>
+</I>&gt;<i> But I don't think this is a good model that would scale to providing a
+</I>&gt;<i> unified view of all available libraries where you wish to construct
+</I>&gt;<i> namespaces a posteriori by combining existing ones.
+</I>
+Like Alain, I'm not convinced that hierarchy materially helps matters,
+though it doesn't seem implausible either.
+
+As a separate note, especially for a first version, but perhaps
+forever, it seems to me preferable to have /building/ of namespaces
+happen at the build-system level, and /references/ to namespaces
+happen at the soruce level.  In other words, being able to explicitly
+do things like open, alias, and qualify expressions using namespaces
+seem essential at the source level.  But constructing them at the
+source seems less important.
+
+It's possible that a language like the one you and Gabriel propose for
+manipulating namespaces is important.  I just don't see the full
+detail.
+
+
+&gt;&gt;&gt;<i> Hope this helps,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think what I'm mostly confused about is what is the nature of the
+</I>&gt;&gt;<i> hierarchical namespace system you're thinking about. What are the
+</I>&gt;&gt;<i> operations available?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> The model is what has been described by Gabriel:
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="http://gallium.inria.fr/~scherer/namespaces/spec.pdf">http://gallium.inria.fr/~scherer/namespaces/spec.pdf</A>
+</I>
+Yes!  I somehow missed this earlier, but read it over this morning.  I
+now have a better sense of what you mean, but it would be even more
+instructive to have some examples.  Would it be possible to put
+together some source examples on github (or wherever) that we could
+look over?  I find it quite helpful to see examples, rather than just
+the grammar of the DSL.
+
+&gt;<i> and
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html">http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> Do you intend to have namespace opens also recursively open all children?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I thought this was your wish.
+</I>&gt;<i> But I think it is more a drawback than a convenience.
+</I>
+I was thinking of something that only went one-level down: opening a
+namespace can open a module, never opening a namespace causing another
+namespace to be opened.
+
+That said, in constructing namespaces, I would very much want an
+include-like functionality, so that the Core namespace would include
+the mappings in the Ucore namespace.  That, however, seems doable at
+the build-system level
+
+&gt;<i>
+</I>&gt;&gt;<i> Is there an operation for merging namespaces?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Yes.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Aliasing upper namespaces?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Yes, you can have several paths leading to the same module object.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> Right now, I lack both a precise mental model of what you mean by
+</I>&gt;&gt;<i> hierarchical namespaces,
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="http://gallium.inria.fr/~scherer/namespaces/spec.pdf">http://gallium.inria.fr/~scherer/namespaces/spec.pdf</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> and an understanding of the language features that motivate this
+</I>&gt;&gt;<i> hierarchy.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Although you do not say it clearly, I think you wish at least Alain's
+</I>&gt;<i> 2-level hierarchal model.
+</I>&gt;<i>
+</I>&gt;<i> This may be fine from your point of view:
+</I>&gt;<i>
+</I>&gt;<i>         level 1 is for JaneStreet different libraries
+</I>&gt;<i>         level 2 is for the modules of each library
+</I>&gt;<i>
+</I>&gt;<i> Most of your libraries are for internal use. So in a way you do not have to
+</I>&gt;<i> share your namespaces with the rest of the world. I think the problem comes
+</I>&gt;<i> when people want to share the namespaces.
+</I>&gt;<i>
+</I>&gt;<i> For instance, there could be two actors Foo and Bar proposing complementary
+</I>&gt;<i> set of libraries for programming the web.
+</I>&gt;<i>
+</I>&gt;<i> When doing web programming I may wish to use parts of both providers
+</I>&gt;<i> Then, I may wish to structure names as
+</I>&gt;<i>
+</I>&gt;<i>         Web
+</I>&gt;<i>             Foo
+</I>&gt;<i>                 Lib1
+</I>&gt;<i>                    &lt;list of modules&gt;
+</I>&gt;<i>                 Lib2
+</I>&gt;<i>                    &lt;list of modules&gt;
+</I>&gt;<i>             Bar
+</I>&gt;<i>
+</I>&gt;<i> In the 2-level model I would be forced to rename namespace files
+</I>&gt;<i> to avoid clashes and get some long list of namespace_files that would look
+</I>&gt;<i> like:
+</I>&gt;<i>
+</I>&gt;<i>         Web_Foo_Lib1
+</I>&gt;<i>         Web_Foo_Lib2
+</I>&gt;<i>         Web_Bar
+</I>&gt;<i>
+</I>&gt;<i> In this model, the reorganization of namespaces exported by users Foo and
+</I>&gt;<i> Bar has into my own view has to be done manually.  The fact that names carry
+</I>&gt;<i> some implicit structure is an indication that one has some hierarchy in
+</I>&gt;<i> mind.
+</I>&gt;<i>
+</I>&gt;<i> In the hierachical view, it would suffice to assemble them within the
+</I>&gt;<i> language of namespaces, using operations like merge, perhaps pruning, etc..
+</I>&gt;<i>
+</I>&gt;<i> Besides, I do not think that a 2-level model is so much simpler than a
+</I>&gt;<i> hierarchical one.  The apparent simplificty of Alain's proposal is more I
+</I>&gt;<i> think in the fact that he does not manipulate namespaces explicitly (such as
+</I>&gt;<i> pruning, merging, etc.)
+</I>
+I have no real objection at a technical level to hierarchy (though it
+sounds like some difficulty has been introduced by the combination of
+auto-open and hierarchy's.  I'm not sure if my proposal that auto-open
+only applies to modules is helpful here.).
+
+I'm not sure as a social matter that hierarchy helps, really.  I
+roughly think that picking unique names for every module is a little
+crazy, but picking unique names for larger packages seems reasonable.
+After all, Debian manages to get away with doing this for every
+software package they release, without hierearch.
+
+We would surely be happy to adjust our internal package names to avoid
+clashes with external projects, and certainly as we release more and
+more software to the world, that becomes clearer.  I'd be happier to
+do that than to have every refernce to an internal package be prefixed
+by &quot;com.janestreet&quot;.
+
+That said, I have no strong objections to hierarchy, and I'm sure it
+would be helpful in some cases.  I'm just not particularly in favor.
+
+y
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000207.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000212.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#210">[ date ]</a>
+              <a href="thread.html#210">[ thread ]</a>
+              <a href="subject.html#210">[ subject ]</a>
+              <a href="author.html#210">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

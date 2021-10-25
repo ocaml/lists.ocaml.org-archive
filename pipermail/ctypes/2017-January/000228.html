@@ -1,0 +1,104 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Static function callback.
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Static%20function%20callback.&In-Reply-To=%3CCABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Static function callback.</H1>
+    <B>Romain Beauxis</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Static%20function%20callback.&In-Reply-To=%3CCABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Static function callback.">romain.beauxis at gmail.com
+       </A><BR>
+    <I>Tue Jan 31 22:31:47 GMT 2017</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#228">[ date ]</a>
+              <a href="thread.html#228">[ thread ]</a>
+              <a href="subject.html#228">[ subject ]</a>
+              <a href="author.html#228">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi guys,
+
+I am playing with a binding for OSX's SecureTransport API. The API
+abstracts away the underlying socket implementation and, thus,
+requires to pass (static) callbacks, which is where I am having
+trouble..
+
+Here are the relevant part of the code:
+
+let fd_read = (...)
+
+let fd_write = (...)
+
+let _set_io_funcs = foreign ~from:lib &quot;SSLSetIOFuncs&quot;
+  (ptr void @-&gt; fd_io_typ @-&gt; fd_io_typ @-&gt; returning int)
+
+let _create_context = (...)
+
+let _release_context = (...)
+
+let init s t =
+  let ctx =
+    _create_context (...)
+  in
+  Gc.finalise _release_context ctx;
+  let read = Root.create fd_read in
+  Gc.finalise Root.release read;
+  let write = Root.create fd_write in
+  Gc.finalise Root.release write;
+  check_err (_set_io_funcs ctx fd_read fd_write);
+  {ctx;read;write}
+
+The trick above is that read and write callbacks are passed at
+initialization and, thus, need to be valid for the life time of the
+handler.
+
+I've tried my best to make sure that the passed callback would be
+immune to Gc issues. Unfortunately, I am still experiencing issues
+with them which, I think, relate to the Gc messing with those.
+
+Basically, if I had some printf inside the fd_* callbacks, the
+compiled binding will sometimes work and some times not.
+
+Besides using C stubs (which I am trying to avoid as an exercise
+here), is there anything else that I could do to make this work?
+
+Thanks for y'all help!
+Romain
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#228">[ date ]</a>
+              <a href="thread.html#228">[ thread ]</a>
+              <a href="subject.html#228">[ subject ]</a>
+              <a href="author.html#228">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

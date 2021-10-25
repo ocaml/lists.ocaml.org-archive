@@ -1,0 +1,108 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Fwd: Lwt/Async abstraction for HTTP library
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Fwd%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3CBBF79EDB-E5E2-457C-ADC5-59A25BD1AAFB%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000470.html">
+   <LINK REL="Next"  HREF="000477.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Fwd: Lwt/Async abstraction for HTTP library</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Fwd%3A%20Lwt/Async%20abstraction%20for%20HTTP%20library&In-Reply-To=%3CBBF79EDB-E5E2-457C-ADC5-59A25BD1AAFB%40recoil.org%3E"
+       TITLE="Fwd: Lwt/Async abstraction for HTTP library">anil at recoil.org
+       </A><BR>
+    <I>Fri Aug 17 02:59:41 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000470.html">Lwt/Async abstraction for HTTP library
+</A></li>
+        <LI>Next message: <A HREF="000477.html">Lwt/Async abstraction for HTTP library
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#471">[ date ]</a>
+              <a href="thread.html#471">[ thread ]</a>
+              <a href="subject.html#471">[ subject ]</a>
+              <a href="author.html#471">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+I also thought this might be quite useful for our (rapidly approaching) ICFP tutorial.  We could spend some time after the basics on showing how both Lwt/Async can be used to implement a simple web service or a crawler.  The Github API bindings are working pretty well, so would let us demonstrate Yojson as well.
+
+-a
+
+Begin forwarded message:
+
+&gt;<i> From: Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/core">anil at recoil.org</A>&gt;
+</I>&gt;<i> Subject: Lwt/Async abstraction for HTTP library
+</I>&gt;<i> Date: 16 August 2012 18:46:15 PDT
+</I>&gt;<i> To: &quot;<A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core at googlegroups.com</A>&quot; &lt;<A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core at googlegroups.com</A>&gt;
+</I>&gt;<i> Reply-To: <A HREF="http://lists.ocaml.org/listinfo/core">ocaml-core at googlegroups.com</A>
+</I>&gt;<i> 
+</I>&gt;<i> I've been working on a release of a cooperative threading HTTP library, and have been using the opportunity to experiment with parameterising it over Lwt/Async.  I had a few (basic) Async questions as a result.
+</I>&gt;<i> 
+</I>&gt;<i> The code is at:
+</I>&gt;<i> <A HREF="https://github.com/avsm/ocaml-cohttp/tree/v2-interface">https://github.com/avsm/ocaml-cohttp/tree/v2-interface</A>
+</I>&gt;<i> (requires Lwt-current to build at the moment)
+</I>&gt;<i> 
+</I>&gt;<i> The basic IO interface that takes care of low-level parsing is very straightforward to implement in Async and Lwt:
+</I>&gt;<i> <A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async_raw.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/async/cohttp_async_raw.ml</A>
+</I>&gt;<i> <A HREF="https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt_raw.ml">https://github.com/avsm/ocaml-cohttp/blob/v2-interface/lwt/cohttp_lwt_raw.ml</A>
+</I>&gt;<i> 
+</I>&gt;<i> The higher-level client HTTP interface is where Lwt and Async diverge, and so have different implementations. The Async version exposes the body as a Pipe which can be lazily consumed or passed to a proxy. This means that pipelined requests must be careful to wait until previous requests have fully consumed their respective bodies before using that particular channel.  In Lwt, this can be modelled with Lwt_stream.t that maps over the requests and responses.
+</I>&gt;<i> 
+</I>&gt;<i> In Async, I ran into a few basic questions while building the equivalent Lwt support.
+</I>&gt;<i> 
+</I>&gt;<i> - Only one Scheduler.go is supported (unlike Lwt_main, which can run multiple times in a program), which makes multiple Async tests hard to compose in oUnit.  Do you have a custom oUnit that can isolate  multiple Async test-cases, or should I write a forking one that does this?
+</I>&gt;<i> 
+</I>&gt;<i> - What's the best way to get a human-readable error?  I have this in the oUnit right now, which is very clunky:
+</I>&gt;<i> 
+</I>&gt;<i>  let _ =  Async_core.Scheduler.within' (fun () -&gt;
+</I>&gt;<i>    Monitor.try_with make_net_req &gt;&gt;=
+</I>&gt;<i>    function
+</I>&gt;<i>    |Error exn -&gt; 
+</I>&gt;<i>      (* TODO: how to dump out top-level errors in a nicer way? *)
+</I>&gt;<i>       Printf.fprintf stderr &quot;err %s.\n%!&quot; (Exn.backtrace ()); return ()
+</I>&gt;<i>    |Ok _ -&gt; return ()
+</I>&gt;<i>  ) in Async_unix.Scheduler.go ()
+</I>&gt;<i> 
+</I>&gt;<i> - Async_streams are deprecated, and I should use Pipes instead. I need to be able to run a background task that will close the I/O channel whenever the Pipe is completed to close the underlying fd.  I obtain a Deferred via Pipe.closed, but how should this run in the background?  Should I just ignore the return, or register it with the Scheduler?
+</I>&gt;<i> 
+</I>&gt;<i> In general, are there any toy network programs written using Async that I could crib good style from?
+</I>&gt;<i> 
+</I>&gt;<i> cheers,
+</I>&gt;<i> Anil
+</I>
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000470.html">Lwt/Async abstraction for HTTP library
+</A></li>
+	<LI>Next message: <A HREF="000477.html">Lwt/Async abstraction for HTTP library
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#471">[ date ]</a>
+              <a href="thread.html#471">[ thread ]</a>
+              <a href="subject.html#471">[ subject ]</a>
+              <a href="author.html#471">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

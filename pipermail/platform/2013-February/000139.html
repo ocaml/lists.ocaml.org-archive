@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C57266456531B41AC848B403A47E6390C%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000135.html">
+   <LINK REL="Next"  HREF="000140.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C57266456531B41AC848B403A47E6390C%40erratique.ch%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Tue Feb 26 15:40:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000135.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000140.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#139">[ date ]</a>
+              <a href="thread.html#139">[ thread ]</a>
+              <a href="subject.html#139">[ subject ]</a>
+              <a href="author.html#139">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le mardi, 26 f&#233;vrier 2013 &#224; 15:59, Didier Remy a &#233;crit :
+&gt;<i> Do you really need this level of granularity? I'd like to think of
+</I>&gt;<i> modules as the smallest compilation unit. Can you give us examples of what
+</I>&gt;<i> you'd like to do with value manipulation?
+</I>
+I have a (yet unreleased) library that provides basic types for computer graphics (vectors, matrices, sizes, quaternions, colors, boxes). I manually &quot;packed&quot; it as follows:
+
+module Gg = struct
+  module Float sig &#8230; end
+
+  type m2  
+  type m3  
+  type m4
+
+  (* Vectors *)
+  type v2
+  type v3
+  type v4
+  module type V (* implemented by all vector types *)
+  module V2 : sig type t = v2 &#8230; end
+  module V3 : sig type t = v3 &#8230; end
+  module V4 : sig type t = v4 &#8230; end
+
+  (* Points *)
+  type p2 = v2
+  type p3 = v3  
+  module type P = sig &#8230; end (* implemented by all point types *)
+  module P2 : sig type t = p2 &#8230; end
+  module P3 : sig type t = p3 &#8230; end
+
+  (* Matrices *)
+  module type M = sig &#8230; end (* implemented by all matrix types *)
+  module M2 : sig type t = m2 &#8230; end
+  module M3 : sig type t = m3 ... end  
+  module M4 : sig type t = m4 &#8230; end
+
+  (* Quaternions *)
+  type quat = v4  
+  module Quat : sig &#8230; end
+
+  (* Sizes *)  
+  type size2 = v2  
+  type size3 = v3  
+  module Size2 = sig ... end
+  module Size3 = sig &#8230; end
+
+  (* Boxes *)
+  ...
+
+end
+
+The idea was that people using the library would do an  
+
+open Gg;;
+
+at the top of their source. Now I would gladly replace that Gg with a namespace to maybe benefit of smaller executables (e.g. a 2D program that only uses V2, P2, M2). However at toplevel there are quite a few things that are not modules.  
+
+1) Module types. These are mainly here to be able to functorize code over multiple dimensions.
+
+2) Types. Are there for various reasons, first to avoid recursive module definition. Second so that printing of errors in the toplevel and by the compiler do not become long-winded/and or unreadable (e.g. print Gg.size2, Gg.v2 instead of Gg.Size2.t, Gg.V2.t).
+
+3) (Values. I don't do that anymore but initially I also had value constructors for the types but I pushed these back into modules so that the open Gg guarantees you that no value is added to your environment, only types and modules are defined).  
+
+So I guess in that case namespaces won't be of any help since only modules can be attached to them. The obvious solution would then to define all top level types maybe in a Gg.Types module, but I'd loose the short printing of type names and need to introduce artificial modules (Gg.Types).  
+
+Daniel
+
+
+
+
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000135.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000140.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#139">[ date ]</a>
+              <a href="thread.html#139">[ thread ]</a>
+              <a href="subject.html#139">[ subject ]</a>
+              <a href="author.html#139">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

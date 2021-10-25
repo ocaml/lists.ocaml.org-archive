@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C5149A04E.7050109%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000361.html">
+   <LINK REL="Next"  HREF="000363.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C5149A04E.7050109%40lexifi.com%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Wed Mar 20 11:41:02 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000361.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000363.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#362">[ date ]</a>
+              <a href="thread.html#362">[ thread ]</a>
+              <a href="subject.html#362">[ subject ]</a>
+              <a href="author.html#362">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/20/2013 12:03 PM, Leo White wrote:
+&gt;<i> None of the above is helped by removing &quot;simple namespaces through
+</I>&gt;<i> filenames&quot;: it is all already supported by my proposal.
+</I>
+This is not true.  The good properties I list for a system without 
+&quot;simple namespaces&quot; are lost if these &quot;simple namespaces&quot; are to 
+supported by tools.
+
+&gt;<i> If you don't
+</I>&gt;<i> like some of the aspects of &quot;simple namespaces through filenames&quot; then
+</I>&gt;<i> simply don't use them.
+</I>
+This does not work: as soon as a feature is supported by the compilers, 
+the tools have to support them as well.  The fact that I don't use 
+&quot;simple namespaces through filenames&quot; does not allow ocamldep, omake, 
+ocamlbuild, ocamldoc, etc to not support them.  Extra features can have 
+bad effects, even for people who do not plan to use them.
+
+Moreover, removing the feature will also reduce the risk of weird 
+behaviors of the compiler and user misunderstandings.  In particular, 
+saying that &quot;open namespace Foo&quot; does not fail as soon as their is a 
+&quot;foo-*.cmi&quot; file in one of the -I directories is fragile.  Concrete 
+example: the library developers decides to change the name of one of his 
+namespaces from Foo to Bar, but there are old foo-*.cmi files around, so 
+the compiler does not complain upon a remaining &quot;open namespace Foo&quot; in 
+one of the files.  It's better if the compiler has some explicit 
+knowledge of namespaces which are really available (through search path 
+files) than to rely on the existence of files.
+
+&gt;<i> The majority of users do not require complex dependency analysis for
+</I>&gt;<i> generated source files. I see no reason to prevent them from using a
+</I>&gt;<i> convenient mechanism for defining namespaces. It is also the only
+</I>&gt;<i> mechanism that is really in keeping with the current design of OCaml.
+</I>
+I consider that the way OCaml interact with the file system has bad 
+consequences w.r.t. to dependency analysis, which can be fixed quite 
+easily by letting the compiler and tools know about which files are 
+available.  Introducing namespaces is an opportunity to improve the 
+situation, and it also makes it even more important to do so (because we 
+want to support naming source files differently from compiled units, 
+which breaks a property on which ocamldep currently relies).
+
+&gt;<i> This should probably be a warning not an error. There is nothing wrong
+</I>&gt;<i> with deliberately shadowing the description of a namespace.
+</I>
+This is probably a matter of taste.  For me, if a library comes with a 
+naming scheme for its modules, I really don't want another library to 
+mess with it.  Shadowing is fragile and make the resolution depends on 
+the ordering between command-line arguments.  Another source of 
+potential problems which can be easily avoided.
+
+&gt;<i> I don't see how they can resolve aliases manually without knowing, on
+</I>&gt;<i> the end user's machine, the location of all packages relative to the
+</I>&gt;<i> location of their package. This also hard codes the aliases, what if the
+</I>&gt;<i> other package moves?
+</I>
+First, I think it's a bad idea for a package to re-export module from 
+another package.  This is just calling for trouble when user read the 
+documentation of the respective libraries, or try to make sense of the 
+error messages.  Providing several names for a module in a single 
+package (e.g. Core..List and Core_std..List) can be useful, but I don't 
+see any use for more complex operations.
+
+Second, if this is really required, this can be done by generating the 
+&quot;search path file&quot; during installation.
+
+&gt;<i> The idea is that build systems like ocamlbuild do not *have* to support
+</I>&gt;<i> the &quot;-name&quot; argument. It is there so that the build system *can* support
+</I>&gt;<i> various naming conventions if it wants to. If we specify a particular
+</I>&gt;<i> file format for specifying names then every build system *must*
+</I>&gt;<i> recognise that format.
+</I>
+With -name, the mapping between source file names and compilation units 
+is only local to the build system.  But this information is really 
+useful for tools (like the current design of ocamldoc or Bisect).  Just 
+providing a low-level feature to rename target files in an arbitrary way 
+will make it harder for these tools to behave correctly.  Concretely, if 
+I write a Makefile manually which uses &quot;-name&quot; as in your proposal, how 
+do I inform ocamldoc about the mapping?  Same question for ocamldep.
+
+Requiring that (in this &quot;current namespace mode&quot;) the source filename 
+correspond to the module name in the namespace will reduce risks of 
+confusion and allow tools to use the existing &quot;search path files&quot; as a 
+good source of information to relate source and compiled files.
+
+
+&gt;<i> So either the user must write their own search path file specifying the
+</I>&gt;<i> name of every single compilation unit, or the build system has to
+</I>&gt;<i> generate it. If the build system has to generate it, how is that better
+</I>&gt;<i> than using a direct argument?
+</I>
+Because other tools can parse the file.  Otherwise, the information is 
+left hidden in the build system.
+
+The users already have to list all files in a library.  Currently, this 
+information is specified in the build system itself.  If users directly 
+write a &quot;search path file&quot; and the build system parses it (for instance 
+to deduce automatically which modules to put in the library), there is 
+no more work for the library author, and the information is directly 
+made available to other tools.
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000361.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000363.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#362">[ date ]</a>
+              <a href="thread.html#362">[ thread ]</a>
+              <a href="subject.html#362">[ subject ]</a>
+              <a href="author.html#362">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

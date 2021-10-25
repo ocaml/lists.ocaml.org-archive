@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3C687334906.960850.1359473842585.JavaMail.root%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000041.html">
+   <LINK REL="Next"  HREF="000097.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)</H1>
+    <B>Xavier Clerc</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Matching%20on%20concrete%20syntax%20%28was%3A%20Re%3A%20Camlp4%20uses%29&In-Reply-To=%3C687334906.960850.1359473842585.JavaMail.root%40inria.fr%3E"
+       TITLE="[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)">xavier.clerc at inria.fr
+       </A><BR>
+    <I>Tue Jan 29 15:37:22 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000041.html">[wg-camlp4] Matching on concrete syntax (was: Re:  Camlp4 uses)
+</A></li>
+        <LI>Next message: <A HREF="000097.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#94">[ date ]</a>
+              <a href="thread.html#94">[ thread ]</a>
+              <a href="subject.html#94">[ subject ]</a>
+              <a href="author.html#94">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+----- Mail original -----
+&gt;<i> On 01/28/2013 04:17 PM, Xavier Clerc wrote:
+</I>&gt;<i> &gt;    3- in Mascot (style tool), camlp4 is used to get either
+</I>&gt;<i> &gt;       a stream of lexical tokens or an AST, both being used
+</I>&gt;<i> &gt;       to detect code smells;
+</I>&gt;<i> ...
+</I>&gt;<i> &gt; Case 3 may appear as a perfect fit for ppx, but indeed
+</I>&gt;<i> &gt; it is quite pleasant to write some code smell in OCaml
+</I>&gt;<i> &gt; syntax (through quotations), rather than by matching
+</I>&gt;<i> &gt; against a bare AST. The latter becomes very verbose,
+</I>&gt;<i> &gt; and very hard to read/maintain to say the least.
+</I>&gt;<i> 
+</I>&gt;<i> I've the intuition that matching AST with patterns in a concrete
+</I>&gt;<i> syntax
+</I>&gt;<i> is a source of never lasting problems.  But it seems you disagree, so
+</I>&gt;<i> I'm very much interested in your experience!
+</I>&gt;<i> 
+</I>&gt;<i> Let me explain my point.
+</I>&gt;<i> 
+</I>&gt;<i> First, the parsing (concrete syntax -&gt; AST) has some built-in
+</I>&gt;<i> ambiguities and resolution mechanism that the programmer does not
+</I>&gt;<i> even
+</I>&gt;<i> need to be aware of.  For instance, I cannot tell how a pattern like
+</I>&gt;<i> &quot;p1
+</I>&gt;<i> | p2 | p3&quot; or an expression &quot;e1 || e2 || e3&quot; is parsed without
+</I>&gt;<i> | looking
+</I>&gt;<i> at the parser (or most probably, playing with -dparsetree).  Is the
+</I>&gt;<i> pattern parsed like &quot;(p1 | p2) | p3&quot; or &quot;p1 | (p2 | p3)&quot;?  The
+</I>&gt;<i> problem
+</I>&gt;<i> is that you might need to know such information if you write AST
+</I>&gt;<i> transformation/matching with concrete syntax.
+</I>&gt;<i> 
+</I>&gt;<i> Second, you need some special extra &quot;concrete&quot; syntax to be able to
+</I>&gt;<i> specify whether you care or not about some features.  For instance,
+</I>&gt;<i> you
+</I>&gt;<i> need to be able to write a pattern which matches a recursive let
+</I>&gt;<i> binding, or non-recursive let binding, or any kind of let binding
+</I>&gt;<i> (recursive or not).  In the latter case, you probably want to be able
+</I>&gt;<i> to
+</I>&gt;<i> extract the recursive flag for later use.  You need to introduce some
+</I>&gt;<i> syntax for that.  Similarly, we need some expert knowledge and
+</I>&gt;<i> specific
+</I>&gt;<i> syntax to know exactly what your &quot;free variables&quot; stand for: you need
+</I>&gt;<i> to
+</I>&gt;<i> be able to say that you want to match an arbitrary constructor or a
+</I>&gt;<i> constructor with no module prefix.  This is the source for a lot of
+</I>&gt;<i> complexity related to anti-quotations in camlp4, in my opinion.
+</I>&gt;<i> 
+</I>&gt;<i> Third, working on concrete syntax gives a false feeling that you
+</I>&gt;<i> don't
+</I>&gt;<i> need to master the abstract syntax, but this is wrong.  You need to
+</I>&gt;<i> know
+</I>&gt;<i> if &quot;M.(e)&quot; and &quot;let open M in e&quot; map to the same AST or not, if
+</I>&gt;<i> record
+</I>&gt;<i> punning is implemented in the parser or if is represented in the AST
+</I>&gt;<i> (exercise: define a &quot;code smell rule&quot; to detect missed punning
+</I>&gt;<i> opportunity, i.e. an instance of a record field &quot;l = l&quot;), etc.
+</I>&gt;<i> 
+</I>&gt;<i> Fourth, working with concrete syntax requires to master a new
+</I>&gt;<i> sub-language (with quotations, anti-quotations), which is far from
+</I>&gt;<i> trivial, and which looks like the real OCaml syntax but is not really
+</I>&gt;<i> the same.  There is a learning curve here, which should not be
+</I>&gt;<i> neglected.
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> At the end of the day, I find it both simpler and more robust to work
+</I>&gt;<i> on
+</I>&gt;<i> abstract syntax, even if this is marginally more verbose.  Some
+</I>&gt;<i> actions
+</I>&gt;<i> can reduce the syntactic overhead of working with abstract syntax:
+</I>&gt;<i> cleaning up the Parsetree (and removing prefixes) and improvements to
+</I>&gt;<i> our beloved host language itself (such as
+</I>&gt;<i> <A HREF="http://caml.inria.fr/mantis/view.php?id=5667">http://caml.inria.fr/mantis/view.php?id=5667</A> or even more ambitious
+</I>&gt;<i> extensions).  I'd rather see time invested in such improvements than
+</I>&gt;<i> on
+</I>&gt;<i> providing support for working with (almost-)concrete syntax.  But
+</I>&gt;<i> YMMV,
+</I>&gt;<i> and I'm very much interested to hear about the opinion and experience
+</I>&gt;<i> of
+</I>&gt;<i> other people on this topic.  (And of course, once quotations are
+</I>&gt;<i> supported, nothing prevent some -ppx rewriter to provide support for
+</I>&gt;<i> concrete-syntax matching, to be used for compiling other -ppx
+</I>&gt;<i> rewriters...)
+</I>
+
+Well Alain, I basically agree about the different points you raise.
+They closely describe my experience in writing Mascot!
+As of today, most checks are written by matching against AST bits,
+because as you pointed out it is a tad safer. However, during development,
+it was a time-saver to be able to easily express and experiment new
+ideas by manipulating &quot;bits of the actual language&quot;. Camlp4 was kind
+enough to translate them for me into AST code which I had to check.
+
+When expressing a complex pattern, I think this turns out to be really
+useful. I even keep some of these patterns in a (non-public) directory
+for development. As you said, the release version has to be polished by
+checking some ambiguities.
+
+To sum up, I totally agree on &quot;robustness&quot; but not quite on &quot;easiness&quot;.
+
+
+Regards,
+
+Xavier
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000041.html">[wg-camlp4] Matching on concrete syntax (was: Re:  Camlp4 uses)
+</A></li>
+	<LI>Next message: <A HREF="000097.html">[wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#94">[ date ]</a>
+              <a href="thread.html#94">[ thread ]</a>
+              <a href="subject.html#94">[ subject ]</a>
+              <a href="author.html#94">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

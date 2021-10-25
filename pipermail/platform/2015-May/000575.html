@@ -1,0 +1,193 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Dev Version as Package?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Dev%20Version%20as%20Package%3F&In-Reply-To=%3CCAMu2m2KP2rZ-Fwjz%2B6B-SMgPWwgf-R-j07_nb%2BPFu-v0bSXHEg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000574.html">
+   <LINK REL="Next"  HREF="000576.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Dev Version as Package?</H1>
+    <B>Ashish Agarwal</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Dev%20Version%20as%20Package%3F&In-Reply-To=%3CCAMu2m2KP2rZ-Fwjz%2B6B-SMgPWwgf-R-j07_nb%2BPFu-v0bSXHEg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Dev Version as Package?">agarwal1975 at gmail.com
+       </A><BR>
+    <I>Fri May  8 19:09:01 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000574.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+        <LI>Next message: <A HREF="000576.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#575">[ date ]</a>
+              <a href="thread.html#575">[ thread ]</a>
+              <a href="subject.html#575">[ subject ]</a>
+              <a href="author.html#575">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Louis, thanks for your suggestions. I'm trying them out, but one quick
+question: how can you query with tags. I tried `opam list -e foobar`, and I
+seem to get the same output no matter what I write for foobar.
+
+Also, is there some convention for tags? You put &quot;org:&quot; as a prefix. Is
+there any special interpretation of this, now or planned in the future?
+
+
+On Thu, May 7, 2015 at 12:53 AM, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">louis.gesbert at ocamlpro.com</A>&gt;
+wrote:
+
+&gt;<i> Hi all,
+</I>&gt;<i>
+</I>&gt;<i> At the moment, you have basically two solutions:
+</I>&gt;<i>
+</I>&gt;<i> - use a repository with `url` files pointing to version control ; this has
+</I>&gt;<i> been covered already. The repo-per-package trick is quite interesting
+</I>&gt;<i> though.
+</I>&gt;<i>
+</I>&gt;<i> This gives you all the flexibility of a full repository, but may be a
+</I>&gt;<i> little bit of work to maintain.
+</I>&gt;<i>
+</I>&gt;<i> - use pinning. The bug-tracker mentionned `pin-bundles` to get a dev
+</I>&gt;<i> environment quickly at some point, and we actually quite have those
+</I>&gt;<i> already: you can import a set of pinnings through `opam switch import
+</I>&gt;<i> &lt;file&gt;`.
+</I>&gt;<i>
+</I>&gt;<i> The format is straight-forward: one line per package, with columns for
+</I>&gt;<i> name, version, &quot;root&quot;/&quot;installed&quot;/&quot;uninstalled&quot;, pinning kind, pinning URL.
+</I>&gt;<i> You can generate the file with `opam switch export &lt;file&gt;` and remove
+</I>&gt;<i> unneeded lines, or write it by hand, then distribute it.
+</I>&gt;<i>
+</I>&gt;<i> In this scheme, one could put all pins as &quot;uninstalled&quot;, and Thomas'
+</I>&gt;<i> script would be replaced by:
+</I>&gt;<i> ```
+</I>&gt;<i> opam switch import pinning-state
+</I>&gt;<i> opam pin add -n project ./ -y # if not already in pinning-state
+</I>&gt;<i> opam install --deps-only project -y
+</I>&gt;<i> ```
+</I>&gt;<i>
+</I>&gt;<i> This is less flexible, but is probably ligher-weight maintenance wise. A
+</I>&gt;<i> major difference is that `opam` files in all the pinned project's sources
+</I>&gt;<i> will be used.
+</I>&gt;<i>
+</I>&gt;<i> Then you have the difference in usage between normal repo and pinned
+</I>&gt;<i> packages. For example, any install command mentionning pinned package `foo`
+</I>&gt;<i> will first update it to get the latest metadata. This won't really handle
+</I>&gt;<i> depending on dev versions, but you may declare your packages' opam files
+</I>&gt;<i> with version &quot;dev&quot; and depend on this version in other packages: then
+</I>&gt;<i> installing with missing pins will fail, that version not being found.
+</I>&gt;<i> Another trick could be to use `available: [ foo:pinned ]` to make the
+</I>&gt;<i> package unavailable unless foo is pinned.
+</I>&gt;<i>
+</I>&gt;<i> If this sounds useful, but would be more convenient with more support
+</I>&gt;<i> (e.g. export only pinning data ?) -- please ask (or contribute!)
+</I>&gt;<i>
+</I>&gt;<i> Another pinning-related trick could be to mark all your packages with a
+</I>&gt;<i> given flag (e.g. &quot;org:foobar&quot;) and then filter them and call `opam pin add
+</I>&gt;<i> --dev-repo` on all. Would need to go through some shell-script at the
+</I>&gt;<i> moment though.
+</I>&gt;<i>
+</I>&gt;<i> NOTE: there is something called &quot;dev dependencies&quot; planned (which is a
+</I>&gt;<i> dependency marked with the flag &quot;dev&quot;, e.g. `depends: &quot;foo&quot; {dev &amp; &gt;=
+</I>&gt;<i> &quot;1.2&quot;}`), but it's different. It is planned to mean: ignore the dependency
+</I>&gt;<i> unless the package is pinned, and is to be used for processing artefacts
+</I>&gt;<i> that are usually in the tarball but not the git source (e.g. setup.ml)
+</I>&gt;<i>
+</I>&gt;<i> &gt; `depends: [ &quot;foo&quot; { git: &quot;path-to-git/foo#bar&quot;} ]`
+</I>&gt;<i>
+</I>&gt;<i> `depends` is basically information that is fed to the solver; we could
+</I>&gt;<i> interpret this, though, as &quot;whenever this package is to be installed, make
+</I>&gt;<i> sure to pin 'foo' first&quot;. The issue with this is that pinning imports the
+</I>&gt;<i> package's metadata from its source -- and that metadata is needed by the
+</I>&gt;<i> solver. I don't see a way to handle this that's not too ad-hoc and wouldn't
+</I>&gt;<i> lead to a confusing interface: it would be easy in the case of explicitely
+</I>&gt;<i> installing the package that has this dependency, but otherwise ?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> &gt; - Ashish Agarwal, 05/05/2015 15:13 -
+</I>&gt;<i> &gt; &gt; Has anyone else encountered this situation before?
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Yes, and I also would be interested in a good solution. One idea we had
+</I>&gt;<i> was
+</I>&gt;<i> &gt; to share switch configurations. I'd like to say here's a whole switch: it
+</I>&gt;<i> &gt; has this name, these remotes (if remotes were switch specific), these
+</I>&gt;<i> pins,
+</I>&gt;<i> &gt; etc. Then, I want to share this config with my team, and declare that a
+</I>&gt;<i> &gt; build machine should switch to this particular config. I have no idea how
+</I>&gt;<i> &gt; to do this though, other than hacking some shell script.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; On Tue, May 5, 2015 at 2:58 PM, Trevor Smith &lt;
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">trevorsummerssmith at gmail.com</A>&gt;
+</I>&gt;<i> &gt; wrote:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; &gt; Hi all,
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; We're using opam internally at work. I have two use cases for our
+</I>&gt;<i> internal
+</I>&gt;<i> &gt; &gt; libraries:
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; 1) &quot;dev dependencies&quot; -- I want what is in the repo.
+</I>&gt;<i> &gt; &gt; 2) &quot;explicit dependency&quot; -- I want a given version.
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; opam has #2 covered.
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; However it is not clear to me how to do #1 correctly. I can, on a given
+</I>&gt;<i> &gt; &gt; machine (ie not on an opam repository), pin a given package to a git
+</I>&gt;<i> repo.
+</I>&gt;<i> &gt; &gt; But locally pinning isn't what I want. I want a package in an opam
+</I>&gt;<i> &gt; &gt; repository to say &quot;I depend upon this other dev package&quot; so that our
+</I>&gt;<i> build
+</I>&gt;<i> &gt; &gt; boxes, and various developer machines will all do the same thing, and I
+</I>&gt;<i> &gt; &gt; don't need to separately pin everything on each box.
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; Has anyone else encountered this situation before?
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; Thoughts? Thanks.
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; Trevor
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt; _______________________________________________
+</I>&gt;<i> &gt; &gt; Platform mailing list
+</I>&gt;<i> &gt; &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> &gt; &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i> &gt; &gt;
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/platform/attachments/20150508/d5a96421/attachment.html">http://lists.ocaml.org/pipermail/platform/attachments/20150508/d5a96421/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000574.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+	<LI>Next message: <A HREF="000576.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#575">[ date ]</a>
+              <a href="thread.html#575">[ thread ]</a>
+              <a href="subject.html#575">[ subject ]</a>
+              <a href="author.html#575">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

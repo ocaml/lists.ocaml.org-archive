@@ -1,0 +1,165 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Spinning process on osx
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3CA6CC3EBBE41841E79519A7AC9F97544A%40erratique.ch%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000027.html">
+   <LINK REL="Next"  HREF="000039.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Spinning process on osx</H1>
+    <B>Daniel B&#252;nzli</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Spinning%20process%20on%20osx&In-Reply-To=%3CA6CC3EBBE41841E79519A7AC9F97544A%40erratique.ch%3E"
+       TITLE="[ocaml-ctypes] Spinning process on osx">daniel.buenzli at erratique.ch
+       </A><BR>
+    <I>Sat Dec 28 01:39:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000027.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+        <LI>Next message: <A HREF="000039.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#38">[ date ]</a>
+              <a href="thread.html#38">[ thread ]</a>
+              <a href="subject.html#38">[ subject ]</a>
+              <a href="author.html#38">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Ok this thing is too annoying, either my code runs an infinite loop (4.01) or I have to wait over 6 minutes for my code to compile (4.00.1). 
+
+So I gave it a go, making a full script this time that works in an ocaml repo checkout, see the end of this message. Note that in practice doing a bisect is not as easy as 
+
+   git bisect start 4.00.1 4.01.0
+   git bisect run script
+
+since you tend to fall on commits in which ocaml doesn't build which screws the search procedure. So in practice you have to watch carefully which checkouts fail because ocaml fails to build and which because of your actual don't so you can restart at slightly different points (e.g. parent or successor of a bad, good commit) to avoid falling on the checkouts that fail for other reasons than your bug. So I guess I really understand now the benefits of CI. 
+
+In any case the offending commit is: 
+
+    <A HREF="https://github.com/ocaml/ocaml/commit/b2636c22d55b15f55a02b3">https://github.com/ocaml/ocaml/commit/b2636c22d55b15f55a02b3</A>
+
+Before I submit something upstream does that ring a bell to anyone ? Do you think it's maybe a specific libffi issue/interaction ? 
+
+Daniel
+
+
+The bug happens with:
+
+&gt;<i> gcc -v
+</I>Configured with: --prefix=/Applications/Xcode.app/Contents/Developer/usr --with-gxx-include-dir=/usr/include/c++/4.2.1
+Apple LLVM version 5.0 (clang-500.2.79) (based on LLVM 3.3svn)
+Target: x86_64-apple-darwin12.5.0
+Thread model: posix
+
+
+
+&gt;<i> uname -a
+</I>Darwin hehey.local 12.5.0 Darwin Kernel Version 12.5.0: Sun Sep 29 13:33:47 PDT 2013; root:xnu-2050.48.12~1/RELEASE_X86_64 x86_64
+
+
+
+To reproduce let $T be a directory (change the $T variable accordingly in the script).
+
+brew update &amp;&amp; brew install sdl2
+cd $T 
+git clone <A HREF="https://github.com/ocaml/ocaml">https://github.com/ocaml/ocaml</A>
+cd ocaml
+git checkout trunk
+$T/sdlspin.sh # exits with 0 if there is no bug
+
+---- sdlspin.sh ----
+#!/bin/sh
+
+T=/Users/dbuenzli/tmp
+cd $T/ocaml
+
+# OCaml
+./configure --prefix $T/ocaml
+make world.opt 
+make install
+
+export PATH=&quot;$T/ocaml/bin:$PATH&quot;
+
+# Findlib 
+curl -O <A HREF="http://download.camlcity.org/download/findlib-1.4.tar.gz">http://download.camlcity.org/download/findlib-1.4.tar.gz</A>
+tar -xvzf findlib-1.4.tar.gz
+cd findlib-1.4
+./configure \
+ -bindir $T/ocaml/bin \
+ -mandir $T/ocaml/man \
+ -sitelib $T/ocaml/lib/ocaml/site-lib \
+ -config $T/ocaml/findlib.conf
+make all opt install
+cd ..
+curl -O -L \
+ <A HREF="https://github.com/ocamllabs/ocaml-ctypes/archive/ocaml-ctypes-0.2.2.tar.gz">https://github.com/ocamllabs/ocaml-ctypes/archive/ocaml-ctypes-0.2.2.tar.gz</A>
+
+# Ctypes 
+tar -xvzf ocaml-ctypes-0.2.2.tar.gz 
+cd ocaml-ctypes-ocaml-ctypes-0.2.2 # WTF
+make
+make install 
+cd ..
+
+# Tsdl overwrite test.ml with bug so we can directly compile
+git clone <A HREF="https://github.com/dbuenzli/tsdl.git">https://github.com/dbuenzli/tsdl.git</A>
+curl <A HREF="http://erratique.ch/tmp/tsdl_bug.ml">http://erratique.ch/tmp/tsdl_bug.ml</A> &gt; tsdl/test/test.ml
+cd tsdl 
+./build test.native
+
+(./test.native) &amp; pid=$!
+sleep 2
+kill -9 $pid 2&gt;/dev/null
+if [ &quot;$?&quot; = &quot;0&quot; ]; then  
+  echo &quot;Spinning, bug&quot; 
+  # Killed we were spinning.
+  EXIT=1
+else
+  # Not killed we finished, no bug
+  echo &quot;No spinning, no bug&quot;
+  EXIT=0
+fi
+cd ..
+
+# Cleanup 
+git clean -q -f -d -x 
+rm -rf tsdl
+
+exit $EXIT
+-------------------------
+
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000027.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+	<LI>Next message: <A HREF="000039.html">[ocaml-ctypes] Spinning process on osx
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#38">[ date ]</a>
+              <a href="thread.html#38">[ thread ]</a>
+              <a href="subject.html#38">[ subject ]</a>
+              <a href="author.html#38">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

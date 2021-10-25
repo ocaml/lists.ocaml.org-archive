@@ -1,0 +1,152 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [compiler-hacking] useful feature?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:cam-compiler-hacking%40lists.ocaml.org?Subject=Re%3A%20%5Bcompiler-hacking%5D%20useful%20feature%3F&In-Reply-To=%3Cy2asiim26ep.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000017.html">
+   <LINK REL="Next"  HREF="000019.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[compiler-hacking] useful feature?</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:cam-compiler-hacking%40lists.ocaml.org?Subject=Re%3A%20%5Bcompiler-hacking%5D%20useful%20feature%3F&In-Reply-To=%3Cy2asiim26ep.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[compiler-hacking] useful feature?">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Fri Oct 17 14:05:18 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000017.html">[compiler-hacking] useful feature?
+</A></li>
+        <LI>Next message: <A HREF="000019.html">[compiler-hacking] @inline attribute?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> Hi all, not sure if this is a valid suggestion for a feature that could be tackled during one of the the compiler
+</I>&gt;<i> hacking sessions. (It's more to do with Lwt than the compiler.)
+</I>&gt;<i>
+</I>&gt;<i> The problem was described by Thomas under &quot;Error handling in key look-ups&quot; at
+</I>&gt;<i> <A HREF="http://roscidus.com/blog/blog/2013/11/28/asynchronous-python-vs-ocaml/">http://roscidus.com/blog/blog/2013/11/28/asynchronous-python-vs-ocaml/</A>
+</I>&gt;<i>
+</I>&gt;<i> The problem occurs when &quot;try..with&quot; is used instead of the Lwt counterparts for handling exceptions.
+</I>
+This certainly seems a valid suggestion for the compiler-hacking
+sessions. I also think that this list is a good place to discuss such
+suggestions, so thank you for starting us off with an interesting one.
+
+&gt;<i> My idea consists of emitting a warning each time the following two conditions are both met:
+</I>&gt;<i> 1. if we have an AST that contains &quot;try EXP with (VAR, EXP')+&quot;, and
+</I>&gt;<i> 2. the type of EXP, and the type of each EXP' is &quot;tp Lwt.t&quot; for some type tp.
+</I>&gt;<i>
+</I>&gt;<i> I'm not sure if this is entirely reasonable or useful, nor can I judge how difficult it is to implement since I don't
+</I>&gt;<i> know what the codebase looks like, but thought I'd offer it up for your judgement.
+</I>
+Firstly, you don't want to add specific knowledge of Lwt to the compiler
+itself, so the feature would need to be something more general which
+could be triggered by Lwt's camlp4/ppx preprocessor.
+
+The basic thing that you are suggesting is a way to tell the compiler:
+&quot;if this expression has the type `foo` then please warn me&quot;. You could
+imagine supporting this through an attribute like:
+
+    (try
+        ...
+    with Not_found -&gt; ...) [@warn_if_type: 'a Lwt.t]
+
+which could be inserted on all try expressions by the Lwt camlp4/ppx
+preprocessor.
+
+The first difficulty with this is deciding what it means for an
+expression to have type `'a Lwt.t`. Does it mean &quot;could be `'a Lwt.t`&quot; or
+&quot;definitely has type `'a Lwt.t`&quot;? This matters because
+polymorphism/abstraction means we cannot always tell whether or not
+something has type `'a Lwt.t`.
+
+Consider the function
+
+    let f (g : unit -&gt; 'a) =
+      (try
+          g ()
+      with Not_found -&gt; raise Invalid_argument) [@warn_if_type: 'a Lwt.t]
+
+Should this emit the warning or not? If it does then there will be many
+false positives, but if it doesn't then you will not detect cases like:
+
+    f (fun () -&gt; return 5)
+
+which clearly does wrap an `'a Lwt.t` in a regular exception handler.
+
+Similarly module abstraction prevents you knowing whether or not an
+expression has type `'a Lwt.t`. For example:
+
+    module M : sig
+      type 'a t
+      val x : int t
+      val f : int t -&gt; int t
+    end = struct
+
+      type 'a t = 'a Lwt.t
+
+      let x = return 1
+
+      let f x =
+        Lwt.bind x
+          (fun x -&gt;
+             if x &lt;= 1 then raise Not_found
+             else return (x - 1))
+
+    end
+
+    let y =
+      try
+        M.f M.x
+      with Not_found -&gt; M.x
+
+Here again we have wrapped an Lwt.t in a regular exception handler, but
+cannot tell that we have done.
+
+It is quite possible that real Lwt code does not encounter these
+problems, or that the warning is still useful even though it is not 100%
+accurate, but these kinds of issues should probably be considered before
+attempting to implement something.
+
+Regards,
+
+Leo
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000017.html">[compiler-hacking] useful feature?
+</A></li>
+	<LI>Next message: <A HREF="000019.html">[compiler-hacking] @inline attribute?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#18">[ date ]</a>
+              <a href="thread.html#18">[ thread ]</a>
+              <a href="subject.html#18">[ subject ]</a>
+              <a href="author.html#18">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/cam-compiler-hacking">More information about the Cam-compiler-hacking
+mailing list</a><br>
+</body></html>

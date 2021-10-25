@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTizzRQNAXCPkq%3DK_FKQjijr-Be0YAhEBD%3Dg4wm5NzuXA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000200.html">
+   <LINK REL="Next"  HREF="000206.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTizzRQNAXCPkq%3DK_FKQjijr-Be0YAhEBD%3Dg4wm5NzuXA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Fri Mar  1 11:59:45 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000200.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000206.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#203">[ date ]</a>
+              <a href="thread.html#203">[ thread ]</a>
+              <a href="subject.html#203">[ subject ]</a>
+              <a href="author.html#203">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Fri, Mar 1, 2013 at 3:27 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 02/28/2013 11:17 PM, Didier Remy wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I agree with your point about settilng deep semantic issues ahead of
+</I>&gt;&gt;&gt;<i> syntactic one.  I would however submit that the question of whether
+</I>&gt;&gt;&gt;<i> you should:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> - Have opens in the language proper, including local opens
+</I>&gt;&gt;&gt;<i> - Have renames for namespaces in the language proper
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Yes, this is  the minimal, and probably agreed on.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I agree with the first point, but not the second one.  In my proposal, the
+</I>&gt;<i> only place where a &quot;.ns&quot; mapping file is referred to is the (local)
+</I>&gt;<i> open/using statement:
+</I>&gt;<i>
+</I>&gt;<i>    open namespace Core  (* ---&gt;  loads core.ns *)
+</I>&gt;<i>
+</I>&gt;<i> In this proposal, I don't think it is important to allow writing
+</I>&gt;<i> Core#List.map, since Core_List.map is always available.  Since .ns files are
+</I>&gt;<i> only &quot;opened&quot;, I don't see the point of renaming them:
+</I>&gt;<i>
+</I>&gt;<i>   alias namespace C = Core
+</I>&gt;<i>   ...
+</I>&gt;<i>   open namespace C
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> What would be useful is an aliasing feature for modules (which could serve
+</I>&gt;<i> to explain the meaning of .ns files in my proposal).
+</I>
+Aha!  We uncover another difference of opinion!  I wouldn't have
+thought that namespaces are &quot;only opened&quot;.  I would have thought one
+could use namespaces as qualifiers as well.  In other words, were I to
+write:
+
+   open namespace Core
+   open namespace Async
+
+where the second open shadows some elements of the first (like the
+Unix module), I'd still like to be able to explicitly reach in, and
+write something like
+
+   Core#Unix
+
+to access Core's Unix library.   Given the desire to use namespaces as
+explicit qualifiers, aliasing becomes obviously useful as well, since
+you may want to use the qualifier over and over in a small chunk of
+code, at which point a short name becomes useful.
+
+so, I think my list of required namespace operations is:
+
+- module-level namespace opens
+- local namespace opens
+- explicit qualification by namespace
+- namespace aliases
+
+y
+
+&gt;&gt;<i> The main question whether namespaces are hierarchical or flat is still not
+</I>&gt;&gt;<i> answered
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I think the question itself assumes that namespaces are a new kind of
+</I>&gt;<i> objects (and then we can discuss what is their structure, flat or
+</I>&gt;<i> hierarchical, graph with ordered edges, etc).  But again, there are some
+</I>&gt;<i> ways to address the needs expressed in this discussion without introducing
+</I>&gt;<i> such a notion.  In my proposal, there is one single &quot;space of names&quot; for
+</I>&gt;<i> modules and compilation units plus a feature to control the mapping of
+</I>&gt;<i> module references to compilation units.  In this context, I don't even know
+</I>&gt;<i> how to interpret the question of whether namespaces are hierarchical or
+</I>&gt;<i> flat.  This does not mean that this question is pointless, only that it
+</I>&gt;<i> pertains only to a given category of solutions for the problems we are
+</I>&gt;<i> trying to solve.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000200.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000206.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#203">[ date ]</a>
+              <a href="thread.html#203">[ thread ]</a>
+              <a href="subject.html#203">[ subject ]</a>
+              <a href="author.html#203">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

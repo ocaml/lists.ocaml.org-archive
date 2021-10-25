@@ -1,0 +1,192 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C514AABC3.7040301%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000371.html">
+   <LINK REL="Next"  HREF="000376.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C514AABC3.7040301%40lexifi.com%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Mar 21 06:42:11 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000371.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000376.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#374">[ date ]</a>
+              <a href="thread.html#374">[ thread ]</a>
+              <a href="subject.html#374">[ subject ]</a>
+              <a href="author.html#374">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 3/20/2013 10:07 PM, Leo White wrote:
+&gt;<i> This is the strategy I have referred to as &quot;regular ocamldep with
+</I>&gt;<i> generated search path files&quot;, it works just as well with simple
+</I>&gt;<i> namespaces. The only difference is that the build system generates the
+</I>&gt;<i> search path file to give to ocamldep, rather than making the user write
+</I>&gt;<i> it by hand.
+</I>
+So the &quot;good&quot; mode for using ocamldep would be to have the build system 
+generate a big search path file for each call to ocamldep?
+
+   - How does the build system generate this search path file?  I guess 
+it has to know about the &quot;simple namespaces&quot; convention.  Does it?  And 
+does it know about the &quot;-name&quot; arguments scattered around in many 
+subdirectories.  Concretely, I don't see how this would work under 
+omake, for instance.
+
+   - How this would work for non-namespaced modules?  Can you represent 
+them with searh path files as in your proposal.  I thought that search 
+path files only defined namespaced names.
+
+   - If you assume that the build system can generate a search path file 
+to avoid calling ocamldep (and thus the compiler as well) with any -I 
+directory, what's the point of supporting -I directories any more in the 
+compiler and tools?
+
+&gt;<i> As a side note, I think that &quot;ocamldep -modules&quot; should continue to be a
+</I>&gt;<i> purely syntactic version that ignores the search path. It is regular
+</I>&gt;<i> ocamldep that should be used for this purpose.
+</I>
+I propose that &quot;ocamldep -modules&quot; ignores the search path directories, 
+but knows about the definition of namespaces.  Otherwise, you need to 
+invent a new convention to report possible namespaces together with each 
+module dependency.
+
+&gt;&gt;&gt;<i> I'm not particularly worried about hypothetical build systems. If you
+</I>&gt;&gt;&gt;<i> want to implement such a build system then you should really add hooks
+</I>&gt;&gt;&gt;<i> into the OCaml compiler. This argument also assumes that catching
+</I>&gt;&gt;&gt;<i> &quot;Sys.file_exists&quot; is fine but catching &quot;Sys.readdir&quot; is impossible.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> No, this argument does not assume that.  But catching Sys.readdir is useless, since you don't know which files the
+</I>&gt;&gt;<i> compiler is interested in. The tool would have to assume that the dependency is on the entire directory, which is of
+</I>&gt;&gt;<i> course way too weak.
+</I>&gt;<i>
+</I>&gt;<i> The tool would only have to know what files it could produce, but it
+</I>&gt;<i> should already know that to answer Sys.file_exists queries.
+</I>
+That's not the way it works, Sys.file_exists returns not only files that 
+the build system can produce but also files which are already here.
+
+The build system I was referring to worked like that:
+
+  - The project is specified by a list of build commands, each of which 
+annotated with a list of target files (assumed to be created by the 
+command).
+
+  - The build is triggered by asking to build one target.
+
+  - To build one target X, the system picks a command which lists X as a 
+target.
+
+  - If the exact same command has already been run previously (this 
+information is kept in a persistent cache), the system checks that pre- 
+and post-conditions attached to that run are still valid in the current 
+state of the file system.  If yes, the command does not need to be run 
+again.
+
+  - The recorded conditions are:  the content (before execution) of any 
+file opened for reading and the content (after execution) of any file 
+opened for writing; the presence or absence (before execution) of any 
+file checked for existence (stat) during the command.
+
+  - When running a command, the tool records those conditions and if the 
+command checks a file for existence or open a file for reading, the tool 
+tries to build this file as a target, recursively.
+
+The result of system calls are not modified, they are just intercepted 
+to allow recording and intermediate compilation of other files.  The 
+tool make the assumption that the behavior of the build commands only 
+depend on the file existence/absence and content, not on extra meta-data 
+(such as mtimes, environment variables, or the system date).
+
+A simpler variant of the system was specified with an ordered set of 
+commands to be executed in sequence, with the same cache behavior.  The 
+benefit is that you don't need to tell the system about which files can 
+be generated by each command.
+
+And as said, even if you don't believe that is a viable approach for a 
+robust build system, the same approach can be used to add extra checks 
+to existing build system that they don't miss dependencies.
+
+&gt;<i> This assumes that a C compiler won't read a directory (say to cache its
+</I>&gt;<i> contents) in order to check for the existence of a file. It is not
+</I>&gt;<i> exactly the most robust basis for a build system, which is probably why
+</I>&gt;<i> it is only a hypothetical build system.
+</I>
+Well, it worked very well for ocaml + gcc.  I could build non trivial 
+code bases (CDuce + all its library dependencies), with extremely 
+precise dynamic dependency analysis and without having to use ocamldep.
+
+&gt;<i> This kind of behaviour already exists in OCaml. Consider this piece of code:
+</I>&gt;<i>
+</I>&gt;<i>      type t = Bar.t (* Bar only contains type definitions *)
+</I>&gt;<i>
+</I>&gt;<i> If you rename bar.mli to baz.mli but don't remove bar.cmi then it will
+</I>&gt;<i> continue to compile until you run &quot;make clean&quot;.
+</I>
+Yes, and I see it as a problem.  I would actually prefer a system where 
+one must pass explicitly to the compiler the list of files it can use, 
+but this is not possible because of backward compatibility.  Since 
+namespaces change the way OCaml interact with the file system anyway and 
+we have this nice notion of explicitly listing available units in 
+well-defined files (which can be used by other tools), I think it's a 
+good opportunity to fix the existing problems (partially).
+
+Moreover, since the relation between the name of compiled units and of 
+source files will be less tightly coupled for namespaces files (because 
+of &quot;-name&quot; or &quot;-namespace&quot;), the chances for facing difficult to track 
+error messages will become higher.
+
+&gt;<i> I really don't think that preventing a very unlikely scenario, which can
+</I>&gt;<i> already happen anyway, is a good reason to make namespaces significantly
+</I>&gt;<i> less convenient for the average user.
+</I>
+I don't think it will.  The average user who creates a library to be 
+used by others will need to pick a good namespace name and list which 
+files constitute the library.  At this point, writing an explicit 
+.mlpath file does not add any burden (the same source of information can 
+be used to define the content of the library).
+
+
+-- Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000371.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000376.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#374">[ date ]</a>
+              <a href="thread.html#374">[ thread ]</a>
+              <a href="subject.html#374">[ subject ]</a>
+              <a href="author.html#374">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

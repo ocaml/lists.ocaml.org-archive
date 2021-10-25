@@ -1,0 +1,1015 @@
+From agarwal1975 at gmail.com  Wed Dec  7 15:04:52 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Wed, 7 Dec 2016 08:04:52 -0700
+Subject: [opam-devel] opam getting compiler version wrong
+Message-ID: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+
+I'm getting this:
+
+$ opam install ppx_sexp_conv.114.10+84
+[ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+ocaml-version >= "4.03.0"
+
+So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch.
+I've certainly run "eval `opam config env`". I created a new switch with
+4.03.0 to try it from scratch, but get the same issue.
+
+Sanity checks:
+
+$ ocaml -version
+The OCaml toplevel, version 4.03.0
+
+$ opam info ocaml | grep all-installed-versions
+all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+
+Incidentally, I'm confused about the output of `opam info ocaml`. I have 6
+switches on this computer. How come only 2 are listed above?
+
+$ opam --version
+2.0~alpha5
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161207/04e7f553/attachment.html>
+
+From agarwal1975 at gmail.com  Wed Dec  7 21:52:21 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Wed, 7 Dec 2016 14:52:21 -0700
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+Message-ID: <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+
+Seems the issue is mis-interpretation of a deprecated constraint. I'm using
+Jane Street's opam repository [1], which contains constraints like:
+
+available: [ ocaml-version >= "4.03.0" ]
+
+After replacing this with a normal constraint in the `depends` field, it
+worked fine. Is there a tool to convert old opam files?
+
+[1] https://github.com/janestreet/opam-repository
+
+
+On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com>
+wrote:
+
+> I'm getting this:
+>
+> $ opam install ppx_sexp_conv.114.10+84
+> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> ocaml-version >= "4.03.0"
+>
+> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch.
+> I've certainly run "eval `opam config env`". I created a new switch with
+> 4.03.0 to try it from scratch, but get the same issue.
+>
+> Sanity checks:
+>
+> $ ocaml -version
+> The OCaml toplevel, version 4.03.0
+>
+> $ opam info ocaml | grep all-installed-versions
+> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+>
+> Incidentally, I'm confused about the output of `opam info ocaml`. I have 6
+> switches on this computer. How come only 2 are listed above?
+>
+> $ opam --version
+> 2.0~alpha5
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161207/9af669fb/attachment.html>
+
+From anil at recoil.org  Sat Dec 10 20:05:56 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 10 Dec 2016 20:05:56 +0000
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+Message-ID: <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+
+You can run "opam admin upgrade-format" to upgrade the repository, but I'm not sure of how to convert individual `opam` files.  This seems like it would be useful in order to upgrade working repositories for pinning purposes...
+
+Anil
+
+> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> 
+> Seems the issue is mis-interpretation of a deprecated constraint. I'm using Jane Street's opam repository [1], which contains constraints like:
+> 
+> available: [ ocaml-version >= "4.03.0" ]
+> 
+> After replacing this with a normal constraint in the `depends` field, it worked fine. Is there a tool to convert old opam files?
+> 
+> [1] https://github.com/janestreet/opam-repository
+> 
+> 
+> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> I'm getting this:
+> 
+> $ opam install ppx_sexp_conv.114.10+84
+> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions: ocaml-version >= "4.03.0"
+> 
+> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch. I've certainly run "eval `opam config env`". I created a new switch with 4.03.0 to try it from scratch, but get the same issue.
+> 
+> Sanity checks:
+> 
+> $ ocaml -version
+> The OCaml toplevel, version 4.03.0
+> 
+> $ opam info ocaml | grep all-installed-versions
+> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> 
+> Incidentally, I'm confused about the output of `opam info ocaml`. I have 6 switches on this computer. How come only 2 are listed above?
+> 
+> $ opam --version
+> 2.0~alpha5
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From drupyog+caml at zoho.com  Sat Dec 10 20:36:08 2016
+From: drupyog+caml at zoho.com (Drup)
+Date: Sat, 10 Dec 2016 21:36:08 +0100
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+ <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+Message-ID: <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+
+opam 2.0 upgrades the format automatically when pinning a repository 
+with an older opam format.
+
+Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+> You can run "opam admin upgrade-format" to upgrade the repository, but I'm not sure of how to convert individual `opam` files.  This seems like it would be useful in order to upgrade working repositories for pinning purposes...
+>
+> Anil
+>
+>> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+>>
+>> Seems the issue is mis-interpretation of a deprecated constraint. I'm using Jane Street's opam repository [1], which contains constraints like:
+>>
+>> available: [ ocaml-version >= "4.03.0" ]
+>>
+>> After replacing this with a normal constraint in the `depends` field, it worked fine. Is there a tool to convert old opam files?
+>>
+>> [1] https://github.com/janestreet/opam-repository
+>>
+>>
+>> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+>> I'm getting this:
+>>
+>> $ opam install ppx_sexp_conv.114.10+84
+>> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions: ocaml-version >= "4.03.0"
+>>
+>> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch. I've certainly run "eval `opam config env`". I created a new switch with 4.03.0 to try it from scratch, but get the same issue.
+>>
+>> Sanity checks:
+>>
+>> $ ocaml -version
+>> The OCaml toplevel, version 4.03.0
+>>
+>> $ opam info ocaml | grep all-installed-versions
+>> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+>>
+>> Incidentally, I'm confused about the output of `opam info ocaml`. I have 6 switches on this computer. How come only 2 are listed above?
+>>
+>> $ opam --version
+>> 2.0~alpha5
+>>
+>>
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+
+
+From agarwal1975 at gmail.com  Sat Dec 10 21:01:25 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Sat, 10 Dec 2016 16:01:25 -0500
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+ <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+ <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+Message-ID: <CAMu2m2L9Ct3f+y6OH=J7NGakMcny-KzMbGeWafxPhDdOdSZaYA@mail.gmail.com>
+
+I just ran this:
+
+$ opam info ppx_sexp_conv.114.10+84 --raw
+
+and I can see that the constraint does get converted correctly. So now I
+don't know what else to investigate. If I make that change manually it
+works.
+
+
+
+On Sat, Dec 10, 2016 at 3:36 PM, Drup <drupyog+caml at zoho.com> wrote:
+
+> opam 2.0 upgrades the format automatically when pinning a repository with
+> an older opam format.
+>
+>
+> Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+>
+>> You can run "opam admin upgrade-format" to upgrade the repository, but
+>> I'm not sure of how to convert individual `opam` files.  This seems like it
+>> would be useful in order to upgrade working repositories for pinning
+>> purposes...
+>>
+>> Anil
+>>
+>> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+>>>
+>>> Seems the issue is mis-interpretation of a deprecated constraint. I'm
+>>> using Jane Street's opam repository [1], which contains constraints like:
+>>>
+>>> available: [ ocaml-version >= "4.03.0" ]
+>>>
+>>> After replacing this with a normal constraint in the `depends` field, it
+>>> worked fine. Is there a tool to convert old opam files?
+>>>
+>>> [1] https://github.com/janestreet/opam-repository
+>>>
+>>>
+>>> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com>
+>>> wrote:
+>>> I'm getting this:
+>>>
+>>> $ opam install ppx_sexp_conv.114.10+84
+>>> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+>>> ocaml-version >= "4.03.0"
+>>>
+>>> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch.
+>>> I've certainly run "eval `opam config env`". I created a new switch with
+>>> 4.03.0 to try it from scratch, but get the same issue.
+>>>
+>>> Sanity checks:
+>>>
+>>> $ ocaml -version
+>>> The OCaml toplevel, version 4.03.0
+>>>
+>>> $ opam info ocaml | grep all-installed-versions
+>>> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+>>>
+>>> Incidentally, I'm confused about the output of `opam info ocaml`. I have
+>>> 6 switches on this computer. How come only 2 are listed above?
+>>>
+>>> $ opam --version
+>>> 2.0~alpha5
+>>>
+>>>
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>>>
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>>
+>
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161210/d3cb10d7/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Tue Dec 13 11:46:44 2016
+From: louis.gesbert at ocamlpro.com (louis.gesbert at ocamlpro.com)
+Date: Tue, 13 Dec 2016 12:46:44 +0100
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+ <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+Message-ID: <5182802.4kby6JT8eq@maitake>
+
+That's not true. opam won't upgrade your repositories implicitely at the 
+moment (I am considering it, but am afraid it may lead to more difficult to 
+track errors). The only thing it rewrites is opam files found in source trees 
+when you pin them.
+
+I will add a warning in opam2 when use of a 1.2 repository is detected.
+
+Best,
+Louis Gesbert - OCamlPro
+
+On samedi 10 d?cembre 2016 21:36:08 CET Drup wrote:
+> opam 2.0 upgrades the format automatically when pinning a repository
+> with an older opam format.
+> 
+> Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+> > You can run "opam admin upgrade-format" to upgrade the repository, but I'm
+> > not sure of how to convert individual `opam` files.  This seems like it
+> > would be useful in order to upgrade working repositories for pinning
+> > purposes...
+> > 
+> > Anil
+> > 
+> >> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com> wrote:
+> >> 
+> >> Seems the issue is mis-interpretation of a deprecated constraint. I'm
+> >> using Jane Street's opam repository [1], which contains constraints
+> >> like:
+> >> 
+> >> available: [ ocaml-version >= "4.03.0" ]
+> >> 
+> >> After replacing this with a normal constraint in the `depends` field, it
+> >> worked fine. Is there a tool to convert old opam files?
+> >> 
+> >> [1] https://github.com/janestreet/opam-repository
+> >> 
+> >> 
+> >> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com>
+> >> wrote: I'm getting this:
+> >> 
+> >> $ opam install ppx_sexp_conv.114.10+84
+> >> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> >> ocaml-version >= "4.03.0"
+> >> 
+> >> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch.
+> >> I've certainly run "eval `opam config env`". I created a new switch with
+> >> 4.03.0 to try it from scratch, but get the same issue.
+> >> 
+> >> Sanity checks:
+> >> 
+> >> $ ocaml -version
+> >> The OCaml toplevel, version 4.03.0
+> >> 
+> >> $ opam info ocaml | grep all-installed-versions
+> >> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> >> 
+> >> Incidentally, I'm confused about the output of `opam info ocaml`. I have
+> >> 6 switches on this computer. How come only 2 are listed above?
+> >> 
+> >> $ opam --version
+> >> 2.0~alpha5
+> >> 
+> >> 
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From agarwal1975 at gmail.com  Mon Dec 19 22:17:55 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 19 Dec 2016 17:17:55 -0500
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <5182802.4kby6JT8eq@maitake>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <68B7FB5F-77E5-44FD-B3FD-E11E189DD8FA@recoil.org>
+ <cfa87537-41f1-5a31-58ff-5ab5c73f9f26@zoho.com>
+ <5182802.4kby6JT8eq@maitake>
+Message-ID: <CAMu2m2JyOCbWQDU=R+kUYLWuSQBggdNG29M0O+2MtVELHOVmYw@mail.gmail.com>
+
+I'm trying the option of doing `opam-admin upgrade-format`, but what's the
+best way to get `opam-admin`? Is it by chance available as a pre-compiled
+binary like `opam` is?
+
+I'm trying to compile opam myself, but getting this:
+
+ocamlfind ocamlc -package
+unix,bigarray,extlib,re,re.str,re.pcre,re.glob,cmdliner,ocamlgraph,cudf,dose3.common,dose3.algo,jsonm,no
+-c -g -w +a-4-44-48 -bin-annot -short-paths -safe-string -I core -I format
+-I solver -I repository -I state -I client -I core/ core/opamCompat.mli
+ocamlfind: Package `no' not found
+
+Unfortunately "no" isn't very easy to search for. Is that really the name
+of an ocamlfind package?
+
+
+On Tue, Dec 13, 2016 at 6:46 AM, <louis.gesbert at ocamlpro.com> wrote:
+
+> That's not true. opam won't upgrade your repositories implicitely at the
+> moment (I am considering it, but am afraid it may lead to more difficult to
+> track errors). The only thing it rewrites is opam files found in source
+> trees
+> when you pin them.
+>
+> I will add a warning in opam2 when use of a 1.2 repository is detected.
+>
+> Best,
+> Louis Gesbert - OCamlPro
+>
+> On samedi 10 d?cembre 2016 21:36:08 CET Drup wrote:
+> > opam 2.0 upgrades the format automatically when pinning a repository
+> > with an older opam format.
+> >
+> > Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+> > > You can run "opam admin upgrade-format" to upgrade the repository, but
+> I'm
+> > > not sure of how to convert individual `opam` files.  This seems like it
+> > > would be useful in order to upgrade working repositories for pinning
+> > > purposes...
+> > >
+> > > Anil
+> > >
+> > >> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com>
+> wrote:
+> > >>
+> > >> Seems the issue is mis-interpretation of a deprecated constraint. I'm
+> > >> using Jane Street's opam repository [1], which contains constraints
+> > >> like:
+> > >>
+> > >> available: [ ocaml-version >= "4.03.0" ]
+> > >>
+> > >> After replacing this with a normal constraint in the `depends` field,
+> it
+> > >> worked fine. Is there a tool to convert old opam files?
+> > >>
+> > >> [1] https://github.com/janestreet/opam-repository
+> > >>
+> > >>
+> > >> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com
+> >
+> > >> wrote: I'm getting this:
+> > >>
+> > >> $ opam install ppx_sexp_conv.114.10+84
+> > >> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> > >> ocaml-version >= "4.03.0"
+> > >>
+> > >> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0
+> switch.
+> > >> I've certainly run "eval `opam config env`". I created a new switch
+> with
+> > >> 4.03.0 to try it from scratch, but get the same issue.
+> > >>
+> > >> Sanity checks:
+> > >>
+> > >> $ ocaml -version
+> > >> The OCaml toplevel, version 4.03.0
+> > >>
+> > >> $ opam info ocaml | grep all-installed-versions
+> > >> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> > >>
+> > >> Incidentally, I'm confused about the output of `opam info ocaml`. I
+> have
+> > >> 6 switches on this computer. How come only 2 are listed above?
+> > >>
+> > >> $ opam --version
+> > >> 2.0~alpha5
+> > >>
+> > >>
+> > >> _______________________________________________
+> > >> opam-devel mailing list
+> > >> opam-devel at lists.ocaml.org
+> > >> http://lists.ocaml.org/listinfo/opam-devel
+> > >
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> >
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161219/38c56819/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Wed Dec 21 23:32:57 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 22 Dec 2016 00:32:57 +0100
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <CAMu2m2JyOCbWQDU=R+kUYLWuSQBggdNG29M0O+2MtVELHOVmYw@mail.gmail.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <5182802.4kby6JT8eq@maitake>
+ <CAMu2m2JyOCbWQDU=R+kUYLWuSQBggdNG29M0O+2MtVELHOVmYw@mail.gmail.com>
+Message-ID: <3123055.E82g0Jr0hZ@maitake>
+
+On lundi 19 d?cembre 2016 17:17:55 CET Ashish Agarwal wrote:
+> I'm trying the option of doing `opam-admin upgrade-format`, but what's the
+> best way to get `opam-admin`? Is it by chance available as a pre-compiled
+> binary like `opam` is?
+> 
+> I'm trying to compile opam myself, but getting this:
+> 
+> ocamlfind ocamlc -package
+> unix,bigarray,extlib,re,re.str,re.pcre,re.glob,cmdliner,ocamlgraph,cudf,dose
+> 3.common,dose3.algo,jsonm,no -c -g -w +a-4-44-48 -bin-annot -short-paths
+> -safe-string -I core -I format -I solver -I repository -I state -I client
+> -I core/ core/opamCompat.mli ocamlfind: Package `no' not found
+> 
+> Unfortunately "no" isn't very easy to search for. Is that really the name
+> of an ocamlfind package?
+
+You need to install the `opam-file-format` package, which has been separated 
+from opam itself. `./configure` should warn about this, but I remember it was 
+missing a check at some point.
+
+Yes, providing pre-compiled libraries would be useful, I'll see if they can 
+easily be added to the release process.
+
+> 
+> On Tue, Dec 13, 2016 at 6:46 AM, <louis.gesbert at ocamlpro.com> wrote:
+> > That's not true. opam won't upgrade your repositories implicitely at the
+> > moment (I am considering it, but am afraid it may lead to more difficult
+> > to
+> > track errors). The only thing it rewrites is opam files found in source
+> > trees
+> > when you pin them.
+> > 
+> > I will add a warning in opam2 when use of a 1.2 repository is detected.
+> > 
+> > Best,
+> > Louis Gesbert - OCamlPro
+> > 
+> > On samedi 10 d?cembre 2016 21:36:08 CET Drup wrote:
+> > > opam 2.0 upgrades the format automatically when pinning a repository
+> > > with an older opam format.
+> > > 
+> > > Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+> > > > You can run "opam admin upgrade-format" to upgrade the repository, but
+> > 
+> > I'm
+> > 
+> > > > not sure of how to convert individual `opam` files.  This seems like
+> > > > it
+> > > > would be useful in order to upgrade working repositories for pinning
+> > > > purposes...
+> > > > 
+> > > > Anil
+> > > > 
+> > > >> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com>
+> > 
+> > wrote:
+> > > >> Seems the issue is mis-interpretation of a deprecated constraint. I'm
+> > > >> using Jane Street's opam repository [1], which contains constraints
+> > > >> like:
+> > > >> 
+> > > >> available: [ ocaml-version >= "4.03.0" ]
+> > > >> 
+> > > >> After replacing this with a normal constraint in the `depends` field,
+> > 
+> > it
+> > 
+> > > >> worked fine. Is there a tool to convert old opam files?
+> > > >> 
+> > > >> [1] https://github.com/janestreet/opam-repository
+> > > >> 
+> > > >> 
+> > > >> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com
+> > > >> 
+> > > >> wrote: I'm getting this:
+> > > >> 
+> > > >> $ opam install ppx_sexp_conv.114.10+84
+> > > >> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> > > >> ocaml-version >= "4.03.0"
+> > > >> 
+> > > >> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0
+> > 
+> > switch.
+> > 
+> > > >> I've certainly run "eval `opam config env`". I created a new switch
+> > 
+> > with
+> > 
+> > > >> 4.03.0 to try it from scratch, but get the same issue.
+> > > >> 
+> > > >> Sanity checks:
+> > > >> 
+> > > >> $ ocaml -version
+> > > >> The OCaml toplevel, version 4.03.0
+> > > >> 
+> > > >> $ opam info ocaml | grep all-installed-versions
+> > > >> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> > > >> 
+> > > >> Incidentally, I'm confused about the output of `opam info ocaml`. I
+> > 
+> > have
+> > 
+> > > >> 6 switches on this computer. How come only 2 are listed above?
+> > > >> 
+> > > >> $ opam --version
+> > > >> 2.0~alpha5
+> > > >> 
+> > > >> 
+> > > >> _______________________________________________
+> > > >> opam-devel mailing list
+> > > >> opam-devel at lists.ocaml.org
+> > > >> http://lists.ocaml.org/listinfo/opam-devel
+> > > > 
+> > > > _______________________________________________
+> > > > opam-devel mailing list
+> > > > opam-devel at lists.ocaml.org
+> > > > http://lists.ocaml.org/listinfo/opam-devel
+> > > 
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+
+
+From agarwal1975 at gmail.com  Thu Dec 22 17:44:35 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Thu, 22 Dec 2016 12:44:35 -0500
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <3123055.E82g0Jr0hZ@maitake>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <5182802.4kby6JT8eq@maitake>
+ <CAMu2m2JyOCbWQDU=R+kUYLWuSQBggdNG29M0O+2MtVELHOVmYw@mail.gmail.com>
+ <3123055.E82g0Jr0hZ@maitake>
+Message-ID: <CAMu2m2JYVznsOqRscZZKLiNS1K8DfN2+qhKKjTuuBb=KG-77dA@mail.gmail.com>
+
+Thanks, that works (though I get a different compile error now). I'll add
+issues to the repo.
+
+
+On Wed, Dec 21, 2016 at 6:32 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+wrote:
+
+> On lundi 19 d?cembre 2016 17:17:55 CET Ashish Agarwal wrote:
+> > I'm trying the option of doing `opam-admin upgrade-format`, but what's
+> the
+> > best way to get `opam-admin`? Is it by chance available as a pre-compiled
+> > binary like `opam` is?
+> >
+> > I'm trying to compile opam myself, but getting this:
+> >
+> > ocamlfind ocamlc -package
+> > unix,bigarray,extlib,re,re.str,re.pcre,re.glob,cmdliner,ocam
+> lgraph,cudf,dose
+> > 3.common,dose3.algo,jsonm,no -c -g -w +a-4-44-48 -bin-annot -short-paths
+> > -safe-string -I core -I format -I solver -I repository -I state -I client
+> > -I core/ core/opamCompat.mli ocamlfind: Package `no' not found
+> >
+> > Unfortunately "no" isn't very easy to search for. Is that really the name
+> > of an ocamlfind package?
+>
+> You need to install the `opam-file-format` package, which has been
+> separated
+> from opam itself. `./configure` should warn about this, but I remember it
+> was
+> missing a check at some point.
+>
+> Yes, providing pre-compiled libraries would be useful, I'll see if they can
+> easily be added to the release process.
+>
+> >
+> > On Tue, Dec 13, 2016 at 6:46 AM, <louis.gesbert at ocamlpro.com> wrote:
+> > > That's not true. opam won't upgrade your repositories implicitely at
+> the
+> > > moment (I am considering it, but am afraid it may lead to more
+> difficult
+> > > to
+> > > track errors). The only thing it rewrites is opam files found in source
+> > > trees
+> > > when you pin them.
+> > >
+> > > I will add a warning in opam2 when use of a 1.2 repository is detected.
+> > >
+> > > Best,
+> > > Louis Gesbert - OCamlPro
+> > >
+> > > On samedi 10 d?cembre 2016 21:36:08 CET Drup wrote:
+> > > > opam 2.0 upgrades the format automatically when pinning a repository
+> > > > with an older opam format.
+> > > >
+> > > > Le 10/12/2016 ? 21:05, Anil Madhavapeddy a ?crit :
+> > > > > You can run "opam admin upgrade-format" to upgrade the repository,
+> but
+> > >
+> > > I'm
+> > >
+> > > > > not sure of how to convert individual `opam` files.  This seems
+> like
+> > > > > it
+> > > > > would be useful in order to upgrade working repositories for
+> pinning
+> > > > > purposes...
+> > > > >
+> > > > > Anil
+> > > > >
+> > > > >> On 7 Dec 2016, at 21:52, Ashish Agarwal <agarwal1975 at gmail.com>
+> > >
+> > > wrote:
+> > > > >> Seems the issue is mis-interpretation of a deprecated constraint.
+> I'm
+> > > > >> using Jane Street's opam repository [1], which contains
+> constraints
+> > > > >> like:
+> > > > >>
+> > > > >> available: [ ocaml-version >= "4.03.0" ]
+> > > > >>
+> > > > >> After replacing this with a normal constraint in the `depends`
+> field,
+> > >
+> > > it
+> > >
+> > > > >> worked fine. Is there a tool to convert old opam files?
+> > > > >>
+> > > > >> [1] https://github.com/janestreet/opam-repository
+> > > > >>
+> > > > >>
+> > > > >> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <
+> agarwal1975 at gmail.com
+> > > > >>
+> > > > >> wrote: I'm getting this:
+> > > > >>
+> > > > >> $ opam install ppx_sexp_conv.114.10+84
+> > > > >> [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> > > > >> ocaml-version >= "4.03.0"
+> > > > >>
+> > > > >> So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0
+> > >
+> > > switch.
+> > >
+> > > > >> I've certainly run "eval `opam config env`". I created a new
+> switch
+> > >
+> > > with
+> > >
+> > > > >> 4.03.0 to try it from scratch, but get the same issue.
+> > > > >>
+> > > > >> Sanity checks:
+> > > > >>
+> > > > >> $ ocaml -version
+> > > > >> The OCaml toplevel, version 4.03.0
+> > > > >>
+> > > > >> $ opam info ocaml | grep all-installed-versions
+> > > > >> all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> > > > >>
+> > > > >> Incidentally, I'm confused about the output of `opam info ocaml`.
+> I
+> > >
+> > > have
+> > >
+> > > > >> 6 switches on this computer. How come only 2 are listed above?
+> > > > >>
+> > > > >> $ opam --version
+> > > > >> 2.0~alpha5
+> > > > >>
+> > > > >>
+> > > > >> _______________________________________________
+> > > > >> opam-devel mailing list
+> > > > >> opam-devel at lists.ocaml.org
+> > > > >> http://lists.ocaml.org/listinfo/opam-devel
+> > > > >
+> > > > > _______________________________________________
+> > > > > opam-devel mailing list
+> > > > > opam-devel at lists.ocaml.org
+> > > > > http://lists.ocaml.org/listinfo/opam-devel
+> > > >
+> > > > _______________________________________________
+> > > > opam-devel mailing list
+> > > > opam-devel at lists.ocaml.org
+> > > > http://lists.ocaml.org/listinfo/opam-devel
+> > >
+> > > _______________________________________________
+> > > opam-devel mailing list
+> > > opam-devel at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161222/67cf0fb7/attachment.html>
+
+From gabriel.scherer at gmail.com  Fri Dec 30 17:06:52 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Fri, 30 Dec 2016 12:06:52 -0500
+Subject: [opam-devel] Multiple names for the same switch (aliases that are
+	really aliases)
+Message-ID: <CAPFanBF4TConbT-r70cOA+EF1f4GSyN=PNxXsbzKGEMO1936DQ@mail.gmail.com>
+
+Hi opam-devel,
+
+A few weeks ago I discussed with Jeremy Yallop the idea of having switches
+for major OCaml versions (4.01, 4.02, 4.03...) that would point to the
+currently-best minor version of them (do you remember? 4.01.0, 4.02.3,
+4.03.1).
+
+I would be willing to invest the effort of doing that and maintaining this
+mapping, but I feel that just creating new switches is too heavy-handed to
+be useful. If I already have a 4.02.3 switch, I would like "opam switch
+4.02" to bring me to that switch, not install a new, distinct one with name
+4.02 that would in fact install the same compiler as 4.02.3.
+
+Do I correctly understand that this feature is not possible in OPAM 1.2.x?
+(If it is, I may do it.)
+Is it possible in 2.x?
+
+(Louis: I do distinctly remember your call to try out 2.x at ICFP and I
+feel guilty about not having done much yet. Apologies.)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161230/fbf6a5d3/attachment.html>
+
+From dra-news at metastack.com  Fri Dec 30 21:52:13 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Fri, 30 Dec 2016 21:52:13 +0000
+Subject: [opam-devel] Multiple names for the same switch (aliases that
+ are	really aliases)
+In-Reply-To: <CAPFanBF4TConbT-r70cOA+EF1f4GSyN=PNxXsbzKGEMO1936DQ@mail.gmail.com>
+References: <CAPFanBF4TConbT-r70cOA+EF1f4GSyN=PNxXsbzKGEMO1936DQ@mail.gmail.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9013568DC1F@Remus.metastack.local>
+
+In opam 2.0, it should definitely be possible to do it with a kind of dummy package which has a version constraint on the underlying OCaml package holding the appropriate ocaml package below the next version (e.g. < 4.03.0 for the 4.02 channel ? there might be a cleverer constraint than that even, IIRC). Each major version would correspond to a version of the package (say ocaml-branch.4.02 or something) which you?d then pin at that version. A neat side-effect is that if a new maintenance release were made, the switch would be upgradable. It would also not require maintenance, beyond adding new major release versions.
+
+It?s not aliases, but would it do what you?re after? All of that?s impossible in OPAM 1.x ? the best bet there would be to have an opam-admin script which can process the compilers directory and re-generate the branch packages (something similar to Anil?s script for the GPRs).
+
+
+David
+
+PS My strange patching work means I do keenly remember all point releases since 3.07 ? who released 4.03.1 without telling me ;o)
+
+From: opam-devel [mailto:opam-devel-bounces at lists.ocaml.org] On Behalf Of Gabriel Scherer
+Sent: 30 December 2016 17:07
+To: opam-devel at lists.ocaml.org
+Subject: [opam-devel] Multiple names for the same switch (aliases that are really aliases)
+
+Hi opam-devel,
+A few weeks ago I discussed with Jeremy Yallop the idea of having switches for major OCaml versions (4.01, 4.02, 4.03...) that would point to the currently-best minor version of them (do you remember? 4.01.0, 4.02.3, 4.03.1).
+I would be willing to invest the effort of doing that and maintaining this mapping, but I feel that just creating new switches is too heavy-handed to be useful. If I already have a 4.02.3 switch, I would like "opam switch 4.02" to bring me to that switch, not install a new, distinct one with name 4.02 that would in fact install the same compiler as 4.02.3.
+Do I correctly understand that this feature is not possible in OPAM 1.2.x? (If it is, I may do it.)
+Is it possible in 2.x?
+(Louis: I do distinctly remember your call to try out 2.x at ICFP and I feel guilty about not having done much yet. Apologies.)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161230/f6e660d5/attachment.html>
+
+From gabriel.scherer at gmail.com  Fri Dec 30 21:56:52 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Fri, 30 Dec 2016 16:56:52 -0500
+Subject: [opam-devel] Multiple names for the same switch (aliases that
+ are really aliases)
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9013568DC1F@Remus.metastack.local>
+References: <CAPFanBF4TConbT-r70cOA+EF1f4GSyN=PNxXsbzKGEMO1936DQ@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9013568DC1F@Remus.metastack.local>
+Message-ID: <CAPFanBH66tQUo3Xeu7zkYZp_mguUOfEyzRdRCctptx7zVQMm0g@mail.gmail.com>
+
+Oh, I'm not trying to get the system to automatically determine what the
+best (last) version is, I am fine with doing it by hand. (And it is
+probably wiser, if we were to release, say, 4.04.1~beta tomorrow.)
+
+The rest of your description sounds like what I expected indeed, and I
+hadn't thought deeply about the upgrade situation but it sounds very nice.
+
+Thanks!
+
+On Fri, Dec 30, 2016 at 4:52 PM, David Allsopp <dra-news at metastack.com>
+wrote:
+
+> In opam 2.0, it should definitely be possible to do it with a kind of
+> dummy package which has a version constraint on the underlying OCaml
+> package holding the appropriate ocaml package below the next version (e.g.
+> < 4.03.0 for the 4.02 channel ? there might be a cleverer constraint than
+> that even, IIRC). Each major version would correspond to a version of the
+> package (say ocaml-branch.4.02 or something) which you?d then pin at that
+> version. A neat side-effect is that if a new maintenance release were made,
+> the switch would be upgradable. It would also not require maintenance,
+> beyond adding new major release versions.
+>
+>
+>
+> It?s not aliases, but would it do what you?re after? All of that?s
+> impossible in OPAM 1.x ? the best bet there would be to have an opam-admin
+> script which can process the compilers directory and re-generate the branch
+> packages (something similar to Anil?s script for the GPRs).
+>
+>
+>
+>
+>
+> David
+>
+>
+>
+> PS My strange patching work means I do keenly remember all point releases
+> since 3.07 ? who released 4.03.1 without telling me ;o)
+>
+>
+>
+> *From:* opam-devel [mailto:opam-devel-bounces at lists.ocaml.org] *On Behalf
+> Of *Gabriel Scherer
+> *Sent:* 30 December 2016 17:07
+> *To:* opam-devel at lists.ocaml.org
+> *Subject:* [opam-devel] Multiple names for the same switch (aliases that
+> are really aliases)
+>
+>
+>
+> Hi opam-devel,
+>
+> A few weeks ago I discussed with Jeremy Yallop the idea of having switches
+> for major OCaml versions (4.01, 4.02, 4.03...) that would point to the
+> currently-best minor version of them (do you remember? 4.01.0, 4.02.3,
+> 4.03.1).
+>
+> I would be willing to invest the effort of doing that and maintaining this
+> mapping, but I feel that just creating new switches is too heavy-handed to
+> be useful. If I already have a 4.02.3 switch, I would like "opam switch
+> 4.02" to bring me to that switch, not install a new, distinct one with name
+> 4.02 that would in fact install the same compiler as 4.02.3.
+>
+> Do I correctly understand that this feature is not possible in OPAM 1.2.x?
+> (If it is, I may do it.)
+> Is it possible in 2.x?
+>
+> (Louis: I do distinctly remember your call to try out 2.x at ICFP and I
+> feel guilty about not having done much yet. Apologies.)
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20161230/cbb586fd/attachment-0001.html>
+
+From meta at antislash.info  Thu Dec  8 17:07:27 2016
+From: meta at antislash.info (Louis Gesbert)
+Date: Thu, 08 Dec 2016 17:07:27 -0000
+Subject: [opam-devel] opam getting compiler version wrong
+In-Reply-To: <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+References: <CAMu2m2K4NN6u59ScYtXymU0HHWKvD7JbdU36as0J-21_B+-X5A@mail.gmail.com>
+ <CAMu2m2+bu27CnAcY=gdrH0C1vTihj1x_s3aOGiML7Ke=G5rXeg@mail.gmail.com>
+Message-ID: <2501560.IhgjI6L1VP@maitake>
+
+Indeed, there is one. It is all documented at:
+
+http://opam.ocaml.org/blog/opam-2-0-preview/#Repositorychanges
+
+The last note explains why you didn't see many 'ocaml' packages. Also, `opam-
+admin` has a new option `--mirror` since then, to upgrade a repo without 
+overwriting the 1.2 version
+
+Note that, as a hack, you could set the variable by hand (opam config set 
+ocaml-version VERSION) ; but you are likely to run into other issues.
+
+On mercredi 7 d?cembre 2016 14:52:21 CET Ashish Agarwal wrote:
+> Seems the issue is mis-interpretation of a deprecated constraint. I'm using
+> Jane Street's opam repository [1], which contains constraints like:
+> 
+> available: [ ocaml-version >= "4.03.0" ]
+> 
+> After replacing this with a normal constraint in the `depends` field, it
+> worked fine. Is there a tool to convert old opam files?
+> 
+> [1] https://github.com/janestreet/opam-repository
+> 
+> 
+> On Wed, Dec 7, 2016 at 8:04 AM, Ashish Agarwal <agarwal1975 at gmail.com>
+> 
+> wrote:
+> > I'm getting this:
+> > 
+> > $ opam install ppx_sexp_conv.114.10+84
+> > [ERROR] ppx_sexp_conv.114.10+84 has unmet availability conditions:
+> > ocaml-version >= "4.03.0"
+> > 
+> > So opam thinks my ocaml version is < 4.03.0, but I'm in a 4.03.0 switch.
+> > I've certainly run "eval `opam config env`". I created a new switch with
+> > 4.03.0 to try it from scratch, but get the same issue.
+> > 
+> > Sanity checks:
+> > 
+> > $ ocaml -version
+> > The OCaml toplevel, version 4.03.0
+> > 
+> > $ opam info ocaml | grep all-installed-versions
+> > all-installed-versions 4.03.0 [4.03.0]  4.04.0 [4.04.0]
+> > 
+> > Incidentally, I'm confused about the output of `opam info ocaml`. I have 6
+> > switches on this computer. How come only 2 are listed above?
+> > 
+> > $ opam --version
+> > 2.0~alpha5
+
+

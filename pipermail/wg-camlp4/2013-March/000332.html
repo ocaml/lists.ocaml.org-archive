@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Request for feedback
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Request%20for%20feedback&In-Reply-To=%3C878v5qtff1.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000331.html">
+   <LINK REL="Next"  HREF="000333.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Request for feedback</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Request%20for%20feedback&In-Reply-To=%3C878v5qtff1.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[wg-camlp4] Request for feedback">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Thu Mar 14 11:00:02 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000331.html">[wg-camlp4] Request for feedback
+</A></li>
+        <LI>Next message: <A HREF="000333.html">[wg-camlp4] Request for feedback
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#332">[ date ]</a>
+              <a href="thread.html#332">[ thread ]</a>
+              <a href="subject.html#332">[ subject ]</a>
+              <a href="author.html#332">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> If people see examples written &quot;let%lwt&quot;, they will probably do the same, don't you think?   &quot;%&quot; does not seem very
+</I>&gt;<i> common in OCaml code; I don't think people already have &quot;bad habits&quot; about it.  And if people insist to write &quot;let %
+</I>&gt;<i> lwt&quot;, it will be because they believe it somehow better.
+</I>&gt;<i>
+</I>&gt;<i> I'm not very fond of &quot;let.lwt&quot;.  The dot symbol has already so many different uses in OCaml...  At least &quot;%&quot; is quite
+</I>&gt;<i> rare and will thus be clearly noticed as an extension.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Another posibility would be
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    let .% lwt x = ...
+</I>&gt;<i>
+</I>&gt;<i> Do you believe it is worth making the syntax more heavy only to discourage (and not even prevent) people from
+</I>&gt;<i> potentially writing code with a style we don't like?
+</I>&gt;<i>
+</I>
+To be honest I am (cautiously) ok with &quot;let%lwt x = ...&quot;. 
+
+&gt;&gt;<i> It does seems like we're going from having a single extension syntax to
+</I>&gt;&gt;<i> having many extension syntaxes. I can see the benefit of &quot;let % lwt&quot;
+</I>&gt;&gt;<i> since that will probably be a common extension point (the same goes for
+</I>&gt;&gt;<i> &quot;match % bit&quot;) but is there much to be gained from the other possible
+</I>&gt;&gt;<i> keyword extensions.
+</I>&gt;<i>
+</I>&gt;<i> function%ext and try%ext are also probably useful.
+</I>
+I'm much less sure about these other syntaxes. I think that
+
+    [%bit match foo with
+        bit-pattern -&gt; ...
+      | other-bit-pattern -&gt; ...
+    ]
+
+makes it much more obvious that we are abusing the OCaml syntax within
+an extension, which is important. It is also not much heavier than:
+
+    match%bit foot with
+      bit-pattern -&gt; ...
+    | other-bit-pattern -&gt; ...
+
+The same goes for function%ext and try%ext.
+
+Note that for &quot;let&quot; the trade-off is potentially much worse:
+
+[%lwt let x = .... in
+  [%lwt let y = ... in
+    [%lwt let z = ... in
+       ...
+    ]
+  ]
+]
+
+vs.
+
+let%lwt x = ... in
+let%lwt y = ... in
+let%lwt z = ... in
+  ...
+
+So while I think it is worth it for let, I'm much less sure about the
+other constructs. I also think that it will be difficult to persuade the
+OCaml developers to allow &quot;KWD % id&quot; all over the place.
+
+&gt;<i> And I can imagine examples where {%ext x1=e1; ...; xn=en} would be useful as well (see the &quot;pre-polyrecord&quot; example).
+</I>
+[%ext x1=e1; ...; xn=en] would already be valid. Also, this might get in
+the way of my proposed short quotation extension form: {%id { .... }}.
+
+Which reminds me, at the very least, we must implement a {x{ ... }x}
+quoting construct for quotation extensions.
+
+&gt;&gt;<i> While &quot;let % lwt&quot; may be alright, I do think that
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> ( % id expr )
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> is a bad idea. It looks too much like a prefix operator. Also, having a
+</I>&gt;&gt;<i> two character delimiter that isn't a single token is different from
+</I>&gt;&gt;<i> every other two character delimiter in the langauge. It also means that
+</I>&gt;&gt;<i> you can't use precedence to resolve conflicts in the parser. Is there
+</I>&gt;&gt;<i> any real benefit in using (%id expr) instead of [%id expr]?
+</I>&gt;<i>
+</I>&gt;<i> The benefit I can see is the uniformity with other forms of expressions:
+</I>&gt;<i>
+</I>&gt;<i>    KW%id ...
+</I>&gt;<i>
+</I>&gt;<i> where KW is the opening keyword/symbol (here &quot;(&quot;) and ... the rest of the construction starting with KW.
+</I>
+I don't think there is any uniformity here, people do not think of
+keywords and delimiters as equivalent, and do not expect them to behave
+the same. They do expect all delimiters to behave the same, which is why
+&quot;( % id expr )&quot; really should not be allowed.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000331.html">[wg-camlp4] Request for feedback
+</A></li>
+	<LI>Next message: <A HREF="000333.html">[wg-camlp4] Request for feedback
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#332">[ date ]</a>
+              <a href="thread.html#332">[ thread ]</a>
+              <a href="subject.html#332">[ subject ]</a>
+              <a href="author.html#332">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

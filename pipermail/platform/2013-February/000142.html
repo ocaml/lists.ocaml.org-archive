@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jR%2B3iYQbJrMfjVr0uejFkM12W9uxr_pj5jCH8%3DTBWe3RQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000137.html">
+   <LINK REL="Next"  HREF="000144.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jR%2B3iYQbJrMfjVr0uejFkM12W9uxr_pj5jCH8%3DTBWe3RQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Tue Feb 26 16:00:22 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000137.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000144.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Tue, Feb 26, 2013 at 10:28 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 02/26/2013 03:38 PM, Yaron Minsky wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - UNSANITARY: Having both &quot;open namespace Core.Std&quot; and Core_List as
+</I>&gt;&gt;<i>    names seems a little unsanity.  Indeed, to provide a decent user
+</I>&gt;&gt;<i>    experience, you probably want to hide the Core_List name almost
+</I>&gt;&gt;<i>    everywhere.  You don't want it showing up in error messages,
+</I>&gt;&gt;<i>    documentation, source files, etc.  When you need to do a bunch of
+</I>&gt;&gt;<i>    work to hide something, maybe it's better not to include it at all.
+</I>&gt;<i>
+</I>&gt;<i> Concretly, what should the OCamldoc-generated page for a Core module look
+</I>&gt;<i> like?  Should the reference to types defined in other Core modules be
+</I>&gt;<i> displayed without any indication that they come from Core (without clicking
+</I>&gt;<i> on it)?
+</I>
+I believe that's right.  When you're reading Core's documentation,
+much as when you're reading Core's code, you want to see the
+in-namespace names.
+
+&gt;<i> I would find this very confusing.  Similarly for error messages: it
+</I>&gt;<i> is indeed nice to be able to see List instead of Core_list when you live
+</I>&gt;<i> with Core all you day long and there is no ambiguity. Still, there needs to
+</I>&gt;<i> be a way to have a more explicit error message, which could distinguish
+</I>&gt;<i> Stdlib_list from Core_list.
+</I>
+I think if you've opened the Core namespace in prefernce to the Stdlib
+one, you want to see Core_list as List, and you want to see
+Stdlib_list as Stdlib_list.
+
+Core should be able to stand up as a full-fledged alternative to the
+standard library.  No one wants error messages for the standard
+library to suddenly get twice as long because it's littered with
+qualifiers.  We want the same for Core.
+
+I would argue that when referencing identifiers in other namespaces,
+you should at that point have the namespace qualifier in place.
+
+&gt;<i> For me, seeing List instead Core_list in &quot;common cases&quot; is only nice
+</I>&gt;<i> to have (and definitely achievable with a little more effort in my
+</I>&gt;<i> proposal), but being able to distinguish Core_list from Stdlib_lib
+</I>&gt;<i> is crucial.  (And I don't think that showing Core#List is nicer than
+</I>&gt;<i> Core_list, at least not enough to justify the addition of a new
+</I>&gt;<i> notion.)
+</I>
+I think you're underselling the importance of keeping names concise.
+We've started using Garrigue's short-paths patch, and it is amazing
+how much it helps error messages, and the key thing it does is remove
+unnecessary qualifications.  OCaml's error messages aren't great as
+they are, and making them even longer is a bug user-interface mistake.
+
+&gt;<i> Having long unique names which can be used in any context is a very good
+</I>&gt;<i> property and would also avoid problems reported with camlp4 extensions not
+</I>&gt;<i> being able to access a specific &quot;standard&quot; module.  If we can use
+</I>&gt;<i> Stdlib_list in any context, we don't need to do any hack to refer to it.
+</I>
+I agree that having unique names that are accessible from any context
+is good, though I think namespaces could provide this.  You could
+refer to Stdlib#List anytime you needed to be explicit, and just use
+List when you did not.
+
+That said, I agree that your proposal provides this feature as well,
+and that it's a good thing.
+
+&gt;&gt;<i> - NO HIDING: I'm not sure that the other namespace proposals do
+</I>&gt;&gt;<i>    support this, but I'd like to be able to hide some modules so that
+</I>&gt;&gt;<i>    they are not reachable outside of the namespace.  We can do this
+</I>&gt;&gt;<i>    with the current Core.Std, but I don't see how to do it in Alain's
+</I>&gt;&gt;<i>    proposal.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> If the library does not install the .cmi file of the private module, it
+</I>&gt;<i> cannot be accessed by any &quot;client code&quot;.  We do this regularly for our
+</I>&gt;<i> internal libraries.  For me, this is not really related to namespaces.
+</I>
+That's an interesting point.  Maybe we could do the same.
+
+&gt;<i> With my proposal, it is even better: you can install .cmi files so that some
+</I>&gt;<i> &quot;privileged&quot; parts of your code base can still access it, but also restrict
+</I>&gt;<i> access to other parts by providing a mapping file which does not alias the
+</I>&gt;<i> private module (and just arrange so that you don't have a -I on the
+</I>&gt;<i> directory where the .cmi is installed).  Currently, what we do to achieve it
+</I>&gt;<i> is to have several install directories for some libraries and copy a
+</I>&gt;<i> different subset of .cmi files to each of them.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000137.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000144.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#142">[ date ]</a>
+              <a href="thread.html#142">[ thread ]</a>
+              <a href="subject.html#142">[ subject ]</a>
+              <a href="author.html#142">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

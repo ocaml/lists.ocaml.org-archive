@@ -1,0 +1,176 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with strings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3CCAAxsn%3DFikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh%2BQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000246.html">
+   <LINK REL="Next"  HREF="000248.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with strings</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3CCAAxsn%3DFikaVsQhv9P63za6WNXXPT-6JoCJogtKH1fmduOXTh%2BQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Help with strings">yallop at gmail.com
+       </A><BR>
+    <I>Tue Dec 26 23:04:30 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000246.html">[ocaml-ctypes] Help with strings
+</A></li>
+        <LI>Next message: <A HREF="000248.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#247">[ date ]</a>
+              <a href="thread.html#247">[ thread ]</a>
+              <a href="subject.html#247">[ subject ]</a>
+              <a href="author.html#247">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear John,
+
+On 25/12/2017, john skaller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at internode.on.net</A>&gt; wrote:
+&gt;<i> So roughly .. when is it safe to use &#8220;string&#8221;?
+</I>&gt;<i> At the moment the answer for me is &#8220;never&#8221; because I don&#8217;t understand the
+</I>&gt;<i> memory management protocol.
+</I>
+It works like this:
+
+  * passing a string using 'string' makes a copy in either direction.
+Furthermore,
+
+    - the copy created when passing a string from OCaml to C lives for
+the lifetime of the C call.
+      (It's possible this will be strengthened in the future:
+<A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/556">https://github.com/ocamllabs/ocaml-ctypes/issues/556</A>)
+
+    - the copy created when passing a string from C to OCaml is a
+regular OCaml string, subject to usual GC behaviour.  Ctypes makes no
+attempt to deallocate the memory used by the original C string.
+
+So, for your three examples
+
+&gt;<i>         char const *get_version();
+</I>&gt;<i>         char *get_buffer();
+</I>&gt;<i>         char *strdup(char *);
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> The first function returns a pointer to an immutable global object.
+</I>
+It's fine, and probably the best choice, to use 'string' for
+'get_version'.  Each call to the function will create a fresh OCaml
+string.
+
+&gt;<i> The second to a mutable part of a buffer.
+</I>
+Mutability means that it's probably not useful to use `string` here,
+since 'string' will create a copy that won't track changes.  It would
+be better to write
+
+   let get_buffer = foreign &quot;get_buffer&quot;
+      (void @-&gt; returning (ptr char))
+
+&gt;<i> The third to a freshly malloc()ed copy of a NTBS.
+</I>
+Here 'string' is not the right thing for the *return type*, since (as
+you say) it prevents access to the pointer needed to free the returned
+memory.  Again, 'ptr char' is probably the best starting point.  On
+the other hand, 'string' is a reasonable choice for the *argument*,
+since Ctypes will automatically deallocate the copy of the string
+after the call.  So the following binding is reasonable:
+
+    let strdup = foreign &quot;strdup&quot;
+      (string @-&gt; returning (ptr char))
+
+In this case it's possible to do a little better.  The 'ocaml_string'
+type description is an alternative to 'string' that avoids the copy:
+
+    let strdup = foreign &quot;strdup&quot;
+      (ocaml_string @-&gt; returning (ptr char))
+
+In the general case, where the C function can call back into OCaml,
+'ocaml_string' is not safe.  But it's safe in the common (first-order)
+case, which includes 'strdup'.
+
+&gt;<i> So roughly, if you wanted to do it right, Ctypes &#8220;type&#8221; system is inadequate.
+</I>&gt;<i> The &#8220;types&#8221; must contain mutablility and ownership information.
+</I>&gt;<i> For example
+</I>&gt;<i>
+</I>&gt;<i>         immutable_lend_noincrementable_nonnull_pointer_char
+</I>
+You're quite right, both that Ctypes doesn't capture these properties
+in the type system, and that it's quite challenging to do so, since C
+is so flexible.  (For example, the 'realpath' function can return
+either a malloc-allocated buffer or a caller-supplied buffer,
+depending on the value of its second argument!)
+
+Regarding mutability, the 4.06.0 release of OCaml distinguishes
+mutable from immutable strings.  When Ctypes drops support for older
+OCaml versions it's likely that string mutability will be more clearly
+marked in Ctypes bindings, too.
+
+&gt;<i> Of course I can do that by passing a char ptr manually created
+</I>&gt;<i> (C types can do that I think),
+</I>
+Indeed (see above).
+
+&gt;<i> copying Ocaml string contents manually (how?),
+</I>
+A quick way is to use the 'coerce' function, which can convert between
+'ptr char' and 'string' because 'string' is a view for 'ptr char'.
+Here's an example using the 'strdup' binding above.
+
+    # let p = strdup &quot;hello, world&quot;;;
+    val p : char Ctypes_static.ptr = (char*) 0x5601c2a90130
+    # coerce (ptr char) string p;;
+    - : string = &quot;hello, world&quot;
+
+More generally the 'ocaml-memcpy' package provides functions that can
+copy between several different representations
+(<A HREF="https://github.com/yallop/ocaml-memcpy">https://github.com/yallop/ocaml-memcpy</A>).
+
+&gt;<i> and then manually free-ing it (C types can do that?)
+</I>
+A simple way is to bind 'free'!  Here's an example, freeing the memory
+returned from the call to 'strdup' above.
+
+    # let free = foreign &quot;free&quot; (ptr char @-&gt; returning void);;
+    val free : char Ctypes_static.ptr -&gt; unit = &lt;fun&gt;
+    # free p;;
+    - : unit = ()
+
+Kind regards,
+
+Jeremy
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000246.html">[ocaml-ctypes] Help with strings
+</A></li>
+	<LI>Next message: <A HREF="000248.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#247">[ date ]</a>
+              <a href="thread.html#247">[ thread ]</a>
+              <a href="subject.html#247">[ subject ]</a>
+              <a href="author.html#247">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

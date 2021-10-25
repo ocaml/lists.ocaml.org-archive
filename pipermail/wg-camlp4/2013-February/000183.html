@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] On domain-specific foreign syntaxes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3C510BB021.8010105%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000182.html">
+   <LINK REL="Next"  HREF="000184.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] On domain-specific foreign syntaxes</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20On%20domain-specific%20foreign%20syntaxes&In-Reply-To=%3C510BB021.8010105%40lexifi.com%3E"
+       TITLE="[wg-camlp4] On domain-specific foreign syntaxes">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Feb  1 12:08:01 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000182.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+        <LI>Next message: <A HREF="000184.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#183">[ date ]</a>
+              <a href="thread.html#183">[ thread ]</a>
+              <a href="subject.html#183">[ subject ]</a>
+              <a href="author.html#183">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 02/01/2013 12:02 PM, Leo White wrote:
+&gt;<i> I think that it is very important to define the &quot;namespace&quot; of
+</I>&gt;<i> extensions. I was thinking something like:
+</I>&gt;<i>
+</I>&gt;<i> type annotation = expression
+</I>&gt;<i> and extension = longident * expression option
+</I>&gt;<i>
+</I>&gt;<i> So the extension has the same type as a constructor application. I don't
+</I>&gt;<i> think annotations should necessarily be namespaced because they will
+</I>&gt;<i> probably be very useful within an extension, in which case they will
+</I>&gt;<i> already be namespaced by that extension.
+</I>
+I can see cases where the notion of &quot;extension&quot; is only used to inject 
+syntactic expressions in a different category (module, pattern, type) 
+but is also &quot;scoped&quot; by an outer extension which provides the namespace. 
+See the &quot;bitstring&quot; example, where we need to put an expression inside a 
+pattern, but the interpretation of this is given by the surrounding 
+marker on the pattern matching.
+
+Note that even if we choose &quot;type extension = expression&quot;, we can 
+provide a special namespaced syntax.  E.g.:
+
+  (:lid e)   ====&gt;  (# lid (e))
+
+(i.e. we inject the lid/expression pair into either a function or 
+constructor application.)  But the syntactic gain is rather small.
+
+Alternatively, if we choose to make &quot;type extension = longident * 
+expression option&quot; as you suggest, we can also support a different syntax:
+
+  (# e)  ====&gt;  (* empty identifier in the Parsetree *)
+
+but this sounds a little bit less natural to me.  I like the 
+minimalistic approach of having &quot;extension = expression&quot; in all 
+syntactic categories (including expression themselves).  But I will 
+certainly not fight the other solution.
+
+
+-- Alain
+
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> I don't believe we should add a further distinction between the
+</I>&gt;&gt;<i> annotations which can actually be ignored by the compiler and those on
+</I>&gt;&gt;<i> which the type-checker must complain.  This can be left to a choice of
+</I>&gt;&gt;<i> syntax which combines an annotation and an extension.
+</I>&gt;<i>
+</I>&gt;<i> I agree.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Similarly, I'm not sure we should hard-code/enforce the fact that an
+</I>&gt;&gt;<i> AST mapper should only be able to expand &quot;under&quot; extensions.
+</I>&gt;&gt;<i> Extensions could also be used as markers which can trigger &quot;local
+</I>&gt;&gt;<i> enough&quot; rewriting. (See examples &quot;Bolt&quot; and &quot;PG'OCaml&quot; below.)
+</I>&gt;<i>
+</I>&gt;<i> I agree.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Only to fix the ideas, let's give some examples, assuming the
+</I>&gt;&gt;<i> following syntax:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   (# e)       -&gt;  extension
+</I>&gt;&gt;<i>   ... (+ e)   -&gt;  annotation (with light postfix syntax)
+</I>&gt;&gt;<i>   (@ e) ...   -&gt;  annotation (with light prefix syntax)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   (@(e) ...)  -&gt;  annotation (explicit scope, prefix syntax)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and maybe a derived &quot;non-ignorable annotation&quot;:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   ... (&amp; e)  ===  ... (+ (# e))
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and syntactic variants such as:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   let(+e) p = ... === (@ e)(let p = ...)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and also something which combine an extension + quotation:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   (:id x[...]x)   === (# id {x{...}x})
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This certainly seems to be along the right lines. If we really prefer {,
+</I>&gt;<i> ( or [ for delimiters then perhaps:
+</I>&gt;<i>
+</I>&gt;<i> Quotation:  {x{ ... }x}
+</I>&gt;<i> Extension:  (:longid expr)
+</I>&gt;<i>
+</I>&gt;<i> Annotation:  (@ expr)  (and maybe others for prefix etc.)
+</I>&gt;<i>
+</I>&gt;<i> Then some abbreviated forms for common cases:
+</I>&gt;<i>
+</I>&gt;<i> Quotation Extension:  {:longid x{ ... }x}  ==  (:longid {x{ .. {x})
+</I>&gt;<i>
+</I>&gt;<i> Let Extension:  let:longid foo = ... in ...    ==  (:longid let foo =
+</I>&gt;<i> ... in ...)
+</I>&gt;<i>
+</I>&gt;<i> Match Extension:  match:longid expr with ...   ==  (:longid match expr
+</I>&gt;<i> with ...)
+</I>&gt;<i>
+</I>&gt;<i> Type-Conv Annotation:  type foo = ... with longid( expr ), longid ...
+</I>&gt;<i> == type foo = ... (@ longid expr) (@ longid) ...
+</I>&gt;<i>
+</I>&gt;<i> We could provide special-cases in ast_mapper to make these abbreviated
+</I>&gt;<i> forms particularly easy to work with.
+</I>&gt;<i>
+</I>&gt;<i> The downside of this abbreviated syntax for quotation extensions (as
+</I>&gt;<i> opposed to {:foo| ... |} )is that it does not provide an alternative
+</I>&gt;<i> delimiter to &quot;}&quot;. However it probably fits in better.
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000182.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+	<LI>Next message: <A HREF="000184.html">[wg-camlp4] On domain-specific foreign syntaxes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#183">[ date ]</a>
+              <a href="thread.html#183">[ thread ]</a>
+              <a href="subject.html#183">[ subject ]</a>
+              <a href="author.html#183">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On the new mixed mode pins
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3CCAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001071.html">
+   <LINK REL="Next"  HREF="001073.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On the new mixed mode pins</H1>
+    <B>David Sheets</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3CCAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g%40mail.gmail.com%3E"
+       TITLE="[opam-devel] On the new mixed mode pins">sheets at alum.mit.edu
+       </A><BR>
+    <I>Sat May 16 12:22:30 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001071.html">[opam-devel] On the new mixed mode pins
+</A></li>
+        <LI>Next message: <A HREF="001073.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1072">[ date ]</a>
+              <a href="thread.html#1072">[ thread ]</a>
+              <a href="subject.html#1072">[ subject ]</a>
+              <a href="author.html#1072">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Fri, May 15, 2015 at 10:10 PM, Daniel B&#252;nzli
+&lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">daniel.buenzli at erratique.ch</A>&gt; wrote:
+&gt;<i> Hello,
+</I>&gt;<i>
+</I>&gt;<i> Having recently upgraded my opam installation to 1.2.1. I had the pleasure of having my pins unknowingly converted to git mixed-mode. (Bad) experiences with this further confirmed me that while I was not planning to use them these pins are an inherently bad idea. Since mixed-mode is the default when you pin a VCS I also claim that as currently implemented they make opam, by default, a much less usable system in practice.
+</I>&gt;<i>
+</I>&gt;<i> In this message I would like to both indicate what I think is wrong about mixed mode and propose an other way of having the functionality of mixed mode &#8212; which I understand as being able to `opam reinstall` a pin by using the on-disk state of tracked files without having to commit them to the repo. This new model would result in a system that is less brittle, easier to use and easier to understand. I'm especially interested if this would satisfy the needs of the users who were proponents of the mixed mode which IIRC included both ThomasL and David Sheets.
+</I>&gt;<i>
+</I>&gt;<i> # The problem
+</I>&gt;<i>
+</I>&gt;<i> The problem is that in general you should always be able to make `opam update -u` with peace of mind, that is without having to worry about the state of the *working* directory your pins' repositories. This may not be a problem for you if you have one or two pins, but it doesn't scale if you have tens of them.
+</I>
+Thank you for writing this up. It really helps to have a lucid
+description of the problem and proposed solution. :-)
+
+I don't usually use `opam update -u` because I don't usually want to
+deal with whatever rebuilds and errors may occur. I like to know and
+directly approve of upgrades as they become necessary for other work.
+I think it's really valuable to have people developing with both lazy
+upgrade and eager upgrade strategies to cover the version-space. Many
+times, I've found incorrect version constraints due to this strategy
+(breakages in minor revs or point releases). Sometimes, I use `opam
+update -u` to clean up lagging versions. I do this maybe once a month
+when I explicitly think about it and not during interactive
+development.
+
+&gt;<i> Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+</I>
+When developing with mixed mode, I typically stash changes that aren't
+compilable. I use `git add -p` and `git stash --keep-index` a lot for
+both the opam workflow and separating changes into logical commits.
+
+&gt;<i> For me the design of mixed-mode pins and pins in general does not acknowledge that the fact that a git's repo directory is a *working* directory whose state doesn't always represent something you would actually like opam to catch and (re)install on an `opam update -u`. You want to be able to tell opam exactly *when* it is allowed to consider the working directory as a state to catch.
+</I>
+I think that, whatever the outcome of these discussions, the mixed VCS
+vs. explicit branch VCS modes should be made clearly distinct.
+
+&gt;<i> # A mental model of VCS pins
+</I>&gt;<i>
+</I>&gt;<i> For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+</I>&gt;<i>
+</I>&gt;<i> # Getting rid of mixed mode
+</I>&gt;<i>
+</I>&gt;<i> So what I propose is to drop mixed-mode and go back to the initial system we had with only path and VCS pins. The behaviour of `pin add` and pins is as follows:
+</I>&gt;<i>
+</I>&gt;<i> * pin add $PATH, a path pin that rsyncs $PATH
+</I>&gt;<i> * pin add -k $VCS $PATH#branch, a $VCS pin that tracks $PATH's repo branch #branch
+</I>&gt;<i> * pin add -k $VCS $PATH, a $VCS pin that tracks $PATH's repo's default branch
+</I>
+Afaik, git conventionally uses 'master' but this is only convention
+and there is no mechanism to change this. Is that correct?
+
+&gt;<i> The VCS pins simply upgrade whenever the corresponding branch updates.
+</I>&gt;<i>
+</I>&gt;<i> # Recovering mixed-mode functionality
+</I>&gt;<i>
+</I>&gt;<i> As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `&#8212;dirty` or `&#8212;working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall &#8212;dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall &#8212;dirty PKG` which will force a reinstall.
+</I>
+If we go this route, I'd like a short form of the flag. Also, I
+believe it should be added to `opam upgrade` as well.
+
+What happens with a branch pin that is dirty-updated? Does it take the
+working tree or only the working tree if the branch is the same? Or
+the working tree with the file filter of the branch specified? It
+seems that working tree filtered by *current* branch is simplest which
+you suggested.
+
+&gt;<i> I think that this would make a much more usable and and conceptually clean model of VCS pins.
+</I>
+This is definitely a cleaner model than what we currently have. Do you
+have objections against a solution using a pin parameter like `opam
+pin -k git+dirty repo` which would behave as mixed mode currently does
+except imply `--dirty` on relevant operations? I believe you mentioned
+something about mode reduction in the GitHub thread regarding this. If
+that is your objection, could you please elaborate on the distinction
+between the current pin kind modes, the command-line mode you've
+proposed, and the `+dirty` mode?
+
+&gt;<i> But I'm curious if that would satisfy the users of mixed-mode pins.
+</I>
+As Thomas Leonard says, it has the new potential for surprise (and
+another default behavior change) but it is definitely much improved
+from the current situation.
+
+&gt;<i> Best,
+</I>
+Thanks,
+
+David
+
+&gt;<i> Daniel
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001071.html">[opam-devel] On the new mixed mode pins
+</A></li>
+	<LI>Next message: <A HREF="001073.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1072">[ date ]</a>
+              <a href="thread.html#1072">[ thread ]</a>
+              <a href="subject.html#1072">[ subject ]</a>
+              <a href="author.html#1072">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,239 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3Cwftxovex4r.fsf%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000199.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Wojciech Meyer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3Cwftxovex4r.fsf%40gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">wojciech.meyer at gmail.com
+       </A><BR>
+    <I>Fri Mar  1 01:17:56 GMT 2013</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000199.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#198">[ date ]</a>
+              <a href="thread.html#198">[ thread ]</a>
+              <a href="subject.html#198">[ subject ]</a>
+              <a href="author.html#198">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>So we have two problems related to the order of the namespaces being open:
+
+1. when merging namespaces, the order is important because of the
+   possible overrides of the names
+2. when opening namespaces order is important because of the order side
+   effects modules might have.
+
+The merging happens in two cases:
+. when namespaces is being open in the OCaml code, withing the `open';
+. in .ns file as explicitly when constructing namespaces.
+
+The side effects happen in just single case, when the namespace is
+brought to the scope - so that means this is only known when everything
+is already properly merged, so it's not a problem.
+
+Let's say for this hierarchy of namespaces:
+
+Core
+      Pervasive
+      Std
+      Extras
+        Async
+        TypeConv
+
+but apart from that we could also have:
+
+CorePkgs
+      Pervasive
+      Std
+      TypeConv
+      Async
+
+we can easily predict how the modules will be open, assuming all the
+namespaces below Core are auto-opened, however we could equally say:
+
+  namespace alias Core = Core # { Pervasive, Std, Extras }
+  open Core
+
+  open Core # *
+
+  open Core # **
+
+  open Core # Extras # *
+
+  open CorePkgs
+  open CorePkgs # *
+
+which roughly equals the syntax:
+  use core.ns
+
+Then with this syntax we are able to open Core and bring it to scope
+with all the side effects we would expect.
+
+Given all the facts and considerations about auto-opens, I'd suggest the
+alternative to have just more expressive syntax for opening namespaces.
+
+Didier Remy &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">Didier.Remy at inria.fr</A>&gt; writes:
+
+&gt;&gt;<i> I agree with your point about settilng deep semantic issues ahead of
+</I>&gt;&gt;<i> syntactic one.  I would however submit that the question of whether
+</I>&gt;&gt;<i> you should:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - Have opens in the language proper, including local opens
+</I>&gt;&gt;<i> - Have renames for namespaces in the language proper
+</I>&gt;<i>
+</I>&gt;<i> Yes, this is  the minimal, and probably agreed on.
+</I>&gt;<i>
+</I>&gt;<i> The main question whether namespaces are hierarchical or flat is still not
+</I>&gt;<i> answered, Flat namespaces are not much of an extension to OCaml and do not
+</I>&gt;<i> raise many questions about their semantics.  This is the benefit of Alain's
+</I>&gt;<i> proposal---but also its weakness to be limited in expressiveness.
+</I>&gt;<i>
+</I>&gt;<i> If namespaces are hierarchical, the simplest model is that of a graph where
+</I>&gt;<i> inner nodes are namespaces, leave nodes are module objects, edges are
+</I>&gt;<i> names (and directed).
+</I>&gt;<i>
+</I>&gt;<i> One question raised is whether edges should also carry auto-open flags, so
+</I>&gt;<i> that whenever a node is opened all other nodes reachable by auto-open edges
+</I>&gt;<i> are also opened.  This feature is strongly desired by Yaron, but it raises
+</I>&gt;<i> further issues...
+</I>&gt;<i>
+</I>&gt;<i> There is no reason for having just one such edge. Indeed, the idea is to
+</I>&gt;<i> break big modules into smaller ones so that only actually used modules need
+</I>&gt;<i> to be linked. The same should hold for auto-open modules.
+</I>&gt;<i>
+</I>&gt;<i> However, since opening modules is not commutative, auto-open edges must be
+</I>&gt;<i> ordered.  This means that the mental model to give to the user is not just
+</I>&gt;<i> a directed graph with label edges whose leaves are module objects, as
+</I>&gt;<i> described above, but whose edges (at least those flagged auto-opened) are
+</I>&gt;<i> also ordered.  I think this is a bit more complicated and not so nice that
+</I>&gt;<i> edges need to be both ordered and named...
+</I>&gt;<i>
+</I>&gt;<i> The problem comes from module leaves.  For inner nodes one could check the
+</I>&gt;<i> absence of conflicting names at the end of auto-open edges when building
+</I>&gt;<i> namespaces so that the order of opens would not matter.  But one cannot do
+</I>&gt;<i> so for leaves, because modules should remain opaque to namespaces (I think),
+</I>&gt;<i> hence conflicts cannot be detected when building the namespace,
+</I>&gt;<i>
+</I>&gt;<i> Yet another question raised by auto-open flags, which Gabriel and I
+</I>&gt;<i> discussed  today is how auto-open behaves on access paths.  Assume,
+</I>&gt;<i> for instance, a namespace containing:
+</I>&gt;<i>
+</I>&gt;<i>         ROOT . --Core--&gt; C --Pervasives*--&gt; M
+</I>&gt;<i>                           \
+</I>&gt;<i>                             --Std*--&gt; S
+</I>&gt;<i>
+</I>&gt;<i> and that the module M contains a submodule List.  Should the user always
+</I>&gt;<i> write Core#Pervasives#List or could he simply write Core#List, since given
+</I>&gt;<i> that Pervasives is auto-open it could have just written
+</I>&gt;<i>
+</I>&gt;<i>            open Core
+</I>&gt;<i>            List
+</I>&gt;<i>
+</I>&gt;<i> to designate module M.List. Indeed, one could expect that both
+</I>&gt;<i>
+</I>&gt;<i>         let open path in Name
+</I>&gt;<i> and
+</I>&gt;<i>         path#Name
+</I>&gt;<i>
+</I>&gt;<i> return the same object.  This way, the ordinary user would not need to know
+</I>&gt;<i> about the Pervasives module.  Only the expert user who wishes to open just
+</I>&gt;<i> the Pervasives module and not its parent will have to know its existence and
+</I>&gt;<i> write
+</I>&gt;<i>
+</I>&gt;<i>         open Core#Pervasive
+</I>&gt;<i>
+</I>&gt;<i> Unfortunately, this choice of semantics implies that paths must be
+</I>&gt;<i> interpreted in a much more complex way: path#name need not only look at the
+</I>&gt;<i> node at path for an edge labeled Name but also at all nodes (recursively)
+</I>&gt;<i> reachable by auto-open edges!
+</I>&gt;<i>
+</I>&gt;<i> With these (small) complications in mind, do we still wish to have
+</I>&gt;<i> auto-open edges? It this the good model?
+</I>&gt;<i>
+</I>&gt;<i> ----------------
+</I>&gt;<i>
+</I>&gt;<i> In their absence, one would have to perform the auto-opens manually, and
+</I>&gt;<i> the order of opens would therefore be given by the user.
+</I>&gt;<i>
+</I>&gt;<i> The reason for auto-opens is to allow the user to just write
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>
+</I>&gt;<i> instead of
+</I>&gt;<i>
+</I>&gt;<i>         open Core
+</I>&gt;<i>         open Pervasive
+</I>&gt;<i>         open Std
+</I>&gt;<i>
+</I>&gt;<i> Perhaps, an alternative to auto-open would be to allow one to write open
+</I>&gt;<i> directives in .ns files as well. Then, a file myenv.ns could both build a
+</I>&gt;<i> namespace and pre-open some of the nodes, including some of its leaves.  The
+</I>&gt;<i> user could then just put something as concise as
+</I>&gt;<i>
+</I>&gt;<i>         use myenv.ns
+</I>&gt;<i>
+</I>&gt;<i> at the top of his *.ml files. And if he opens myenv.ns he will have a very
+</I>&gt;<i> clear idea of what names should be visible.
+</I>&gt;<i>
+</I>&gt;<i> Just an idea, which I don't like so much either.  But is shows that there
+</I>&gt;<i> are still important details to be thought of and choices to be made.
+</I>&gt;<i>
+</I>&gt;<i> ----------------
+</I>&gt;<i>
+</I>&gt;<i> Notice that the problem comes from the fact that leaves of namespaces are
+</I>&gt;<i> opaque modules (and I think modules should remain opaque to namespaces), and
+</I>&gt;<i> as a result conflicting interfaces of modules cannot be detected when
+</I>&gt;<i> building a namespace, combined with the fact that the open construct of the
+</I>&gt;<i> module language is not itself strict (i.e. it may override bindings) and
+</I>&gt;<i> thus does not commute.
+</I>&gt;<i>
+</I>&gt;<i>         Didier
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>
+--
+Wojciech Meyer
+<A HREF="http://danmey.org">http://danmey.org</A>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000199.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#198">[ date ]</a>
+              <a href="thread.html#198">[ thread ]</a>
+              <a href="subject.html#198">[ subject ]</a>
+              <a href="author.html#198">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

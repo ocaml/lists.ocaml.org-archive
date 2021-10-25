@@ -1,0 +1,89 @@
+<tt>
+Hi&nbsp;Anil,&lt;br&gt;&lt;br&gt;This&nbsp;was&nbsp;definitely&nbsp;a&nbsp;bug&nbsp;in&nbsp;type-conv.&nbsp;Valentin&nbsp;has&nbsp;a&nbsp;fix&nbsp;for&nbsp;this:&lt;br&gt;&lt;br&gt;diff&nbsp;--git&nbsp;a/base/type_conv/lib/&lt;a&nbsp;href=&quot;http://pa_type_conv.ml&quot;&gt;pa_type_conv.ml&lt;/a&gt;&nbsp;b/base/type_conv/lib/&lt;a&nbsp;href=&quot;http://pa_type_conv.ml&quot;&gt;pa_type_conv.ml&lt;/a&gt;&lt;br&gt;<br>
+---&nbsp;a/base/type_conv/lib/&lt;a&nbsp;href=&quot;http://pa_type_conv.ml&quot;&gt;pa_type_conv.ml&lt;/a&gt;&lt;br&gt;+++&nbsp;b/base/type_conv/lib/&lt;a&nbsp;href=&quot;http://pa_type_conv.ml&quot;&gt;pa_type_conv.ml&lt;/a&gt;&lt;br&gt;@@&nbsp;-371,10&nbsp;+371,11&nbsp;@@&lt;br&gt;      &nbsp;|&nbsp;&lt;:ctyp@loc&lt;&nbsp;+&#39;$var$&nbsp;&gt;&gt;&nbsp;|&nbsp;&lt;:ctyp@loc&lt;&nbsp;-&#39;$var$&nbsp;&gt;&gt;&nbsp;-&gt;&nbsp;&lt;:ctyp@loc&lt;&nbsp;&#39;$var$&nbsp;&gt;&gt;&lt;br&gt;<br>
+      &nbsp;|&nbsp;tp&nbsp;-&gt;&nbsp;tp))#ctyp&lt;br&gt; &lt;br&gt;- &nbsp;class&nbsp;vars_of&nbsp;=&nbsp;object&lt;br&gt;+ &nbsp;class&nbsp;vars_of&nbsp;=&nbsp;object&nbsp;(self)&lt;br&gt;    &nbsp;inherit&nbsp;fold&nbsp;as&nbsp;super&lt;br&gt;    &nbsp;val&nbsp;vars&nbsp;=&nbsp;[]&lt;br&gt;    &nbsp;method&nbsp;vars&nbsp;=&nbsp;vars&lt;br&gt;+   &nbsp;method!&nbsp;ctyp&nbsp;_&nbsp;=&nbsp;self&lt;br&gt;    &nbsp;method&nbsp;ident&nbsp;=&nbsp;function&lt;br&gt;<br>
+    &nbsp;|&nbsp;&lt;:ident&lt;&nbsp;$lid:v$&nbsp;&gt;&gt;&nbsp;-&gt;&nbsp;{&lt;&nbsp;vars&nbsp;=&nbsp;v&nbsp;::&nbsp;vars&nbsp;&gt;}&lt;br&gt;    &nbsp;|&nbsp;ident&nbsp;-&gt;&nbsp;super#ident&nbsp;ident&lt;br&gt;&lt;br&gt;I&#39;d&nbsp;like&nbsp;to&nbsp;get&nbsp;a&nbsp;quick&nbsp;bugfix&nbsp;out&nbsp;the&nbsp;door&nbsp;that&nbsp;includes&nbsp;this&nbsp;and&nbsp;more&nbsp;portable&nbsp;use&nbsp;of&nbsp;mktemp&nbsp;in&nbsp;base/core/lib/discover.sh.&lt;br&gt;<br>
+&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Mon,&nbsp;Oct&nbsp;1,&nbsp;2012&nbsp;at&nbsp;1:23&nbsp;PM,&nbsp;Anil&nbsp;Madhavapeddy&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:anil@recoil.org&quot;&nbsp;target=&quot;_blank&quot;&gt;anil@recoil.org&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+Hi&nbsp;Yury,&lt;br&gt;<br>
+&lt;br&gt;<br>
+I&nbsp;got&nbsp;a&nbsp;little&nbsp;lost&nbsp;in&nbsp;the&nbsp;new&nbsp;type_conv&nbsp;control&nbsp;flow&nbsp;(objects,&nbsp;why&nbsp;is&nbsp;it&nbsp;always&nbsp;objects!),&nbsp;but&nbsp;it&nbsp;looks&nbsp;like&nbsp;the&nbsp;bug&nbsp;is&nbsp;at:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp;class&nbsp;vars_of&nbsp;=&nbsp;object&lt;br&gt;<br>
+ &nbsp; &nbsp;inherit&nbsp;fold&nbsp;as&nbsp;super&lt;br&gt;<br>
+ &nbsp; &nbsp;val&nbsp;vars&nbsp;=&nbsp;[]&lt;br&gt;<br>
+ &nbsp; &nbsp;method&nbsp;vars&nbsp;=&nbsp;vars&lt;br&gt;<br>
+ &nbsp; &nbsp;method&nbsp;ident&nbsp;=&nbsp;function&lt;br&gt;<br>
+ &nbsp; &nbsp;|&nbsp;&lt;:ident&lt;&nbsp;$lid:v$&nbsp;&gt;&gt;&nbsp;-&gt;&nbsp;{&lt;&nbsp;vars&nbsp;=&nbsp;v&nbsp;::&nbsp;vars&nbsp;&gt;}&lt;br&gt;<br>
+ &nbsp; &nbsp;|&nbsp;ident&nbsp;-&gt;&nbsp;super#ident&nbsp;ident&lt;br&gt;<br>
+ &nbsp;end&lt;br&gt;<br>
+ &nbsp;let&nbsp;lids_of_patt&nbsp;patt&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp;((new&nbsp;vars_of)#patt&nbsp;patt)#vars&lt;br&gt;<br>
+&lt;br&gt;<br>
+This&nbsp;extracts&nbsp;out&nbsp;all&nbsp;the&nbsp;identifiers&nbsp;in&nbsp;a&nbsp;pattern&nbsp;binding.&nbsp;In&nbsp;the&nbsp;case&nbsp;of&nbsp;dyntype,&nbsp;we&nbsp;generate&nbsp;output&nbsp;like:&lt;br&gt;<br>
+&lt;br&gt;<br>
+let&nbsp;(value_of_t&nbsp;:&nbsp;?id_seed:&nbsp;(Int64.t&nbsp;ref)&nbsp;-&gt;&nbsp;t&nbsp;-&gt;&nbsp;Dyntype.Value.t)&nbsp;=&lt;br&gt;<br>
+ &nbsp;&lt;snip&gt;&nbsp;in&lt;br&gt;<br>
+ &nbsp; fun&nbsp;?id_seed&nbsp;t&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &lt;snip&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+I&#39;ve&nbsp;simplified&nbsp;the&nbsp;Dyntype&nbsp;generation&nbsp;to&nbsp;be&nbsp;simply:&lt;br&gt;<br>
+&lt;br&gt;<br>
+let&nbsp;value_of_t,&nbsp;value_of_foo&nbsp;=&lt;br&gt;<br>
+ &nbsp; (fun&nbsp;?id_seed&nbsp;t&nbsp;-&gt;&nbsp;&lt;...&gt;),&nbsp;(fun&nbsp;?id_seed&nbsp;t&nbsp;-&gt;&nbsp;&lt;...&gt;)&lt;br&gt;<br>
+&lt;br&gt;<br>
+and&nbsp;it&nbsp;works&nbsp;fine&nbsp;now.&nbsp;The&nbsp;changeset&nbsp;is:&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;https://github.com/mirage/dyntype/commit/3569269c8cad3f013151fb1b5d89cf76981f1df1&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/mirage/dyntype/commit/3569269c8cad3f013151fb1b5d89cf76981f1df1&lt;/a&gt;&lt;br&gt;<br>
+and&nbsp;is&nbsp;present&nbsp;in&nbsp;dyntype-0.9.0.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Where&nbsp;would&nbsp;you&nbsp;like&nbsp;Core&nbsp;bugs&nbsp;such&nbsp;as&nbsp;this&nbsp;type_conv&nbsp;one&nbsp;to&nbsp;be&nbsp;reported?&nbsp; The&nbsp;bitbucket&nbsp;issue&nbsp;tracker?&lt;br&gt;<br>
+&lt;span&nbsp;class=&quot;HOEnZb&quot;&gt;&lt;font&nbsp;color=&quot;#888888&quot;&gt;&lt;br&gt;<br>
+-anil&lt;br&gt;<br>
+&lt;/font&gt;&lt;/span&gt;&lt;div&nbsp;class=&quot;HOEnZb&quot;&gt;&lt;div&nbsp;class=&quot;h5&quot;&gt;&lt;br&gt;<br>
+On&nbsp;30&nbsp;Sep&nbsp;2012,&nbsp;at&nbsp;05:46,&nbsp;Yury&nbsp;Sulsky&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:yury.sulsky@gmail.com&quot;&gt;yury.sulsky@gmail.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&lt;br&gt;<br>
+&gt;&nbsp;Hi&nbsp;Anil,&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;I&#39;ll&nbsp;take&nbsp;a&nbsp;look&nbsp;at&nbsp;the&nbsp;dyntype&nbsp;extension&nbsp;to&nbsp;see&nbsp;how&nbsp;type_conv&nbsp;is&nbsp;broken,&nbsp;but&nbsp;the&nbsp;point&nbsp;of&nbsp;these&nbsp;assignments&nbsp;is&nbsp;to&nbsp;avoid&nbsp;ocaml&nbsp;4&#39;s&nbsp;unused&nbsp;value&nbsp;warnings&nbsp;by&nbsp;from&nbsp;generated&nbsp;code.&nbsp;Apparently,&nbsp;type_conv&nbsp;thinks&nbsp;that&nbsp;values&nbsp;called&nbsp;&quot;t&quot;,&nbsp;&quot;ref&quot;,&nbsp;&quot;t_of_value&quot;,&nbsp;and&nbsp;&quot;value_of_t&quot;&nbsp;have&nbsp;been&nbsp;generated&nbsp;by&nbsp;this&nbsp;extension.&lt;br&gt;<br>
+<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;On&nbsp;Sun,&nbsp;Sep&nbsp;30,&nbsp;2012&nbsp;at&nbsp;12:32&nbsp;AM,&nbsp;Anil&nbsp;Madhavapeddy&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:anil@recoil.org&quot;&gt;anil@recoil.org&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;I&#39;ve&nbsp;been&nbsp;porting&nbsp;some&nbsp;of&nbsp;our&nbsp;syntax&nbsp;extensions&nbsp;to&nbsp;the&nbsp;new&nbsp;type_conv&nbsp;(from&nbsp;108.00.02&nbsp;-&gt;&nbsp;108.07),&nbsp;and&nbsp;the&nbsp;Dyntype&nbsp;extension&nbsp;is&nbsp;broken&nbsp;because&nbsp;of&nbsp;some&nbsp;extra&nbsp;bits&nbsp;that&nbsp;are&nbsp;generated:&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;For&nbsp;a&nbsp;simple:&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;#&nbsp;type&nbsp;t&nbsp;=&nbsp;int&nbsp;with&nbsp;value;;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;This&nbsp;diff&nbsp;happens&nbsp;between&nbsp;the&nbsp;output&nbsp;of&nbsp;108.00.02&nbsp;and&nbsp;108.07.00:&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;---&nbsp;&lt;a&nbsp;href=&quot;http://simple-108.00.02.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;simple-108.00.02.ml&lt;/a&gt;&nbsp;2012-09-29&nbsp;21:29:42.000000000&nbsp;-0700&lt;br&gt;<br>
+&gt;&nbsp;+++&nbsp;_build/&lt;a&nbsp;href=&quot;http://simple_value_test.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;simple_value_test.ml&lt;/a&gt;&nbsp;2012-09-29&nbsp;21:30:04.000000000&nbsp;-0700&lt;br&gt;<br>
+&gt;&nbsp;@@&nbsp;-22,6&nbsp;+22,12&nbsp;@@&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; then&nbsp;Dyntype.Value.Rec&nbsp;(((&quot;t&quot;,&nbsp;__id__),&nbsp;__x__))&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; else&nbsp;Dyntype.Value.Ext&nbsp;(((&quot;t&quot;,&nbsp;(gen_t_id&nbsp;~id_seed&nbsp;__x3__)),&nbsp;__x__))&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;+let&nbsp;_&nbsp;=&nbsp;t&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;t&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;t&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;ref&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;value_of_t&lt;br&gt;<br>
+&gt;&nbsp;+&lt;br&gt;<br>
+&gt;&nbsp; let&nbsp;(t_of_value&nbsp;:&nbsp;Dyntype.Value.t&nbsp;-&gt;&nbsp;t)&nbsp;=&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; let&nbsp;module&nbsp;Deps&nbsp;=&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; &nbsp; struct&lt;br&gt;<br>
+&gt;&nbsp;@@&nbsp;-73,4&nbsp;+79,8&nbsp;@@&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;raise&nbsp;(Deps.Runtime_error&nbsp;((&quot;Var/Rec/Ext&quot;,&nbsp;__x__))))&lt;br&gt;<br>
+&gt;&nbsp; &nbsp; &nbsp; in&nbsp;t_of_value_aux&nbsp;{&nbsp;Deps.t&nbsp;=&nbsp;[];&nbsp;}&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;+let&nbsp;_&nbsp;=&nbsp;t&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;t&lt;br&gt;<br>
+&gt;&nbsp;+and&nbsp;_&nbsp;=&nbsp;t_of_value&lt;br&gt;<br>
+&gt;&nbsp;+&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;These&nbsp;are&nbsp;unbound,&nbsp;and&nbsp;so&nbsp;compilation&nbsp;breaks...&nbsp;what&nbsp;are&nbsp;they&nbsp;for?&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;-anil&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/div&gt;&lt;/div&gt;&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;<br>
+
+</tt>

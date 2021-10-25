@@ -1,0 +1,310 @@
+From olivier.nicole at ensta-paristech.fr  Sun Apr  3 18:54:25 2016
+From: olivier.nicole at ensta-paristech.fr (Olivier Nicole)
+Date: Sun, 3 Apr 2016 19:54:25 +0200
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+Message-ID: <570158D1.90204@ensta.fr>
+
+Hello,
+
+I switched to a modified version of OCaml using Gabriel Scherer's
+opam-compiler-conf script. But when I try to install the core package, I
+get a version error:
+
+> $ ocaml -version
+> The OCaml toplevel, version 4.04.0+dev0-2016-02-18
+> $ opam install core
+> [ERROR] core is not available because your system doesn't comply with ocaml-version
+>         >= "4.02.1" & ocaml-version < "4.03".
+
+Is there any clean way to install packages with a modified version of
+the compiler?
+
+Thanks,
+
+Olivier
+
+From yallop at gmail.com  Mon Apr  4 06:36:15 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 4 Apr 2016 06:36:15 +0100
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <570158D1.90204@ensta.fr>
+References: <570158D1.90204@ensta.fr>
+Message-ID: <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+
+Dear Olivier,
+
+On 3 April 2016 at 18:54, Olivier Nicole
+<olivier.nicole at ensta-paristech.fr> wrote:
+> I switched to a modified version of OCaml using Gabriel Scherer's
+> opam-compiler-conf script. But when I try to install the core package, I
+> get a version error:
+>
+>> $ ocaml -version
+>> The OCaml toplevel, version 4.04.0+dev0-2016-02-18
+>> $ opam install core
+>> [ERROR] core is not available because your system doesn't comply with ocaml-version
+>>         >= "4.02.1" & ocaml-version < "4.03".
+
+Is your OPAM package list up-to-date?  Recent versions of Core (e.g.
+113.33.00) should meet the version constraints for modified trunk
+compilers:
+
+   https://github.com/ocaml/opam-repository/blob/master/packages/core/core.113.33.00/opam#L29
+
+Whether they'll actually build is another question, of course.
+
+Kind regards,
+
+Jeremy.
+
+From runhang at posteo.net  Mon Apr  4 06:23:51 2016
+From: runhang at posteo.net (Runhang Li)
+Date: Mon, 4 Apr 2016 14:23:51 +0900
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <570158D1.90204@ensta.fr>
+References: <570158D1.90204@ensta.fr>
+Message-ID: <8C0C39F8-FB04-4181-B107-F8D6AF5E5D6C@posteo.net>
+
+Hi, Olivier
+
+Which version of Core are you trying to install? From opam page[1], I can see Jane Street has relaxed version constraint since 113.24.01.
+Another way is to download a copy of the source code locally, modify the constraint in opam file, and use ``opam pin add core .`` to install this local copy.
+
+[1]: https://github.com/ocaml/opam-repository/tree/master/packages/core <https://github.com/ocaml/opam-repository/tree/master/packages/core>
+
+
+> On Apr 4, 2016, at 2:54 AM, Olivier Nicole <olivier.nicole at ensta-paristech.fr> wrote:
+> 
+> Hello,
+> 
+> I switched to a modified version of OCaml using Gabriel Scherer's
+> opam-compiler-conf script. But when I try to install the core package, I
+> get a version error:
+> 
+>> $ ocaml -version
+>> The OCaml toplevel, version 4.04.0+dev0-2016-02-18
+>> $ opam install core
+>> [ERROR] core is not available because your system doesn't comply with ocaml-version
+>>> = "4.02.1" & ocaml-version < "4.03".
+> 
+> Is there any clean way to install packages with a modified version of
+> the compiler?
+> 
+> Thanks,
+> 
+> Olivier
+> _______________________________________________
+> Cam-compiler-hacking mailing list
+> Cam-compiler-hacking at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/cam-compiler-hacking
+
+Kindly,
+
+Runhang
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20160404/f9a9d83b/attachment.html>
+
+From olivier.nicole at ensta-paristech.fr  Mon Apr  4 13:45:00 2016
+From: olivier.nicole at ensta-paristech.fr (Olivier Nicole)
+Date: Mon, 4 Apr 2016 14:45:00 +0200
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+References: <570158D1.90204@ensta.fr>
+ <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+Message-ID: <570261CC.8090605@ensta.fr>
+
+On 04/04/2016 07:36 AM, Jeremy Yallop wrote:
+> Is your OPAM package list up-to-date?  Recent versions of Core (e.g.
+> 113.33.00) should meet the version constraints for modified trunk
+> compilers:
+> 
+>    https://github.com/ocaml/opam-repository/blob/master/packages/core/core.113.33.00/opam#L29
+> 
+> Whether they'll actually build is another question, of course.
+
+Thank you, I just needed to do an `opam update`. But now the ppx-tools
+and sexplibs packages fail to build, and I'm quite sure it is not due to
+my changes in translcore.ml (I merely changed a condition to `true` so
+that records are always updated fieldwise). For example, the build of
+ppx_tools fails with:
+
+    File "src/gen/common.ml", line 73, characters 24-34:
+    Error: This expression has type Types.constructor_arguments
+           but an expression was expected of type Types.type_expr list
+
+Am I missing something or did my changes really break the package?
+
+Best regards,
+
+Olivier
+
+> Kind regards,
+> 
+> Jeremy.
+> _______________________________________________
+> Cam-compiler-hacking mailing list
+> Cam-compiler-hacking at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/cam-compiler-hacking
+> 
+
+From jeremy.yallop at cl.cam.ac.uk  Mon Apr  4 17:46:50 2016
+From: jeremy.yallop at cl.cam.ac.uk (Jeremy Yallop)
+Date: Mon, 4 Apr 2016 17:46:50 +0100
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <570261CC.8090605@ensta.fr>
+References: <570158D1.90204@ensta.fr>
+ <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+ <570261CC.8090605@ensta.fr>
+Message-ID: <CAAxsn=Ew3kSEnj9M0AoQ8_+D0B5i4X1sZVEt8qHE40O7=pq9XA@mail.gmail.com>
+
+On 4 April 2016 at 13:45, Olivier Nicole
+<olivier.nicole at ensta-paristech.fr> wrote:
+> On 04/04/2016 07:36 AM, Jeremy Yallop wrote:
+>> Is your OPAM package list up-to-date?  Recent versions of Core (e.g.
+>> 113.33.00) should meet the version constraints for modified trunk
+>> compilers:
+>>
+>>    https://github.com/ocaml/opam-repository/blob/master/packages/core/core.113.33.00/opam#L29
+>>
+>> Whether they'll actually build is another question, of course.
+>
+> Thank you, I just needed to do an `opam update`. But now the ppx-tools
+> and sexplibs packages fail to build, and I'm quite sure it is not due to
+> my changes in translcore.ml (I merely changed a condition to `true` so
+> that records are always updated fieldwise). For example, the build of
+> ppx_tools fails with:
+>
+>     File "src/gen/common.ml", line 73, characters 24-34:
+>     Error: This expression has type Types.constructor_arguments
+>            but an expression was expected of type Types.type_expr list
+>
+> Am I missing something or did my changes really break the package?
+
+It's quite likely that the released versions of ppx-tools and sexplib
+don't compile with OCaml trunk.  Packages that depend on compiler-libs
+tend to break whenever there's a significant change to a module such
+as Parsetree or Types.
+
+From olivier.nicole at ensta-paristech.fr  Mon Apr  4 18:18:52 2016
+From: olivier.nicole at ensta-paristech.fr (Olivier Nicole)
+Date: Mon, 4 Apr 2016 19:18:52 +0200
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <CAAxsn=Ew3kSEnj9M0AoQ8_+D0B5i4X1sZVEt8qHE40O7=pq9XA@mail.gmail.com>
+References: <570158D1.90204@ensta.fr>
+ <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+ <570261CC.8090605@ensta.fr>
+ <CAAxsn=Ew3kSEnj9M0AoQ8_+D0B5i4X1sZVEt8qHE40O7=pq9XA@mail.gmail.com>
+Message-ID: <5702A1FC.1070500@ensta.fr>
+
+On 04/04/2016 06:46 PM, Jeremy Yallop wrote:
+> On 4 April 2016 at 13:45, Olivier Nicole
+> <olivier.nicole at ensta-paristech.fr> wrote:
+>> On 04/04/2016 07:36 AM, Jeremy Yallop wrote:
+>>> Is your OPAM package list up-to-date?  Recent versions of Core (e.g.
+>>> 113.33.00) should meet the version constraints for modified trunk
+>>> compilers:
+>>>
+>>>    https://github.com/ocaml/opam-repository/blob/master/packages/core/core.113.33.00/opam#L29
+>>>
+>>> Whether they'll actually build is another question, of course.
+>>
+>> Thank you, I just needed to do an `opam update`. But now the ppx-tools
+>> and sexplibs packages fail to build, and I'm quite sure it is not due to
+>> my changes in translcore.ml (I merely changed a condition to `true` so
+>> that records are always updated fieldwise). For example, the build of
+>> ppx_tools fails with:
+>>
+>>     File "src/gen/common.ml", line 73, characters 24-34:
+>>     Error: This expression has type Types.constructor_arguments
+>>            but an expression was expected of type Types.type_expr list
+>>
+>> Am I missing something or did my changes really break the package?
+> 
+> It's quite likely that the released versions of ppx-tools and sexplib
+> don't compile with OCaml trunk.  Packages that depend on compiler-libs
+> tend to break whenever there's a significant change to a module such
+> as Parsetree or Types.
+> 
+
+Working with version 4.02.3 fixed the problem. Thank you!
+
+Best regards,
+
+Olivier
+
+From jdimino at janestreet.com  Tue Apr  5 10:57:17 2016
+From: jdimino at janestreet.com (Jeremie Dimino)
+Date: Tue, 5 Apr 2016 10:57:17 +0100
+Subject: [compiler-hacking] Use of opam-compiler-conf: install packages
+In-Reply-To: <5702A1FC.1070500@ensta.fr>
+References: <570158D1.90204@ensta.fr>
+ <CAAxsn=HD-=yJiobd+OqitmOgECiG23Lyi+Mzd9jg01u+FXts7A@mail.gmail.com>
+ <570261CC.8090605@ensta.fr>
+ <CAAxsn=Ew3kSEnj9M0AoQ8_+D0B5i4X1sZVEt8qHE40O7=pq9XA@mail.gmail.com>
+ <5702A1FC.1070500@ensta.fr>
+Message-ID: <CANhEzE7urMSSEqyJR5r4yZe+Djtoy8-D7sMbpNEP8H-ATm+=uQ@mail.gmail.com>
+
+BTW, regarding JS packages, the ones currently released in opam are < 4.03
+only. We do have a version of core and other Jane Street packages that
+works with 4.03. It's being released [1]. I'm not sure it's working with
+4.03.0+trunk though, and it's definitely not working with 4.04. We are
+thinking of ways to improve compatibility of at least the ppx rewriters
+
+ [1] https://github.com/ocaml/opam-repository/pull/6094
+
+
+On Mon, Apr 4, 2016 at 6:18 PM, Olivier Nicole <
+olivier.nicole at ensta-paristech.fr> wrote:
+
+> On 04/04/2016 06:46 PM, Jeremy Yallop wrote:
+> > On 4 April 2016 at 13:45, Olivier Nicole
+> > <olivier.nicole at ensta-paristech.fr> wrote:
+> >> On 04/04/2016 07:36 AM, Jeremy Yallop wrote:
+> >>> Is your OPAM package list up-to-date?  Recent versions of Core (e.g.
+> >>> 113.33.00) should meet the version constraints for modified trunk
+> >>> compilers:
+> >>>
+> >>>
+> https://github.com/ocaml/opam-repository/blob/master/packages/core/core.113.33.00/opam#L29
+> >>>
+> >>> Whether they'll actually build is another question, of course.
+> >>
+> >> Thank you, I just needed to do an `opam update`. But now the ppx-tools
+> >> and sexplibs packages fail to build, and I'm quite sure it is not due to
+> >> my changes in translcore.ml (I merely changed a condition to `true` so
+> >> that records are always updated fieldwise). For example, the build of
+> >> ppx_tools fails with:
+> >>
+> >>     File "src/gen/common.ml", line 73, characters 24-34:
+> >>     Error: This expression has type Types.constructor_arguments
+> >>            but an expression was expected of type Types.type_expr list
+> >>
+> >> Am I missing something or did my changes really break the package?
+> >
+> > It's quite likely that the released versions of ppx-tools and sexplib
+> > don't compile with OCaml trunk.  Packages that depend on compiler-libs
+> > tend to break whenever there's a significant change to a module such
+> > as Parsetree or Types.
+> >
+>
+> Working with version 4.02.3 fixed the problem. Thank you!
+>
+> Best regards,
+>
+> Olivier
+> _______________________________________________
+> Cam-compiler-hacking mailing list
+> Cam-compiler-hacking at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/cam-compiler-hacking
+>
+
+
+
+-- 
+Jeremie
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20160405/05d83d76/attachment.html>
+

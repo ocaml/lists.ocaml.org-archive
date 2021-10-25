@@ -1,0 +1,200 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5127A964.7080506%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000074.html">
+   <LINK REL="Next"  HREF="000082.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C5127A964.7080506%40lexifi.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Feb 22 17:22:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000074.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000082.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#81">[ date ]</a>
+              <a href="thread.html#81">[ thread ]</a>
+              <a href="subject.html#81">[ subject ]</a>
+              <a href="author.html#81">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/22/2013 3:06 PM, Leo White wrote:
+&gt;<i> There are a number of possible solutions to spurious opens. The simplest
+</I>&gt;<i> of which is to only look for &quot;Core.Std.Mutex&quot; in directories which
+</I>&gt;<i> contain the special &quot;Core.Std&quot; .cmi file (mentioned previously as a
+</I>&gt;<i> solution to typos in open statements). These special .cmi files could
+</I>&gt;<i> also be extended to include a list of modules that have that namespace
+</I>&gt;<i> within the current directory which would prevent spurious reads entirely.
+</I>
+This seems a little bit hackish to me, and likely to require more 
+over-engineering (do we need a tool to create those .cmi files; if they 
+are plain text file, it's ugly to use the .cmi extension).
+
+&gt;&gt;<i>  - It prevents from putting .cmi files from many libraries in the same
+</I>&gt;&gt;<i> directory, which is sometimes useful (to simplify deployment; to
+</I>&gt;&gt;<i> control precisely the set of .cmi available for a given file; to
+</I>&gt;&gt;<i> improve performance by avoiding repeated lookups in many directories).
+</I>&gt;<i>
+</I>&gt;<i> I think that this ability is of dubious value and not really a big loss.
+</I>
+We use this quite intensively on LexiFi's code base.  This really speeds 
+up compilation time under Windows, and we also use it to simplify 
+deployment (our application is shipped with some .cmi files from many 
+libraries and automatically compiles user-provided addins against them; 
+it would be tedious -- and useless -- to reproduce a complete hierarchy 
+of libraries on the installation side).
+
+We would hate to have the third-party libraries we use adopt a new 
+feature (namespaces) which solves a problem we don't have but forces us 
+to change in non trivial ways how we organize our code base and deployment.
+
+&gt;<i> This is basically an error, so dependencies
+</I>&gt;<i> should not be expected to be correct.
+</I>
+I don't agree.  Having wrong dependencies is a nightmare to debug and 
+during development having errors in the code is not an exceptional 
+situation.  A robust build system should handle nicely things like 
+moving files around, renaming them, etc.
+
+&gt;<i> There is possibly the need for some kind of partial dependency for
+</I>&gt;<i> parallel builds. This is more like a lock than a dependency, so there
+</I>&gt;<i> should be no question of circular dependencies. I'm not really familiar
+</I>&gt;<i> with how parallel file accesses work on different file systems, but
+</I>&gt;<i> perhaps the compiler could lock &quot;.cmi&quot; files before reading and writing.
+</I>&gt;<i> This might be a good idea more generally for cases where dependencies
+</I>&gt;<i> have not been correctly calculated.
+</I>
+These locks do not really solve the problem.  Imagine you have a big 
+project with two modules
+
+   foo/a.ml in namespace Foo
+   bar/a.ml in namespace Bar
+
+Now you compile x.ml which refers to Foo # A. &quot;ocamldep -modules&quot; 
+reports that the dependencies for it include mode &quot;A&quot;, which must be 
+mapped to all buildable a.cmi/a.cmx in your tree, i.e. both foo/a and 
+bar/a.  (Things are even worse if you use the same syntax as for 
+modules, because then any reference like Foo.A must be interpreted as a 
+potential dependency to foo.cmi/cmx or to a.cmi/cmx.)  But maybe 
+bar/a.ml refers to x.ml, and then you have a circular dependency.
+
+I'd like any proposal about namespaces to come with a description of (i) 
+how ocamldep is supposed to behave; (ii) how build systems (based on, 
+say, make, omake and ocamlbuild) are supposed to be adapted.
+
+So here it is for my proposal of using &quot;short names&quot; declared in 
+external files:
+
+   - Doing &quot;open namespace Core_std&quot; is strictly equivalent to doing 
+&quot;module Mutex == Core_std_mutex;; module Thread == Core_std_thread;; 
+module Date == Core_std_date&quot; assuming a new module aliasing feature 
+(available in structures and signatures).
+
+   - ocamldep would read the core_std.ns file (meaning that it must 
+exist and be up-to-date when ocamldep runs; I expect those files to be 
+quite static so this shouldn't be a big problem -- otherwise, we would 
+need to have a first pass where ocamldep would returns the list of .ns 
+files to be opened, and the build system would arrange to build them).
+
+  - when ocamldep encounters a module reference &quot;Mutex&quot; in a scope where 
+an alias &quot;module Mutex == Core_std_mutex&quot; has been defined (manually or 
+by loading core_std.ns), it reports a dependency to module 
+Core_std_mutex instead of Mutex.
+
+  - the build systems do not have to be adapted.
+
+
+
+&gt;<i>
+</I>&gt;&gt;<i> That's why I've proposed to allow specifying mapping between
+</I>&gt;&gt;<i> references to external modules in dedicated files.  We could have a
+</I>&gt;&gt;<i> file core_std.ns (probably shipped with Core) with this content:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Mutex = Core_std_mutex
+</I>&gt;&gt;<i> Thread = Core_std_thread
+</I>&gt;&gt;<i> Date = Core_std_date
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and just a reference in the source code (or on the command-line):
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>   open namespace Core_std
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> which would load core_std.ns and use the corresponding module renaming
+</I>&gt;&gt;<i> in the rest of the module.
+</I>&gt;<i>
+</I>&gt;<i> There is very little difference between that suggestion and having a
+</I>&gt;<i> core_std.ns file containing:
+</I>&gt;<i>
+</I>&gt;<i>   Mutex;
+</I>&gt;<i>   Thread;
+</I>&gt;<i>   Date;
+</I>&gt;<i>
+</I>&gt;<i> and using that as a (partial) declaration of a Core_std namespaces,
+</I>&gt;<i> except that you have to give every file a unique long filename. So I
+</I>&gt;<i> don't really see the particular benefit of using long filenames.
+</I>
+With my proposal, you don't force users of the library to use the new 
+feature (meaning that if for some reason your local build system does 
+not work nicely with namespaces, you can always refer to modules using 
+their long names).  Moreover, the semantics is very easy to explain, the 
+linker does not need to be changed, and we don't change how OCaml 
+behaves w.r.t. to the file system (your proposal prevents users from 
+using the currently valid technique of copying .cmi files from many 
+libraries in the same directory).
+
+&gt;<i> There is also a more general problem with any solution like this, which
+</I>&gt;<i> tries to define namespaces (or sets of aliases) in a single file. It is
+</I>&gt;<i> difficult to use the namespace from inside the modules that are within
+</I>&gt;<i> the namespace. For example, if I use:
+</I>&gt;<i>
+</I>&gt;<i>   open namespace Core_std
+</I>&gt;<i>
+</I>&gt;<i> from within mutex.ml then it will attempt to open itself.
+</I>
+
+I don't understand the problem.  The source file would be 
+core_std_mutex.ml and it is fine if it does &quot;open namespace Core_std&quot; as 
+long as it doesn't refer to Mutex (which would be a circular dependency).
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000074.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000082.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#81">[ date ]</a>
+              <a href="thread.html#81">[ thread ]</a>
+              <a href="subject.html#81">[ subject ]</a>
+              <a href="author.html#81">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

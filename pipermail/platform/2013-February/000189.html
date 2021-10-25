@@ -1,0 +1,252 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTSj%3DqEp-HMdvEdAb2mdozVk%3DXZxSsT7YEzNHc2SEkMsQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000187.html">
+   <LINK REL="Next"  HREF="000190.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTSj%3DqEp-HMdvEdAb2mdozVk%3DXZxSsT7YEzNHc2SEkMsQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Thu Feb 28 14:23:05 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000187.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000190.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Feb 28, 2013 at 7:44 AM, Gabriel Scherer
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">gabriel.scherer at gmail.com</A>&gt; wrote:
+&gt;<i> I think the whole discussion of &quot;compilation argument vs. information
+</I>&gt;<i> in source header&quot; is misguided. The two places are essentially
+</I>&gt;<i> isomorphic, and a robust system could make them equi-expressive. In
+</I>&gt;<i> particular, the idea that what putting namespace information outside
+</I>&gt;<i> the source code is a regression is incorrect, as the semantics of an
+</I>&gt;<i> OCaml program *already* depends on the state of the filesystem on
+</I>&gt;<i> which it is compiled and the search path set at compilation time.
+</I>&gt;<i> Namespaces by themselves introduce no regression or improvement on
+</I>&gt;<i> this aspect.
+</I>
+I strongly disagree with this line of argument.  Sure, they are
+technically equally powerful, but that doesn't tell you much.  Good
+programming language design is in part about thinking about people,
+not just about isomorphisms.
+
+And yes, the OCaml program's semantics depend on the state of the
+filesystem.  But right now, if you read the source files, you're
+pretty close to understanding the program.  Build systems are hard to
+read, and are idiosyncratic, differing a lot from project to project.
+The more semantics issues you bury there, the more you hide them from
+the programmer, and the worse off you are.
+
+&gt;<i> There are practical reasons why one would favor one or the approach in
+</I>&gt;<i> a particular case, but it is not possible to satisfy all criterions
+</I>&gt;<i> simultaneously.
+</I>&gt;<i>
+</I>&gt;<i> 1. People are very sensitive about *source language* changes, not so
+</I>&gt;<i> much about changes in compilation interface (perceived as anecdotical
+</I>&gt;<i> tooling); this makes it easier to suggest new flags than new language
+</I>&gt;<i> features. Arguably both should treated with the same care, and in
+</I>&gt;<i> particular design decisions regarding tooling should be inspected with
+</I>&gt;<i> scientific rigor. This doesn't happen in practice (which of the
+</I>&gt;<i> proposed tool changes during this discussion was accompanied with a
+</I>&gt;<i> rigorous specification of the semantics?), so tooling changes are
+</I>&gt;<i> easier and faster to get in a language release, and easier to get
+</I>&gt;<i> half-specified and half-baked.
+</I>
+I agree that it's more work to make a language change.  But
+programming in the large is important, and is worth putting real work
+into.  Up until now, the OCaml community hasn't worried about the
+issue, and as the community grows up and the use of the language
+grows, I believe we need to get this right.
+
+&gt;<i> 2. Such header information may need to be shared by several files of a
+</I>&gt;<i> project and may become a source of painful redundancy. Compilation
+</I>&gt;<i> flags are an easy way to factorize these redundancies away. In
+</I>&gt;<i> principle this could also be done in the source code (by having
+</I>&gt;<i> separate files with this source information, and a semantic
+</I>&gt;<i> #include-like language construct), but this means yet another language
+</I>&gt;<i> change that has to be carefully designed.
+</I>
+We have all of this overhead now within Jane Street, with packed
+libraries being the rule.  My experience is it's just not that big of
+a deal.  Putting this in the build files is a clear problem in my
+mind.
+
+&gt;<i> 3. People naturally share source snippets without thinking of sharing
+</I>&gt;<i> the surrounding contextual information (the state of the compilation
+</I>&gt;<i> environment), so in practice having information in the source helps to
+</I>&gt;<i> be more robust wrt. environmental change. In mails, Q&amp;A sites, etc.,
+</I>&gt;<i> sharing source text is better than a tarball with a _tags file or
+</I>&gt;<i> whatnot.
+</I>
+Agreed.  This seems like an argument in favor of opening namespaces
+explicitly in the source.
+
+&gt;<i> It's well and good to hope that any semantic features associated to
+</I>&gt;<i> namespaces will eventually end up in the source language as well. But
+</I>&gt;<i> that may be significantly harder than agreeing on those features in
+</I>&gt;<i> the first place. Because picking a good syntax is really hard, and
+</I>&gt;<i> because this may require more change to other tools that are not part
+</I>&gt;<i> of the OCaml compiler distribution, and is therefore more costly for
+</I>&gt;<i> everyone involved (this is Alain's understandable reason for shunning
+</I>&gt;<i> any such change). So I would like to encourage people to discuss which
+</I>&gt;<i> semantics they need and want, what a good design would be, rather than
+</I>&gt;<i> whether to implement this inside or outside the source language.
+</I>
+I disagree, precisely because the presence or absence of namespace
+declarations in the source language is in my mind an important part of
+the semantics of namespaces.
+
+&gt;<i> On Thu, Feb 28, 2013 at 10:01 AM, Erkki Seppala
+</I>&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">flux-ocaml-platform at inside.org</A>&gt; wrote:
+</I>&gt;&gt;<i> TLDR; I agree with the parts of proposal suggesting statement &quot;namespace
+</I>&gt;&gt;<i> X&quot; to be introduced to .ml and .mli files and then statements &quot;open
+</I>&gt;&gt;<i> namespace X&quot;, &quot;let namespace Y = X&quot; and their expression forms. And that
+</I>&gt;&gt;<i> this all should be controlled from the source code, not the build
+</I>&gt;&gt;<i> system.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; writes:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>   My biggest objection to having opens be at the build system level is
+</I>&gt;&gt;&gt;<i>   that it makes your code more ambiguous.  When you do namespace
+</I>&gt;&gt;&gt;<i>   manipulations, you very much want to see what's happening by
+</I>&gt;&gt;&gt;<i>   inspecting the source.  We have a vigorous code review system here,
+</I>&gt;&gt;&gt;<i>   and I don't want to start adding code review of the build rules to
+</I>&gt;&gt;&gt;<i>   it, and this change would require that.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I agree that namespaces should be defined and accessed through the
+</I>&gt;&gt;<i> source code. Not the least because it depends on the project's chosen
+</I>&gt;&gt;<i> build system on how I should go on changing those definitions. While
+</I>&gt;&gt;<i> currently the situation is the same regarding findlib package
+</I>&gt;&gt;<i> management, I think it is worth considering that perhaps this kind of
+</I>&gt;&gt;<i> namespace system could automatically lead into the build system
+</I>&gt;&gt;<i> (ocamldep?)  inferring which packages you need to use and eliminate that
+</I>&gt;&gt;<i> piece of configuration from the build system. Only special cases would
+</I>&gt;&gt;<i> need more configuration.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> While C++ might not be the golden standard to look upon on language
+</I>&gt;&gt;<i> development, perhaps it can serve as an inspiration. Its namespace
+</I>&gt;&gt;<i> system seems to work pretty nicely without complaints from the
+</I>&gt;&gt;<i> developers. It has the following constructs:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> namespace X {
+</I>&gt;&gt;<i>   /* introduce values for the namespace X */
+</I>&gt;&gt;<i>   int a = 42;
+</I>&gt;&gt;<i>   namespace Z {
+</I>&gt;&gt;<i>     /* introduce namespace X::Z */
+</I>&gt;&gt;<i>     int b = a;
+</I>&gt;&gt;<i>   }
+</I>&gt;&gt;<i> }
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> namespace X {
+</I>&gt;&gt;<i>   /* introduce more values for the namespace X */
+</I>&gt;&gt;<i>   int z = 5;
+</I>&gt;&gt;<i> }
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> namespace Y = X; /* alias a namespace */
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> int b = X::a; /* access a value in a namespace */
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> using namespace X; /* bring X to current scope (works in function scope
+</I>&gt;&gt;<i>                       as well */
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> using X::a; /* bring one value from a namespace to current scope */
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In implementation side it works by simply relabeling symbols in the
+</I>&gt;&gt;<i> generated object files which makes the namespaces open.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> C++'s compilation system with include files is of course very different
+</I>&gt;&gt;<i> from OCaml, but a similar solution to OCaml would mean having a hidden
+</I>&gt;&gt;<i> internal name (such as namespace_modulename or possibly even something
+</I>&gt;&gt;<i> that like namespace#modulename) for the module created from that
+</I>&gt;&gt;<i> compilation unit. It would need to be limited to a single top-level
+</I>&gt;&gt;<i> namespace specification per compilation unit, so it would work sort of
+</I>&gt;&gt;<i> in reverse compared to C++. For example if x.ml contained statement
+</I>&gt;&gt;<i> &quot;namespace Foo&quot;, a module Foo#X would be generated instead of plain X.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This solution would not allow the same module names from different
+</I>&gt;&gt;<i> namespaces to coexist in a single directory, but I don't see this as an
+</I>&gt;&gt;<i> essential feature. The source file names already would be the same, and
+</I>&gt;&gt;<i> OCaml compiler produces object files to the same directory as the
+</I>&gt;&gt;<i> source. If you have a build system copying files around, it could (and
+</I>&gt;&gt;<i> perhaps should!) preserve the directory hierarchy.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> - NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+</I>&gt;&gt;&gt;<i>   namespace to also implicitly open some modules, this essentially
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The previosuly described system would also eliminate the C++-like
+</I>&gt;&gt;<i> ability of introducing values to a namespace, unless special module
+</I>&gt;&gt;<i> names or other changes, such as an automatic opening of some modules,
+</I>&gt;&gt;<i> are implemented. It would be nice to be able to define such top-level
+</I>&gt;&gt;<i> values from multiple compilation units, but I'm uncertain how that would
+</I>&gt;&gt;<i> be implemented.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This approach would need the compiler to find many similarly named .cmi
+</I>&gt;&gt;<i> files and decide the proper one to use based on their contents, as
+</I>&gt;&gt;<i> mentioned in a previous proposal.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Everyone seems to agree that # is a good operator for accessing modules
+</I>&gt;&gt;<i> (or values) from namespaces. Or maybe we could go with \ ;-).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>   But what Alain is proposing is to make opening a namespace silent at
+</I>&gt;&gt;&gt;<i>   the source level.  This strikes me as a grave error.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I agree. At worst this could mean that in large projects developers let
+</I>&gt;&gt;<i> the build system recompile their files so they can see what namespaces
+</I>&gt;&gt;<i> they are using. It seems much better to me to just read it from the
+</I>&gt;&gt;<i> source code, which is the same regardless of the project.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i>   _____________________________________________________________________
+</I>&gt;&gt;<i>      / __// /__ ____  __               <A HREF="http://www.modeemi.fi/~flux/\">http://www.modeemi.fi/~flux/\</A>   \
+</I>&gt;&gt;<i>     / /_ / // // /\ \/ /                                            \  /
+</I>&gt;&gt;<i>    /_/  /_/ \___/ /_/\_\@modeemi.fi                                  \/
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000187.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000190.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#189">[ date ]</a>
+              <a href="thread.html#189">[ thread ]</a>
+              <a href="subject.html#189">[ subject ]</a>
+              <a href="author.html#189">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

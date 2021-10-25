@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Logging function calls
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAHR%3DVkzROsicg%3Do-%2B2fQOwwoinvsMaVg1dO%3DYXjhFQEcZFGM6w%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000096.html">
+   <LINK REL="Next"  HREF="000098.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Logging function calls</H1>
+    <B>Thomas Braibant</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Logging%20function%20calls&In-Reply-To=%3CCAHR%3DVkzROsicg%3Do-%2B2fQOwwoinvsMaVg1dO%3DYXjhFQEcZFGM6w%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Logging function calls">thomas.braibant at gmail.com
+       </A><BR>
+    <I>Mon Sep 15 10:01:11 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000096.html">[ocaml-ctypes] Logging function calls
+</A></li>
+        <LI>Next message: <A HREF="000098.html">[ocaml-ctypes] Logging function calls
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#97">[ date ]</a>
+              <a href="thread.html#97">[ thread ]</a>
+              <a href="subject.html#97">[ subject ]</a>
+              <a href="author.html#97">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi Jeremy,
+
+Thanks for your reply. Your proposal is quite close to what I had in
+mind. Yet, I am a bit puzzled about the dereferencing of the pointer
+in format_val. Shouldn't we test if it is the null-pointer before
+doing that? In that case, is testing if p = Ctypes.null the preferred
+way to do that? (I spotted that pattern somewhere in memory.ml I
+think.)
+
+Regarding my other use case, what I miss is a way to tag a view (with
+the identity coercion both way) with a name, and be able to use that
+name to pick the right pretty printer (for flags, and so on). That
+would be a tiny bit more convenient than reading the integer value of
+(FLAG_BAR | FLAG_FOO) in my log, but I can cope with that.
+
+Best,
+Thomas
+
+
+On Sat, Sep 13, 2014 at 1:20 PM, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+&gt;<i> On 12 September 2014 10:15, Thomas Braibant &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">thomas.braibant at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> I would like to log function calls using something like the following code:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> let rec log:
+</I>&gt;&gt;<i> type a. a fn -&gt; a -&gt; a =
+</I>&gt;&gt;<i>     function
+</I>&gt;&gt;<i>     | Static.Returns ty -&gt;
+</I>&gt;&gt;<i>        fun result -&gt;
+</I>&gt;&gt;<i>        Printf.printf &quot;&lt;- %s\n%!&quot; (string_of ty result);
+</I>&gt;&gt;<i>        result
+</I>&gt;&gt;<i>     | Static.Function (ty, fn) -&gt;
+</I>&gt;&gt;<i>        fun f x -&gt;
+</I>&gt;&gt;<i>        Printf.printf &quot;-&gt; %s\n%!&quot; (string_of ty x);
+</I>&gt;&gt;<i>        log fn (f x)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This works beautifully for simple enough function arguments. However,
+</I>&gt;&gt;<i> I would also like to display a bit more than what is currently
+</I>&gt;&gt;<i> available.
+</I>&gt;&gt;<i> Two quick examples come to mind.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> First, printing the name of manifest constants (e.g., defined in C
+</I>&gt;&gt;<i> using #define FOO 0x0001337). I would like to log FOO rather than its
+</I>&gt;&gt;<i> integer value. If I provide a correct printing function, it might even
+</I>&gt;&gt;<i> produces correct C code.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Second, a bit more akward, printing the content of structs that are
+</I>&gt;&gt;<i> passed by reference to functions. I do not see a way to print that
+</I>&gt;&gt;<i> information as valid C, but it would be tremendously useful in my
+</I>&gt;&gt;<i> logs.
+</I>&gt;<i>
+</I>&gt;<i> I think that you can do what you want by matching a little deeper on
+</I>&gt;<i> &quot;ty&quot;.  Here's a function that prints C values, dereferencing
+</I>&gt;<i> pointers-to-structures rather than just printing their addresses:
+</I>&gt;<i>
+</I>&gt;<i>   let rec format_val : type a. a typ -&gt; Format.formatter -&gt; a -&gt; unit =
+</I>&gt;<i>     fun t fmt -&gt; let open Static in match t with
+</I>&gt;<i>     | Pointer (Struct _ as s) -&gt;
+</I>&gt;<i>        fun v -&gt; Format.fprintf fmt &quot;pointer to %a&quot; (format_val s) !@v
+</I>&gt;<i>     | t -&gt; Ctypes.format t fmt
+</I>&gt;<i>
+</I>&gt;<i> You can then call format_val instead of string_of inside your log function:
+</I>&gt;<i>
+</I>&gt;<i>   let rec log:
+</I>&gt;<i>     type a. a fn -&gt; a -&gt; a =
+</I>&gt;<i>       function
+</I>&gt;<i>       | Static.Returns ty -&gt;
+</I>&gt;<i>          fun result -&gt;
+</I>&gt;<i>          Format.(fprintf std_formatter) &quot;&lt;- @[%a@]@\n%!&quot; (format_val ty) result;
+</I>&gt;<i>          result
+</I>&gt;<i>       | Static.Function (ty, fn) -&gt;
+</I>&gt;<i>          fun f x -&gt;
+</I>&gt;<i>          Format.(fprintf std_formatter) &quot;-&gt; @[%a@]@\n%!&quot; (format_val ty) x;
+</I>&gt;<i>          log fn (f x)
+</I>&gt;<i>
+</I>&gt;<i> Here are the results, logging the results of passing the address of an
+</I>&gt;<i> uninitialized struct to the identity function:
+</I>&gt;<i>
+</I>&gt;<i>    # let s = structure &quot;s&quot;;;
+</I>&gt;<i>    val s : '_a structure typ = struct s
+</I>&gt;<i>    # let i = field s &quot;i&quot; int;;
+</I>&gt;<i>    val i : (int, ('_a, [ `Struct ]) structured) field = &lt;abstr&gt;
+</I>&gt;<i>    # let j = field s &quot;j&quot; float;;
+</I>&gt;<i>    val j : (float, ('_a, [ `Struct ]) structured) field = &lt;abstr&gt;
+</I>&gt;<i>    # let () = seal s;;
+</I>&gt;<i>    # let v = make s;;
+</I>&gt;<i>    val v : ('_a, [ `Struct ]) structured = {
+</I>&gt;<i>        i = -486857096, j = 4.5857492245e-41
+</I>&gt;<i>      }
+</I>&gt;<i>    # log (ptr s @-&gt; returning (ptr s)) (fun x -&gt; x) (addr v);;
+</I>&gt;<i>    -&gt; pointer to { i = -486857096, j = 4.5857492245e-41  }
+</I>&gt;<i>    &lt;- pointer to { i = -486857096, j = 4.5857492245e-41  }
+</I>&gt;<i>    - : '_a structure ptr = (struct s*) 0x95fc40
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000096.html">[ocaml-ctypes] Logging function calls
+</A></li>
+	<LI>Next message: <A HREF="000098.html">[ocaml-ctypes] Logging function calls
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#97">[ date ]</a>
+              <a href="thread.html#97">[ thread ]</a>
+              <a href="subject.html#97">[ subject ]</a>
+              <a href="author.html#97">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

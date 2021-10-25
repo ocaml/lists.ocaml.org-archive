@@ -1,0 +1,182 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Structs with malloc allocated fields
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Structs%20with%20malloc%20allocated%20fields&In-Reply-To=%3CCAAxsn%3DHtWu%3D5rZNSLS9OkZgBMhBqAzfDgK2JZN3UM1SgYMMjGw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000026.html">
+   <LINK REL="Next"  HREF="000028.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Structs with malloc allocated fields</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Structs%20with%20malloc%20allocated%20fields&In-Reply-To=%3CCAAxsn%3DHtWu%3D5rZNSLS9OkZgBMhBqAzfDgK2JZN3UM1SgYMMjGw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Structs with malloc allocated fields">yallop at gmail.com
+       </A><BR>
+    <I>Tue Dec 17 23:33:53 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000026.html">[ocaml-ctypes] Structs with malloc allocated fields
+</A></li>
+        <LI>Next message: <A HREF="000028.html">[ocaml-ctypes] Calling from C into OCaml
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#30">[ date ]</a>
+              <a href="thread.html#30">[ thread ]</a>
+              <a href="subject.html#30">[ subject ]</a>
+              <a href="author.html#30">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 17 December 2013 04:46, Travis Brady &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">travis.brady at gmail.com</A>&gt; wrote:
+&gt;<i> I'm wrapping a simple library that contains a few functions that call malloc
+</I>&gt;<i> or realloc internally to allocate a few struct members and I'm wondering how
+</I>&gt;<i> to make those behave with Ctypes and the GC.
+</I>&gt;<i>
+</I>&gt;<i> The library exposes structname_free functions where applicable, but I'm not
+</I>&gt;<i> certain how to tell Ctypes how to use them or if I even need to at all.
+</I>
+There are several possible approaches to consider.  One approach is to
+simply write C-style code in OCaml, binding the structname_free
+functions and explicitly calling them when you know that it's safe to
+do so.  This will probably work best if the lifetime of the struct is
+easy to predict -- for example, if it's associated with a file
+descriptor or other resource that also needs to be explicitly
+released.
+
+Another approach is to register the destructor functions with the GC
+so that they're called automatically when ctypes no longer has a
+reference to the memory.  This approach should work well where you're
+allocating the memory from ctypes, since the hooks for registering
+destructor functions are currently associated with the ctypes
+allocation functions such as make
+(<A HREF="http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake">http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake</A>).
+
+Here's a simple example with a struct whose fields point to memory
+dynamically allocated by C code.  The unmanaged_person function shows
+the C-style approach, with explicit deallocation; the managed_person
+function shows the GC-based approach, using the finaliser argument to
+the make function to register the destructor:
+
+   $ cat example_stubs.c
+   #include &lt;stdlib.h&gt;
+   #include &lt;string.h&gt;
+   #include &lt;stdio.h&gt;
+
+   struct person { char *name; int age; };
+
+   void initialize_person(struct person *p, const char *name, int age)
+   {
+     p-&gt;name = malloc(strlen(name) + 1);
+     strcpy(p-&gt;name, name);
+     p-&gt;age = age;
+   }
+
+   void destroy_person(struct person *p)
+   {
+     printf(&quot;goodbye %s (age %d)\n&quot;, p-&gt;name, p-&gt;age);
+     free(p-&gt;name);
+   }
+   $ cat example.ml
+   open Ctypes
+   open Foreign
+
+   type person
+   let person : person structure typ = structure &quot;person&quot;
+   let name = field person &quot;name&quot; string
+   let age = field person &quot;age&quot; int
+   let () = seal person
+
+   let initialize_person = foreign &quot;initialize_person&quot;
+     (ptr person @-&gt; string @-&gt; int @-&gt; returning void)
+
+   let destroy_person = foreign &quot;destroy_person&quot;
+     (ptr person @-&gt; returning void)
+
+   (* Allocate a `person' value, registering the destructor function
+with the GC *)
+   let managed_person ~name ~age =
+     let p = make ~finalise:(fun p -&gt; destroy_person (addr p)) person in
+     initialize_person (addr p) name age;
+     p
+
+   (* Allocate a `person' value that must be explicitly deallocated *)
+   let unmanaged_person ~name ~age =
+     let p = make person in
+     initialize_person (addr p) name age;
+     p
+   $ ocamlfind ocamlc -c -package ctypes example_stubs.c example.ml
+   $ ocamlmklib -o example example_stubs.o example.cmo
+   $ ocaml
+           OCaml version 4.01.0
+
+   # #use &quot;topfind&quot;;;
+   [...]
+   # #require &quot;ctypes.foreign&quot;;;
+   [...]
+   # #load &quot;example.cma&quot;;;
+   # open Example;;
+   # let mcc = unmanaged_person &quot;Mrs McCave&quot; 40;;
+   val mcc : (Example.person, [ `Struct ]) Ctypes.structured = &lt;abstr&gt;
+   # let () = for i = 1 to 23 do ignore (managed_person ~name:&quot;Dave&quot;
+~age:i) done;;
+   # Gc.full_major ();;
+   goodbye Dave (age 23)
+   goodbye Dave (age 22)
+   goodbye Dave (age 21)
+   goodbye Dave (age 20)
+   goodbye Dave (age 19)
+   goodbye Dave (age 18)
+   goodbye Dave (age 17)
+   goodbye Dave (age 16)
+   goodbye Dave (age 15)
+   goodbye Dave (age 14)
+   goodbye Dave (age 13)
+   goodbye Dave (age 12)
+   goodbye Dave (age 11)
+   goodbye Dave (age 10)
+   goodbye Dave (age 9)
+   goodbye Dave (age 8)
+   goodbye Dave (age 7)
+   goodbye Dave (age 6)
+   goodbye Dave (age 5)
+   goodbye Dave (age 4)
+   goodbye Dave (age 3)
+   goodbye Dave (age 2)
+   goodbye Dave (age 1)
+   - : unit = ()
+   # destroy_person (Ctypes.addr mcc);;
+   goodbye Mrs McCave (age 40)
+   - : unit = ()
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000026.html">[ocaml-ctypes] Structs with malloc allocated fields
+</A></li>
+	<LI>Next message: <A HREF="000028.html">[ocaml-ctypes] Calling from C into OCaml
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#30">[ date ]</a>
+              <a href="thread.html#30">[ thread ]</a>
+              <a href="subject.html#30">[ subject ]</a>
+              <a href="author.html#30">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

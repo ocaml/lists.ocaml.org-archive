@@ -1,0 +1,254 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBGVrCei_tZdkxroHG3wJ6G%2BD3OmW_9LL_x5wpsNMnc0Dg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000134.html">
+   <LINK REL="Next"  HREF="000141.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAPFanBGVrCei_tZdkxroHG3wJ6G%2BD3OmW_9LL_x5wpsNMnc0Dg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Feb 26 15:12:04 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000134.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000141.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+&gt;<i> One thing I'll say is that it is important to be able to add values,
+</I>&gt;<i> and not just modules, to the namespace.  Open Core.Std also adds
+</I>&gt;<i> top-level values, as does the traditional standard library (i.e.,
+</I>&gt;<i> Pervasives), and I don't want to lose that.
+</I>
+This is handled as a &quot;bonus feature&quot; discussed in
+<A HREF="http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html">http://gallium.inria.fr/~scherer/namespaces/pack_et_functor_pack.html</A>
+, under the name &quot;flat access&quot;. The idea is that adding values to
+namespaces directly doesn't work very well (in OCaml, values cannot
+live outside a compilation unit), but you can have some modules that
+will be explicitly opened if you open the namespace (or included if
+you use it as a module). However, we're not yet sure that this works
+as well as the other aspects of the design, and would recommend
+starting without it to get a feel of the system.
+
+On Tue, Feb 26, 2013 at 3:38 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+&gt;<i> Leo, do you have a summary of what you don't like about Alain's
+</I>&gt;<i> namespace proposal?  I'm not presently able to identify any obvious
+</I>&gt;<i> weaknesses in it.  The downsides I see are:
+</I>&gt;<i>
+</I>&gt;<i> - UNSANITARY: Having both &quot;open namespace Core.Std&quot; and Core_List as
+</I>&gt;<i>   names seems a little unsanity.  Indeed, to provide a decent user
+</I>&gt;<i>   experience, you probably want to hide the Core_List name almost
+</I>&gt;<i>   everywhere.  You don't want it showing up in error messages,
+</I>&gt;<i>   documentation, source files, etc.  When you need to do a bunch of
+</I>&gt;<i>   work to hide something, maybe it's better not to include it at all.
+</I>
+I want to point out that Alain's idea of using long, hopefully-unique
+names for the source files, that you deem &quot;unsanitary&quot; here, is also a
+workaround for the problem of internal name conflict. In Alain's
+proposal, internal names conflicts are (hopfeully) avoided with no
+implementation change, just by judicious name choices and letting the
+implementation do its work. This imposes this &quot;unsanitary&quot; aspect you
+mention, but it is a complexity tradeoff: the other alternative would
+be to design a more clever implementation to choose internal names
+(than the module's source filename), which could be hidden from the
+user (no exposed Core_List) but require an implementation change. I
+think that could warrant an exploration (because it could support use
+cases such as linking together two versions of the same library, which
+isn't possible with a purely filename-based solution), but in the
+context Alain's proposal this &quot;unsanitary&quot; aspect has more advantages
+than downsides.
+
+&gt;<i> - NO HIDING: I'm not sure that the other namespace proposals do
+</I>&gt;<i>   support this, but I'd like to be able to hide some modules so that
+</I>&gt;<i>   they are not reachable outside of the namespace.  We can do this
+</I>&gt;<i>   with the current Core.Std, but I don't see how to do it in Alain's
+</I>&gt;<i>   proposal.
+</I>
+I'm surprised by this &quot;hiding&quot; idea. What does it mean, and what would
+be an use case for that?
+
+&gt;<i> Are there other issues I'm missing?
+</I>
+My gut feeling is that a hierarchical model would add little
+complexity to Alain's proposal and give a saner semantics to &quot;open
+namespace&quot;. With a flat model there can be no real notion of &quot;open
+namespace&quot;, only handcrafted renamings en masse (Core_list -&gt; List,
+Core_array -&gt; Array...). (On the other hand &quot;open namespace&quot;, if they
+are done at the source level, are a source language change, while none
+are necessary so far, so they will require more work to handle in any
+case.)
+
+There is the problem of internal name conflicts, but that is one of
+the more &quot;advanced&quot; questions that may be left out of a first
+experiment.
+
+When deciding to leave out some questions for later, it is however
+important to wonder whether we're sure that we will actually be able
+to extend the design to support them. Some early design choices may
+make future extensions harder (without breaking compatibility). One
+solution is to make a coherent design that covers advanced features,
+and decide to implement only a subset. One other is to try to guess
+what will be easy to add afterwards, and be lucky. Finally, one can
+experiment with a first design and move to another, but without
+committing to backward compatibility (meaning no language release
+between the two design iterations).
+
+My personal guess is that
+- &quot;flat access&quot; will be easy an easy extension.
+- &quot;hierarchical rather than flat mappings&quot; will be relatively easy in
+theory but make a painful transition period for providers that have
+modules organized flatly and desire to change; but it depends on a
+question of &quot;seeing non-leaf namespaces as modules&quot; that Alain's flat
+namespaces don't need to consider.
+- &quot;extending the mapping description language&quot; must be planned for
+beforehand to avoid growing pains.
+- &quot;finer implementation of internal names to avoid linking conflicts&quot;
+is yet of unknown difficulty, either today and after any first
+proposal not tackling this aspect is acted upon.
+
+&gt;<i>
+</I>&gt;<i> y
+</I>&gt;<i>
+</I>&gt;<i> On Tue, Feb 26, 2013 at 9:30 AM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> On Tue, Feb 26, 2013 at 8:03 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> On 02/25/2013 10:53 PM, Yaron Minsky wrote:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> I understand your point Alain, but while what you're saying is
+</I>&gt;&gt;&gt;&gt;<i> technically reasonable, I think it doesn't hold together.  When
+</I>&gt;&gt;&gt;&gt;<i> programming in the large, it is useful to be able to manipulate the
+</I>&gt;&gt;&gt;&gt;<i> namespace and group parts of the world together.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Can you give concrete examples of which manipulations are desired (and why)?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I think the conversation has gotten confused.  You said &quot;who needs
+</I>&gt;&gt;<i> pack?  Just use hierarchically named modules&quot;.  I'm saying: that's
+</I>&gt;&gt;<i> crazy, you need to be able to do simple manipulations of namespaces
+</I>&gt;&gt;<i> (like the ones implied by &quot;open Core.Std&quot; or &quot;open Core.Stable&quot;.)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Now you're pointing out that your namespace proposal covers the
+</I>&gt;&gt;<i> manipulations I'm describing.  That may well be right, and I wasn't
+</I>&gt;&gt;<i> contesting that point.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> All I'm saying is that simply relying on long module names without any
+</I>&gt;&gt;<i> kind of explicit namespace control does not scale.  I stand by that,
+</I>&gt;&gt;<i> without necessarily objecting to your namespace proposal.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Many libraries, not
+</I>&gt;&gt;&gt;&gt;<i> just Core or Async, want to be able to remap the world by adding a
+</I>&gt;&gt;&gt;&gt;<i> collection of related names to the namespace.  The ability to do the
+</I>&gt;&gt;&gt;&gt;<i> moral equivalent of:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i>     open Core.Std
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> is powerful and important.  Your proposal of having people add
+</I>&gt;&gt;&gt;&gt;<i> prefixes to module names does not fit the bill, and the resulting
+</I>&gt;&gt;&gt;&gt;<i> system does not, in my opinion, scale.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I believe my proposal covers this use case.  If you depend a lot on a
+</I>&gt;&gt;&gt;<i> specify library which exports many modules, you might indeed want to avoid
+</I>&gt;&gt;&gt;<i> using long names everywhere to access these modules.  That's why I propose
+</I>&gt;&gt;&gt;<i> to give simple ways to alias long modules names to short ones, in a way
+</I>&gt;&gt;&gt;<i> which can be factorized (with external mapping files).
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> In my proposal, the equivalent of &quot;open Core.Std&quot; would simply be to tell
+</I>&gt;&gt;&gt;<i> the compiler (through a command-line option or with a directive in the code)
+</I>&gt;&gt;&gt;<i> to use a mapping file.  The same can be done within the library itself.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Here is a minimalistic version of my proposal, restricted to specifying
+</I>&gt;&gt;&gt;<i> those mapping files on the compiler and tools command-lines.  To make it
+</I>&gt;&gt;&gt;<i> clear that this is only about mapping module references to compiled units,
+</I>&gt;&gt;&gt;<i> let's piggy-back the -I option.  If its argument is a file with a .ns suffix
+</I>&gt;&gt;&gt;<i> and not a directory, the compiler interprets it as a mapping file (a
+</I>&gt;&gt;&gt;<i> sequence of lines of the form &quot;Module_name =
+</I>&gt;&gt;&gt;<i> relative_path_to_compiled_unit&quot;, e.g. &quot;List = core_list&quot;), and when this -I
+</I>&gt;&gt;&gt;<i> option is considered during the resolution of a module reference (such as
+</I>&gt;&gt;&gt;<i> &quot;List&quot;) and the module is defined in the file, the compiler simply resolves
+</I>&gt;&gt;&gt;<i> the module to the corresponding unit.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> This approach could also be used to restrict which units are visible by the
+</I>&gt;&gt;&gt;<i> compiler (and avoid repeated lookup on the file system) without moving files
+</I>&gt;&gt;&gt;<i> around on the file system.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> ocamldep (without -modules) would apply the same logic; ocamldep -modules
+</I>&gt;&gt;&gt;<i> could either implement the same logic, or leave it to the build system
+</I>&gt;&gt;&gt;<i> interpreting its output (allowing more dynamic scenarios where the mapping
+</I>&gt;&gt;&gt;<i> file themselves are generated).  I expect ocamldoc to work mostly
+</I>&gt;&gt;&gt;<i> out-of-the-box, even though one could think about using the mapping files
+</I>&gt;&gt;&gt;<i> (in reverse direction) to provide shorter names in the generated
+</I>&gt;&gt;&gt;<i> documentation (or not).
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Users of a library are never forced to use the mapping files, and they can
+</I>&gt;&gt;&gt;<i> always refer to a module with its full name (provided the corresponding -I
+</I>&gt;&gt;&gt;<i> &lt;path&gt; is used).
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> The OCaml stdlib would be adapted to use longer names (stdlib_list,
+</I>&gt;&gt;&gt;<i> stdlib_array, etc) and shipped with a stdlib.ns file opened by default
+</I>&gt;&gt;&gt;<i> (unless -nostdlib is used).  To be clear: this mapping file will be used by
+</I>&gt;&gt;&gt;<i> the stdlib itself, so references within itself don't need to use long names.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I'm interested to see concrete examples of manipulation or scenarios not be
+</I>&gt;&gt;&gt;<i> covered by this proposal.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I am unaware of any.  I think this does mostly support the
+</I>&gt;&gt;<i> Core.Std/Core.Stable tricks we use.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> One thing I'll say is that it is important to be able to add values,
+</I>&gt;&gt;<i> and not just modules, to the namespace.  Open Core.Std also adds
+</I>&gt;&gt;<i> top-level values, as does the traditional standard library (i.e.,
+</I>&gt;&gt;<i> Pervasives), and I don't want to lose that.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> y
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000134.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000141.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

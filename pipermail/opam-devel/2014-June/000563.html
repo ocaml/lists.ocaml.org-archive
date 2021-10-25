@@ -1,0 +1,146 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] ocamlc.opt and pthreads
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20ocamlc.opt%20and%20pthreads&In-Reply-To=%3CCANvDa5hVoC%3Dm5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000562.html">
+   <LINK REL="Next"  HREF="000564.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] ocamlc.opt and pthreads</H1>
+    <B>Mika Illouz</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20ocamlc.opt%20and%20pthreads&In-Reply-To=%3CCANvDa5hVoC%3Dm5aU4U4SdU7k4pyH0vQNANnRHPHAnkhAKMtoaPQ%40mail.gmail.com%3E"
+       TITLE="[opam-devel] ocamlc.opt and pthreads">mika at illouz.net
+       </A><BR>
+    <I>Fri Jun 13 02:43:11 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000562.html">[opam-devel] [MirageOS-devel] experimental opam bulk build logs	on GitHub
+</A></li>
+        <LI>Next message: <A HREF="000564.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#563">[ date ]</a>
+              <a href="thread.html#563">[ thread ]</a>
+              <a href="subject.html#563">[ subject ]</a>
+              <a href="author.html#563">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear OPAM-ers,
+
+I have two systems on which opam is installed.  System A runs Ubuntu
+11.10 (ancient, I know) and opam 1.0.0, with the 4.00.1 ocaml compiler.
+
+A $ lsb_release -i -c
+Distributor ID: Ubuntu
+Codename:       natty
+A $ opam --version
+1.0.0
+
+I have a second system, system B, running Ubuntu 13.10 (less ancient)
+and opam 1.1.1, with the 3.12.1 and 4.01.0 compilers
+
+B $ lsb_release -i -c
+Distributor ID: Ubuntu
+Codename:       saucy
+B $ opam --version
+1.1.1
+
+I will try to compile a simple ocaml program into bytecode, on both
+systems, and for the heck of it, link against system threads library:
+A $ echo &quot;let _ = print_endline \&quot;hi\&quot;&quot; &gt; /tmp/x.ml
+A $ /home/mika/.opam/4.00.1/bin/ocamlc -thread
+/home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+A $ /home/mika/.opam/4.00.1/bin/ocamlc.opt -thread
+/home/mika/.opam/4.00.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+
+No problem so far.
+
+Now on system B:
+B $ echo &quot;let _ = print_endline \&quot;hi\&quot;&quot; &gt; /tmp/x.ml
+B $ /home/mika/.opam/3.12.1/bin/ocamlc -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+B $ /home/mika/.opam/3.12.1/bin/ocamlc.opt -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+File &quot;/tmp/x.ml&quot;, line 1, characters 0-1:
+Error: Error on dynamically loaded library:
+/home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so:
+/home/mika/.opam/3.12.1/lib/ocaml/stublibs/dllthreads.so: undefined symbol:
+pthread_sigmask
+
+On system B, ocamlc.opt seems to have trouble, whereas ocamlc does
+not.  (4.01.0 also has the identical issue).  Trying to figure out
+why, I looked at the DLL dependencies of the ocamlc.opt's :
+
+A $ ldd /home/mika/.opam/4.00.1/bin/ocamlc.opt
+        linux-vdso.so.1 =&gt;  (0x00007fffa29ff000)
+        libm.so.6 =&gt; /lib/x86_64-linux-gnu/libm.so.6 (0x00007fad8291b000)
+        libdl.so.2 =&gt; /lib/x86_64-linux-gnu/libdl.so.2 (0x00007fad82717000)
+        libncurses.so.5 =&gt; /lib/libncurses.so.5 (0x00007fad824d2000)
+        libpthread.so.0 =&gt; /lib/x86_64-linux-gnu/libpthread.so.0
+(0x00007fad822b4000)
+        libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007fad81f1c000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007fad82bc7000)
+
+B $ ldd /home/mika/.opam/3.12.1/bin/ocamlc.opt
+        linux-vdso.so.1 =&gt;  (0x00007fff8affe000)
+        libm.so.6 =&gt; /lib/x86_64-linux-gnu/libm.so.6 (0x00007f128410c000)
+        libdl.so.2 =&gt; /lib/x86_64-linux-gnu/libdl.so.2 (0x00007f1283f08000)
+        libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1283b3f000)
+        /lib64/ld-linux-x86-64.so.2 (0x00007f128441c000)
+
+The critical difference seems to be that system A's ocamlc.opt is linked
+against libpthread.so (and libncurses.so, for whatever reason), and
+system B's does not.  In fact, compilation succeeds on system B if I
+use LD_PRELOAD:
+
+B $ LD_PRELOAD=/lib/x86_64-linux-gnu/libpthread.so.0
+ /home/mika/.opam/3.12.1/bin/ocamlc -thread
+/home/mika/.opam/3.12.1/lib/ocaml/threads/threads.cma /tmp/x.ml -o /tmp/x
+
+Incidentally, if I compile ocaml from Inria's tarball, compilation
+using ocamlc.opt also fails on system B, unless I configure the the
+compilation of the compiler with &quot;./configure -libs -lpthread&quot; .
+
+The ocaml installed through opam on system A seems to do the right
+thing.  Does anyone have any idea how I can make system B's compiler
+behave similarly?
+
+thanks
+mika
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20140612/d454ac6f/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20140612/d454ac6f/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000562.html">[opam-devel] [MirageOS-devel] experimental opam bulk build logs	on GitHub
+</A></li>
+	<LI>Next message: <A HREF="000564.html">[opam-devel] ocamlc.opt and pthreads
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#563">[ date ]</a>
+              <a href="thread.html#563">[ thread ]</a>
+              <a href="subject.html#563">[ subject ]</a>
+              <a href="author.html#563">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

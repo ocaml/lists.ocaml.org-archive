@@ -1,0 +1,182 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-parallel] About Lwt and Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3CCANhEzE4MkRhdhdEWJCDbsa_%2BxhQixpwnEEc_ZbmmGx4rPwWjcw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000001.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-parallel] About Lwt and Async</H1>
+    <B>Jeremie Dimino</B> 
+    <A HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3CCANhEzE4MkRhdhdEWJCDbsa_%2BxhQixpwnEEc_ZbmmGx4rPwWjcw%40mail.gmail.com%3E"
+       TITLE="[wg-parallel] About Lwt and Async">jdimino at janestreet.com
+       </A><BR>
+    <I>Mon Apr 29 11:18:57 BST 2013</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000001.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#0">[ date ]</a>
+              <a href="thread.html#0">[ thread ]</a>
+              <a href="subject.html#0">[ subject ]</a>
+              <a href="author.html#0">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi everybody and welcome to the wg-parallel mailing list,
+
+The aim of this group is to discuss the future of monadic cooperative
+concurrent programing in OCaml.  There are currently two well-known
+libraries for that purpose, lwt and async. Lwt is historically the
+first one, async was developed at Jane Street and has been
+open-sourced recently.
+
+These libraries are quite 'invasive' since they require to write the
+code in a cooperative way.  It is not possible to use both of them in
+the same program and even if a third-party library can sometime be
+made to work with both, it is in general complex and not very
+convenient.
+
+So while they are both important having two such 'core' and
+incompatible libraries is not a very good thing for the OCaml
+community.  Switching brutally from one to the other is not realistic
+since it would require a huge amount of time and efforts.  The idea
+would be to make them evolve so they are close enough and, if
+possible, eventually have only one.
+
+One strategy developped by big projects using both lwt and async such
+as Mirage/Xen is to interact at the RPC level.  This can be done on
+top of lwt and async without modifying them and there are people
+working in this direction.
+
+They are currently two big semantic divergences in the kernel of both
+libraries: execution order and error handling. Plus they are a number
+of other more or less important differences.  I try to describe them
+in the rest of this email.
+
+Semantic of bind
+----------------
+
+The general idea in lwt is to run the most it can immediatly and
+yielding is always explicit, while in async the precedence is given to
+knowing exactly when the code is going to be executed.
+
+So for [return x &gt;&gt;= f]:
+
+- lwt evaluates [f x] immediatly
+- async returns a non-determined deferred and will evaluate [f x]
+during the next cycle
+
+This semantic of the bind is very important for lwt users, but async
+is already planning to add a second monad with lwt's behavior, so it
+shouldn't be an issue.
+
+Lwt and async also differs regarding Lwt.wait/Ivar.fill but there
+seems to be an agreement that the async's behavior is better and it is
+trivial to change in lwt so that shouldn't be an issue.
+
+Error handling
+--------------
+
+The ['a Lwt.t] type 'inline' the error monad [Value of 'a | Error of
+exn] while in async all errors are explicit.  So the async equivalent
+of ['a Lwt.t] would be [('a, exn) Result.t Deferred.t].
+
+As a result, while most functions in lwt return a [something Lwt.t],
+in async they return a variant or a [something Or_error.t Deferred.t]
+when the result may be an error status.
+
+This may be tedious to handle.
+
+Local storage
+-------------
+
+Lwt allows to define global variables with different values in
+different threads.  This was introduced so logs can display 'thread
+identifiers' but is now also used for other things.  Async internally
+has such a mechanism, it could be adapted and exported.
+
+Scheduler
+---------
+
+The kernel of lwt can be used without a scheduler, which is important
+for javascript for instance.  The scheduler is part of the lwt.unix
+package and can be run multiple times in the lifetime of a program.
+
+This is not true for async but it is something that can be considered.
+
+Portability
+-----------
+
+The kernel of lwt depends only on the standard library and has no C.
+As a result it is very portable and can be used without problem in
+javascript or any other exotic environment.
+
+The kernel of async (Async_core) currently depends on Core which
+depends on Unix and contains C bindings.  It is planned to split Core
+to get a small kernel for Core and Async.
+
+Lwt is also more portable, for example it runs on Windows.  Windows
+support could be added to Async.
+
+There are questions about whether this should be done like in
+unix/lwt.unix, i.e. emulate unix's behavior on Windows, or binds the
+Win32 API directly and write the dispatching code in OCaml.
+
+General experience
+------------------
+
+Async is part of the core suite and use core's convention.  Code using
+it starts with:
+
+    open Core.Std
+    open Async.Std
+
+which brings all the core and async world into the environment.
+
+The core style is generally considered better and async has a huge
+number of utilities well integrated together, but switching code to it
+may require a lot of work.
+
+On the other hand lwt is more independent so it is easier to integrate
+it into an existing project.
+
+
+
+In conclusion there is a lot to think about but no blocker.
+
+Jeremie
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000001.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#0">[ date ]</a>
+              <a href="thread.html#0">[ thread ]</a>
+              <a href="subject.html#0">[ subject ]</a>
+              <a href="author.html#0">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-parallel">More information about the wg-parallel
+mailing list</a><br>
+</body></html>

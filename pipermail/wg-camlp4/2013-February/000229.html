@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C51141CC7.60201%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000228.html">
+   <LINK REL="Next"  HREF="000230.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C51141CC7.60201%40gmail.com%3E"
+       TITLE="[wg-camlp4] benchmarks">bobzhang1988 at gmail.com
+       </A><BR>
+    <I>Thu Feb  7 21:29:43 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000228.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000230.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#229">[ date ]</a>
+              <a href="thread.html#229">[ thread ]</a>
+              <a href="subject.html#229">[ subject ]</a>
+              <a href="author.html#229">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/7/13 4:22 PM, Gerd Stolpmann wrote:
+&gt;<i> Am 07.02.2013 21:39:39 schrieb(en) Thomas Gazagnaire:
+</I>&gt;&gt;<i> Hi all,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> In my opinion as a *user* of camlp4, the main pitfall that I can see 
+</I>&gt;&gt;<i> (and which has not yet been addressed) is that it is really slowing 
+</I>&gt;&gt;<i> down the compilation process. To improve that, the usual methods are:
+</I>&gt;&gt;<i> 1. to use native syntax extensions
+</I>&gt;&gt;<i> 2. to statically link the syntax extensions into one preprocessor binary
+</I>&gt;<i>
+</I>Fan encourages static linking to native code, that's to say &quot;linking all 
+your plugins as much as possible&quot;, unlike p4 the linking does not have 
+any side effects, it registers the features it could provide,  each file 
+itself tells what features it want to use.
+&gt;<i> Well, Alain started with the suggestion to run all preprocessors as 
+</I>&gt;<i> separate binaries. Of course, if you have many preprocessors or many 
+</I>&gt;<i> files to preprocess, this will become slow. Under the most common 
+</I>&gt;<i> assumption, though, namely that only a few files need preprocessing at 
+</I>&gt;<i> all, this is no problem, and certainly the most flexible option.
+</I>&gt;<i>
+</I>&gt;<i> Regarding dynloading. First, it's not only that native dynloading does 
+</I>&gt;<i> not work on all platforms. Worse, not even bytecode dynloading works 
+</I>&gt;<i> everywhere when it comes to loading external C libraries (which may be 
+</I>&gt;<i> required here and there). Because of this, we should design without 
+</I>&gt;<i> dynloading in mind, and at most consider this as an accelarator that 
+</I>&gt;<i> is available on certain platforms only.
+</I>&gt;<i>
+</I>&gt;<i> In my opinion, there should be ppx drivers (= something that turns a 
+</I>&gt;<i> preprocessor into a program suited for -ppx). The simple default 
+</I>&gt;<i> driver just pipes the parsetree through the preprocessors, and these 
+</I>&gt;<i> are running as subprocesses. But it should also be possible to link a 
+</I>&gt;<i> custom ppx driver for the not-so-frequent cases that the preprocessors 
+</I>&gt;<i> are needed often. And finally, there could also be a ppx driver that 
+</I>&gt;<i> dynloads.
+</I>&gt;<i>
+</I>&gt;<i> I guess the details are not so complicated to figure out (e.g. define 
+</I>&gt;<i> a module type a ppx preprocessor must satisfy, and have some utilities 
+</I>&gt;<i> to &quot;make this a program&quot;, &quot;make this a dynloadable extension&quot;, and 
+</I>&gt;<i> &quot;bind several ppx processors together&quot;).
+</I>&gt;<i>
+</I>&gt;&gt;<i> Currently, 1. is very broken  (natdynlink doesn't work on all 
+</I>&gt;&gt;<i> platforms and most of the syntax packages do not install their native 
+</I>&gt;&gt;<i> libraries anyway) and 2. is not very flexible because of lack of 
+</I>&gt;&gt;<i> tooling, and so very rarely used.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> So, if we decide to switch to a new preprocessing tool, I guess it's 
+</I>&gt;&gt;<i> important to get these hings right:
+</I>&gt;&gt;<i> * it should be easy enough for external tools to statically build 
+</I>&gt;&gt;<i> pre-processors.
+</I>&gt;&gt;<i> * the new preprocessor should be benchmarked on realistic examples to 
+</I>&gt;&gt;<i> see how much time we gain vs. camlp4. A good example might be mirage 
+</I>&gt;&gt;<i> which is using only pa_lwt and cstruct (or xen-api which is using 
+</I>&gt;&gt;<i> only ocaml-rpc, or core but that maybe too much syntax in one go).
+</I>&gt;<i>
+</I>&gt;<i> Fully agreed to both points.
+</I>&gt;<i>
+</I>&gt;<i> Gerd
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Best,
+</I>&gt;&gt;<i> Thomas
+</I>&gt;&gt;<i> PS: I'm not speaking about the bootstraping time of camlp4, which is 
+</I>&gt;&gt;<i> indeed very painful, but which doesn't really affect the end-user 
+</I>&gt;&gt;<i> once the compiler is installed.
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000228.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000230.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#229">[ date ]</a>
+              <a href="thread.html#229">[ thread ]</a>
+              <a href="subject.html#229">[ subject ]</a>
+              <a href="author.html#229">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

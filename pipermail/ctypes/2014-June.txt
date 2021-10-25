@@ -1,0 +1,94 @@
+From costel.person at gmail.com  Thu Jun  5 20:20:37 2014
+From: costel.person at gmail.com (Costel Person)
+Date: Thu, 5 Jun 2014 12:20:37 -0700
+Subject: [ocaml-ctypes] Converting from int to file_descr
+Message-ID: <CAATUEDK6JBKFqUq5xcj=yGhAnEVfHfRGbtJdKK45BtKT_xvXpw@mail.gmail.com>
+
+I am trying to call forkpty
+pid_t forkpty(int *amaster, char *name, const struct termios *termp, const
+struct winsize *winp);
+
+Only care about file descriptor 'amaster' and result : pid_t
+
+All is good:
+  let forkpty = foreign "forkpty" (ptr int @-> ptr void @-> ptr void @->
+ptr void @-> returning int)
+
+    let amaster : int ptr = allocate int -1 in
+    let pid = forkpty amaster null null null in
+    let pipefd = !@ amaster
+
+Do not understand how to convert the int representing file descriptor to
+ Unix.file_descr
+
+Or use a view to pass a Unix.file_descr as an int to forkpty ?
+
+Any help appreciated ...
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140605/19e70b0c/attachment.html>
+
+From sheets at alum.mit.edu  Fri Jun  6 11:30:41 2014
+From: sheets at alum.mit.edu (David Sheets)
+Date: Fri, 6 Jun 2014 11:30:41 +0100
+Subject: [ocaml-ctypes] Converting from int to file_descr
+In-Reply-To: <CAATUEDK6JBKFqUq5xcj=yGhAnEVfHfRGbtJdKK45BtKT_xvXpw@mail.gmail.com>
+References: <CAATUEDK6JBKFqUq5xcj=yGhAnEVfHfRGbtJdKK45BtKT_xvXpw@mail.gmail.com>
+Message-ID: <CAAWM5TxK1AT2HedVXf+Mwn12SbgQ+Pe2jhxieck3Cjto0MJ4sA@mail.gmail.com>
+
+On Thu, Jun 5, 2014 at 8:20 PM, Costel Person <costel.person at gmail.com> wrote:
+> I am trying to call forkpty
+> pid_t forkpty(int *amaster, char *name, const struct termios *termp, const
+> struct winsize *winp);
+>
+> Only care about file descriptor 'amaster' and result : pid_t
+>
+> All is good:
+>   let forkpty = foreign "forkpty" (ptr int @-> ptr void @-> ptr void @-> ptr
+> void @-> returning int)
+>
+>     let amaster : int ptr = allocate int -1 in
+>     let pid = forkpty amaster null null null in
+>     let pipefd = !@ amaster
+>
+> Do not understand how to convert the int representing file descriptor to
+> Unix.file_descr
+>
+> Or use a view to pass a Unix.file_descr as an int to forkpty ?
+>
+> Any help appreciated ...
+
+Hi Costel,
+
+I use the fd-send-recv package in opam for this coercion. The function
+to use is Fd_send_recv.int_of_fd. You can easily create a ctypes view
+for Unix.file_descr with
+
+Ctypes.view ~read:Fd_send_recv.fd_of_int ~write:Fd_send_recv.int_of_fd
+Ctypes.int
+
+Internally, file descriptors are just OCaml ints as you can see from
+<https://github.com/djs55/ocaml-fd-send-recv/blob/master/lib/fd_send_recv.ml#L22>.
+Because of this, you could also easily implement this coercion
+yourself. I prefer to adopt the tiny fd-send-recv dependency and
+abstract this dirty Obj.magic business.
+
+Hope this helps,
+
+David Sheets
+
+From anil at recoil.org  Mon Jun 16 10:28:36 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 16 Jun 2014 10:28:36 +0100
+Subject: [ocaml-ctypes] ctypes 0.2.3 in debian sid
+Message-ID: <32FCAC5D-2EE4-47AE-B3EB-E7CA3BDB44A6@recoil.org>
+
+I notice that Stephane Glondu (CCed) kindly uploaded Ctypes 0.2.3 into Debian; 
+https://packages.debian.org/unstable/main/libctypes-ocaml
+
+I'm not sure what the process for keeping you informed of releases is, but there's a Ctypes 0.3.0 release now that supports C stub generation, and would be good to get into distributions  as well.
+
+https://github.com/ocamllabs/ocaml-ctypes/releases/tag/0.3
+
+-anil
+

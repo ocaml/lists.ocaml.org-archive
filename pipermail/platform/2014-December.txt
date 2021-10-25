@@ -1,0 +1,129 @@
+From louis.gesbert at ocamlpro.com  Sat Dec  6 02:08:10 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 06 Dec 2014 11:08:10 +0900
+Subject: [ocaml-platform] opam-in-a-box
+Message-ID: <1429799.1gO6qO1K3u@agaric>
+
+Hi all,
+
+Following the thread on Teaching at lists.ocaml.org about the needs for teachers and the discussion on opam-in-a-box, here is a preliminary specification of what I intend to do to improve the situation.
+
+* keep the ad-hoc scripting to a minimum. So that it's easier to maintain, contribute, and not get too tied to a given tool (e.g. Vagrant)
+* opam-in-a-box should be just that, a VM or container with a pre-installed OPAM. The provisionning command on the VM should be as simple as possible (one system-package install, opam init, one opam package install ; possibly one more command to serve some web pages)
+* Now the tough part: setting up the account for a nice default user setup, with a possible choice of editors. For that I'm starting to work on the 'opam package for user setup' (opus ?) ('OCaml TOol Package for User Setup', 'octopus' ? :))
+
+## user-setup
+
+user-setup is a small OCaml program intended to be used as an OPAM package with optional dependencies on every tool package it has a module for (e.g. merlin, ocp-indent, ocp-index...). Its role is simply to set up the configuration of the user to use the installed tools. The idea is to have a clean modular interface, with a module for each editor, containing:
+
+- a base config template, to be used if the user has no config yet (typically, opam-in-a-box install)
+- a list of chunks that need to be added to given editor files. We'll support update of these chunks with correct handling of manual modifications.
+
+then for each tool (within each editor):
+- a similar list of chunks
+- a list of files to link or install
+
+We'll suppose a default configuration for most of this for now, the opam-in-a-box setting being the first use-case, and since advanced users probably won't use that anyway.
+
+Doing it this way has a bunch of advantages, among them:
+- it should be easy to contribute configurations, and for this, contributions are highly needed (I've already put together a good emacs config from the various cited sources and my own to start, but am not qualified to do this for e.g. vim)
+- it's flexible and allows updates: by using depopts, it will be re-run on every tool installation, change or upgrade, only for people to chose to install it.
+- it's not normal for an opam package to write outside of ~/.opam, but here that'll be well advertised and kept to this one single package, without tainting tool packages themselves.
+
+
+This seems like the most important part of what we have been discussing on the Teaching list to me, so I'll focus on it. Hopefully this'll be enough to make provisionning with Vagrant or Docker (or whatever) trivial. Do we have preset boxes on Vagrant-cloud yet ?
+
+Now writing the concrete interface.
+
+Cheers,
+Louis
+
+From anil at recoil.org  Sat Dec 13 20:28:56 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 13 Dec 2014 20:28:56 +0000
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <1429799.1gO6qO1K3u@agaric>
+References: <1429799.1gO6qO1K3u@agaric>
+Message-ID: <FB1FF43D-F674-407B-B2C8-301EC0BA5F72@recoil.org>
+
+
+> On 6 Dec 2014, at 02:08, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> Hi all,
+> 
+> Following the thread on Teaching at lists.ocaml.org about the needs for teachers and the discussion on opam-in-a-box, here is a preliminary specification of what I intend to do to improve the situation.
+> 
+> * keep the ad-hoc scripting to a minimum. So that it's easier to maintain, contribute, and not get too tied to a given tool (e.g. Vagrant)
+
+Absolutely -- it would be really useful to have a reusable set of scripts that we could reuse across (e.g.) Docker and Vagrant.
+
+Thomas Gazagnaire suggest pulling out opam-installext from the Docker scripts into an OPAM package so that we can just install it easily.
+
+> * opam-in-a-box should be just that, a VM or container with a pre-installed OPAM. The provisionning command on the VM should be as simple as possible (one system-package install, opam init, one opam package install ; possibly one more command to serve some web pages)
+
+Agreed.
+
+> * Now the tough part: setting up the account for a nice default user setup, with a possible choice of editors. For that I'm starting to work on the 'opam package for user setup' (opus ?) ('OCaml TOol Package for User Setup', 'octopus' ? :))
+
+I guess this only applies for whole-VM virtualisation like Vagrant.  In the case of Docker packages, we can just skip all this and let the host editor work.  Do we have a page somewhere where we can editor customisation instructions easily?  Right now it's spread across Real World OCaml's installation instructions, the Merlin website, etc.
+
+> 
+> ## user-setup
+> 
+> user-setup is a small OCaml program intended to be used as an OPAM package with optional dependencies on every tool package it has a module for (e.g. merlin, ocp-indent, ocp-index...). Its role is simply to set up the configuration of the user to use the installed tools. The idea is to have a clean modular interface, with a module for each editor, containing:
+> 
+> - a base config template, to be used if the user has no config yet (typically, opam-in-a-box install)
+> - a list of chunks that need to be added to given editor files. We'll support update of these chunks with correct handling of manual modifications.
+> 
+> then for each tool (within each editor):
+> - a similar list of chunks
+> - a list of files to link or install
+> 
+> We'll suppose a default configuration for most of this for now, the opam-in-a-box setting being the first use-case, and since advanced users probably won't use that anyway.
+> 
+> Doing it this way has a bunch of advantages, among them:
+> - it should be easy to contribute configurations, and for this, contributions are highly needed (I've already put together a good emacs config from the various cited sources and my own to start, but am not qualified to do this for e.g. vim)
+> - it's flexible and allows updates: by using depopts, it will be re-run on every tool installation, change or upgrade, only for people to chose to install it.
+> - it's not normal for an opam package to write outside of ~/.opam, but here that'll be well advertised and kept to this one single package, without tainting tool packages themselves.
+
+This sounds excellent.  What about managing `~/.ocamlinit` as well?  That's a very common missing step among RWO readers.
+
+Anil
+
+From louis.gesbert at ocamlpro.com  Tue Dec 16 00:17:46 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 16 Dec 2014 09:17:46 +0900
+Subject: [ocaml-platform] opam-in-a-box
+In-Reply-To: <FB1FF43D-F674-407B-B2C8-301EC0BA5F72@recoil.org>
+References: <1429799.1gO6qO1K3u@agaric>
+ <FB1FF43D-F674-407B-B2C8-301EC0BA5F72@recoil.org>
+Message-ID: <6066206.3BL9uuaWXL@agaric>
+
+> > * keep the ad-hoc scripting to a minimum. So that it's easier to maintain, contribute, and not get too tied to a given tool (e.g. Vagrant)
+> 
+> Absolutely -- it would be really useful to have a reusable set of scripts that we could reuse across (e.g.) Docker and Vagrant.
+> 
+
+See https://github.com/AltGr/opam-user-setup/ for a first prototype
+
+> Thomas Gazagnaire suggest pulling out opam-installext from the Docker scripts into an OPAM package so that we can just install it easily.
+
+Excellent idea, too
+
+> > * Now the tough part: setting up the account for a nice default user setup, with a possible choice of editors. For that I'm starting to work on the 'opam package for user setup' (opus ?) ('OCaml TOol Package for User Setup', 'octopus' ? :))
+> 
+> I guess this only applies for whole-VM virtualisation like Vagrant.  In the case of Docker packages, we can just skip all this and let the host editor work.  Do we have a page somewhere where we can editor customisation instructions easily?  Right now it's spread across Real World OCaml's installation instructions, the Merlin website, etc.
+> 
+
+I was hoping it would be as useful for Docker ; on the instructions, yeah, I've been trying to gather from different sources, and have the hope to attract all good setups to a single point. I'm still not sure about the relation between opam-user-setup and the documentation, but the latter needs to be part of the effort.
+
+> This sounds excellent.  What about managing `~/.ocamlinit` as well?  That's a very common missing step among RWO readers.
+
+Why not indeed.
+
+Cheers,
+Louis
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20141216/b72eed93/attachment.html>
+

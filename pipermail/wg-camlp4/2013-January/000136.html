@@ -1,0 +1,184 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Editor support for syntax extensions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Editor%20support%20for%20syntax%20extensions&In-Reply-To=%3C51097713.2090602%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000135.html">
+   <LINK REL="Next"  HREF="000137.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Editor support for syntax extensions</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Editor%20support%20for%20syntax%20extensions&In-Reply-To=%3C51097713.2090602%40gmail.com%3E"
+       TITLE="[wg-camlp4] Editor support for syntax extensions">bobzhang1988 at gmail.com
+       </A><BR>
+    <I>Wed Jan 30 19:40:03 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000135.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+        <LI>Next message: <A HREF="000137.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 1/30/13 2:27 PM, Gerd Stolpmann wrote:
+Hi Gerd,
+    I think delegating ocamlfind for (ppx/camlp4/fan) is a mistake. IMO 
+the right way is that
+the file itself tells the preprocessor which syntax or plugin it 
+wants(with the good default option),
+that's how Fan adopted.
+&gt;<i> Am 30.01.2013 15:21:20 schrieb(en) Alain Frisch:
+</I>&gt;&gt;<i> On 01/30/2013 12:19 PM, T&#246;r&#246;k Edwin wrote:
+</I>&gt;&gt;&gt;<i> I still get syntax highlighting and matching parens in both vim and 
+</I>&gt;&gt;&gt;<i> emacs for the above (although maybe antiquotations would confuse it):
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Highlighting gets completely wrong as soon as you start e.g. using 
+</I>&gt;&gt;<i> double quotes. And indentation is just impossible if the editor isn't 
+</I>&gt;&gt;<i> aware of the grammar implemented by the extensions.  One could 
+</I>&gt;&gt;<i> certainly try to fix this and introduce more tools, complexity and 
+</I>&gt;&gt;<i> border cases. But I still fail to see the real benefits of allowing 
+</I>&gt;&gt;<i> very customized syntax which would justify such efforts.  The whole 
+</I>&gt;&gt;<i> point of -ppx versus camlp4 is precisely to stop messing up with the 
+</I>&gt;&gt;<i> concrete syntax: define some generic enough extension points, and 
+</I>&gt;&gt;<i> just work with a fixed concrete syntax.  I'd prefer to see dead 
+</I>&gt;&gt;<i> simple solutions adopted for -ppx, and more advanced stuff (based on 
+</I>&gt;&gt;<i> concrete syntax) left to camlp4/fan.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> 4. What syntax extensions to use =&gt; define in the source code
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> This has already been mentioned that the source file could define 
+</I>&gt;&gt;&gt;<i> what syntax extensions it uses, so it works for all build systems 
+</I>&gt;&gt;&gt;<i> (ocamlbuild, makefiles, omake), etc.
+</I>&gt;&gt;&gt;<i> It may not even need special support from the compiler: there could 
+</I>&gt;&gt;&gt;<i> be a -ppx that finds these pragmas and loads those other -ppx on its 
+</I>&gt;&gt;&gt;<i> own!
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I've started something along these lines:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> <A HREF="https://github.com/alainfrisch/ppx_drivers">https://github.com/alainfrisch/ppx_drivers</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Exactly how this works with ocamlfind needs to be discussed.  I know 
+</I>&gt;&gt;<i> Gerd has some ideas!
+</I>&gt;<i>
+</I>&gt;<i> Well, I had some private discussions with Alain before this list started.
+</I>&gt;<i>
+</I>&gt;<i> A central point is that the ppx driver and ocamlfind remain separate 
+</I>&gt;<i> software projects. You need the ability to use ppx preprocessors 
+</I>&gt;<i> without ocamlfind, and the role of ocamlfind is &quot;only&quot; to make it more 
+</I>&gt;<i> user-friendly. This should be similar to normal library lookup - where 
+</I>&gt;<i> ocamlfind finally generates only a command where many details are 
+</I>&gt;<i> filled in.
+</I>&gt;<i>
+</I>&gt;<i> Alain had the idea to include the names of the preprocessors directly 
+</I>&gt;<i> in the source text. He chose the syntax
+</I>&gt;<i>
+</I>&gt;<i> include PPX(First_ppx_processor)(Second_ppx_processor)
+</I>&gt;<i>
+</I>&gt;<i> Well, we probably can now select something better, not reusing the 
+</I>&gt;<i> &quot;include&quot; notation for something that is not &quot;include&quot;. Maybe let's 
+</I>&gt;<i> prefer now
+</I>&gt;<i>
+</I>&gt;<i> (:PPX &quot;first_ppx_preprocessor&quot; &quot;second_ppx_preprocessor&quot;)
+</I>&gt;<i>
+</I>&gt;<i> just to pick the current discussion up. The task of the ppx driver is 
+</I>&gt;<i> to interpret these directives, and to run the preprocessors in the 
+</I>&gt;<i> right order as subcommands (or, if the platform supports it, as plugins).
+</I>&gt;<i>
+</I>&gt;<i> Ocamlfind integration: The problem here is that such a directive needs 
+</I>&gt;<i> to be forwarded to ocamlfind in order to figure the details out. This 
+</I>&gt;<i> would need a relatively tight coupling between the ppx driver and 
+</I>&gt;<i> ocamlfind. In order to avoid that the ppx driver calls ocamlfind for 
+</I>&gt;<i> every activated preprocessor, the idea is to make the ppx driver a 
+</I>&gt;<i> library, maybe with a single function
+</I>&gt;<i>
+</I>&gt;<i> preprocess : (string -&gt; string) -&gt; in_channel -&gt; out_channel
+</I>&gt;<i>
+</I>&gt;<i> The string-&gt;string function is the lookup function. It takes a string 
+</I>&gt;<i> like &quot;first_ppx_preprocessor&quot; and returns the command to run.
+</I>&gt;<i>
+</I>&gt;<i> So, that enables us to provide two utilities:
+</I>&gt;<i>
+</I>&gt;<i>  - ocamlppx: This would be part of the OCaml distribution, and would be
+</I>&gt;<i>    limited in functionality. In particular, it interprets the ppx strings
+</I>&gt;<i>    directly as commands (identity as lookup function):
+</I>&gt;<i>
+</I>&gt;<i>    (:PPX &quot;/path/to/my/ppx/executable maybe arguments&quot;)
+</I>&gt;<i>
+</I>&gt;<i>  - ocamlfind ppx: This version provides extended lookup features.
+</I>&gt;<i>    You would just use
+</I>&gt;<i>
+</I>&gt;<i>    (:PPX &quot;package-name&quot;)
+</I>&gt;<i>
+</I>&gt;<i>    and it is ocamlfind's task to look the executable up (or, optionally,
+</I>&gt;<i>    load a plugin, but the details of the mechanism are hidden from the
+</I>&gt;<i>    simple user).
+</I>&gt;<i>
+</I>&gt;<i> Gerd
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Alain
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> wg-camlp4 mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000135.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+	<LI>Next message: <A HREF="000137.html">[wg-camlp4] Editor support for syntax extensions
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#136">[ date ]</a>
+              <a href="thread.html#136">[ thread ]</a>
+              <a href="subject.html#136">[ subject ]</a>
+              <a href="author.html#136">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,172 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] calbacks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20calbacks&In-Reply-To=%3CD583672D-CB51-4812-8D95-3DE3521701F7%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000268.html">
+   <LINK REL="Next"  HREF="000255.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] calbacks</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20calbacks&In-Reply-To=%3CD583672D-CB51-4812-8D95-3DE3521701F7%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] calbacks">skaller at internode.on.net
+       </A><BR>
+    <I>Fri Dec 29 00:32:20 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000268.html">[ocaml-ctypes] Help with strings
+</A></li>
+        <LI>Next message: <A HREF="000255.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#269">[ date ]</a>
+              <a href="thread.html#269">[ thread ]</a>
+              <a href="subject.html#269">[ subject ]</a>
+              <a href="author.html#269">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>FWIW here&#8217;s what I do for callbacks.  Its a bit waffly! 
+The code that does it is actually written in Ocaml but it is
+generating C++ text. 
+
+The situation is different because my system Felix is a C++ code generator 
+so the compiler can translate Felix code to C++ without worrying about any additional
+compilation step(s). Indeed, Felix is designed as a C++ upgrade,
+meaning to throw out the bad syntax, introduce a good type system,
+but *preserve* ABI compatibility and make writing bindings 
+for C and C++ trivial.
+
+First, normally a function binding is roughly like:
+
+	fun myfun : A * B * C * D -&gt; R = &#8220;Cfunction($1,$2,$3,$4)&#8221;;
+
+but this:
+
+	callback fun myfun_t: A * B * myfun_t * D -&gt; R;
+
+is actually a *type* definition. The type defined is roughly
+
+	typedef myfun_t = A * B * CLIENT * D &#8212;&gt; R
+
+
+Here, I wrote &#8212;&gt; with two dashes, which means a C function type in
+Felix whereas -&gt; is a Felix function type. A Felix function is a C++
+class with an apply() method that accepts an argument of the type
+of the function argument.  The context is bound into the class
+object by the C++ constructor. Where I wrote CLIENT above, it means
+a C void*. When the compiler sees the above it generates a wrapper
+function that looks roughly like this:
+
+	R myfun_t W_myfun_t (A a, B b, myfun_t *CLOSURE, D d) {
+		return CLOSURE-&gt;apply(a,b,d);
+	}
+
+I left out a lot of messy casts. But we&#8217;re not finished. When we call a
+C HOF it will have a signature like this:
+
+	typedef void (*hof) (X, Y, C_myfun_t func, void *client_data, Z);
+
+where C_myfun_t is the C type of the callback, and the void pointer
+client data is the associated data pointer. When the programmer
+declares that the Felix type should be
+
+	X * Y * myfun_t * Z -&gt;  void
+
+so we leave out the function type entirely, and use the Felix function
+type in place of the client data pointer,
+and we need a second wrapper now, one that picks up the myfun_t, which
+in Felix is a pointer to the C++ class object of the function type,
+and passes it for the callbacks specified CLIENT data pointer,
+and passes W_myfun_t, an actual C function pointer, as the function.
+
+The wrapper function is invariant, it is the same for ALL callbacks
+of the same type, and the type of the closure is also invariant,
+its the same for all Felix functions of the same type.
+
+So: to make this work in Felix I have to translate a special kind of type
+and I have to translate a HOF accepting a callback into some C
+type definitions AND two wrapper function: actually one
+wrapper for each callback type, and, one wrapper for each
+HOF.
+
+So what can Ctypes do? It can do exactly the same thing.
+
+You need a value of a special type say 
+
+	&#8216;a callback
+
+to use in the callback function type signature that indicates
+where the client data pointer lives in the signature:
+
+	A @-&gt; B @-&gt; clientdata @-&gt;D @-&gt; returning R
+
+in the foreign function. This is all you need to know to
+generate a wrapper for the callback. You do not have to actually
+generate C code to be compiled if you can manipulate the
+Ocaml data type representation well enough from Ocaml
+in your interpreter, as long as it &#8220;does&#8221; the right thing somehow,
+what you&#8217;re actually generating is an Ocaml function which
+translates another Ocaml function. The mind boggles,
+it was easier for me, because I could just print the
+required C++ code into the Felix compiler output.
+But you must be able to do it without doing that because,
+Ctypes is *already* doing it.
+
+Having done that, you have to organise that a HOF binding
+in Ocaml accepting an Ocaml function of the correct type 
+actually calls the code for a binding that accepted a C function
+and also a void *, passing the wrapper as above and the
+actual closure pointer as the client data.
+
+So I think you can do all this without generating any C at all,
+since you can already translate Ctypes values representing
+types and functions into C functions and C function calls.
+That&#8217;s what you&#8217;d be doing here, except you have to do the
+extra work in your Ocaml interpreter of the Ctypes to munge
+things around a bit. I could be wrong you *might* need to
+generate some C that requires compilation.
+
+And it *might* be useful to generate that C as a first attempt,
+to avoid getting caught in a mental meta-recursive knot.
+I found it really hard to think about when I was doing it
+for Felix, it took weeks to get right.
+
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000268.html">[ocaml-ctypes] Help with strings
+</A></li>
+	<LI>Next message: <A HREF="000255.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#269">[ date ]</a>
+              <a href="thread.html#269">[ thread ]</a>
+              <a href="subject.html#269">[ subject ]</a>
+              <a href="author.html#269">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

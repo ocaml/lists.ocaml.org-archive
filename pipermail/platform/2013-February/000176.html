@@ -1,0 +1,288 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTG37iAAx1MdSNvoyHrJFw%3DiHK946P8vrXcKLMr_h%2ByOg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000177.html">
+   <LINK REL="Next"  HREF="000178.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jTG37iAAx1MdSNvoyHrJFw%3DiHK946P8vrXcKLMr_h%2ByOg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Wed Feb 27 16:31:28 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000177.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000178.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#176">[ date ]</a>
+              <a href="thread.html#176">[ thread ]</a>
+              <a href="subject.html#176">[ subject ]</a>
+              <a href="author.html#176">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Let me try to summarize the current situation about the argument
+between Alain, Leo and myself.  I think Leo and I are roughly on the
+same page, but I may be missing things.
+
+- MAKING LONG NAMES AVAILABLE.  Alain prefers to have unambiguous long
+  names that are usable in a first class way.  I find this mildly
+  distasteful, but would be OK with it as long as it was well hidden
+  from the user by default.  Long names shouldn't show up by default
+  in source files, error messages or documentation.  I view this as
+  quite important for usability of namespaces.
+
+- SOURCE-LEVEL OPENS.  Alain would prefer to have namespace
+  manipulations restricted to the command line, and therefore the
+  build system.  He thinks of namespaces as something that should be
+  used pretty rarely (or at least, there should be very few
+  namespaces), and it's therefore OK to push them to the outside.
+
+  Leo and I both believe this is a big mistake.  We expect opens to
+  happen fairly commonly, and for there to be many different libraries
+  that are organized as namespaces.
+
+  Alain doubts that there would be many module-name clashes.  I
+  disagree on this point as does Leo.  We use packed modules
+  pervasively (for /every/ library), and as a result, we have lots of
+  little namespaces, and lots of repeated names within them (names
+  like Common, Protocol, Spec, Config, etc.)
+
+  My biggest objection to having opens be at the build system level is
+  that it makes your code more ambiguous.  When you do namespace
+  manipulations, you very much want to see what's happening by
+  inspecting the source.  We have a vigorous code review system here,
+  and I don't want to start adding code review of the build rules to
+  it, and this change would require that.
+
+  Alain's claim that opens are a bad thing also seems wrong to me.
+  opens should be rare, but all of our proposals involve the
+  equivalent of opening a namespace.  Alain is not saying we should
+  have none of that (after all, we're all glad that Pervasives is
+  opened!).  But what Alain is proposing is to make opening a
+  namespace silent at the source level.  This strikes me as a grave
+  error.
+
+- NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+  namespace to also implicitly open some modules, this essentially
+  adding values to the search path in addition to modules.  I would be
+  sad to lose this feature, but I don't think it's absolutely
+  essential.  It would merely add boilerplate.  Roughly speaking,
+  every time a user of Core writes
+
+     open namespace Core#Std
+
+  instead of
+
+     open namespace Core#Std
+     open Core#Std.Common
+
+  they're making a mistake.  I'd like to avoid this error, and I don't
+  know really what the objection to the feature is, but in the worst
+  case, we can add a syntax extension to work around this problem,
+  using a -ppx transformer to add the open ourselves.
+
+
+
+On Wed, Feb 27, 2013 at 8:09 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 02/27/2013 12:51 PM, Leo White wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Without an open statement your proposal does not scale well. The main
+</I>&gt;&gt;<i> need for namespaces arises out of the fact that people choose the same
+</I>&gt;&gt;<i> short names for their modules. This will still be the case for the names
+</I>&gt;&gt;<i> people choose within their &quot;.ns&quot; files. As soon as I want to use two
+</I>&gt;&gt;<i> libraries that contain modules with the same short name, your proposal
+</I>&gt;&gt;<i> will have the meaning of the short name decided by the order of
+</I>&gt;&gt;<i> command-line arguments. This seems very fragile.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I want to see concrete examples!  I don't believe that it is common, in the
+</I>&gt;<i> same unit, to access two modules called &quot;List&quot; from two different libraries.
+</I>&gt;<i> Maybe you want to use both String.Set and Int.Set, but you're not going to
+</I>&gt;<i> &quot;open&quot; String and Int anyway.  You may also want to use Xmllight.parse and
+</I>&gt;<i> Xmlm.parse (although it is not clear that this will happen in the same
+</I>&gt;<i> module), but you're not going to open Xmllight or Xmlm globally in your
+</I>&gt;<i> unit.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> I also think that open statements (even at the top of a file) are a very
+</I>&gt;&gt;<i> good thing.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> If put at the top of the file, I don't see them as fundamentally different
+</I>&gt;<i> from command-line arguments, and the meaning of the short name is decided by
+</I>&gt;<i> the order of open statements, which is also quite fragile.
+</I>&gt;<i>
+</I>&gt;<i> And &quot;open statements&quot; (for modules, not even namespaces) are generally
+</I>&gt;<i> considered as a dangerous feature, because they are the source of technical
+</I>&gt;<i> problems (dependency analysis), because they make the code harder to read
+</I>&gt;<i> and refactorize, and because it makes modules more fragile (if a module B is
+</I>&gt;<i> extended with more components, they can hide components with the same name
+</I>&gt;<i> from another module A which is open before B in some client code).  Making
+</I>&gt;<i> &quot;opens&quot; more local is a way to reduce those problems.  I'm thus surprised by
+</I>&gt;<i> your claim that open statements are very good thing.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> They show which libraries the file is going to use.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This seems to confirm that what you're aiming at is really a way to specify
+</I>&gt;<i> in the source code which libraries are used.  But then we should push the
+</I>&gt;<i> reasoning further and ensure this specification is the only one required to
+</I>&gt;<i> use a library.  Why should we accept to pass -I / -pp / -ppx flags to the
+</I>&gt;<i> compiler (and specify again libraries at link time) when the information is
+</I>&gt;<i> already part of the source code?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> Currently, a file using a library that does not use pack will simply
+</I>&gt;&gt;<i> launch straight into using modules with short names that give no
+</I>&gt;&gt;<i> indication of their origin.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Many of the third-party libraries I use export a single module, which I
+</I>&gt;<i> never &quot;open&quot;, and whose name is unique enough to avoid clashes (e.g.
+</I>&gt;<i> Postgresql, Sqlite3, Xmlm).  Some libraries use prefixes (Nethtml, with an
+</I>&gt;<i> internal Nethtml_scanner module; Lwt comes with Lwt_util, Lwt_condition,
+</I>&gt;<i> Lwt_mutex, etc).  It would have been crazy, indeed, for Nethtml to have an
+</I>&gt;<i> internal &quot;Scanner&quot; module, or for Lwt to expose a &quot;Mutex&quot; module.  I'm fine
+</I>&gt;<i> with this situation, but I can understand that in some cases, it would make
+</I>&gt;<i> sense, for instance, to alias Lwt_mutex to Mutex in a given project.
+</I>&gt;<i>
+</I>&gt;<i> So I don't agree with the opinion that -pack is currently the only way to
+</I>&gt;<i> avoid clashes!  It would be useful to get some statistics about the use of
+</I>&gt;<i> -pack in OPAM.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> I must look in the build system to find out
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> what they refer to. By encouraging people to use namespaces, these files
+</I>&gt;&gt;<i> will instead start with &quot;open namespace Foo&quot;, and it will be obvious
+</I>&gt;&gt;<i> what libraries they are using.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> So if you have a program like:
+</I>&gt;<i>
+</I>&gt;<i>  open namespace Foo
+</I>&gt;<i>  open namespace Bar
+</I>&gt;<i>
+</I>&gt;<i>  (* ... several hundreds of lines ... *)
+</I>&gt;<i>
+</I>&gt;<i>   .... Baz.parse ...
+</I>&gt;<i>
+</I>&gt;<i> then, yes, you know that this program uses the Foo and Bar
+</I>&gt;<i> libraries/namespaces, but you have no idea where Baz comes from.  This is
+</I>&gt;<i> fine, as long as you don't have clashes of &quot;short&quot; names, i.e. Foo and Bar
+</I>&gt;<i> are different enough to not provide top-level components of the same name.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> As OPAM (and the platform) become more widely used I expect there to be
+</I>&gt;&gt;<i> many more small convenience libraries. This will increase the number of
+</I>&gt;&gt;<i> libraries that are being used within a single project, and it will be
+</I>&gt;&gt;<i> useful to know from the source files themselves which files use which
+</I>&gt;&gt;<i> libraries.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I like this idea of putting more information in the source code about a file
+</I>&gt;<i> &quot;requirements&quot; (let's say, which libraries are used).  This could be
+</I>&gt;<i> interpreted directly by the compiler (if there is a well-defined convention
+</I>&gt;<i> on how libraries are located and invoked) or by a driver such as ocamlfind.
+</I>&gt;<i> Currently, library dependencies are specified on the command-line (hence in
+</I>&gt;<i> the build system) and I agree it makes sense to allow specifying that in the
+</I>&gt;<i> source code.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> I understand that for backwards compatibility it is useful to be able to
+</I>&gt;&gt;<i> use files via both a namespaced name and a traditional name. However,
+</I>&gt;&gt;<i> when not worried about backwards compatibility, we should instead be
+</I>&gt;&gt;<i> focussed on providing a coherent story about how OCaml components are
+</I>&gt;&gt;<i> named and how these names are managed. For me, this means (for a
+</I>&gt;&gt;<i> non-backwards compatible library) only providing (or at least actively
+</I>&gt;&gt;<i> encouraging) access to components through namespaces.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I understand your point and I think it makes sense if &quot;namespaces&quot; are
+</I>&gt;<i> indeed to be added to the language.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;&gt;<i> Worse: if we use &quot;ocamldep -modules&quot;, this resolution has to be done
+</I>&gt;&gt;&gt;<i> by the build system, so this complex logic (which depends on the
+</I>&gt;&gt;&gt;<i> location in the source file) will have to be re-implemented in omake
+</I>&gt;&gt;&gt;<i> and other build systems around.  It is an important property that
+</I>&gt;&gt;&gt;<i> &quot;ocamldep -modules&quot; does not need to look for the existence of
+</I>&gt;&gt;&gt;<i> compiled units on the current tree.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Firstly, I would like to make clear that this would be no problem for
+</I>&gt;&gt;<i> build systems that used makefile formatted ocamldep output.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Indeed.  However, &quot;ocamldep -modules&quot; has been added for good reasons and it
+</I>&gt;<i> is the recommended way to use omake.  (And don't know about ocamlbuild.)
+</I>&gt;<i> omake is used by some of the largest OCaml code base around.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> &quot;ocamldep -modules&quot; has always produced an over-estimate of the modules
+</I>&gt;&gt;<i> that a file uses and then allowed the build system to figure out the
+</I>&gt;&gt;<i> rest.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> &quot;ocamldep -modules&quot; does not produce more false dependencies than
+</I>&gt;<i> &quot;ocamldep&quot;.  I'd rather say that &quot;ocamldep&quot; (without -modules) misses some
+</I>&gt;<i> dependencies (for generated files which are not yet present when ocamldep is
+</I>&gt;<i> executed).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> OCamlDep would simply treat any namespace for which it could find
+</I>&gt;&gt;<i> no &quot;.ns&quot; file as an implicit namespace.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I have to admit that I'm a little bit lost and I don't really know which
+</I>&gt;<i> &quot;namespace proposal&quot; we are talking about (mine has only &quot;.ns&quot; file, no
+</I>&gt;<i> other notion of namespaces).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000177.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000178.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#176">[ date ]</a>
+              <a href="thread.html#176">[ thread ]</a>
+              <a href="subject.html#176">[ subject ]</a>
+              <a href="author.html#176">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] Problem (and fix) with Unix.create_process in windows
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Problem%20%28and%20fix%29%20with%20Unix.create_process%20in%0A%20windows&In-Reply-To=%3C20150901130847.GA24741%40notk.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000041.html">
+   <LINK REL="Next"  HREF="000043.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] Problem (and fix) with Unix.create_process in windows</H1>
+    <B>Adrien Nader</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20Problem%20%28and%20fix%29%20with%20Unix.create_process%20in%0A%20windows&In-Reply-To=%3C20150901130847.GA24741%40notk.org%3E"
+       TITLE="[wg-windows] Problem (and fix) with Unix.create_process in windows">adrien at notk.org
+       </A><BR>
+    <I>Tue Sep  1 14:08:47 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000041.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+        <LI>Next message: <A HREF="000043.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#42">[ date ]</a>
+              <a href="thread.html#42">[ thread ]</a>
+              <a href="subject.html#42">[ subject ]</a>
+              <a href="author.html#42">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+On Tue, Sep 01, 2015, Leonardo Laguna wrote:
+&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> I have spent some hours trying to find a problem when using
+</I>&gt;<i> Unix.create_process in windows.
+</I>&gt;<i> 
+</I>&gt;<i> The problem shows when trying to create a process in which the path of the
+</I>&gt;<i> executable and one of the arguments have spaces, for example:
+</I>&gt;<i> 
+</I>&gt;<i> let cmd = &quot;C:/Program Files/Something/something.exe&quot; ;;
+</I>&gt;<i> let args = [&quot;arg1&quot;; &quot;arg2&quot;; &quot;C:/Program Files/arg3&quot;] ;;
+</I>&gt;<i> 
+</I>&gt;<i> let pid = Unix.create_process cmd (cmd::args |&gt; Array.of_list) Unix.stdin
+</I>&gt;<i> Unix.stdout Unix.stderr ;;
+</I>&gt;<i> 
+</I>&gt;<i> Unix.waitpid [] pid ;;
+</I>&gt;<i> 
+</I>&gt;<i> As soon as there's an argument with spaces, the process fails to run. I
+</I>&gt;<i> tried many different combinations with quoting, backlashes, forwardslashes,
+</I>&gt;<i> backslashed space, etc, but nothing seemed to work.
+</I>&gt;<i> 
+</I>&gt;<i> I saw that ocaml calls CreateProcess from the windows API, which has many
+</I>&gt;<i> weird things in the documentation.
+</I>&gt;<i> 
+</I>&gt;<i> When calling CreateProcess you need to supply (optionally) the path to the
+</I>&gt;<i> application and then the full command line call. For example:
+</I>&gt;<i> 
+</I>&gt;<i> CreateProcess(&quot;C:/some.exe&quot;,&quot;\&quot;C:/some.exe\&quot; arg1 arg2&quot;,.........);
+</I>&gt;<i> 
+</I>&gt;<i> Note that you need to pass in the full command line the name of the
+</I>&gt;<i> application quoted.
+</I>&gt;<i> 
+</I>&gt;<i> The only way of fixing my problem was to pass NULL as first argument:
+</I>&gt;<i> 
+</I>&gt;<i> CreateProcess(NULL&quot;,&quot;\&quot;C:/some.exe\&quot; arg1 arg2&quot;,.........);
+</I>&gt;<i> 
+</I>&gt;<i> After making this change all calls work fine for me.
+</I>&gt;<i> 
+</I>&gt;<i> Has anyone had these kind of problems?
+</I>&gt;<i> 
+</I>&gt;<i> Is is possible to get this change in the ocaml code?
+</I>
+Yes! I'm not saying it will happen, only that it's possible.
+
+It's probably the kind of things for which you need to provide new
+testsuite entries.
+Have you checked the compatibility for this? I.e. is it supposed to also
+work on Windows XP? (not that I care about XP)
+You will also need to explain the possible drawbacks of passing NULL as
+the first parameter.
+
+Just a few quick ideas. If this solves the problem you mention, that
+sounds like something good but at the same time the corresponding code
+is quite sensitive and with Microsoft's weird APIs I'm a bit worried
+about corner cases.
+
+-- 
+Adrien Nader
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000041.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+	<LI>Next message: <A HREF="000043.html">[wg-windows] Problem (and fix) with Unix.create_process in windows
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#42">[ date ]</a>
+              <a href="thread.html#42">[ thread ]</a>
+              <a href="subject.html#42">[ subject ]</a>
+              <a href="author.html#42">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

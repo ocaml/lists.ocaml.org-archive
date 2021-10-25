@@ -1,0 +1,434 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 1.3 roadmap
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%201.3%20roadmap&In-Reply-To=%3C553EB83C-E92E-4475-87D5-396B151D988F%40m4x.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000946.html">
+   <LINK REL="Next"  HREF="000964.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 1.3 roadmap</H1>
+    <B>Simon Cruanes</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%201.3%20roadmap&In-Reply-To=%3C553EB83C-E92E-4475-87D5-396B151D988F%40m4x.org%3E"
+       TITLE="[opam-devel] OPAM 1.3 roadmap">simon.cruanes.2007 at m4x.org
+       </A><BR>
+    <I>Sat Feb 21 09:58:08 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000946.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+        <LI>Next message: <A HREF="000964.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#947">[ date ]</a>
+              <a href="thread.html#947">[ thread ]</a>
+              <a href="subject.html#947">[ subject ]</a>
+              <a href="author.html#947">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>The one I'm most familiar with is fakeroot, used by archlinux for building its packages; it's relevant because the average user (me) can install unsupported software from AUR (a large repository of user-contributed, unsupported packages). Fakeroot is used during the compilation of such packages, before a proper archive is built (one that the distribution package manager, pacman, can use to install/uninstall). Apparently fakeroot emulates a filesystem in a sub-directory and makes believe the untrusted software that is being compiled that it has root privileges to write in the filesystem.
+
+It is probably impossible to do that in a portable way across all OSes, so I think the first step is building in a temporary directory. For Windows support, using shell commands is discouraged (as far as I understood) so opam could provide its own file manipulation directives that would respect the boundaries of the temporary directory.
+
+Le 21 f&#233;vrier 2015 10:16:03 UTC+01:00, Roberto Di Cosmo &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>&gt; a &#233;crit :
+&gt;<i>Anil, Simon, can you provide more details on the sandboxing mechanisms
+</I>&gt;<i>you know of?
+</I>&gt;<i>
+</I>&gt;<i>We looked into all this for Mancoosi years ago; the most complete tool
+</I>&gt;<i>out there was installwatch (now checkinstall) that hijacks filesystem
+</I>&gt;<i>modifying
+</I>&gt;<i>commands using the standard LD_PRELOAD trick and a wrapper for system
+</I>&gt;<i>calls.
+</I>&gt;<i>Checkinstall does not alter user priviledges, though, so one sometimes
+</I>&gt;<i>needed
+</I>&gt;<i>a combination of fakeroot (that only alter user priviledges) with it.
+</I>&gt;<i>
+</I>&gt;<i>The best approach I know of was described in a Master thesis from ...
+</I>&gt;<i>Cambridge
+</I>&gt;:<i>-) It was under the supervision of Peter Sewell, and used the ptrace
+</I>&gt;<i>mechanism
+</I>&gt;<i>instead of the LD_PRELOAD trick, because LD_PRELOAD is blind to
+</I>&gt;<i>statically
+</I>&gt;<i>compiled binaries that have system calls hardcoded, while ptrace gets
+</I>&gt;<i>them all.
+</I>&gt;<i>
+</I>&gt;<i>The dissertation is still available today here
+</I>&gt;<i><A HREF="http://robot101.net/files/diss.ps.gz">http://robot101.net/files/diss.ps.gz</A>
+</I>&gt;<i>and contains a very nice discussion of the issues related to monitoring
+</I>&gt;<i>and
+</I>&gt;<i>rolling back file system changes performed by a command in the Linux
+</I>&gt;<i>system.
+</I>&gt;<i>The source code is also available here
+</I>&gt;<i><A HREF="http://robot101.net/files/trace.tar.gz">http://robot101.net/files/trace.tar.gz</A>
+</I>&gt;<i>and one can get in touch with Robert Mcqueen that will be delighted to
+</I>&gt;<i>see his
+</I>&gt;<i>work being used.
+</I>&gt;<i>
+</I>&gt;<i>Since all this is almost 10 years old, I suppose many exciting new
+</I>&gt;<i>ideas, tools
+</I>&gt;<i>and approaches surfaced in the meantime, and I'd really like to know
+</I>&gt;<i>more.
+</I>&gt;<i>
+</I>&gt;<i>Cheers
+</I>&gt;<i>
+</I>&gt;<i>--
+</I>&gt;<i>Roberto
+</I>&gt;<i>
+</I>&gt;<i>On Sat, Feb 21, 2015 at 09:37:07AM +0100, Simon Cruanes wrote:
+</I>&gt;&gt;<i> Sandboxing the build would also be a big security improvement. I
+</I>&gt;<i>think cabal
+</I>&gt;&gt;<i> now does it, and signing packages doesn't protect against malicious
+</I>&gt;<i>or buggy
+</I>&gt;&gt;<i> packages (see: bumblebee's uninstall target). That also goes hand in
+</I>&gt;<i>hand with
+</I>&gt;&gt;<i> file tracking. I don't know how difficult it is, though.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Cheers!
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Le 21 f&#233;vrier 2015 05:01:56 UTC+01:00, Louis Gesbert
+</I>&gt;&gt;<i> &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt; a &#233;crit :
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     With 1.2.1 almost out of the door, time has come to review the
+</I>&gt;<i>roadmap discussed back in December and choose where we'll be going for
+</I>&gt;<i>1.3. Original mail attached for reference.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     The topic that is burning hot at the moment is, specially after
+</I>&gt;<i>the Debian Haskell build host has been compromised, security: we have
+</I>&gt;<i>no signing at all at the moment, and we need to improve on this before
+</I>&gt;<i>it becomes a problem. TUF [1] has devised a sane amount of rules for
+</I>&gt;<i>repository management and signing that should make it easier to get it
+</I>&gt;<i>right in OPAM. Hannes has mentionned writing an OCaml implementation
+</I>&gt;<i>for TUF, which could get very helpful.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Also of importance is Windows support. It should at least be
+</I>&gt;<i>straighforward and documented to get a basic Cygwin setup working. That
+</I>&gt;<i>goes with adding automated tests (appveyor can now be added in Github
+</I>&gt;<i>alongside Travis). Related is cleaning up external command usage (even
+</I>&gt;<i>if not really justified by a Windows
+</I>&gt;&gt;<i>     port only, as David Allsopp pointed out) -- replacing curl calls
+</I>&gt;<i>by cohttp, use ocaml-fileutils...
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     These are the other main features, that'll probably take more
+</I>&gt;<i>time if we are to focus eg. on security:
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     * a plugin mechanism with plugins for example for OCaml (for
+</I>&gt;<i>better agnosticity), external dependency handling [2], documentation
+</I>&gt;<i>generation...
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     * a 'provides:' field in OPAM files [3]. This is a loose
+</I>&gt;<i>requirement if we want to switch the repository to have OCaml itself in
+</I>&gt;<i>a package (which is already possible, but the system compiler may yet
+</I>&gt;<i>be an issue).
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     * More flexible switch handling (multi-switch packages,
+</I>&gt;<i>per-switch remotes, layered switches for cross-compilation...)
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     * Tracking of files installed by packages. While unrelated to
+</I>&gt;<i>repo signing, this might have some security implications, so we might
+</I>&gt;<i>want to bring it in.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     * With file tracking, generating a binary repo (with some
+</I>&gt;<i>limitations) could be quite
+</I>&gt;&gt;<i>     straight-forward.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Which of these do you think is most important ? Have I forgotten
+</I>&gt;<i>anything ?
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Cheers,
+</I>&gt;&gt;<i>     Louis
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     [1] <A HREF="http://theupdateframework.com/">http://theupdateframework.com/</A>
+</I>&gt;&gt;<i>     [2]
+</I>&gt;<i><A HREF="https://github.com/ocaml/opam/blob/master/doc/design/depexts-plugins">https://github.com/ocaml/opam/blob/master/doc/design/depexts-plugins</A>
+</I>&gt;&gt;<i>     [3]
+</I>&gt;<i><A HREF="https://github.com/ocaml/opam/blob/master/doc/design/provides.md">https://github.com/ocaml/opam/blob/master/doc/design/provides.md</A>
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     message suivi
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>       De&#160;:   Louis Gesbert
+</I>&gt;&gt;<i>       &#192;&#160;:    <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i>     Envoy&#233;&#160;: Wed Dec 17 11:07:40 UTC+01:00 2014
+</I>&gt;&gt;<i>     Objet&#160;:  [opam-devel] OPAM Roadmap -- what next ?
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Hi all,
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     with some lag after the 1.2 release, I'd like to open some space
+</I>&gt;<i>for a
+</I>&gt;&gt;<i>     collective discussion of the priorities for where the energies
+</I>&gt;<i>should go
+</I>&gt;&gt;<i>     next. We have mainly 3 directions for improvements: first,
+</I>&gt;<i>portability,
+</I>&gt;&gt;<i>     with the main goal of a Windows version. Second, agnosticity,
+</I>&gt;<i>with the goal
+</I>&gt;&gt;<i>     to make OPAM more generic, and try and open it to users outside
+</I>&gt;<i>of the
+</I>&gt;&gt;<i>     OCaml community (wouldn't OPAM for Haskell be fun ?). Third,
+</I>&gt;<i>there are
+</I>&gt;&gt;<i>     always lots of features and improvements that have been asked
+</I>&gt;<i>for, and
+</I>&gt;&gt;<i>     would improve the experience of current users.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     So here is a summary of what I've gathered. Feel free to add your
+</I>&gt;<i>own.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     ## Portability
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Rewrite parallel command engine.** / done.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Native system manipulation (cp, rm, curl...).**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     These are mostly done through calls to the shell or external
+</I>&gt;<i>programs. It's
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     not very pretty but quite pragmatic actually... until we want to
+</I>&gt;<i>run on
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Windows without Cygwin. Anyway, this wouldn't be the end of
+</I>&gt;<i>portability
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     issues.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Windows support.**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     for OPAM itself to begin with. This should be pretty close.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Packages on Windows.**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Locate common issues and attempt to find generic fixes.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Allow **direct use of more solvers** or solver servers.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Support cross-compilation**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     This is quite an open issue at the moment.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     ## Agnosticity
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Isolate OCaml-specific stuff.**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     E.g. specific opam-file variables. See ocaml-specific.md
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Separate as plugins**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     To open the gate to OPAM without these plugins, or with other
+</I>&gt;<i>ones
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Compilers as packages.**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     This should mostly work now, but needs some tests and
+</I>&gt;<i>strengthening. The
+</I>&gt;&gt;<i>     main
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     thing still to do is to handle the system compiler changes
+</I>&gt;<i>properly ; that
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     part should be made more generic anyway (see discussion on hooks)
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     ## Features
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - A **provides** field. Generally useful, but particulary so with
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     compilers-as-packages
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Releasing the **&quot;features&quot; field** for easier package
+</I>&gt;<i>configuration
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Track installed files**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Improve security**: just checking md5s is quite light ;
+</I>&gt;<i>package scripts
+</I>&gt;&gt;<i>     can
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     write anywhere
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **OS-specific handling of dependencies** (eg dependencies on
+</I>&gt;<i>packages
+</I>&gt;&gt;<i>     from the
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     OS) with plugins (#1519)
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Specify and implement **hooks**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Find a nicer way to **share dev repos** / undoable &quot;pinning
+</I>&gt;<i>sources&quot;
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Per-switch remotes**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - **Multi-switch packages**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Support for (automatic generation of) **binary packages**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     - Nicer **ocamlfind interaction**
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>      
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Cheers,
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     Louis Gesbert
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>    
+</I>&gt;<i>&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     opam-devel mailing list
+</I>&gt;&gt;<i>     <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i>     <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>    
+</I>&gt;<i>&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;&#9473;
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i>     opam-devel mailing list
+</I>&gt;&gt;<i>     <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i>     <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> Simon
+</I>&gt;<i>
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> opam-devel mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>-- 
+</I>&gt;<i>Roberto Di Cosmo
+</I>&gt;<i> 
+</I>&gt;<i>------------------------------------------------------------------
+</I>&gt;<i>Professeur               En delegation a l'INRIA
+</I>&gt;<i>PPS                      E-mail: <A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>
+</I>&gt;<i>Universite Paris Diderot WWW  : <A HREF="http://www.dicosmo.org">http://www.dicosmo.org</A>
+</I>&gt;<i>Case 7014                Tel  : ++33-(0)1-57 27 92 20
+</I>&gt;<i>5, Rue Thomas Mann       
+</I>&gt;<i>F-75205 Paris Cedex 13   Identica: <A HREF="http://identi.ca/rdicosmo">http://identi.ca/rdicosmo</A>
+</I>&gt;<i>FRANCE.                  Twitter: <A HREF="http://twitter.com/rdicosmo">http://twitter.com/rdicosmo</A>
+</I>&gt;<i>------------------------------------------------------------------
+</I>&gt;<i>Attachments:
+</I>&gt;<i>MIME accepted, Word deprecated
+</I>&gt;<i>      <A HREF="http://www.gnu.org/philosophy/no-word-attachments.html">http://www.gnu.org/philosophy/no-word-attachments.html</A>
+</I>&gt;<i>------------------------------------------------------------------
+</I>&gt;<i>Office location:
+</I>&gt;<i> 
+</I>&gt;<i>Bureau 3020 (3rd floor)
+</I>&gt;<i>Batiment Sophie Germain
+</I>&gt;<i>Avenue de France
+</I>&gt;<i>Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+</I>&gt;<i>-----------------------------------------------------------------
+</I>&gt;<i>GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3      
+</I>&gt;<i>                 
+</I>
+-- 
+Simon
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150221/f894f40e/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150221/f894f40e/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000946.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+	<LI>Next message: <A HREF="000964.html">[opam-devel] OPAM 1.3 roadmap
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#947">[ date ]</a>
+              <a href="thread.html#947">[ thread ]</a>
+              <a href="subject.html#947">[ subject ]</a>
+              <a href="author.html#947">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

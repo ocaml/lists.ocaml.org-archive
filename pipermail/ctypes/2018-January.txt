@@ -1,0 +1,239 @@
+From skaller at internode.on.net  Wed Jan  3 07:42:41 2018
+From: skaller at internode.on.net (john skaller)
+Date: Wed, 3 Jan 2018 18:42:41 +1100
+Subject: [ocaml-ctypes] structures
+Message-ID: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+
+Just thought, as a novice, I?d report on my latest attempt to use Ctypes
+to bind some C structs. The bottom line: it took me hours, i found it confusing,
+and wished there were  an example in the tutorial which included
+
+(a) the C code
+(b) Ocaml interface (mli file)
+(c) Ocaml implementation (ml file)
+
+The source of my confusion is the amount of ?types? involved!
+Ocaml uses separate namespaces for types and values, and this
+is used in Ctypes. Supposedly to make things simpler, for me it
+made things much harder.
+
+Its not just the types but the operators do this too, for example
+?ptr? has two meanings, depending on context.
+
+When you?re binding you have a C type to think about,
+possibly with two names, a structure tag name as well as
+a typedef name.
+
+Then, you have an Ocaml type representing the C type.
+Then, you have an Ocaml value encoding the binding information,
+which is a ?type? representation. And that representation itself
+has an Ocaml type, the type of the encoding value, which is distinct
+from the type of the Ocaml value used to represent the C value.
+
+Throw in the use of the same name for these things and my solution
+was to just try all the possible combinations until something compiled.
+
+This finally seems to work:
+
+
+(* C HEADER FILE ****)
+struct __ccc_t;
+typedef struct __ccc_t *ccc_t;
+void ccc_destroy(ccc_t);
+
+(* MLI FILE *********)
+type __ccc_t_tag
+type __ccc_t_struct = __ccc_t_tag structure
+type __ccc_t_type = __ccc_t_struct typ
+
+
+
+(* pointer alias *)
+type ccc_t = __ccc_t_struct ptr
+val ccc_t : ccc_t typ
+
+val ccc_destroy: ccc_t  -> unit
+
+
+(* ML FILE ********)
+type __ccc_t_tag
+type __ccc_t_struct = __ccc_t_tag structure
+type __ccc_t_type = __ccc_t_struct typ
+let __ccc_t_tag  : __ccc_t_type = structure "__ccc_t_tag"
+
+(* pointer alias *)
+type ccc_t = __ccc_t_struct ptr
+let ccc_t: ccc_t typ = ptr (__ccc_t_tag)
+
+let ccc_destroy =  foreign "ccc_destroy" (
+  ccc_t @-> returning void
+)
+
+
+That?s a lot of code for 3 lines of C. This is real code (with the name
+changed to protect the guilty).
+
+The phrase ?ccc? occurs 5 times in the C code and
+27 times in the Ocaml code.
+
+I have made a choice that the structure ?tag? name used in C is the
+only way to define the Ocaml struct, and where C uses a typedef
+to introduce a non-tag name, Ocaml will use an alias also.
+Since Ctypes  doesn?t split struct tag name space from type namespace
+I have added ?_tag? to the tag name.
+
+I?m currently testing with dynamic/libffi link but I can see this isn?t going
+to cut it, either performance wise or interms of getting messy stuff like
+bit fields working .. so Cstubs unfortunately looks like a requirement
+(as well as some hand written extra C to cope with bitfields).
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From skaller at internode.on.net  Sat Jan 20 22:08:16 2018
+From: skaller at internode.on.net (john skaller)
+Date: Sun, 21 Jan 2018 09:08:16 +1100
+Subject: [ocaml-ctypes] string_of_char_ptr
+In-Reply-To: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+References: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+Message-ID: <DBB3E461-F1BC-44F4-A4B7-A17F4B6F8D55@internode.on.net>
+
+According to Real World Ocaml string_of_char_ptr can be used to convert a 
+C char* to an Ocaml string. But I can?t find it anywhere in the API!
+
+Any clues?
+
+I found Ctypes.string_from_ptr but that is useless because it requires a length:
+
+val string_from_ptr : char ptr -> length:int -> string
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Sat Jan 20 23:17:07 2018
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 20 Jan 2018 23:17:07 +0000
+Subject: [ocaml-ctypes] string_of_char_ptr
+In-Reply-To: <DBB3E461-F1BC-44F4-A4B7-A17F4B6F8D55@internode.on.net>
+References: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+ <DBB3E461-F1BC-44F4-A4B7-A17F4B6F8D55@internode.on.net>
+Message-ID: <CAAxsn=FZ2esab0-NWNY+1Ay4dk58vbROA5twpx0UBHs_OrjAxA@mail.gmail.com>
+
+On 20 January 2018 at 22:08, john skaller <skaller at internode.on.net> wrote:
+> According to Real World Ocaml string_of_char_ptr can be used to convert a
+> C char* to an Ocaml string. But I can?t find it anywhere in the API!
+>
+> Any clues?
+
+I don't think that function is exposed in the API, at least in recent
+versions.  But if you have a 'char ptr' value 'p' then you can convert
+it to a string using 'coerce':
+
+     coerce (ptr char) string p
+
+For example:
+
+     # let getenv = foreign "getenv" (string @-> returning (ptr char));;
+     val getenv : string -> char Ctypes_static.ptr = <fun>
+     # let p = getenv "USER";;
+     val p : char Ctypes_static.ptr = (char*) 0x7ffe712cd9f8
+     # coerce (ptr char) string p;;
+     - : string = "jeremy"
+
+Kind regards,
+
+Jeremy
+
+From skaller at internode.on.net  Sat Jan 20 23:36:33 2018
+From: skaller at internode.on.net (john skaller)
+Date: Sun, 21 Jan 2018 10:36:33 +1100
+Subject: [ocaml-ctypes] string_of_char_ptr
+In-Reply-To: <CAAxsn=FZ2esab0-NWNY+1Ay4dk58vbROA5twpx0UBHs_OrjAxA@mail.gmail.com>
+References: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+ <DBB3E461-F1BC-44F4-A4B7-A17F4B6F8D55@internode.on.net>
+ <CAAxsn=FZ2esab0-NWNY+1Ay4dk58vbROA5twpx0UBHs_OrjAxA@mail.gmail.com>
+Message-ID: <FA348599-3FC4-4DE5-8AB7-BD6D305967D4@internode.on.net>
+
+
+> On 21 Jan. 2018, at 10:17, Jeremy Yallop <yallop at gmail.com> wrote:
+> 
+> On 20 January 2018 at 22:08, john skaller <skaller at internode.on.net> wrote:
+>> According to Real World Ocaml string_of_char_ptr can be used to convert a
+>> C char* to an Ocaml string. But I can?t find it anywhere in the API!
+>> 
+>> Any clues?
+> 
+> I don't think that function is exposed in the API, at least in recent
+> versions.  
+
+It?s not, its in the repository in an *.ml file which is not exposed,
+its used to define a view. One supplies read and write functions
+to views, but is there a way to get them back?
+
+The API is too abstract. I?d have used a concrete record :)
+
+
+> But if you have a 'char ptr' value 'p' then you can convert
+> it to a string using 'coerce':
+> 
+>     coerce (ptr char) string p
+> 
+> For example:
+> 
+>     # let getenv = foreign "getenv" (string @-> returning (ptr char));;
+>     val getenv : string -> char Ctypes_static.ptr = <fun>
+>     # let p = getenv "USER";;
+>     val p : char Ctypes_static.ptr = (char*) 0x7ffe712cd9f8
+>     # coerce (ptr char) string p;;
+>     - : string = ?jeremy"
+
+Ouch. That doesn?t make sense. I mean I?m happy that it will do the 
+job, thanks for the info! But that?s not what a C programmer would
+think of as a coercion. Pointers and what they point at are distinct.
+
+Sigh .. of course now I am binding a function that returns a char* and
+of course the docs don?t say who owns the storage. Is it in a static
+buffer? Part of another data structure? Malloc()?d and therefore
+I have to free it? The usual problem with C: the fuctional API
+is weakly specified and the resource management isn?t specified at all ;)
+Off to troll the *.c files to see how its implemented? argghhh?
+
+
+
+?
+john skaller
+skaller at users.sourceforge.net
+http://felix-lang.org
+
+
+From yallop at gmail.com  Mon Jan 22 07:19:40 2018
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 22 Jan 2018 07:19:40 +0000
+Subject: [ocaml-ctypes] string_of_char_ptr
+In-Reply-To: <FA348599-3FC4-4DE5-8AB7-BD6D305967D4@internode.on.net>
+References: <CD71B8E2-306A-4CD5-9494-17E151D460C4@internode.on.net>
+ <DBB3E461-F1BC-44F4-A4B7-A17F4B6F8D55@internode.on.net>
+ <CAAxsn=FZ2esab0-NWNY+1Ay4dk58vbROA5twpx0UBHs_OrjAxA@mail.gmail.com>
+ <FA348599-3FC4-4DE5-8AB7-BD6D305967D4@internode.on.net>
+Message-ID: <CAAxsn=Gq8-Ow19HZYtqie2vvLVsAziRFQu811632b2bc-g+OKQ@mail.gmail.com>
+
+On 20 January 2018 at 23:36, john skaller <skaller at internode.on.net> wrote:
+> One supplies read and write functions to views, but is there a way to get them back?
+
+Yes, via coerce.  Given a view created as follows
+
+   let v = view ~read:f ~write:g t
+
+the read and write functions f and g are both available as coercions
+between the view and the underlying type:
+
+    f  ?  coerce t v
+    g  ?  coerce v t
+

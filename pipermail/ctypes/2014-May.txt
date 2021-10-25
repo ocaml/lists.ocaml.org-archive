@@ -1,0 +1,806 @@
+From philippe.veber at gmail.com  Fri May 16 06:28:59 2014
+From: philippe.veber at gmail.com (Philippe Veber)
+Date: Fri, 16 May 2014 07:28:59 +0200
+Subject: [ocaml-ctypes] Bit field encoding.
+Message-ID: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+
+Hi everyone,
+
+Has ctypes some support for bit fields in C struct? If not is it correct to
+encode:
+
+typedef struct {
+   int32_t pos;
+   uint32_t bin:16, qual:8, l_qname:8;
+   ...
+} bam1_core_t
+
+as:
+
+   type bam1_core_t
+   let bam1_core_t : bam1_core_t structure typ = structure "bam1_core_t"
+   let bam1_core_t_pos_f = field bam1_core_t "pos" int32_t
+   let bam1_core_t_props_f = field bam1_core_t "props" int32_t
+   ...
+   let () = seal bam1_core_t
+
+and then play with the fake "props" field directly?
+
+Cheers,
+  Philippe.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140516/87672c8e/attachment.html>
+
+From yallop at gmail.com  Sat May 17 00:52:13 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 17 May 2014 00:52:13 +0100
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <20140430161924.28903.96399@andromeda1.ze.tum.de>
+References: <20140430161924.28903.96399@andromeda1.ze.tum.de>
+Message-ID: <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+
+Dear Florian,
+
+On 30/04/2014, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+> i have this create function
+>
+> type t = unit ptr
+> let zframe : t typ = ptr void
+> let zframe_opt : t option typ = ptr_opt void
+>
+> let create msg =
+>   let stub = foreign "zframe_new"
+>       (string @-> size_t @-> returning zframe_opt)
+>   in
+>   let msg_size =  Size_t.of_int (String.length msg) in
+>   match stub msg msg_size with
+>   | None -> raise Frame_creation
+>   | Some x -> x
+>
+> How can i tell the garbage collector to call my specific
+> destroy function?
+
+You can attach a finaliser, either to the zframe value itself, or to
+another object which has the same lifetime as the zframe.  The
+drawback of attaching the finaliser directly to the zframe is that a
+number of ctypes functions (e.g. the functions for pointer arithmetic)
+create new ptr values, so you may end up destroying the object while
+you still have a pointer to it.  For example:
+
+    let zf = create msg in
+    let () = Gc.finalise destroy_zframe zf in
+      (zf +@ 0)
+    (* At this point you still have a pointer to the zframe you
+       created, but the original Ctypes.ptr value has gone, so the
+       GC is free to run the finaliser attached to it. *)
+
+If you're already wrapping the zframe in a larger OCaml value, such as
+a record, it would probably be wiser to attach the finaliser to that
+value instead, since you can see more easily in your own code exactly
+when copies are made.  If you want even stronger guarantees, you
+should make sure that the type you use to wrap the zframe has a
+mutable field, since the runtime is free to make copies of immutable
+values.
+
+It may be more advisable to consider an alternative interface that
+makes the lifetime of your zframes deterministic and explicit.  One
+simple approach is to follow the design of the channel interfaces in
+the standard library, and expose a pair of functions
+
+   val create : string -> t
+   val destroy : t -> unit
+
+then leave it up to the user to ensure that destroy_zframe is closed
+at an appropriate moment (but perhaps catching other errors, such as
+double closes).
+
+An alternative approach is to follow the design often used in Scheme,
+and expose a single higher-order function that manages the lifetime of
+the frame.  For example, if you have a function with the following
+interface
+
+   val with_zframe : string -> (t -> 'a) -> 'a
+
+then you might call it as follows
+
+   with_zframe msg
+     (fun zframe ->
+         (* body: the zframe value is "live" here *)
+     )
+
+and the user can be confident that -- whether the body finishes
+normally or with an exception -- with_zframe will destroy the value in
+a timely way.  This approach is used in the Batteries library to
+manage files: see with_file_in and with_file_out, for example:
+
+   http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_in
+   http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_out
+
+I hope that helps,
+
+Jeremy.
+
+From yallop at gmail.com  Sat May 17 01:14:34 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 17 May 2014 01:14:34 +0100
+Subject: [ocaml-ctypes] Bit field encoding.
+In-Reply-To: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+References: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+Message-ID: <CAAxsn=Ennh6-MWja5M3QnAHDurTmi1P7wWijTTU3MhoTqUdhQA@mail.gmail.com>
+
+Dear Philippe,
+
+On 16/05/2014, Philippe Veber <philippe.veber at gmail.com> wrote:
+> Has ctypes some support for bit fields in C struct?
+
+Not yet, I'm afraid.
+
+> If not is it correct to
+> encode:
+>
+> typedef struct {
+>    int32_t pos;
+>    uint32_t bin:16, qual:8, l_qname:8;
+>    ...
+> } bam1_core_t
+>
+> as:
+>
+>    type bam1_core_t
+>    let bam1_core_t : bam1_core_t structure typ = structure "bam1_core_t"
+>    let bam1_core_t_pos_f = field bam1_core_t "pos" int32_t
+>    let bam1_core_t_props_f = field bam1_core_t "props" int32_t
+>    ...
+>    let () = seal bam1_core_t
+>
+> and then play with the fake "props" field directly?
+
+It's quite likely to work but it's not guaranteed, since the C
+standard gives compilers a fair amount of freedom in laying out
+bit-fields.  The good news is that the standard also requires
+compilers to document how bit-fields are laid out, so your compiler
+documentation may have helpful details.
+
+Kind regards,
+
+Jeremy.
+
+From florian.pichlmeier at mytum.de  Mon May 19 15:20:25 2014
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Mon, 19 May 2014 14:20:25 -0000
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+References: <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+ <20140430161924.28903.96399@andromeda1.ze.tum.de>
+Message-ID: <20140519142025.2757.70984@andromeda1.ze.tum.de>
+
+Dear Jeremy,
+
+thanks a lot for your comprehensive response.
+
+I will change my api to include explicit destroy 
+functions for messages.
+
+But now i have encountered a new problem.
+Zeromq uses incomplete types for many data types,
+like the frame type
+typedef struct _zframe_t zframe_t;
+
+On the OCaml side i use void pointer to represent 
+these data types, and thats where the problem arose.
+
+The frame destroy function call for example is that
+    zframe_destroy (zframe_t **self_p);
+with the corresponding ocaml function
+
+let destroy (msg : t) = 
+let stub = foreign "zframe_destroy" (ptr void @-> returning int) in
+stub (msg +@ 0)
+
+The problem is the msg +@ 0 part.
+
+Do you know a way around this problem?
+
+Thanks again for your efforts,
+
+Florian
+ 
+Jeremy Yallop <yallop at gmail.com> wrote:
+
+
+> Dear Florian,
+> 
+> On 30/04/2014, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+> 
+> > i have this create function
+> > 
+> > type t = unit ptr
+> > let zframe : t typ = ptr void
+> > let zframe_opt : t option typ = ptr_opt void
+> > 
+> > let create msg =
+> >   let stub = foreign "zframe_new"
+> >       (string @-> size_t @-> returning zframe_opt)
+> >   in
+> >   let msg_size =  Size_t.of_int (String.length msg) in
+> >   match stub msg msg_size with
+> >   | None -> raise Frame_creation
+> >   | Some x -> x
+> > 
+> > How can i tell the garbage collector to call my specific
+> > destroy function?
+> > 
+> > 
+> 
+> You can attach a finaliser, either to the zframe value itself, or to
+> another object which has the same lifetime as the zframe.  The
+> drawback of attaching the finaliser directly to the zframe is that a
+> number of ctypes functions (e.g. the functions for pointer arithmetic)
+> create new ptr values, so you may end up destroying the object while
+> you still have a pointer to it.  For example:
+> 
+>     let zf = create msg in
+>     let () = Gc.finalise destroy_zframe zf in
+>       (zf +@ 0)
+>     (* At this point you still have a pointer to the zframe you
+>        created, but the original Ctypes.ptr value has gone, so the
+>        GC is free to run the finaliser attached to it. *)
+> 
+> If you're already wrapping the zframe in a larger OCaml value, such as
+> a record, it would probably be wiser to attach the finaliser to that
+> value instead, since you can see more easily in your own code exactly
+> when copies are made.  If you want even stronger guarantees, you
+> should make sure that the type you use to wrap the zframe has a
+> mutable field, since the runtime is free to make copies of immutable
+> values.
+> 
+> It may be more advisable to consider an alternative interface that
+> makes the lifetime of your zframes deterministic and explicit.  One
+> simple approach is to follow the design of the channel interfaces in
+> the standard library, and expose a pair of functions
+> 
+>    val create : string -> t
+>    val destroy : t -> unit
+> 
+> then leave it up to the user to ensure that destroy_zframe is closed
+> at an appropriate moment (but perhaps catching other errors, such as
+> double closes).
+> 
+> An alternative approach is to follow the design often used in Scheme,
+> and expose a single higher-order function that manages the lifetime of
+> the frame.  For example, if you have a function with the following
+> interface
+> 
+>    val with_zframe : string -> (t -> 'a) -> 'a
+> 
+> then you might call it as follows
+> 
+>    with_zframe msg
+>      (fun zframe ->
+>          (* body: the zframe value is "live" here *)
+>      )
+> 
+> and the user can be confident that -- whether the body finishes
+> normally or with an exception -- with_zframe will destroy the value in
+> a timely way.  This approach is used in the Batteries library to
+> manage files: see with_file_in and with_file_out, for example:
+> 
+>    http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_in
+>    http://ocaml-batteries-team.github.io/batteries-included/hdoc2/BatFile.html#VALwith_file_out
+> 
+> I hope that helps,
+> 
+> Jeremy.
+> 
+> 
+> 
+
+From yallop at gmail.com  Mon May 19 15:52:29 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 19 May 2014 15:52:29 +0100
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <20140519142025.2757.70984@andromeda1.ze.tum.de>
+References: <20140430161924.28903.96399@andromeda1.ze.tum.de>
+ <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+ <20140519142025.2757.70984@andromeda1.ze.tum.de>
+Message-ID: <CAAxsn=F+WC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA@mail.gmail.com>
+
+Dear Florian,
+
+On 19/05/2014, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+> But now i have encountered a new problem.
+> Zeromq uses incomplete types for many data types,
+> like the frame type
+> typedef struct _zframe_t zframe_t;
+>
+> On the OCaml side i use void pointer to represent
+> these data types, and thats where the problem arose.
+>
+> The frame destroy function call for example is that
+>     zframe_destroy (zframe_t **self_p);
+> with the corresponding ocaml function
+>
+> let destroy (msg : t) =
+> let stub = foreign "zframe_destroy" (ptr void @-> returning int) in
+> stub (msg +@ 0)
+>
+> The problem is the msg +@ 0 part.
+
+The ctypes equivalent of zeromq's incomplete struct declaration is a
+call to the 'structure' function without a corresponding call to
+'seal'.  For example, you can represent zframe_t as follows:
+
+    (* struct _zframe_t *)
+    let zframe_t = structure "_zframe_t"
+
+This allows you to give a more precise type to the zframe_destroy binding:
+
+    let zframe_destroy = foreign "zframe_destroy"
+        (ptr (ptr zframe_t) @-> returning int)
+
+Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+complete, so pointer arithmetic (with +@ etc.) should work as you
+expect.
+
+I hope that helps,
+
+Jeremy.
+
+From philippe.veber at gmail.com  Tue May 20 06:53:06 2014
+From: philippe.veber at gmail.com (Philippe Veber)
+Date: Tue, 20 May 2014 07:53:06 +0200
+Subject: [ocaml-ctypes] Bit field encoding.
+In-Reply-To: <CAAxsn=Ennh6-MWja5M3QnAHDurTmi1P7wWijTTU3MhoTqUdhQA@mail.gmail.com>
+References: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+ <CAAxsn=Ennh6-MWja5M3QnAHDurTmi1P7wWijTTU3MhoTqUdhQA@mail.gmail.com>
+Message-ID: <CAOOOohRA3Sj0+k1KxPBV7Bgk1MQfpzfqBNeuUtmZ2mQ2eE1VSQ@mail.gmail.com>
+
+Thanks a lot Jeremy for your answer! I have chosen to write helper C
+functions to access the records containing bitfields, so that I let the
+compiler do its business without caring too much. I guess that no field
+after a bitfield definition in a struct can be reliably accessed either
+(with ctypes), even if it's not a bitfield itself (as there is no means to
+know if the bitfield was packed or padded). Is that right?
+
+
+2014-05-17 2:14 GMT+02:00 Jeremy Yallop <yallop at gmail.com>:
+
+> Dear Philippe,
+>
+> On 16/05/2014, Philippe Veber <philippe.veber at gmail.com> wrote:
+> > Has ctypes some support for bit fields in C struct?
+>
+> Not yet, I'm afraid.
+>
+> > If not is it correct to
+> > encode:
+> >
+> > typedef struct {
+> >    int32_t pos;
+> >    uint32_t bin:16, qual:8, l_qname:8;
+> >    ...
+> > } bam1_core_t
+> >
+> > as:
+> >
+> >    type bam1_core_t
+> >    let bam1_core_t : bam1_core_t structure typ = structure "bam1_core_t"
+> >    let bam1_core_t_pos_f = field bam1_core_t "pos" int32_t
+> >    let bam1_core_t_props_f = field bam1_core_t "props" int32_t
+> >    ...
+> >    let () = seal bam1_core_t
+> >
+> > and then play with the fake "props" field directly?
+>
+> It's quite likely to work but it's not guaranteed, since the C
+> standard gives compilers a fair amount of freedom in laying out
+> bit-fields.  The good news is that the standard also requires
+> compilers to document how bit-fields are laid out, so your compiler
+> documentation may have helpful details.
+>
+> Kind regards,
+>
+> Jeremy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140520/89072f0d/attachment.html>
+
+From yallop at gmail.com  Thu May 22 09:24:38 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 22 May 2014 09:24:38 +0100
+Subject: [ocaml-ctypes] ANN: ocaml-ctypes 0.3
+Message-ID: <CAAxsn=FVPcwDWUZ9JsqRFOaWP+iDKfK6AK9jt5Zt9dv+_fG4ow@mail.gmail.com>
+
+I'm pleased to announce the release of ocaml-ctypes 0.3, which is now
+available on OPAM and for download from GitHub:
+
+    https://github.com/ocamllabs/ocaml-ctypes/releases/
+
+The ocaml-ctypes library makes it possible to call C functions
+directly from OCaml without writing any C code.  For example, you can
+bind C's "puts" function by supplying its name and type:
+
+   # let puts = foreign "puts" (string @-> returning int);;
+   val puts : string -> int = <fun>
+
+You can then call the function immediately:
+
+   # puts "Hello, world!";;
+   Hello, world!
+   - : int = 14
+
+This is a simple example, but you can use the library to describe most
+standard C types -- scalars, functions, structs, unions, arrays, and
+pointers to values and functions -- making it possible to bind and
+call almost any C function without leaving OCaml.
+
+The ocaml-ctypes 0.1 release was announced on caml-list last summer:
+
+   https://sympa.inria.fr/sympa/arc/caml-list/2013-06/msg00046.html
+
+Since then the library has acquired a number of new features, including
+
+ * Stub generation for functions.
+
+   In addition to the dynamic binding mode illustrated with "puts"
+above, ocaml-ctypes now supports generating stub code which can be
+statically linked into your program.  The interface for stub
+generation is close to the existing interface for dynamic binding, so
+it should be easy to adapt existing code that uses ctypes to use stub
+generation.  The pull request that introduced stub generation
+describes the interface:
+
+   https://github.com/ocamllabs/ocaml-ctypes/pull/129
+
+   The release notes link to a number of examples:
+
+   https://github.com/ocamllabs/ocaml-ctypes/releases/tag/ocaml-ctypes-0.3
+
+ * Support for inverse stub generation.
+
+   Stub generation can also operate in reverse, turning OCaml code
+into a shared library that can be used from C.  There is an example
+available which exposes a simple subset of Xmlm's XML-parsing API to C
+(all without actually writing any C, of course):
+
+   https://github.com/yallop/ocaml-ctypes-inverted-stubs-example/
+
+ * Support for bigarrays.
+
+ * Support for passing OCaml strings directly to C. (Patch by Peter Zotov.)
+
+ * Top-level printing for C types and values: you can now build a
+representation of a C type or a value and see its C printed form:
+
+    # void @-> returning (ptr (array 10 (funptr (void @-> returning char))));;
+    - : (unit -> (unit -> char) carray ptr) fn = char(*(*(void))[10])(void)
+
+    # struct_value ;;
+    - : (s, [ `Struct ]) structured = { i = 10, d = 3.5  }
+
+The release notes for this release and for ocaml-ctypes 0.2 list a
+number of other newly-available features.  There is also one
+backwards-incompatible change: what was previously the Ctypes.Array
+module is now called Ctypes.CArray.
+
+I'm grateful to the following people for contributions to the 0.2 and
+0.3 releases:
+   Daniel B?nzli
+   Ivan Gotovchits
+   Rob Hoes
+   Anil Madhavapeddy
+   Mike McClurg
+   Greg Perkins
+   David Sheets
+   Peter Zotov
+
+Jeremy.
+
+From florian.pichlmeier at mytum.de  Mon May 26 17:21:02 2014
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Mon, 26 May 2014 16:21:02 -0000
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <CAAxsn=F+WC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA@mail.gmail.com>
+References: <CAAxsn=F+WC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA@mail.gmail.com>
+ <20140430161924.28903.96399@andromeda1.ze.tum.de>
+ <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+ <20140519142025.2757.70984@andromeda1.ze.tum.de>
+Message-ID: <20140526162102.56256.19915@andromeda1.ze.tum.de>
+
+Dear Jeremy,
+
+i changed the representation of zframe_t
+
+type frame
+type t = frame structure ptr
+let zframe_t : frame structure typ = structure "_zframe_t"
+
+> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+> complete, so pointer arithmetic (with +@ etc.) should work as you
+> expect.
+
+I tried this approach with pointer arithmetic (+@), but i still get
+the Static.IncompleteType exception when i call the destroy function.
+ 
+let destroy (msg : t) =
+  let stub = foreign "zframe_destroy" ((ptr zframe_t) @-> returning int) in
+  stub (msg +@ 0)
+
+Another problem is, that the zframe_destroy function expects **zframe_t as input,
+but with msg +@ 0 i only get *zframe_t. Does it suffice to declare the function
+like i did above, or do i need another approach?
+
+Again, many thanks for your efforts.
+
+Florian
+
+Jeremy Yallop <yallop at gmail.com> wrote:
+
+
+> Dear Florian,
+> 
+> On 19/05/2014, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+> 
+> > But now i have encountered a new problem.
+> > Zeromq uses incomplete types for many data types,
+> > like the frame type
+> > typedef struct _zframe_t zframe_t;
+> > 
+> > On the OCaml side i use void pointer to represent
+> > these data types, and thats where the problem arose.
+> > 
+> > The frame destroy function call for example is that
+> >     zframe_destroy (zframe_t **self_p);
+> > with the corresponding ocaml function
+> > 
+> > let destroy (msg : t) =
+> > let stub = foreign "zframe_destroy" (ptr void @-> returning int) in
+> > stub (msg +@ 0)
+> > 
+> > The problem is the msg +@ 0 part.
+> > 
+> > 
+> 
+> The ctypes equivalent of zeromq's incomplete struct declaration is a
+> call to the 'structure' function without a corresponding call to
+> 'seal'.  For example, you can represent zframe_t as follows:
+> 
+>     (* struct _zframe_t *)
+>     let zframe_t = structure "_zframe_t"
+> 
+> This allows you to give a more precise type to the zframe_destroy binding:
+> 
+>     let zframe_destroy = foreign "zframe_destroy"
+>         (ptr (ptr zframe_t) @-> returning int)
+> 
+> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+> complete, so pointer arithmetic (with +@ etc.) should work as you
+> expect.
+> 
+> I hope that helps,
+> 
+> Jeremy.
+> 
+> 
+> 
+
+From yallop at gmail.com  Wed May 28 03:36:59 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 28 May 2014 11:36:59 +0900
+Subject: [ocaml-ctypes] Bit field encoding.
+In-Reply-To: <CAOOOohRA3Sj0+k1KxPBV7Bgk1MQfpzfqBNeuUtmZ2mQ2eE1VSQ@mail.gmail.com>
+References: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+ <CAAxsn=Ennh6-MWja5M3QnAHDurTmi1P7wWijTTU3MhoTqUdhQA@mail.gmail.com>
+ <CAOOOohRA3Sj0+k1KxPBV7Bgk1MQfpzfqBNeuUtmZ2mQ2eE1VSQ@mail.gmail.com>
+Message-ID: <CAAxsn=HS_+vNGNb9_ZcnChyBMK8QNCQo-jGrD1tgbtefEMNRGA@mail.gmail.com>
+
+On 20 May 2014 14:53, Philippe Veber <philippe.veber at gmail.com> wrote:
+> Thanks a lot Jeremy for your answer! I have chosen to write helper C
+> functions to access the records containing bitfields, so that I let the
+> compiler do its business without caring too much. I guess that no field
+> after a bitfield definition in a struct can be reliably accessed either
+> (with ctypes), even if it's not a bitfield itself (as there is no means to
+> know if the bitfield was packed or padded). Is that right?
+
+Yes, I think that's strictly true, although it's probably possible to
+predict how things will be laid out in particular cases.
+
+In a future release there'll be the option to query the C compiler
+about struct layout directly, at which point we should have better
+guarantees about access to structs with bitfields:
+
+   https://github.com/ocamllabs/ocaml-ctypes/pull/62
+
+Jeremy.
+
+From yallop at gmail.com  Wed May 28 03:47:28 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 28 May 2014 11:47:28 +0900
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <20140526162102.56256.19915@andromeda1.ze.tum.de>
+References: <20140430161924.28903.96399@andromeda1.ze.tum.de>
+ <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+ <20140519142025.2757.70984@andromeda1.ze.tum.de>
+ <CAAxsn=F+WC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA@mail.gmail.com>
+ <20140526162102.56256.19915@andromeda1.ze.tum.de>
+Message-ID: <CAAxsn=Gyt-XhDdSm0Xw5E-L+gFTdvX52T3-mUB+2GY266XfUOA@mail.gmail.com>
+
+On 27 May 2014 01:21, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+> i changed the representation of zframe_t
+>
+> type frame
+> type t = frame structure ptr
+> let zframe_t : frame structure typ = structure "_zframe_t"
+
+Looks good!
+
+>> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+>> complete, so pointer arithmetic (with +@ etc.) should work as you
+>> expect.
+>
+> I tried this approach with pointer arithmetic (+@), but i still get
+> the Static.IncompleteType exception when i call the destroy function.
+>
+> let destroy (msg : t) =
+>   let stub = foreign "zframe_destroy" ((ptr zframe_t) @-> returning int) in
+>   stub (msg +@ 0)
+>
+> Another problem is, that the zframe_destroy function expects **zframe_t as input,
+> but with msg +@ 0 i only get *zframe_t. Does it suffice to declare the function
+> like i did above, or do i need another approach?
+
+Right: this is the source of the difficulty.  The argument to the C
+function is a pointer to pointer:
+
+   void zframe_destroy(frame_t **)
+
+and so the argument in the ctypes binding needs two 'ptr' applications:
+
+   let stub = foreign "zframe_destroy" (ptr (ptr zframe_t) @-> returning void)
+
+In order to call the function you'll need to store the argument in
+addressable memory.  For example, you might write:
+
+  let p = allocate (ptr zframe_t) msg in
+  stub p
+
+Jeremy.
+
+From philippe.veber at gmail.com  Wed May 28 07:14:00 2014
+From: philippe.veber at gmail.com (Philippe Veber)
+Date: Wed, 28 May 2014 08:14:00 +0200
+Subject: [ocaml-ctypes] Bit field encoding.
+In-Reply-To: <CAAxsn=HS_+vNGNb9_ZcnChyBMK8QNCQo-jGrD1tgbtefEMNRGA@mail.gmail.com>
+References: <CAOOOohT-=sHsgD2AHsGQ8oS9cc=OvhsJdbn96LcYAwtQieH-Tg@mail.gmail.com>
+ <CAAxsn=Ennh6-MWja5M3QnAHDurTmi1P7wWijTTU3MhoTqUdhQA@mail.gmail.com>
+ <CAOOOohRA3Sj0+k1KxPBV7Bgk1MQfpzfqBNeuUtmZ2mQ2eE1VSQ@mail.gmail.com>
+ <CAAxsn=HS_+vNGNb9_ZcnChyBMK8QNCQo-jGrD1tgbtefEMNRGA@mail.gmail.com>
+Message-ID: <CAOOOohTG=MPr6a+QM=sxodY4EUQ03XHem_U+pyJEEicRuprkow@mail.gmail.com>
+
+This looks really promising. Thanks!
+
+
+
+2014-05-28 4:36 GMT+02:00 Jeremy Yallop <yallop at gmail.com>:
+
+> On 20 May 2014 14:53, Philippe Veber <philippe.veber at gmail.com> wrote:
+> > Thanks a lot Jeremy for your answer! I have chosen to write helper C
+> > functions to access the records containing bitfields, so that I let the
+> > compiler do its business without caring too much. I guess that no field
+> > after a bitfield definition in a struct can be reliably accessed either
+> > (with ctypes), even if it's not a bitfield itself (as there is no means
+> to
+> > know if the bitfield was packed or padded). Is that right?
+>
+> Yes, I think that's strictly true, although it's probably possible to
+> predict how things will be laid out in particular cases.
+>
+> In a future release there'll be the option to query the C compiler
+> about struct layout directly, at which point we should have better
+> guarantees about access to structs with bitfields:
+>
+>    https://github.com/ocamllabs/ocaml-ctypes/pull/62
+>
+> Jeremy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140528/ef2f6d5f/attachment.html>
+
+From yallop at gmail.com  Wed May 28 07:53:42 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 28 May 2014 15:53:42 +0900
+Subject: [ocaml-ctypes] Finalising data
+In-Reply-To: <CAAxsn=Gyt-XhDdSm0Xw5E-L+gFTdvX52T3-mUB+2GY266XfUOA@mail.gmail.com>
+References: <20140430161924.28903.96399@andromeda1.ze.tum.de>
+ <CAAxsn=Fwu8Qhp6tr92XVUTj52mvWOSyNMFmdTTmMXS8zkTgeAA@mail.gmail.com>
+ <20140519142025.2757.70984@andromeda1.ze.tum.de>
+ <CAAxsn=F+WC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA@mail.gmail.com>
+ <20140526162102.56256.19915@andromeda1.ze.tum.de>
+ <CAAxsn=Gyt-XhDdSm0Xw5E-L+gFTdvX52T3-mUB+2GY266XfUOA@mail.gmail.com>
+Message-ID: <CAAxsn=Ekr+GWfBWcBOK3o1m-eC4vuG3BkOAkG5ZMqDMhqTUKMw@mail.gmail.com>
+
+On 28 May 2014 11:47, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 27 May 2014 01:21, Florian Pichlmeier <florian.pichlmeier at mytum.de> wrote:
+>> i changed the representation of zframe_t
+>>
+>> type frame
+>> type t = frame structure ptr
+>> let zframe_t : frame structure typ = structure "_zframe_t"
+>
+> Looks good!
+>
+>>> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+>>> complete, so pointer arithmetic (with +@ etc.) should work as you
+>>> expect.
+>>
+>> I tried this approach with pointer arithmetic (+@), but i still get
+>> the Static.IncompleteType exception when i call the destroy function.
+>>
+>> let destroy (msg : t) =
+>>   let stub = foreign "zframe_destroy" ((ptr zframe_t) @-> returning int) in
+>>   stub (msg +@ 0)
+>>
+>> Another problem is, that the zframe_destroy function expects **zframe_t as input,
+>> but with msg +@ 0 i only get *zframe_t. Does it suffice to declare the function
+>> like i did above, or do i need another approach?
+>
+> Right: this is the source of the difficulty.  The argument to the C
+> function is a pointer to pointer:
+>
+>    void zframe_destroy(frame_t **)
+>
+> and so the argument in the ctypes binding needs two 'ptr' applications:
+>
+>    let stub = foreign "zframe_destroy" (ptr (ptr zframe_t) @-> returning void)
+
+By the way, the new stub generation facility in 0.3 catches the error
+during compilation.
+
+Here's your binding, moved inside a functor to make it available for
+stub generation:
+
+    $ cat czmq.ml
+    open Ctypes
+    type frame
+    type t = frame structure ptr
+    let zframe_t : frame structure typ = structure "_zframe_t"
+
+    module Bindings(F : Cstubs.FOREIGN) =
+    struct
+      let zframe_destroy = F.foreign "zframe_destroy" (ptr zframe_t
+@-> returning void)
+    end
+
+You also need a simple driver for generating C code from the bindings:
+
+    $ cat generate.ml
+    let () =
+      Format.printf "#include <czmq.h>\n";
+      Cstubs.write_c ~prefix:"czmq" Format.std_formatter (module Czmq.Bindings)
+
+Now you can build the generator and run it to generate the C stubs:
+
+    $ ocamlfind ocamlc -o gen -package ctypes.stubs -linkpkg czmq.ml generate.ml
+    $ ./gen > czmq_stubs.c
+
+Finally, compiling the generated stub results in a useful diagnostic
+from the C compiler:
+
+    $ ocamlc -c -I $(ocamlc -where)/.. czmq_stubs.c
+    czmq_stubs.c: In function ?czmq_1_zframe_destroy?:
+    czmq_stubs.c:7:4: warning: passing argument 1 of ?zframe_destroy?
+from incompatible pointer type [enabled by default]
+        zframe_destroy(x2);
+        ^
+    In file included from /usr/local/include/czmq.h:36:0,
+             from czmq_stubs.c:1:
+    /usr/local/include/zframe.h:39:5: note: expected ?struct zframe_t
+**? but argument is of type ?struct _zframe_t *?
+        zframe_destroy (zframe_t **self_p);
+        ^
+
+Jeremy
+

@@ -1,0 +1,47 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;&lt;div&gt;&lt;div&gt;Hello,&lt;br&gt;&lt;br&gt;&lt;/div&gt;here&nbsp;is&nbsp;minimal&nbsp;example,&nbsp;which&nbsp;works&nbsp;without&nbsp;any&nbsp;problems&nbsp;on&nbsp;x86&nbsp;and&nbsp;raises&nbsp;CallToExpiredClosure&nbsp;on&nbsp;ARM:&lt;br&gt;&lt;a&nbsp;href=&quot;https://github.com/mryau/ctypes-mintest&quot;&gt;https://github.com/mryau/ctypes-mintest&lt;/a&gt;&lt;br&gt;&lt;br&gt;&lt;/div&gt;WBR,&nbsp;ssp&lt;br&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;2017-05-11&nbsp;16:37&nbsp;GMT+05:00&nbsp;Jeremy&nbsp;Yallop&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:yallop@gmail.com&quot;&nbsp;target=&quot;_blank&quot;&gt;yallop@gmail.com&lt;/a&gt;&gt;&lt;/span&gt;:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;&lt;span&nbsp;class=&quot;&quot;&gt;On&nbsp;11&nbsp;May&nbsp;2017&nbsp;at&nbsp;10:20,&nbsp;Serge&nbsp;Sivkov&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:ssp.mryau@gmail.com&quot;&gt;ssp.mryau@gmail.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;thank&nbsp;for&nbsp;your&nbsp;reply,&nbsp;it&nbsp;allow&nbsp;me&nbsp;partially&nbsp;resolve&nbsp;problem:&nbsp;code&nbsp;works&nbsp;on&lt;br&gt;<br>
+&gt;&nbsp;x86&nbsp;without&nbsp;any&nbsp;problems&nbsp;(yet&nbsp;with&nbsp;Gc.compact()&nbsp;calls&nbsp;insert&nbsp;after&nbsp;each&nbsp;line&lt;br&gt;<br>
+&gt;&nbsp;of&nbsp;code).&nbsp;But&nbsp;ARM&nbsp;version&nbsp;allways&nbsp;raises&nbsp;CallToExpiredClosure&nbsp;on&nbsp;the&nbsp;first&lt;br&gt;<br>
+&gt;&nbsp;call&nbsp;to&nbsp;callback.&lt;br&gt;<br>
+&gt;&nbsp;I&#39;ve&nbsp;tried&nbsp;next&nbsp;variants&nbsp;to&nbsp;store&nbsp;callback&nbsp;if&nbsp;struct&nbsp;field:&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;existing&nbsp;toplevel&nbsp;function&nbsp;by&nbsp;name&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;store&nbsp;function&nbsp;name&nbsp;to&nbsp;toplevel&nbsp;ref&nbsp;and&nbsp;save&nbsp;it&nbsp;to&nbsp;struct&nbsp;field&nbsp;by&lt;br&gt;<br>
+&gt;&nbsp;!ref_name&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;by&nbsp;register&nbsp;closure&nbsp;to&nbsp;function&nbsp;(fun&nbsp;a&nbsp;b&nbsp;c&nbsp;d&nbsp;-&gt;&nbsp;top_level_function&nbsp;a&nbsp;b&nbsp;c&lt;br&gt;<br>
+&gt;&nbsp;d)&nbsp;with&nbsp;Ctypes.Root.create&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;by&nbsp;store&nbsp;same&nbsp;closure&nbsp;to&nbsp;Hashtbl.&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;by&nbsp;register&nbsp;finaliser&nbsp;with&nbsp;Gc.finalise&nbsp;for&nbsp;closure&nbsp;(and&nbsp;it&nbsp;has&nbsp;not&nbsp;been&lt;br&gt;<br>
+&gt;&nbsp;called)&lt;br&gt;<br>
+&gt;&nbsp;All&nbsp;this&nbsp;variants&nbsp;work&nbsp;on&nbsp;x86&nbsp;and&nbsp;do&nbsp;not&nbsp;work&nbsp;on&nbsp;ARM,&nbsp;i.e.&nbsp;first&nbsp;call&nbsp;to&lt;br&gt;<br>
+&gt;&nbsp;OCaml&nbsp;callback&nbsp;from&nbsp;C&nbsp;raises&nbsp;CallToExpiredClosure.&lt;br&gt;<br>
+&gt;&nbsp;It&nbsp;seems&nbsp;I&nbsp;don&#39;t&nbsp;understand&nbsp;problem&nbsp;at&nbsp;all.&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;So&nbsp;here&nbsp;is&nbsp;base&nbsp;questions:&lt;br&gt;<br>
+&gt;&nbsp;-&nbsp;in&nbsp;case&nbsp;I&nbsp;store&nbsp;in&nbsp;C&nbsp;struct&nbsp;field&nbsp;existing&nbsp;toplevel&nbsp;function&nbsp;by&nbsp;name,&nbsp;may&lt;br&gt;<br>
+&gt;&nbsp;it&nbsp;be&nbsp;GC&#39;ed?&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;Yes. &nbsp;The&nbsp;only&nbsp;way&nbsp;to&nbsp;prevent&nbsp;a&nbsp;value&nbsp;from&nbsp;being&nbsp;collected&nbsp;is&nbsp;to&lt;br&gt;<br>
+ensure&nbsp;that&nbsp;it&#39;s&nbsp;visible&nbsp;to&nbsp;the&nbsp;GC,&nbsp;which&nbsp;requires&nbsp;keeping&nbsp;a&nbsp;reference&lt;br&gt;<br>
+to&nbsp;it&nbsp;in&nbsp;an&nbsp;OCaml&nbsp;object. &nbsp;The&nbsp;GC&nbsp;doesn&#39;t&nbsp;scan&nbsp;C&nbsp;memory,&nbsp;such&nbsp;as&lt;br&gt;<br>
+struct&nbsp;fields,&nbsp;so&nbsp;storing&nbsp;a&nbsp;function&nbsp;in&nbsp;a&nbsp;struct&nbsp;field&nbsp;won&#39;t&nbsp;stop&nbsp;it&lt;br&gt;<br>
+being&nbsp;collected.&lt;br&gt;<br>
+&lt;span&nbsp;class=&quot;&quot;&gt;&lt;br&gt;<br>
+&gt;&nbsp;-what&nbsp;may&nbsp;cause&nbsp;CallToExpiredClosure&nbsp;raise&nbsp;too&nbsp;if&nbsp;I&nbsp;has&nbsp;only&nbsp;one&nbsp;callback&nbsp;to&lt;br&gt;<br>
+&gt;&nbsp;call&nbsp;and&nbsp;at&nbsp;C&nbsp;side&nbsp;this&nbsp;struct&nbsp;in&nbsp;GDB&nbsp;seems&nbsp;to&nbsp;be&nbsp;correct?&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;If&nbsp;there&#39;s&nbsp;an&nbsp;OCaml&nbsp;reference&nbsp;to&nbsp;the&nbsp;function&nbsp;passed&nbsp;to&nbsp;C&nbsp;then&lt;br&gt;<br>
+CallToExpiredClosure&nbsp;should&nbsp;never&nbsp;occur. &nbsp;But&nbsp;it&nbsp;has&nbsp;to&nbsp;be&nbsp;exactly&nbsp;the&lt;br&gt;<br>
+same&nbsp;function&nbsp;--&nbsp;for&nbsp;example,&nbsp;storing&nbsp;a&nbsp;function&nbsp;in&nbsp;a&nbsp;struct&nbsp;field,&lt;br&gt;<br>
+then&nbsp;reading&nbsp;from&nbsp;the&nbsp;struct&nbsp;field&nbsp;will&nbsp;create&nbsp;a&nbsp;new&nbsp;copy&nbsp;of&nbsp;the&lt;br&gt;<br>
+function,&nbsp;which&nbsp;won&#39;t&nbsp;prevent&nbsp;the&nbsp;original&nbsp;from&nbsp;being&nbsp;collected.&lt;br&gt;<br>
+&lt;br&gt;<br>
+If&nbsp;you&nbsp;have&nbsp;a&nbsp;(smallish)&nbsp;running&nbsp;example&nbsp;somewhere&nbsp;of&nbsp;the&nbsp;code&nbsp;that&#39;s&lt;br&gt;<br>
+causing&nbsp;problems&nbsp;I&#39;d&nbsp;be&nbsp;happy&nbsp;to&nbsp;take&nbsp;a&nbsp;look.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Kind&nbsp;regards,&lt;br&gt;<br>
+&lt;br&gt;<br>
+Jeremy.&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

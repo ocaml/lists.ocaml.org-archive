@@ -1,0 +1,717 @@
+From louis.gesbert at ocamlpro.com  Fri Dec 18 07:47:53 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 18 Dec 2015 16:47:53 +0900
+Subject: [opam-devel] opam 1.3 status
+Message-ID: <3345875.3vZbcWxVr6@maitake>
+
+This is a summary of what's going on for 1.3, for all those who were wondering.
+This is not complete, and I may have forgotten stuff, don't hesitate to complete
+and comment.
+
+I think a more redacted version of this would have its place on the platform
+blog, to show there is activity.
+
+Note that I've also been busy helping out on the flambda compiler patch, which
+explains that things have been a bit slower on opam lately, but I am getting
+back on it full-time soon.
+
+
+
+# Ongoing changes for 1.3
+
+Lots has been going on, signature of the repository was the main goal for this
+release but it was then decided to prioritise some architectural changes and
+improvements and add signature on top of that for the release just after. So I
+feel there is a need to clarify all that's going on and what to expect for
+1.3.0.
+
+- Simplification of the ~/.opam architecture, store switch state in a single
+  file (done, but more changes pending)
+
+- Refactoring of file handling, for better error reporting, more reliable code
+  and ease to extend (done)
+
+- Much cleaner and flexible URL handling (including VC targets and specific
+  transports) (done)
+
+- Refactoring of OpamState, lots of simplification on state loading, pinned
+  package handling. This should make it much easier to understand and maintain,
+  and also much more efficient (ongoing)
+
+- Compilers as packages and disappearance of the .comp files, through making the
+  opam files much more generic. In practice, switch creation and compiler
+  installation are now internally treated as two different operations (ongoing,
+  most of it done but lacks a proper interface at the moment)
+
+- Tracking of package installed files and reliable automatic removal (planned,
+  but the hard part is done)
+
+- Setup of package configuration variables (planned)
+
+### Package definitions
+
+- Inclusion of url and descr in the opam file format, to describe a package with
+  a single file (done)
+
+- Better definition of package variables, self-references (done)
+
+- Support for "dev" dependencies (done)
+
+- Allow packages to define environment variables, possibly depending on other
+  variables or features (`setenv:` field) (done)
+
+- Allow fields for use by external tools: `x-fieldname:` (done)
+
+- Conflicts now consistently treated as disjunction (i.e. a formula that must
+  not be true) (done)
+
+- Add `extra-sources:` for packages needing more than a single archive (e.g.
+  compiler packages) (planned)
+
+- Allow to quote strings with pythonesque `"""` delimiters, for easier
+  integration of package descriptions (done)
+
+- Possibility to depend on the hash on an arbitrary file on the system and
+  trigger reinstallation, e.g. to detect an updated system compiler (ongoing)
+
+- New "canonical" and "format-preserving" printers, resp. for signing and
+  batch-editing files (done)
+
+### Other, smaller changes
+
+- Ability to override switch default dirs using
+  switch/config/global-config.config. `opam config set` command (done)
+
+- Support (and doc) for many different external solvers besides aspcud (done)
+
+- Json output including command logs that could be usedd to browse the status
+  (done)
+
+- More flexibility for install, reinstall, upgrade commands when the package
+  isn't in the expected state (already installed or not installed) (done)
+
+There are also plans on easing cross-compilation and allowing operations across
+switches which are well underway (in large part thanks to Pietro Abate's
+efforts), but these are intended for the next minor release (e.g. 1.3.1).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20151218/b9f56542/attachment.sig>
+
+From louis.gesbert at ocamlpro.com  Fri Dec 18 09:55:14 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 18 Dec 2015 18:55:14 +0900
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <3345875.3vZbcWxVr6@maitake>
+References: <3345875.3vZbcWxVr6@maitake>
+Message-ID: <22318229.IcpagbyFpI@maitake>
+
+Forgot to mention: a planned cleanup and sanitisation of how archives are 
+downloaded and cached.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20151218/149a5048/attachment.sig>
+
+From thomas at gazagnaire.org  Fri Dec 18 15:30:35 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Fri, 18 Dec 2015 16:30:35 +0100
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <3345875.3vZbcWxVr6@maitake>
+References: <3345875.3vZbcWxVr6@maitake>
+Message-ID: <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+
+Hi Louis.
+
+all of this sounds very good. I'd just like to report 3 more features that various people have told me about this last months:
+
+1/ `opam bundle`: it seems that a few existing projects don't want to tell their users to install OCaml and opam. They just want a stand-alone tarball that you can decompress and run `configure && make && make install`. There are already some patches from @ygrek doing this, that would be very cool to integrate the tool upstream
+
+2/ local switch/root. few people reported that they would like to use a per-project opam root. This could be done easily by making the CLI check for a `.opam` directory in parent directories. Or it could work with a local config switch file (now that we have only one config file per switch), stored in the repository.
+
+3/ local remotes. Currently the remote are per-switch which make them a bit annoying when you have a repo with dev packages. Currently it's easier to share a list of pins that a remote. So maybe extend `opam pin` to allow to take file of packages to pin -- actually it could already work with `opam switch import`, so maybe it's just a matter of documentation.
+
+And last big item, that I haven't seen in your list: windows support: is this still on the map?
+
+Thomas
+
+> On 18 Dec 2015, at 08:47, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> This is a summary of what's going on for 1.3, for all those who were wondering.
+> This is not complete, and I may have forgotten stuff, don't hesitate to complete
+> and comment.
+> 
+> I think a more redacted version of this would have its place on the platform
+> blog, to show there is activity.
+> 
+> Note that I've also been busy helping out on the flambda compiler patch, which
+> explains that things have been a bit slower on opam lately, but I am getting
+> back on it full-time soon.
+> 
+> 
+> 
+> # Ongoing changes for 1.3
+> 
+> Lots has been going on, signature of the repository was the main goal for this
+> release but it was then decided to prioritise some architectural changes and
+> improvements and add signature on top of that for the release just after. So I
+> feel there is a need to clarify all that's going on and what to expect for
+> 1.3.0.
+> 
+> - Simplification of the ~/.opam architecture, store switch state in a single
+>  file (done, but more changes pending)
+> 
+> - Refactoring of file handling, for better error reporting, more reliable code
+>  and ease to extend (done)
+> 
+> - Much cleaner and flexible URL handling (including VC targets and specific
+>  transports) (done)
+> 
+> - Refactoring of OpamState, lots of simplification on state loading, pinned
+>  package handling. This should make it much easier to understand and maintain,
+>  and also much more efficient (ongoing)
+> 
+> - Compilers as packages and disappearance of the .comp files, through making the
+>  opam files much more generic. In practice, switch creation and compiler
+>  installation are now internally treated as two different operations (ongoing,
+>  most of it done but lacks a proper interface at the moment)
+> 
+> - Tracking of package installed files and reliable automatic removal (planned,
+>  but the hard part is done)
+> 
+> - Setup of package configuration variables (planned)
+> 
+> ### Package definitions
+> 
+> - Inclusion of url and descr in the opam file format, to describe a package with
+>  a single file (done)
+> 
+> - Better definition of package variables, self-references (done)
+> 
+> - Support for "dev" dependencies (done)
+> 
+> - Allow packages to define environment variables, possibly depending on other
+>  variables or features (`setenv:` field) (done)
+> 
+> - Allow fields for use by external tools: `x-fieldname:` (done)
+> 
+> - Conflicts now consistently treated as disjunction (i.e. a formula that must
+>  not be true) (done)
+> 
+> - Add `extra-sources:` for packages needing more than a single archive (e.g.
+>  compiler packages) (planned)
+> 
+> - Allow to quote strings with pythonesque `"""` delimiters, for easier
+>  integration of package descriptions (done)
+> 
+> - Possibility to depend on the hash on an arbitrary file on the system and
+>  trigger reinstallation, e.g. to detect an updated system compiler (ongoing)
+> 
+> - New "canonical" and "format-preserving" printers, resp. for signing and
+>  batch-editing files (done)
+> 
+> ### Other, smaller changes
+> 
+> - Ability to override switch default dirs using
+>  switch/config/global-config.config. `opam config set` command (done)
+> 
+> - Support (and doc) for many different external solvers besides aspcud (done)
+> 
+> - Json output including command logs that could be usedd to browse the status
+>  (done)
+> 
+> - More flexibility for install, reinstall, upgrade commands when the package
+>  isn't in the expected state (already installed or not installed) (done)
+> 
+> There are also plans on easing cross-compilation and allowing operations across
+> switches which are well underway (in large part thanks to Pietro Abate's
+> efforts), but these are intended for the next minor release (e.g. 1.3.1).
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From agarwal1975 at gmail.com  Fri Dec 18 15:36:08 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Fri, 18 Dec 2015 10:36:08 -0500
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+References: <3345875.3vZbcWxVr6@maitake>
+ <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+Message-ID: <CAMu2m2+qA=TwL5dYNodca1-v3Fpa-bRmdH1LDsLO1iaqtmQVTw@mail.gmail.com>
+
+Hi. Thanks for this nice summary and ongoing work. Is there any support
+planned for installing binaries? What is needed is a way to specify a
+different tarball depending on the detected architecture. I know some
+people want this for OCaml packages, but actually I'm interested in it for
+our non-OCaml biopam repo [1].
+
+[1] https://github.com/solvuu/biopam
+
+
+On Fri, Dec 18, 2015 at 10:30 AM, Thomas Gazagnaire <thomas at gazagnaire.org>
+wrote:
+
+> Hi Louis.
+>
+> all of this sounds very good. I'd just like to report 3 more features that
+> various people have told me about this last months:
+>
+> 1/ `opam bundle`: it seems that a few existing projects don't want to tell
+> their users to install OCaml and opam. They just want a stand-alone tarball
+> that you can decompress and run `configure && make && make install`. There
+> are already some patches from @ygrek doing this, that would be very cool to
+> integrate the tool upstream
+>
+> 2/ local switch/root. few people reported that they would like to use a
+> per-project opam root. This could be done easily by making the CLI check
+> for a `.opam` directory in parent directories. Or it could work with a
+> local config switch file (now that we have only one config file per
+> switch), stored in the repository.
+>
+> 3/ local remotes. Currently the remote are per-switch which make them a
+> bit annoying when you have a repo with dev packages. Currently it's easier
+> to share a list of pins that a remote. So maybe extend `opam pin` to allow
+> to take file of packages to pin -- actually it could already work with
+> `opam switch import`, so maybe it's just a matter of documentation.
+>
+> And last big item, that I haven't seen in your list: windows support: is
+> this still on the map?
+>
+> Thomas
+>
+> > On 18 Dec 2015, at 08:47, Louis Gesbert <louis.gesbert at ocamlpro.com>
+> wrote:
+> >
+> > This is a summary of what's going on for 1.3, for all those who were
+> wondering.
+> > This is not complete, and I may have forgotten stuff, don't hesitate to
+> complete
+> > and comment.
+> >
+> > I think a more redacted version of this would have its place on the
+> platform
+> > blog, to show there is activity.
+> >
+> > Note that I've also been busy helping out on the flambda compiler patch,
+> which
+> > explains that things have been a bit slower on opam lately, but I am
+> getting
+> > back on it full-time soon.
+> >
+> >
+> >
+> > # Ongoing changes for 1.3
+> >
+> > Lots has been going on, signature of the repository was the main goal
+> for this
+> > release but it was then decided to prioritise some architectural changes
+> and
+> > improvements and add signature on top of that for the release just
+> after. So I
+> > feel there is a need to clarify all that's going on and what to expect
+> for
+> > 1.3.0.
+> >
+> > - Simplification of the ~/.opam architecture, store switch state in a
+> single
+> >  file (done, but more changes pending)
+> >
+> > - Refactoring of file handling, for better error reporting, more
+> reliable code
+> >  and ease to extend (done)
+> >
+> > - Much cleaner and flexible URL handling (including VC targets and
+> specific
+> >  transports) (done)
+> >
+> > - Refactoring of OpamState, lots of simplification on state loading,
+> pinned
+> >  package handling. This should make it much easier to understand and
+> maintain,
+> >  and also much more efficient (ongoing)
+> >
+> > - Compilers as packages and disappearance of the .comp files, through
+> making the
+> >  opam files much more generic. In practice, switch creation and compiler
+> >  installation are now internally treated as two different operations
+> (ongoing,
+> >  most of it done but lacks a proper interface at the moment)
+> >
+> > - Tracking of package installed files and reliable automatic removal
+> (planned,
+> >  but the hard part is done)
+> >
+> > - Setup of package configuration variables (planned)
+> >
+> > ### Package definitions
+> >
+> > - Inclusion of url and descr in the opam file format, to describe a
+> package with
+> >  a single file (done)
+> >
+> > - Better definition of package variables, self-references (done)
+> >
+> > - Support for "dev" dependencies (done)
+> >
+> > - Allow packages to define environment variables, possibly depending on
+> other
+> >  variables or features (`setenv:` field) (done)
+> >
+> > - Allow fields for use by external tools: `x-fieldname:` (done)
+> >
+> > - Conflicts now consistently treated as disjunction (i.e. a formula that
+> must
+> >  not be true) (done)
+> >
+> > - Add `extra-sources:` for packages needing more than a single archive
+> (e.g.
+> >  compiler packages) (planned)
+> >
+> > - Allow to quote strings with pythonesque `"""` delimiters, for easier
+> >  integration of package descriptions (done)
+> >
+> > - Possibility to depend on the hash on an arbitrary file on the system
+> and
+> >  trigger reinstallation, e.g. to detect an updated system compiler
+> (ongoing)
+> >
+> > - New "canonical" and "format-preserving" printers, resp. for signing and
+> >  batch-editing files (done)
+> >
+> > ### Other, smaller changes
+> >
+> > - Ability to override switch default dirs using
+> >  switch/config/global-config.config. `opam config set` command (done)
+> >
+> > - Support (and doc) for many different external solvers besides aspcud
+> (done)
+> >
+> > - Json output including command logs that could be usedd to browse the
+> status
+> >  (done)
+> >
+> > - More flexibility for install, reinstall, upgrade commands when the
+> package
+> >  isn't in the expected state (already installed or not installed) (done)
+> >
+> > There are also plans on easing cross-compilation and allowing operations
+> across
+> > switches which are well underway (in large part thanks to Pietro Abate's
+> > efforts), but these are intended for the next minor release (e.g. 1.3.1).
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20151218/4c09c103/attachment.html>
+
+From louis.gesbert at ocamlpro.com  Sat Dec 19 01:42:35 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Sat, 19 Dec 2015 10:42:35 +0900
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+References: <3345875.3vZbcWxVr6@maitake>
+ <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+Message-ID: <2626829.Ht1Ga4QmNF@maitake>
+
+> Hi Louis.
+> 
+> all of this sounds very good. I'd just like to report 3 more features that
+> various people have told me about this last months:
+> 
+> 1/ `opam bundle`: it seems that a few existing projects don't want to tell
+> their users to install OCaml and opam. They just want a stand-alone tarball
+> that you can decompress and run `configure && make && make install`. There
+> are already some patches from @ygrek doing this, that would be very cool to
+> integrate the tool upstream
+
+Ah, indeed; these patches should be made easier by the reorganised opam-lib (I 
+remember there were issues with e.g. OpamArg). I'll see with @ygrek once the 
+current refactoring is done.
+
+> 2/ local switch/root. few people reported that they would like to use a
+> per-project opam root. This could be done easily by making the CLI check
+> for a `.opam` directory in parent directories. Or it could work with a
+> local config switch file (now that we have only one config file per
+> switch), stored in the repository.
+
+Why not, this sounds like a very easy one, at least with the first option -- 
+are there cases where this might get confusing ? The second one would allow 
+sharing of repositories and `opam update` across "per-project switches", it 
+boils down to "allow creating a switch with the prefix I supply" -- something 
+that I intended to add already, the `opam switch` interface needing to be 
+rewritten anyway, since compilers turned into packages -- and some magic to 
+automatically choose "current switch" based on PWD.
+
+However, this will only work for opam commands, and you still need to `eval 
+$(opam config env)`, which really isn't a huge benefit compared to `eval 
+$(opam config env --root/--switch xxx)` that you need without a specific 
+feature.
+
+I think the best answer to these use-cases is clearly opam-manager [1], which 
+was designed for this purpose: it can dynamically choose opam root and switch 
+based on `.opam-switch` files found in ancestors of PWD, and more importantly, 
+installs dispatchers for binaries that make them transparent -- without need 
+for `config env`.
+
+[1]: https://github.com/OCamlPro/opam-manager
+
+> 3/ local remotes. Currently the remote are per-switch which make them a bit
+> annoying when you have a repo with dev packages. Currently it's easier to
+> share a list of pins that a remote. So maybe extend `opam pin` to allow to
+> take file of packages to pin -- actually it could already work with `opam
+> switch import`, so maybe it's just a matter of documentation.
+
+That's on my list too, but I delayed it until I finish refactoring OpamState 
+-- it's tempting to change everything at once, but often a bad idea. I'm not 
+sure it will make it for 1.3 though, although, since it will require yet 
+another format change to ~/.opam, it may be better to have all these changes 
+at once. In my new version repository state is completely decoupled from 
+switch state, so the work will mostly be on how to define the repository state 
+in the ~/.opam layout.
+
+> And last big item, that I haven't seen in your list: windows support: is
+> this still on the map?
+
+Yes. I consider it a parallel branch of work, so it may not be synchronised 
+with 1.3, but effort is being put into this too.
+
+> - Ashish Agarwal -
+> Hi. Thanks for this nice summary and ongoing work. Is there any support
+> planned for installing binaries? What is needed is a way to specify a
+> different tarball depending on the detected architecture. I know some
+> people want this for OCaml packages, but actually I'm interested in it for
+> our non-OCaml biopam repo [1].
+
+I did not put this on the list, but have been thinking about it for a while. 
+Once we have tracking of packages' files, extracting that info to generate 
+binary packages, or even a full opam repository of binary packages, would be 
+easy. There are many dark corners though, that may not be a problem for 
+biocaml:
+- optional dependencies: you need to choose whether you want them before 
+generating the binaries, obviously
+- ocaml is not relocatable, which is a big issue, although we have proposed a 
+compiler patch a while ago and have some hacks available [2]
+- there are actually different approaches available, depending on whether you 
+just want to cache builds, you want to distribute a bundle, or you want a real 
+binary repository
+- local setup, external dependencies, etc.
+
+But some stuff on this front is to be expected too!
+
+[2] https://github.com/OCamlPro/ocp-reloc
+
+
+Hope this clarifies things!
+
+Best,
+Louis Gesbert, OCamlPro
+
+From agarwal1975 at gmail.com  Sun Dec 20 00:29:14 2015
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Sat, 19 Dec 2015 19:29:14 -0500
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <2626829.Ht1Ga4QmNF@maitake>
+References: <3345875.3vZbcWxVr6@maitake>
+ <73AF9EF6-4900-4E78-8A2E-6CB32429C2F7@gazagnaire.org>
+ <2626829.Ht1Ga4QmNF@maitake>
+Message-ID: <CAMu2m2+OLdzj1R77bhC0DYnwM_9bfgT5eEYV6TeAmPPR4DeMGw@mail.gmail.com>
+
+Thanks for the info.
+
+On Fri, Dec 18, 2015 at 8:42 PM, Louis Gesbert <louis.gesbert at ocamlpro.com>
+wrote:
+
+> > Hi Louis.
+> >
+> > all of this sounds very good. I'd just like to report 3 more features
+> that
+> > various people have told me about this last months:
+> >
+> > 1/ `opam bundle`: it seems that a few existing projects don't want to
+> tell
+> > their users to install OCaml and opam. They just want a stand-alone
+> tarball
+> > that you can decompress and run `configure && make && make install`.
+> There
+> > are already some patches from @ygrek doing this, that would be very cool
+> to
+> > integrate the tool upstream
+>
+> Ah, indeed; these patches should be made easier by the reorganised
+> opam-lib (I
+> remember there were issues with e.g. OpamArg). I'll see with @ygrek once
+> the
+> current refactoring is done.
+>
+> > 2/ local switch/root. few people reported that they would like to use a
+> > per-project opam root. This could be done easily by making the CLI check
+> > for a `.opam` directory in parent directories. Or it could work with a
+> > local config switch file (now that we have only one config file per
+> > switch), stored in the repository.
+>
+> Why not, this sounds like a very easy one, at least with the first option
+> --
+> are there cases where this might get confusing ? The second one would allow
+> sharing of repositories and `opam update` across "per-project switches", it
+> boils down to "allow creating a switch with the prefix I supply" --
+> something
+> that I intended to add already, the `opam switch` interface needing to be
+> rewritten anyway, since compilers turned into packages -- and some magic to
+> automatically choose "current switch" based on PWD.
+>
+> However, this will only work for opam commands, and you still need to `eval
+> $(opam config env)`, which really isn't a huge benefit compared to `eval
+> $(opam config env --root/--switch xxx)` that you need without a specific
+> feature.
+>
+> I think the best answer to these use-cases is clearly opam-manager [1],
+> which
+> was designed for this purpose: it can dynamically choose opam root and
+> switch
+> based on `.opam-switch` files found in ancestors of PWD, and more
+> importantly,
+> installs dispatchers for binaries that make them transparent -- without
+> need
+> for `config env`.
+>
+> [1]: https://github.com/OCamlPro/opam-manager
+>
+> > 3/ local remotes. Currently the remote are per-switch which make them a
+> bit
+> > annoying when you have a repo with dev packages. Currently it's easier to
+> > share a list of pins that a remote. So maybe extend `opam pin` to allow
+> to
+> > take file of packages to pin -- actually it could already work with `opam
+> > switch import`, so maybe it's just a matter of documentation.
+>
+> That's on my list too, but I delayed it until I finish refactoring
+> OpamState
+> -- it's tempting to change everything at once, but often a bad idea. I'm
+> not
+> sure it will make it for 1.3 though, although, since it will require yet
+> another format change to ~/.opam, it may be better to have all these
+> changes
+> at once. In my new version repository state is completely decoupled from
+> switch state, so the work will mostly be on how to define the repository
+> state
+> in the ~/.opam layout.
+>
+> > And last big item, that I haven't seen in your list: windows support: is
+> > this still on the map?
+>
+> Yes. I consider it a parallel branch of work, so it may not be synchronised
+> with 1.3, but effort is being put into this too.
+>
+> > - Ashish Agarwal -
+> > Hi. Thanks for this nice summary and ongoing work. Is there any support
+> > planned for installing binaries? What is needed is a way to specify a
+> > different tarball depending on the detected architecture. I know some
+> > people want this for OCaml packages, but actually I'm interested in it
+> for
+> > our non-OCaml biopam repo [1].
+>
+> I did not put this on the list, but have been thinking about it for a
+> while.
+> Once we have tracking of packages' files, extracting that info to generate
+> binary packages, or even a full opam repository of binary packages, would
+> be
+> easy. There are many dark corners though, that may not be a problem for
+> biocaml:
+> - optional dependencies: you need to choose whether you want them before
+> generating the binaries, obviously
+> - ocaml is not relocatable, which is a big issue, although we have
+> proposed a
+> compiler patch a while ago and have some hacks available [2]
+> - there are actually different approaches available, depending on whether
+> you
+> just want to cache builds, you want to distribute a bundle, or you want a
+> real
+> binary repository
+> - local setup, external dependencies, etc.
+>
+> But some stuff on this front is to be expected too!
+>
+> [2] https://github.com/OCamlPro/ocp-reloc
+>
+>
+> Hope this clarifies things!
+>
+> Best,
+> Louis Gesbert, OCamlPro
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20151219/525bc090/attachment.html>
+
+From daniel.buenzli at erratique.ch  Tue Dec 22 12:24:18 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 22 Dec 2015 12:24:18 +0000
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <3345875.3vZbcWxVr6@maitake>
+References: <3345875.3vZbcWxVr6@maitake>
+Message-ID: <C9E04474D76C4E71BA8FD312B3ADA186@erratique.ch>
+
+Le vendredi, 18 d?cembre 2015 ? 07:47, Louis Gesbert a ?crit :
+> This is a summary of what's going on for 1.3, for all those who were wondering.
+> This is not complete, and I may have forgotten stuff, don't hesitate to complete
+> and comment.
+
+Fix the broken pin workflow [1] ? The fact that I have to write `opam pin add -kgit PKG repo#master` to get the safe and usable semantics on my pin is quite annoying at the moment, I constantly get into that insane mixed-mode.
+
+Best,
+
+Daniel
+
+[1] https://github.com/ocaml/opam/issues/2156
+
+
+
+
+From louis.gesbert at ocamlpro.com  Tue Dec 22 14:09:54 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 22 Dec 2015 23:09:54 +0900
+Subject: [opam-devel] opam 1.3 status
+In-Reply-To: <C9E04474D76C4E71BA8FD312B3ADA186@erratique.ch>
+References: <3345875.3vZbcWxVr6@maitake>
+ <C9E04474D76C4E71BA8FD312B3ADA186@erratique.ch>
+Message-ID: <2632131.bekdFlGAdq@maitake>
+
+Don't worry, I didn't mention it, but I do still have this in mind :)
+
+Le mardi 22 d?cembre 2015, 12:24:18 Daniel B?nzli a ?crit :
+> Le vendredi, 18 d?cembre 2015 ? 07:47, Louis Gesbert a ?crit :
+> > This is a summary of what's going on for 1.3, for all those who were
+> > wondering. This is not complete, and I may have forgotten stuff, don't
+> > hesitate to complete and comment.
+> 
+> Fix the broken pin workflow [1] ? The fact that I have to write `opam pin
+> add -kgit PKG repo#master` to get the safe and usable semantics on my pin
+> is quite annoying at the moment, I constantly get into that insane
+> mixed-mode.
+> 
+> Best,
+> 
+> Daniel
+> 
+> [1] https://github.com/ocaml/opam/issues/2156
+

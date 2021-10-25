@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> sexp_default
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20sexp_default&In-Reply-To=%3CCAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001172.html">
+   <LINK REL="Next"  HREF="001180.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>sexp_default</H1>
+    <B>Markus Mottl</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20sexp_default&In-Reply-To=%3CCAP_800q7doNGS1htxfyJAXjmfLVW47XJtqBM5Yfu-0bgSYfB0g%40mail.gmail.com%3E"
+       TITLE="sexp_default">markus.mottl at gmail.com
+       </A><BR>
+    <I>Fri Mar 30 17:19:38 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001172.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+        <LI>Next message: <A HREF="001180.html">sexp_default
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#290">[ date ]</a>
+              <a href="thread.html#290">[ thread ]</a>
+              <a href="subject.html#290">[ subject ]</a>
+              <a href="author.html#290">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Hi,
+
+I have a patch for sexplib, which adds a new record field qualifier
+&quot;sexp_default&quot;.  It allows users to explicitly add the default
+expression to be used when a record field is missing in an
+S-expression.  E.g.:
+
+  type t = { foo : int sexp_default(42) } with sexp
+
+In this definition &quot;foo&quot; will default to &quot;42&quot; if the S-expression does
+not specify &quot;foo&quot;.  Any valid OCaml-expression is allowed within the
+parentheses, including variables and even function calls.  When such a
+record is converted to an S-expression, the normal behavior is to
+always emit the field, no matter whether it is equivalent to the
+default or not.  The reason is that unlike &quot;sexp_list&quot;, &quot;sexp_array&quot;,
+etc., it may not be obvious to the reader of an S-expression what the
+default may be.
+
+If, however, default fields should be excluded from the conversion,
+e.g. to generate a minimal default configuration file for later
+refinement, the following is supported (note the exclamation mark at
+the end):
+
+  type t = { foo : int sexp_default(42)! } with sexp
+
+Using manifest types, developers can easily generate equivalent
+instantiations of a record type with different conversion behavior.
+E.g.:
+
+    type drop_foo_default = t = { foo : int sexp_default(foo)! } with sexp
+
+This way different &quot;default views&quot; could be emitted for a given record.
+
+Using manifest types together with module functors and maybe
+first-class modules to do this dynamically for large numbers of
+instantiations, one can also easily generate numerous default
+converters for different contexts.  E.g.:
+
+  module Make (Defaults : sig val default : t end) = struct
+    type s = t = { foo : int sexp_default(Defaults.default.foo) } with sexp
+  end
+
+Some wizardry with modules and manifest types provides for almost
+unlimited power for providing defaults and configuring how they are
+emitted.
+
+Let me know if this patch would likely be accepted or if there are any
+suggestions for improvement, and I'll push it to my fork of OCaml
+Core.
+
+Regards,
+Markus
+
+-- 
+Markus Mottl&#160; &#160; &#160; &#160; <A HREF="http://www.ocaml.info&#160;">http://www.ocaml.info&#160;</A> &#160; &#160; &#160; <A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001172.html">[Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+</A></li>
+	<LI>Next message: <A HREF="001180.html">sexp_default
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#290">[ date ]</a>
+              <a href="thread.html#290">[ thread ]</a>
+              <a href="subject.html#290">[ subject ]</a>
+              <a href="author.html#290">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

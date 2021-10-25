@@ -1,0 +1,152 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On the new mixed mode pins
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3CCAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR%3DBsmfotsu-jx1Ghw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001073.html">
+   <LINK REL="Next"  HREF="001075.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On the new mixed mode pins</H1>
+    <B>David Sheets</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3CCAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR%3DBsmfotsu-jx1Ghw%40mail.gmail.com%3E"
+       TITLE="[opam-devel] On the new mixed mode pins">sheets at alum.mit.edu
+       </A><BR>
+    <I>Sat May 16 14:40:30 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001073.html">[opam-devel] On the new mixed mode pins
+</A></li>
+        <LI>Next message: <A HREF="001075.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1074">[ date ]</a>
+              <a href="thread.html#1074">[ thread ]</a>
+              <a href="subject.html#1074">[ subject ]</a>
+              <a href="author.html#1074">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Sat, May 16, 2015 at 2:00 PM, Daniel B&#252;nzli
+&lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">daniel.buenzli at erratique.ch</A>&gt; wrote:
+&gt;<i> Le samedi, 16 mai 2015 &#224; 13:22, David Sheets a &#233;crit :
+</I>&gt;&gt;<i> I don't usually use `opam update -u`
+</I>&gt;<i>
+</I>&gt;<i> Right me neither, I do both operations in sequence but usually don't have a close look at the proposition. I tend to trust the work of the opam repo maintainers (shouldn't I ?).
+</I>
+As we bring more test systems online and automate their integration,
+yes, this will become safer. My primary reason for lazily upgrading is
+timeliness. I prefer to let the solver determine the minimal plan to
+satisfy my requirements. I definitely trust the opam repo maintainers
+more than I should for package lower bounds and this is one aspect of
+repository health that we're working on with increased testing.
+
+&gt;&gt;<i> I think that, whatever the outcome of these discussions, the mixed VCS
+</I>&gt;&gt;<i> vs. explicit branch VCS modes should be made clearly distinct.
+</I>&gt;<i>
+</I>&gt;<i> Yes, that was my initial reaction and proposal in this comment:
+</I>&gt;<i>
+</I>&gt;<i> <A HREF="https://github.com/ocaml/opam/issues/2141#issuecomment-101994075">https://github.com/ocaml/opam/issues/2141#issuecomment-101994075</A>
+</I>&gt;<i>
+</I>&gt;<i> But by thinking more about this, I had the impression that we could kill a few concepts and get a simpler and better system for the end-user.
+</I>
+Indeed I believe the current meaning could be simplified and
+clarified. My recollection is that we realized that defaulting to VCS
+pins *alone* required too much VCS manipulation in the simplest cases
+of new users or small pin counts. In response to that issue, Louis
+expediently and cleverly devised the current mixed mode pinning. I
+agree it could use revision and, retrospectively, explicit dirty
+requests would have been a cleaner design.
+
+&gt;&gt;<i> Afaik, git conventionally uses 'master' but this is only convention
+</I>&gt;&gt;<i> and there is no mechanism to change this. Is that correct?
+</I>&gt;<i>
+</I>&gt;<i> In fact if we wanted to be consistent with what a `git clone` would do (the least surprising in my opinion), we should maybe rather take the repository's current active branch whenever we `opam pin -k git $PATH`.
+</I>
+Agreed. This is the same VCS reference semantic that the mixed mode
+VCS pins currently have. This does make the VCS mode dependent on
+local working tree state and divergent from a remote repository but I
+believe this state is so small and 'obvious' as to be acceptable.
+
+&gt;&gt;<i> What happens with a branch pin that is dirty-updated? Does it take the
+</I>&gt;&gt;<i> working tree or only the working tree if the branch is the same?
+</I>&gt;<i>
+</I>&gt;<i> I would say let's keep this simple. This should mean: take the on-disk state of git-tracked files currently checked out in the working directory of the pin's git repo. Don't lookup branch information.
+</I>&gt;<i>
+</I>&gt;&gt;<i> Or the working tree with the file filter of the branch specified? It
+</I>&gt;&gt;<i> seems that working tree filtered by *current* branch is simplest which
+</I>&gt;&gt;<i> you suggested.
+</I>&gt;<i>
+</I>&gt;<i> Not sure what you mean by file-filter. If you mean only take the on-disk state of the git-tracked files that are checked out in the working directory *and* are also tracked by the branch then I think the semantics is too tricky.
+</I>
+Yes. I think ignoring any branch pin in the case of working directory
+installs is a little strange but does make some kind of sense. After
+all, it is called working directory...
+
+&gt;<i> I really want this to be obvious: now look at all the git-tracked files in the repo's working directory and try to use this for installing. (For this reason &#8212;working-dir may be a better name than &#8212;dirty, also it happens that `-w` is not used whereas `-d` is).
+</I>
+in the repo's working directory *on the currently checked out branch regardless*
+
+&gt;&gt;<i> &gt; I think that this would make a much more usable and and conceptually clean model of VCS pins.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This is definitely a cleaner model than what we currently have. Do you
+</I>&gt;&gt;<i> have objections against a solution using a pin parameter like `opam
+</I>&gt;&gt;<i> pin -k git+dirty repo` which would behave as mixed mode currently does
+</I>&gt;&gt;<i> except imply `--dirty` on relevant operations?
+</I>&gt;<i>
+</I>&gt;<i> Did you mean &quot;would behave as mixed mode currently does *by* implying `&#8212;dirty` on relevant operations ?&quot;
+</I>
+Yes, sorry for the confusion.
+
+&gt;<i> No strong objection, but my initial aim was to try to reduce the pin modes to simplify the system both conceptually and from an implementation point of view. To me non automatic &#8212;dirty seems to be the only sane way of working with VCS pins if you need to scale. If you need something that always auto-syncs on sources you can still use path pins (as long as you do not build anything in them).
+</I>
+I think it really depends on your development practices and/or use of
+indiscriminate upgrade. I'd be happy in a world where I have an escape
+hatch (--working-dir) from the VCS pin. &quot;+dirty&quot; simply retains the
+current behavior if desired or as default. I don't know if it's worth
+implementation for user consistency/quick-and-dirty introduction.
+
+I would like a message printed when pins are synced in a VCS mode that
+would sync differently in a dirty mode.
+
+&gt;<i> It seems [1] that Louis tried to avoid having explicit dirty modes as it doubles the number of modes, but I think that by doing so the pin system became semantically much too obscure (cf. the comment I mentioned above).
+</I>
+It's like a higher-order pin mode ('path+dirty' = 'path'?).
+
+&gt;<i> [1] <A HREF="https://github.com/ocaml/opam/issues/2033#issuecomment-76321338">https://github.com/ocaml/opam/issues/2033#issuecomment-76321338</A>
+</I>
+Thanks,
+
+David
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001073.html">[opam-devel] On the new mixed mode pins
+</A></li>
+	<LI>Next message: <A HREF="001075.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1074">[ date ]</a>
+              <a href="thread.html#1074">[ thread ]</a>
+              <a href="subject.html#1074">[ subject ]</a>
+              <a href="author.html#1074">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

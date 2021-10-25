@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C87ppyujpt6.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000360.html">
+   <LINK REL="Next"  HREF="000362.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C87ppyujpt6.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 20 11:03:49 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000360.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000362.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#361">[ date ]</a>
+              <a href="thread.html#361">[ thread ]</a>
+              <a href="subject.html#361">[ subject ]</a>
+              <a href="author.html#361">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> 1. Getting rid of &quot;simple namespace through filenames&quot;
+</I>&gt;<i>
+</I>&gt;<i> I propose to keep search path files as the only way to define namespaces.  For the typical user (who relies on
+</I>&gt;<i> ocamlfind), this does not change anything.  The overhead for library developers is minimal. And this could drastically
+</I>&gt;<i> improve the quality of ocamldep.  It would work as follow:
+</I>&gt;<i>
+</I>&gt;<i>  - A namespace-qualified module name is looked up in search path files passed to ocamldep.  For those references,
+</I>&gt;<i> ocamldep can produce a dependency to concrete files.  This is the best of both worlds: (i) contrary to &quot;ocamldep
+</I>&gt;<i> -modules&quot;, the build system does not need to recreate the lookup logic (in Leo's proposal, this even requires calling
+</I>&gt;<i> ocamldep many times in this process, which might be quite slow);  (ii) contrary to &quot;ocamldep&quot; (without -modules), this
+</I>&gt;<i> work well even with files to be generated (and even when the source file is named differently).
+</I>&gt;<i>
+</I>&gt;<i>  - An unqualified module name is resolved by taking local module declarations and &quot;open namespace&quot; statement into
+</I>&gt;<i> account.  If the name can potentially refer to a namespaced module defined in on the search path files passed to
+</I>&gt;<i> ocamldep, ocamldep returns a dependency to concrete files as in the case above.  Otherwise, it behaves as of today
+</I>&gt;<i> (returning either module names in &quot;-modules&quot; mode or concrete files otherwise, by looking at the file system).  Since
+</I>&gt;<i> only non-namespaced module names are potentially returned as module names, the build system can behave as today (simply
+</I>&gt;<i> looking buildable files in -I directories).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Also, &quot;open namespace Foo&quot; would fail if there is no definition of modules under namespace &quot;Foo&quot; in the search path
+</I>&gt;<i> files passed to the compiler.  This is more robust than looking for foo-*.cmi files on the file system: these files
+</I>&gt;<i> might not exist yet, either because (i) dependency analysis is bogus or (ii) there is no actual dependency to any module
+</I>&gt;<i> in Foo in the current unit; or, on the contrary, there could be foo-*.cmi left from a previous compilation even though
+</I>&gt;<i> we have decided e.g. to change the name of the namespace.  It's much better, in my opinion, to be able to work with a
+</I>&gt;<i> &quot;closed world&quot; assumption w.r.t. namespaces while compiling a single unit.
+</I>
+None of the above is helped by removing &quot;simple namespaces through
+filenames&quot;: it is all already supported by my proposal. If you don't
+like some of the aspects of &quot;simple namespaces through filenames&quot; then
+simply don't use them. You can always generate a search path file if you
+are having strange dependency issues.
+
+The majority of users do not require complex dependency analysis for
+generated source files. I see no reason to prevent them from using a
+convenient mechanism for defining namespaces. It is also the only
+mechanism that is really in keeping with the current design of OCaml.
+
+Search path files should only be necessary for unusual packages, not a
+requirement for all packages.
+
+&gt;<i> 2. Simplifying search path files
+</I>&gt;<i>
+</I>&gt;<i> I propose to get:
+</I>&gt;<i>
+</I>&gt;<i>   (i) rid of aliases;
+</I>&gt;<i>
+</I>&gt;<i>   (ii) define as an error the situation where the same namespace-qualified name is defined twice (with different target
+</I>&gt;<i> files) in the set of all search path files used together.
+</I>
+This should probably be a warning not an error. There is nothing wrong
+with deliberately shadowing the description of a namespace.
+
+&gt;<i> (ii) will strongly encourage libraries to avoid stepping on each other feet and thus make the life of the user better.
+</I>&gt;<i> Conflicts resolved by, say, a first-match policy are likely to fail at some point anyway (with bad error messages).
+</I>&gt;<i> Namespaces are introduced to avoid such problems.
+</I>&gt;<i>
+</I>&gt;<i> Complex namespace manipulation, which could benefit from aliases, are likely to be useful only to advanced users.  I
+</I>&gt;<i> don't see it as a problem that they have to resolve aliases manually or with very simple tools.
+</I>
+I don't see how they can resolve aliases manually without knowing, on
+the end user's machine, the location of all packages relative to the
+location of their package. This also hard codes the aliases, what if the
+other package moves?
+
+&gt;<i> 4. Replacing &quot;-name&quot;
+</I>&gt;<i>
+</I>&gt;<i> Leo proposes to allow specifying the target compilation unit name (*.cmi/*.cmo/*.cmx/*.o) with a new compiler
+</I>&gt;<i> command-line argument.
+</I>&gt;<i>
+</I>&gt;<i> The use case is to simplify the life of library developers so that they don't need to use long names for all their
+</I>&gt;<i> source files.  This should greatly simplify the migration of existing libraries to namespaces.
+</I>&gt;<i> In practice, however, most the source files in such a library will need to include a new &quot;open namespace&quot; directive to
+</I>&gt;<i> make other modules from the same library accessible.  Also, we will need to inform the build system about the relation
+</I>&gt;<i> between source and target filenames.  For ocamlbuild, for instance, this will probably mean the creation of a new kind
+</I>&gt;<i> of text file to describe this mapping.
+</I>
+The idea is that build systems like ocamlbuild do not *have* to support
+the &quot;-name&quot; argument. It is there so that the build system *can* support
+various naming conventions if it wants to. If we specify a particular
+file format for specifying names then every build system *must*
+recognise that format.
+
+&gt;<i>  - Lookup in mylib.mlpath for the compilation unit name corresponding to Mylib..Bar and use it as the target filename
+</I>&gt;<i> (if mylib.mlpath contains a line &quot;Mylib..Bar:mylib_xxx&quot;, then the compiler will compile bar.mli to mylib_xxx.cmi).  We
+</I>&gt;<i> hard-code in particular that in this mode, the source filename is equal to the module name as seen by &quot;clients&quot; of the
+</I>&gt;<i> library.
+</I>
+So either the user must write their own search path file specifying the
+name of every single compilation unit, or the build system has to
+generate it. If the build system has to generate it, how is that better
+than using a direct argument?
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000360.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000362.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#361">[ date ]</a>
+              <a href="thread.html#361">[ thread ]</a>
+              <a href="subject.html#361">[ subject ]</a>
+              <a href="author.html#361">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

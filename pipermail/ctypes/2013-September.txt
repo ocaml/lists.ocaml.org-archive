@@ -1,0 +1,276 @@
+From rudi.grinberg at gmail.com  Sun Sep 22 16:34:38 2013
+From: rudi.grinberg at gmail.com (Rudi Grinberg)
+Date: Sun, 22 Sep 2013 11:34:38 -0400
+Subject: [ocaml-ctypes] When can we expect the next version to be released?
+Message-ID: <CADU9VHsADtjqihVGn3S91gU6H0yL5ewYAGsU-bw7J+zh0yvnNw@mail.gmail.com>
+
+Hello,
+
+When can we expect the version of ctypes to be released? The reason I'm
+interested is that I'm already using features in bindings that I've created
+that are not present in the OPAM version (0.1?), so I can't publish my
+bindings as an OPAM package yet.
+
+Thanks,
+Rudi.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20130922/5c0b3445/attachment.html>
+
+From phil at hagelb.org  Sun Sep 22 20:50:22 2013
+From: phil at hagelb.org (Phil Hagelberg)
+Date: Sun, 22 Sep 2013 12:50:22 -0700
+Subject: [ocaml-ctypes] Setting completion function variable for Readline
+Message-ID: <87txhc7i0x.fsf@enigma.home.hagelb.org>
+
+I've been using ctypes to call into GNU Readline, and it's been working
+out nicely so far. However, I'd like to implement my own custom
+completer functionality, and I'm having some difficulty with
+that. Readline's documentation[1] says you can set the
+"rl_completion_entry_function" variable to a function pointer which can
+handle your completion:
+
+> Variable: rl_compentry_func_t * rl_completion_entry_function
+>     This is a pointer to the generator function for
+>     rl_completion_matches(). If the value of
+>     rl_completion_entry_function is NULL then the default filename
+>     generator function, rl_filename_completion_function(), is used. An
+>     application-specific completion function is a function whose address
+>     is assigned to rl_completion_entry_function and whose return values
+>     are used to generate possible completions. 
+
+But I can't find any way to do this from OCaml, with or without
+Ctypes. I see some mention of passing OCaml functions as arguments to C
+functions, but in this case I need to put it in a variable instead. I
+don't actually know C myself, or I'd imagine it'd be easy to do with a
+small shim written in C. Is this possible with Ctypes?
+
+thanks,
+Phil
+
+[1] - http://tiswww.case.edu/php/chet/readline/readline.html#SEC44
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20130922/a4c3b4d6/attachment.sig>
+
+From yallop at gmail.com  Mon Sep 23 07:40:36 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 23 Sep 2013 07:40:36 +0100
+Subject: [ocaml-ctypes] When can we expect the next version to be
+	released?
+In-Reply-To: <CADU9VHsADtjqihVGn3S91gU6H0yL5ewYAGsU-bw7J+zh0yvnNw@mail.gmail.com>
+References: <CADU9VHsADtjqihVGn3S91gU6H0yL5ewYAGsU-bw7J+zh0yvnNw@mail.gmail.com>
+Message-ID: <CAAxsn=FVkrf-=NpeiZ2F9hONTUDjswOYdqV7Z+n41yQM4Tf_cg@mail.gmail.com>
+
+On 22 September 2013 16:34, Rudi Grinberg <rudi.grinberg at gmail.com> wrote:
+> When can we expect the version of ctypes to be released? The reason I'm
+> interested is that I'm already using features in bindings that I've created
+> that are not present in the OPAM version (0.1?), so I can't publish my
+> bindings as an OPAM package yet.
+
+I'll look at packaging up ctypes 0.2 next week (i.e. after ICFP).
+
+Ideally I'd like 0.2 to include a fix for issue 38
+(https://github.com/ocamllabs/ocaml-ctypes/issues/38).  I don't think
+there are any other blockers.
+
+From yallop at gmail.com  Mon Sep 23 08:10:30 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 23 Sep 2013 08:10:30 +0100
+Subject: [ocaml-ctypes] Setting completion function variable for Readline
+In-Reply-To: <87txhc7i0x.fsf@enigma.home.hagelb.org>
+References: <87txhc7i0x.fsf@enigma.home.hagelb.org>
+Message-ID: <CAAxsn=G9w7AfTYPEN0ABiXzzHAJVgvnJhYPhMkESdbnYnx9GFw@mail.gmail.com>
+
+On 22 September 2013 20:50, Phil Hagelberg <phil at hagelb.org> wrote:
+> I've been using ctypes to call into GNU Readline, and it's been working
+> out nicely so far. However, I'd like to implement my own custom
+> completer functionality, and I'm having some difficulty with
+> that. Readline's documentation[1] says you can set the
+> "rl_completion_entry_function" variable to a function pointer which can
+> handle your completion:
+>
+>> Variable: rl_compentry_func_t * rl_completion_entry_function
+>>     This is a pointer to the generator function for
+>>     rl_completion_matches(). If the value of
+>>     rl_completion_entry_function is NULL then the default filename
+>>     generator function, rl_filename_completion_function(), is used. An
+>>     application-specific completion function is a function whose address
+>>     is assigned to rl_completion_entry_function and whose return values
+>>     are used to generate possible completions.
+>
+> But I can't find any way to do this from OCaml, with or without
+> Ctypes. I see some mention of passing OCaml functions as arguments to C
+> functions, but in this case I need to put it in a variable instead. I
+> don't actually know C myself, or I'd imagine it'd be easy to do with a
+> small shim written in C. Is this possible with Ctypes?
+
+Yes: you can use the foreign_value function[0] to retrieve the address
+of the global, and then set it directly using the assignment operator
+<- at .  I've just pushed a small but complete example which might serve
+as a useful starting point:
+
+   https://github.com/ocamllabs/ocaml-ctypes/commit/3d2e8c02f3
+
+[0] http://ocamllabs.github.io/ocaml-ctypes/Foreign.html#VALforeign_value
+[1] http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VAL%28%3C-@%29
+
+From phil at hagelb.org  Tue Sep 24 04:45:34 2013
+From: phil at hagelb.org (Phil Hagelberg)
+Date: Mon, 23 Sep 2013 20:45:34 -0700
+Subject: [ocaml-ctypes] Setting completion function variable for Readline
+In-Reply-To: <CAAxsn=G9w7AfTYPEN0ABiXzzHAJVgvnJhYPhMkESdbnYnx9GFw@mail.gmail.com>
+References: <87txhc7i0x.fsf@enigma.home.hagelb.org>,
+ <CAAxsn=G9w7AfTYPEN0ABiXzzHAJVgvnJhYPhMkESdbnYnx9GFw@mail.gmail.com>
+Message-ID: <87mwn27uht.fsf@enigma.home.hagelb.org>
+
+
+Jeremy Yallop writes:
+
+> Yes: you can use the foreign_value function[0] to retrieve the address
+> of the global, and then set it directly using the assignment operator
+> <- at .
+
+Thanks; that looks like just the trick.
+
+There's one twist which still has me stumped though. For custom
+completion functions, Readline requires an array be returned which is
+null-terminated. As far as I can tell, it's impossible to represent this
+within the OCaml type system. Is this something I'd have to dip into the
+Obj module to implement? What would that look like?
+
+-Phil Hagelberg
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20130923/740d6d44/attachment.sig>
+
+From florian.pichlmeier at mytum.de  Tue Sep 24 16:43:44 2013
+From: florian.pichlmeier at mytum.de (Florian Pichlmeier)
+Date: Tue, 24 Sep 2013 15:43:44 -0000
+Subject: [ocaml-ctypes] Variadic Functions
+Message-ID: <20130924154344.65387.32437@magellan1.ze.tum.de>
+
+Hi,
+
+i am trying to write a binding to the czmq library using ctypes.
+
+Some of these functions are variadic functions, like this one
+
+//  Create new poller
+CZMQ_EXPORT zpoller_t *
+    zpoller_new (void *reader, ...);
+
+Is there a way with ctypes to emulate this signature?
+
+Thanks in advance,
+
+Florian
+
+From yallop at gmail.com  Wed Sep 25 04:27:23 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 25 Sep 2013 00:27:23 -0300
+Subject: [ocaml-ctypes] Setting completion function variable for Readline
+In-Reply-To: <87mwn27uht.fsf@enigma.home.hagelb.org>
+References: <87txhc7i0x.fsf@enigma.home.hagelb.org>
+ <CAAxsn=G9w7AfTYPEN0ABiXzzHAJVgvnJhYPhMkESdbnYnx9GFw@mail.gmail.com>
+ <87mwn27uht.fsf@enigma.home.hagelb.org>
+Message-ID: <CAAxsn=EqLgi-wZGMnKO26wFZBQj2i4vk3EnEb+_Wukbjun8pEg@mail.gmail.com>
+
+On 24 September 2013 00:45, Phil Hagelberg <phil at hagelb.org> wrote:
+>
+> Jeremy Yallop writes:
+>
+>> Yes: you can use the foreign_value function[0] to retrieve the address
+>> of the global, and then set it directly using the assignment operator
+>> <- at .
+>
+> Thanks; that looks like just the trick.
+
+There's one thing I forgot to mention: it's important to ensure that
+the function you assign to the global isn't garbage collected while
+there's still a possibility that it can be called by the C library.
+If you use a global function everything should be fine, and you don't
+need to do anything special.  It's also fine to use a non-global
+function such as a closure constructed at runtime, but you'll need to
+keep a reference to it around in OCaml to prevent collection.
+
+> There's one twist which still has me stumped though. For custom
+> completion functions, Readline requires an array be returned which is
+> null-terminated. As far as I can tell, it's impossible to represent this
+> within the OCaml type system. Is this something I'd have to dip into the
+> Obj module to implement? What would that look like?
+
+Is it an array of pointers terminated with a null pointer?  The ctypes
+array type can represent that; there's a function in the fts
+binding[0] in the distribution that converts an OCaml list to such an
+array which might be a useful inspiration or starting point.
+
+https://github.com/ocamllabs/ocaml-ctypes/blob/816b56081d/examples/fts/fts.ml#L234-239
+
+From yallop at gmail.com  Mon Sep 30 14:31:01 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 30 Sep 2013 14:31:01 +0100
+Subject: [ocaml-ctypes] Variadic Functions
+In-Reply-To: <20130924154344.65387.32437@magellan1.ze.tum.de>
+References: <20130924154344.65387.32437@magellan1.ze.tum.de>
+Message-ID: <CAAxsn=H_JJV3yX3LruMddAcDKX_nmv-dUgb8B9ekXDgPMGx1Xg@mail.gmail.com>
+
+On 24 September 2013 12:43, Florian Pichlmeier
+<florian.pichlmeier at mytum.de> wrote:
+> Some of these functions are variadic functions, like this one
+>
+> //  Create new poller
+> CZMQ_EXPORT zpoller_t *
+>     zpoller_new (void *reader, ...);
+>
+> Is there a way with ctypes to emulate this signature?
+
+The short answer, unfortunately, is "no".  This type of function is
+rather tricky to wrap.  This isn't due to a limitation of ctypes; it's
+because there isn't a way to write wrappers for variadic functions in
+standard C [0, 1]
+
+Ideally the C library interface should provide a more wrappable
+interface in addition to the variadic function, e.g.
+
+    zpoller_t *zpoller_new_vec(void **readers);    /* argument is a
+null-terminated array of pointers */
+
+or
+
+    zpoller_t *zpoller_new_vec(void **readers, size_t nreaders);
+
+It might be worth sending a pull request to the czmq maintainers to
+modify the interface.
+
+If you're not too concerned by portability you can use the fact that
+some C implementations (e.g. GCC on Linux) have the same calling
+convention for variadic and regular functions.  Here ctypes offers an
+advantage over handwritten bindings: since C types are exposed as
+OCaml values you can construct a signature dynamically according to
+the number of arguments you want to pass to  the function.  For
+example, you might call the function using any of the signatures
+
+    ptr void @-> returning (ptr (zpoller_t))
+
+    ptr void @-> ptr void @-> returning (ptr (zpoller_t))
+
+    ptr void @-> ptr void @-> ptr void @-> returning (ptr (zpoller_t))
+
+and so on.  In fact, it ought to be possible (but probably not easy)
+to write a function which accepts a list of pointers, constructs a
+suitable signature for zpoller_new and calls the function.
+
+Jeremy.
+
+[0] http://c-faq.com/varargs/handoff.html
+[1] http://c-faq.com/varargs/invvarargs.html
+

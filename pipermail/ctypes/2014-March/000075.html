@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Foreign function interface support
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCAAxsn%3DGZo0p4wutP3Q8HF8SdOSkCV2Z95_fq-cApe4P9%2BSb4%2BA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000074.html">
+   <LINK REL="Next"  HREF="000076.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Foreign function interface support</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCAAxsn%3DGZo0p4wutP3Q8HF8SdOSkCV2Z95_fq-cApe4P9%2BSb4%2BA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Foreign function interface support">yallop at gmail.com
+       </A><BR>
+    <I>Tue Mar  4 11:34:51 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000074.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+        <LI>Next message: <A HREF="000076.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#75">[ date ]</a>
+              <a href="thread.html#75">[ thread ]</a>
+              <a href="subject.html#75">[ subject ]</a>
+              <a href="author.html#75">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 04/03/2014, Pavel Zaichenkov &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">zaichenkov at gmail.com</A>&gt; wrote:
+&gt;<i> It fails for both OS X and Ubuntu.
+</I>
+Passing -Wl,--no-as-needed should fix the problem on Ubuntu.  Here's a
+full example that works (for me) on both Ubuntu and OS X.  I'm calling
+ocamlfind directly rather than using corebuild, but perhaps this'll be
+some help in constructing a corebuild command that does what you need.
+ (The '-verbose 1' corebuild option will show you the commands that
+corebuild is executing.)
+
+In both cases picosat.ml and test.ml contain exactly the code that you posted.
+
+On Ubuntu:
+
+  $ ocamlfind opt -a -cclib -lpicosat -cclib -Wl,--no-as-needed
+-package ctypes.foreign picosat.ml -o picosat.cmxa
+  $ ocamlfind opt    -cclib -lpicosat -cclib -Wl,--no-as-needed
+-package ctypes.foreign -linkpkg picosat.cmxa test.ml -o test.native
+
+On OS X
+
+  $ ocamlfind opt -a -cclib -lpicosat -package ctypes.foreign
+picosat.ml -o picosat.cmxa
+  $ ocamlfind opt    -cclib -lpicosat -package ctypes.foreign -linkpkg
+picosat.cmxa test.ml -o test.native
+
+You can check that the picosat library has been linked in using 'ldd
+test.native' on Ubuntu or 'otool -L test.native' on OS X; you should
+see a line like this:
+
+   libpicosat.so.1 =&gt; /usr/lib/libpicosat.so.1 (0x00007fa11567d000)
+
+or like this:
+
+   libpicosat.dylib (compatibility version 0.0.0, current version 0.0.0)
+
+&gt;<i> Btw, I get &quot;Unbound value returning_checking_errno&quot; error for datetime
+</I>&gt;<i> example in both systems.
+</I>
+As Daniel said, this is due to an API change in ctypes between 0.1.X
+(which is described in RWO) and 0.2.X (which is what OPAM now installs
+by default).  It's still possible to install 0.1.1 using OPAM if you
+want a version of ctypes that's fully compatible with the RWO text,
+but the API changes are actually fairly few, so it may be worth
+persisting with the latest version.  In this case the change you need
+is to change
+
+   foreign &quot;gettimeofday&quot;
+      (ptr timeval @-&gt; ptr timezone @-&gt; returning_checking_errno int)
+
+to
+
+   foreign &quot;gettimeofday&quot; ~check_errno:true
+      (ptr timeval @-&gt; ptr timezone @-&gt; returning int)
+
+Hope that helps,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000074.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+	<LI>Next message: <A HREF="000076.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#75">[ date ]</a>
+              <a href="thread.html#75">[ thread ]</a>
+              <a href="subject.html#75">[ subject ]</a>
+              <a href="author.html#75">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

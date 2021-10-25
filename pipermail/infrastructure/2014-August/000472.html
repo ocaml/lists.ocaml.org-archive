@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-infra] TLS (https) for ocaml.org
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20TLS%20%28https%29%20for%20ocaml.org&In-Reply-To=%3C53F4BB29.6000403%40mehnert.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000473.html">
+   <LINK REL="Next"  HREF="000470.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-infra] TLS (https) for ocaml.org</H1>
+    <B>Hannes Mehnert</B> 
+    <A HREF="mailto:infrastructure%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-infra%5D%20TLS%20%28https%29%20for%20ocaml.org&In-Reply-To=%3C53F4BB29.6000403%40mehnert.org%3E"
+       TITLE="[ocaml-infra] TLS (https) for ocaml.org">hannes at mehnert.org
+       </A><BR>
+    <I>Wed Aug 20 16:13:45 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000473.html">[ocaml-infra] TLS (https) for ocaml.org
+</A></li>
+        <LI>Next message: <A HREF="000470.html">[ocaml-infra] opam.ocaml.org/ocaml.org merge
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#472">[ date ]</a>
+              <a href="thread.html#472">[ thread ]</a>
+              <a href="subject.html#472">[ subject ]</a>
+              <a href="author.html#472">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA384
+
+First some disclaimers:
+- - I'm not a lighthttpd expert
+- - I don't know what is to protect on ocaml.org (what the security
+model is)
+
+On 08/20/2014 15:47, David Sheets wrote:
+&gt;<i> ssl.cipher-list = 
+</I>&gt;<i> &quot;ECDHE-RSA-AES256-SHA384:AES256-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH:!AESGCM&quot;
+</I>
+
+&gt;<i>
+</I>&gt;<i> 
+</I>- - Prefix handling     Not valid for &quot;www.ocaml.org&quot;   CONFUSING
+&gt;<i> This causes a Big Scary Warning when accessing via www.ocaml.org
+</I>
+you might want to enable https only for ocaml.org, docs.ocaml.org,
+forge.ocaml.org, lists.ocaml.org, and opam.ocaml.org (those hostnames
+mentioned in the certificate)?
+
+&gt;<i> - Chain issues     Incomplete This requires another download of the
+</I>&gt;<i> Gandi Standard SSL CA cert. Maybe we should bundle this cert for
+</I>&gt;<i> all our TLS sites?
+</I>
+Yes, that should be done. While my firefox does not complain about the
+certificate chain (most likely it already has ghandi's certificate
+installed), the server should distribute the chain up till the
+self-signed CA certificate -- thus please include ghandi's cert.
+
+&gt;<i> - RC4     Yes (with TLS 1.1 and newer)   WEAK I don't know the
+</I>&gt;<i> severity of this issue. Maybe a simple cipher-list modification?
+</I>&gt;<i> I'm not clear on the compatibility story.
+</I>
+windows XP with (unpatched) IE6 still supports only 3DES and RC4,
+other OS should be fine without RC4
+(<A HREF="http://blog.cloudflare.com/killing-rc4-the-long-goodbye">http://blog.cloudflare.com/killing-rc4-the-long-goodbye</A> might be of
+interest); also
+<A HREF="http://www.ietf.org/id/draft-ietf-tls-prohibiting-rc4-00.txt">http://www.ietf.org/id/draft-ietf-tls-prohibiting-rc4-00.txt</A>
+
+&gt;<i> - Forward Secrecy     With some browsers This also looks like a
+</I>&gt;<i> configuration issue. Perhaps plain DHE would help?
+</I>
+I'd remove the !EDH from the ssl.cipher-list above (and add a !RSA
+instead to prevent non-pfs connections). Also, why !AESGCM? I'd also
+add !RC4, !eNULL, !LOW, !EXP (from
+<A HREF="https://bettercrypto.org/static/applied-crypto-hardening.pdf">https://bettercrypto.org/static/applied-crypto-hardening.pdf</A>)
+
+
+hannes
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.22 (FreeBSD)
+
+iQIcBAEBCQAGBQJT9LspAAoJELyJZYjffCju3KMP/3Jv8ryGYcNNG71ApCY6RMDb
+gj8kQehVqWRVoQxkLnot63ovaz1U56tBrd8sq7fmcVUSEyZlxODzW4PZAxL6bPD/
+ddbESw4QHcoyrVqObgir0GUk05xfYPey19J0adA+4HPjAlIXnGxoZoskiiJpOE9x
+JEDzvs3TST4j/Abybp+ida0HSdt0cUYFFf++qHY6/ej0M6WOxVbq7eh5GS7x1lGf
+hRf9VrMR4i4J0uWOxBR7BK8ZUDkM6BE6IoB+iG5XFH1kP4pCsvkWl9xOnhFtcBm0
+sjjWR34udPUcYl2MxhovoBSk3wKm5jvtvvFAIkdIM4L0EXRAjLy2xS8ZLun9yYHE
+0yhH0kgjcuqYcN1Cexe0rFadhpmlyf6EUZkfnHqVMcPEdwvi11PA4489BPoavwpz
+puXYZP7x3RlgBbKyJxPXMltB+4EvQYtzEdjUbHjAw20/QKZnuiuezaYXQsiVylNT
+IphJS1Tv3+/izsMQohHV2MayDznAmsTLYSkL5adGe809A2OwDhMoc25UQCVbGR7t
+UtWdeJ+W0+7mjHatBoOBaSv/q2MIczehRlGXFQuxyGh8/L1lWMH80XWBFONYVBTO
+F3wvhfQLAfWsFYyLgi0noVPjWfPpMwg4Up0OlvL7CuQmqDJ2NDG9riy2LsPFBZAO
+l+1zLIIsD5gQgzyM/Lfk
+=HXzM
+-----END PGP SIGNATURE-----
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000473.html">[ocaml-infra] TLS (https) for ocaml.org
+</A></li>
+	<LI>Next message: <A HREF="000470.html">[ocaml-infra] opam.ocaml.org/ocaml.org merge
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#472">[ date ]</a>
+              <a href="thread.html#472">[ thread ]</a>
+              <a href="subject.html#472">[ subject ]</a>
+              <a href="author.html#472">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/infrastructure">More information about the Infrastructure
+mailing list</a><br>
+</body></html>

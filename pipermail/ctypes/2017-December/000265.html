@@ -1,0 +1,115 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Passing Caml function to C
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Passing%20Caml%20function%20to%20C&In-Reply-To=%3CA34BF4AE-0CB1-4BDD-AF90-815F1CB14E37%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000263.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Passing Caml function to C</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Passing%20Caml%20function%20to%20C&In-Reply-To=%3CA34BF4AE-0CB1-4BDD-AF90-815F1CB14E37%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] Passing Caml function to C">skaller at internode.on.net
+       </A><BR>
+    <I>Thu Dec 28 17:34:15 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000263.html">[ocaml-ctypes] Passing Caml function to C
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#265">[ date ]</a>
+              <a href="thread.html#265">[ thread ]</a>
+              <a href="subject.html#265">[ subject ]</a>
+              <a href="author.html#265">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+&gt;<i> On 29 Dec. 2017, at 03:44, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> Serge Sivkov has explained how things work using OCaml's standard
+</I>&gt;<i> Callback module.  Ctypes provides a slightly different mechanism.
+</I>
+&gt;<i> The implementation of funptr uses the closure functions in the libffi
+</I>&gt;<i> library to dynamically generate function pointers
+</I>&gt;<i> 
+</I>&gt;<i>   <A HREF="http://www.chiark.greenend.org.uk/doc/libffi-dev/html/The-Closure-API.html">http://www.chiark.greenend.org.uk/doc/libffi-dev/html/The-Closure-API.html</A>
+</I>
+The standard way to do that is
+
+THUNK:
+	JSR handler
+	DATA data_address
+	DATA code_address&#8217;
+
+and you just pop the return address off the stack to get the
+data and code addresses, leaving the return address of the call to THUNK.
+
+But the thunk has to be in memory which is both writable and executable,
+and usually that combination is disallowed for ordinary users for
+security reasons. Hmmm.
+
+In my system I use the 
+
+	void *client_data
+
+pointer that callbacks, and the HOFs that accept them, almost always
+have. However, the programmer has to TELL the compiler which
+argument is the client data pointer.
+
+This doesn&#8217;t require any thunks, but it doesn&#8217;t work without a client data pointer.
+
+An amusing story .. except for those that had to deal with this massive
+screw up ..  in older versions of Windows, the event callbacks were passed
+the window handle. So you would store the client data in the window data
+frame. There was only one problem: when you created a window,
+your callback had to PUT the client data pointer into the window frame.
+The problem was .. where did you GET that client data from, in a callback?
+
+So what you did was put it into a global variable and hope and pray that
+the very next callback was the create window callback so it picked
+up the right data from the global variable.
+
+MS fixed it with CreateWindowEx.
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000263.html">[ocaml-ctypes] Passing Caml function to C
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#265">[ date ]</a>
+              <a href="thread.html#265">[ thread ]</a>
+              <a href="subject.html#265">[ subject ]</a>
+              <a href="author.html#265">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

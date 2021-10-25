@@ -1,0 +1,133 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;&lt;div&gt;Would&nbsp;it&nbsp;be&nbsp;possible&nbsp;to&nbsp;use&nbsp;the&nbsp;extension&nbsp;mechanism&nbsp;itself&nbsp;for&nbsp;lightweight&nbsp;quasiquotations?&lt;br&gt;&lt;br&gt;I&nbsp;did&nbsp;a&nbsp;small&nbsp;experiment&nbsp;with&nbsp;-ppx&nbsp;recently&nbsp;(&nbsp;&lt;a&nbsp;href=&quot;http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/smartcatch_ppx.ml&quot;&nbsp;target=&quot;_blank&quot;&gt;http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/smartcatch_ppx.ml&lt;/a&gt;,&nbsp;as&nbsp;a&nbsp;contribution&nbsp;to&nbsp;Jacques-Henri&nbsp;Jourdan&#39;s&nbsp;work&nbsp;on&nbsp;&lt;a&nbsp;href=&quot;http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/&quot;&nbsp;target=&quot;_blank&quot;&gt;http://gallium.inria.fr/blog/a-library-to-record-ocaml-backtraces/&lt;/a&gt;&nbsp;),&nbsp;and&nbsp;frankly&nbsp;the&nbsp;absence&nbsp;of&nbsp;quasiquotations&nbsp;felt&nbsp;like&nbsp;a&nbsp;pain&nbsp;in&nbsp;the&nbsp;ass.&nbsp;Compare&nbsp;the&nbsp;camlp4&nbsp;part&nbsp;of&nbsp;the&nbsp;relevant&nbsp;code:&lt;br&gt;<br>
+<br>
+<br>
+<br>
+&lt;br&gt;&lt;pre&gt;&nbsp;&nbsp;let&nbsp;add_debug_expr&nbsp;_loc&nbsp;patvar&nbsp;e&nbsp;=<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&lt;:expr&lt;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;let&nbsp;_&nbsp;=&nbsp;ExceptionHandling.register&nbsp;$lid:patvar$&nbsp;in<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;$e$<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&gt;&gt;&lt;br&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div&gt;with&nbsp;the&nbsp;Ast_rewriter&nbsp;equivalent&nbsp;(the&nbsp;recommended&nbsp;solution&nbsp;alongside&nbsp;-ppx&nbsp;right&nbsp;now):&lt;br&gt;&lt;pre&gt;let&nbsp;add_register&nbsp;patvar&nbsp;body&nbsp;=<br>
+&nbsp;&nbsp;let&nbsp;open&nbsp;Ast_mapper&nbsp;in<br>
+&nbsp;&nbsp;let&nbsp;register_fun&nbsp;=&nbsp;Location.mknoloc&nbsp;(Longident.parse&nbsp;&quot;ExceptionHandling.register&quot;)&nbsp;in<br>
+&nbsp;&nbsp;(*&nbsp;let&nbsp;_&nbsp;=&nbsp;&lt;register_fun&gt;&nbsp;&lt;patvar&gt;&nbsp;in&nbsp;&lt;body&gt;&nbsp;*)<br>
+&nbsp;&nbsp;E.(let_&nbsp;Nonrecursive<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;[P.any&nbsp;(),&nbsp;apply&nbsp;(ident&nbsp;register_fun)&nbsp;&nbsp;[&quot;&quot;,&nbsp;ident&nbsp;patvar]]<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;body)&lt;br&gt;&lt;/pre&gt;&lt;/div&gt;&lt;div&gt;There&nbsp;is&nbsp;a&nbsp;gap&nbsp;of&nbsp;readability,&nbsp;maintainability&nbsp;but&nbsp;also&nbsp;writability&nbsp;between&nbsp;the&nbsp;two&nbsp;approaches.&nbsp;I&nbsp;suspect&nbsp;that&nbsp;the&nbsp;Ast_mapper.E&nbsp;domain-specific&nbsp;language&nbsp;could&nbsp;be&nbsp;improved&nbsp;to&nbsp;reduce&nbsp;it,&nbsp;but&nbsp;I&#39;m&nbsp;not&nbsp;sure&nbsp;quasiquotations&nbsp;are&nbsp;not&nbsp;the&nbsp;best&nbsp;long-term&nbsp;solution.&nbsp;But&nbsp;maybe&nbsp;we&nbsp;can&nbsp;have&nbsp;quasiquotations&nbsp;with&nbsp;the&nbsp;current&nbsp;extension&nbsp;mechanism?&lt;br&gt;<br>
+<br>
+<br>
+<br>
+&lt;/div&gt;&lt;pre&gt;let&nbsp;add_register&nbsp;patvar&nbsp;body&nbsp;=<br>
+&nbsp;&nbsp;[%quote&lt;br&gt;&nbsp;&nbsp;&nbsp; let&nbsp;_&nbsp;=&nbsp;ExceptionHandling.register&nbsp;[%anti&nbsp;patvar]&nbsp;in&nbsp;[%anti&nbsp;body]&lt;br&gt;&nbsp;&nbsp;]&lt;br&gt;&lt;/pre&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;I&#39;m&nbsp;rather&nbsp;interested&nbsp;in&nbsp;getting&nbsp;ideas&nbsp;of&nbsp;how&nbsp;this&nbsp;actually&nbsp;would&nbsp;work&nbsp;and&nbsp;fleshing&nbsp;it&nbsp;out.&lt;br&gt;<br>
+<br>
+<br>
+<br>
+&lt;br&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;(Note&nbsp;that&nbsp;the&nbsp;problem&nbsp;here&nbsp;is&nbsp;to&nbsp;have&nbsp;a&nbsp;convenient&nbsp;way&nbsp;to&nbsp;write&nbsp;little&nbsp;pieces&nbsp;of&nbsp;OCaml&nbsp;AST&nbsp;when&nbsp;you&nbsp;program&nbsp;AST-to-AST&nbsp;filters&nbsp;of&nbsp;any&nbsp;kind.&nbsp;This&nbsp;is&nbsp;a&nbsp;restricted&nbsp;use&nbsp;case&nbsp;as&nbsp;compared&nbsp;to&nbsp;Camlp4&nbsp;quasiquotations&nbsp;conventions,&nbsp;that&nbsp;offer&nbsp;facilities&nbsp;for&nbsp;antiquotations&nbsp;inside&nbsp;foreign&nbsp;quotations&nbsp;implementing&nbsp;a&nbsp;completely&nbsp;different&nbsp;syntax.&nbsp;I&nbsp;used&nbsp;the&nbsp;latter&nbsp;in&nbsp;Macaque,&nbsp;and&nbsp;they&nbsp;are&nbsp;exposed&nbsp;to&nbsp;end-users,&nbsp;so&nbsp;user-friendliness&nbsp;of&nbsp;the&nbsp;antiquotation&nbsp;syntax&nbsp;was&nbsp;important.&nbsp;Here&nbsp;it&#39;s&nbsp;only&nbsp;for&nbsp;extension&nbsp;*writers*,&nbsp;so&nbsp;it&#39;s&nbsp;ok&nbsp;if&nbsp;it&#39;s&nbsp;*a&nbsp;bit*&nbsp;heavy.)&lt;br&gt;<br>
+<br>
+<br>
+<br>
+&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Fri,&nbsp;Mar&nbsp;29,&nbsp;2013&nbsp;at&nbsp;2:04&nbsp;PM,&nbsp;Alain&nbsp;Frisch&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:alain.frisch@lexifi.com&quot;&nbsp;target=&quot;_blank&quot;&gt;alain.frisch@lexifi.com&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;<br>
+<br>
+<br>
+<br>
+&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;&lt;div&gt;On&nbsp;01/29/2013&nbsp;05:22&nbsp;PM,&nbsp;Alain&nbsp;Frisch&nbsp;wrote:&lt;br&gt;<br>
+&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+On&nbsp;01/29/2013&nbsp;04:37&nbsp;PM,&nbsp;Xavier&nbsp;Clerc&nbsp;wrote:&lt;br&gt;<br>
+&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+However,&nbsp;during&nbsp;development,&lt;br&gt;<br>
+it&nbsp;was&nbsp;a&nbsp;time-saver&nbsp;to&nbsp;be&nbsp;able&nbsp;to&nbsp;easily&nbsp;express&nbsp;and&nbsp;experiment&nbsp;new&lt;br&gt;<br>
+ideas&nbsp;by&nbsp;manipulating&nbsp;&quot;bits&nbsp;of&nbsp;the&nbsp;actual&nbsp;language&quot;.&nbsp;Camlp4&nbsp;was&nbsp;kind&lt;br&gt;<br>
+enough&nbsp;to&nbsp;translate&nbsp;them&nbsp;for&nbsp;me&nbsp;into&nbsp;AST&nbsp;code&nbsp;which&nbsp;I&nbsp;had&nbsp;to&nbsp;check.&lt;br&gt;<br>
+&lt;/blockquote&gt;<br>
+&lt;br&gt;<br>
+What&nbsp;about&nbsp;having&nbsp;a&nbsp;tool&nbsp;(either&nbsp;stand-alone&nbsp;or&nbsp;part&nbsp;of&nbsp;the&nbsp;compilers)&lt;br&gt;<br>
+which&nbsp;dumps&nbsp;the&nbsp;Parsetree&nbsp;representation&nbsp;of&nbsp;some&nbsp;code&nbsp;fragment&nbsp;in&nbsp;as&lt;br&gt;<br>
+textual&nbsp;OCaml&nbsp;values&nbsp;(probably&nbsp;without&nbsp;locations)?&lt;br&gt;<br>
+&lt;br&gt;<br>
+So&nbsp;you&nbsp;can&nbsp;type&nbsp;your&nbsp;&quot;model&quot;&nbsp;as&nbsp;source&nbsp;code&nbsp;and&nbsp;obtain&nbsp;quickly&nbsp;the&lt;br&gt;<br>
+Parsetree&nbsp;representation,&nbsp;copy/paste&nbsp;it&nbsp;into&nbsp;a&nbsp;nice&nbsp;pattern&nbsp;and&nbsp;replace&lt;br&gt;<br>
+some&nbsp;parts&nbsp;with&nbsp;variables.&lt;br&gt;<br>
+&lt;/blockquote&gt;<br>
+&lt;br&gt;&lt;/div&gt;<br>
+I&#39;ve&nbsp;hacked&nbsp;a&nbsp;quick&nbsp;implementation&nbsp;of&nbsp;such&nbsp;a&nbsp;tool,&nbsp;reusing&nbsp;the&nbsp;generic&nbsp;value&nbsp;printer&nbsp;from&nbsp;the&nbsp;toplevel:&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/tools/dump_ast.ml?revision=HEAD&amp;view=markup&quot;&nbsp;target=&quot;_blank&quot;&gt;http://caml.inria.fr/cgi-bin/&lt;u&gt;&lt;/u&gt;viewvc.cgi/ocaml/branches/&lt;u&gt;&lt;/u&gt;extension_points/tools/dump_&lt;u&gt;&lt;/u&gt;ast.ml?revision=HEAD&amp;view=&lt;u&gt;&lt;/u&gt;markup&lt;/a&gt;&lt;br&gt;<br>
+<br>
+<br>
+<br>
+<br>
+&lt;br&gt;<br>
+It&nbsp;parses&nbsp;either&nbsp;command-line&nbsp;arguments&nbsp;(currently,&nbsp;as&nbsp;types,&nbsp;expressions&nbsp;or&nbsp;patterns)&nbsp;or&nbsp;external&nbsp;.ml/.mli&nbsp;files,&nbsp;and&nbsp;shows&nbsp;the&nbsp;internal&nbsp;Parsetree&nbsp;representation.&nbsp; By&nbsp;default,&nbsp;location&nbsp;and&nbsp;empty&nbsp;attribute&nbsp;fields&nbsp;are&nbsp;removed&nbsp;(they&nbsp;can&nbsp;be&nbsp;restored&nbsp;with&nbsp;command-line&nbsp;flags:&nbsp;-locs&nbsp;and&nbsp;-emptyattrs).&lt;br&gt;<br>
+<br>
+<br>
+<br>
+<br>
+&lt;br&gt;<br>
+Examples:&lt;br&gt;<br>
+&lt;br&gt;<br>
+$&nbsp;./ocamlast&nbsp;-w&nbsp;50&nbsp;-e&nbsp;&quot;1&nbsp;+&nbsp;x&nbsp;[@attr]&nbsp;*&nbsp;2&quot;&lt;br&gt;<br>
+{pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp;Pexp_apply&lt;br&gt;<br>
+ &nbsp; ({pexp_desc&nbsp;=&nbsp;Pexp_ident&nbsp;{txt&nbsp;=&nbsp;Lident&nbsp;&quot;*&quot;}},&lt;br&gt;<br>
+ &nbsp; [(&quot;&quot;,&lt;br&gt;<br>
+ &nbsp; &nbsp; {pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; Pexp_apply&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp;({pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Pexp_ident&nbsp;{txt&nbsp;=&nbsp;Lident&nbsp;&quot;+&quot;}},&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp;[(&quot;&quot;,&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Pexp_constant&nbsp;(Const_int&nbsp;1)});&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; (&quot;&quot;,&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;{pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Pexp_ident&nbsp;{txt&nbsp;=&nbsp;Lident&nbsp;&quot;x&quot;}})]);&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp;pexp_attributes&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; [(&quot;attr&quot;,&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; {pexp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; Pexp_construct&nbsp;({txt&nbsp;=&nbsp;Lident&nbsp;&quot;()&quot;},&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;None,&nbsp;false)})]});&lt;br&gt;<br>
+ &nbsp; &nbsp;(&quot;&quot;,&lt;br&gt;<br>
+ &nbsp; &nbsp; {pexp_desc&nbsp;=&nbsp;Pexp_constant&nbsp;(Const_int&nbsp;2)})])}&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;br&gt;<br>
+$&nbsp;./ocamlast&nbsp;-w&nbsp;50&nbsp;-emptyattrs&nbsp;-t&nbsp;&quot;int&nbsp;list&nbsp;*&nbsp;string&quot;&lt;br&gt;<br>
+{ptyp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp;Ptyp_tuple&lt;br&gt;<br>
+ &nbsp; [{ptyp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp;Ptyp_constr&nbsp;({txt&nbsp;=&nbsp;Lident&nbsp;&quot;list&quot;},&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; [{ptyp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;Ptyp_constr&nbsp;({txt&nbsp;=&nbsp;Lident&nbsp;&quot;int&quot;},&nbsp;[]);&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp; &nbsp; ptyp_attributes&nbsp;=&nbsp;[]}]);&lt;br&gt;<br>
+ &nbsp; &nbsp; ptyp_attributes&nbsp;=&nbsp;[]};&lt;br&gt;<br>
+ &nbsp; &nbsp;{ptyp_desc&nbsp;=&lt;br&gt;<br>
+ &nbsp; &nbsp; &nbsp;Ptyp_constr&nbsp;({txt&nbsp;=&nbsp;Lident&nbsp;&quot;string&quot;},&nbsp;[]);&lt;br&gt;<br>
+ &nbsp; &nbsp; ptyp_attributes&nbsp;=&nbsp;[]}];&lt;br&gt;<br>
+ ptyp_attributes&nbsp;=&nbsp;[]}&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;br&gt;<br>
+This&nbsp;should&nbsp;should&nbsp;simplify&nbsp;the&nbsp;learning&nbsp;curve&nbsp;of&nbsp;the&nbsp;Parsetree,&nbsp;and&nbsp;even&nbsp;allow&nbsp;quick&nbsp;copy/paste&nbsp;to&nbsp;write&nbsp;patterns/expressions&nbsp;on&nbsp;Parsetree.&nbsp; That&nbsp;said,&nbsp;creating&nbsp;Parsetree&nbsp;fragments&nbsp;manually&nbsp;is&nbsp;quite&nbsp;tedious,&nbsp;and&nbsp;I&#39;ve&nbsp;created&nbsp;a&nbsp;module&nbsp;to&nbsp;make&nbsp;this&nbsp;easier:&lt;br&gt;<br>
+<br>
+<br>
+<br>
+<br>
+&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/ast_helper.mli?revision=HEAD&amp;view=markup&quot;&nbsp;target=&quot;_blank&quot;&gt;http://caml.inria.fr/cgi-bin/&lt;u&gt;&lt;/u&gt;viewvc.cgi/ocaml/branches/&lt;u&gt;&lt;/u&gt;extension_points/parsing/ast_&lt;u&gt;&lt;/u&gt;helper.mli?revision=HEAD&amp;view=&lt;u&gt;&lt;/u&gt;markup&lt;/a&gt;&lt;br&gt;<br>
+<br>
+<br>
+<br>
+<br>
+&lt;br&gt;<br>
+Currently,&nbsp;this&nbsp;module&nbsp;exposes&nbsp;&quot;builder&nbsp;functions&quot;&nbsp;which&nbsp;are&nbsp;very&nbsp;close&nbsp;to&nbsp;Parsetree&nbsp;constructors/records&nbsp;(making&nbsp;locations&nbsp;and&nbsp;attributes&nbsp;optional),&nbsp;but&nbsp;one&nbsp;can&nbsp;easily&nbsp;improve&nbsp;its&nbsp;interface&nbsp;(either&nbsp;by&nbsp;changing&nbsp;the&nbsp;existing&nbsp;functions,&nbsp;e.g.&nbsp;to&nbsp;use&nbsp;optional&nbsp;and&nbsp;labelled&nbsp;arguments,&nbsp;or&nbsp;by&nbsp;exposing&nbsp;other&nbsp;function&nbsp;to&nbsp;cover&nbsp;common&nbsp;cases).&lt;div&gt;<br>
+<br>
+<br>
+<br>
+&lt;div&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;br&gt;<br>
+Alain&lt;br&gt;<br>
+______________________________&lt;u&gt;&lt;/u&gt;_________________&lt;br&gt;<br>
+wg-camlp4&nbsp;mailing&nbsp;list&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;mailto:wg-camlp4@lists.ocaml.org&quot;&nbsp;target=&quot;_blank&quot;&gt;wg-camlp4@lists.ocaml.org&lt;/a&gt;&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;http://lists.ocaml.org/listinfo/wg-camlp4&quot;&nbsp;target=&quot;_blank&quot;&gt;http://lists.ocaml.org/&lt;u&gt;&lt;/u&gt;listinfo/wg-camlp4&lt;/a&gt;&lt;br&gt;<br>
+&lt;/div&gt;&lt;/div&gt;&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;&lt;/div&gt;<br>
+
+</tt>

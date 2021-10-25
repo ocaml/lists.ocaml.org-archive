@@ -1,0 +1,142 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Lifetime of Ctypes allocation
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCAAxsn%3DFPGFP3JCZJgn_Kx7XxdZTzAbWpjcOJpSRXHEXb%2B_Xi4Q%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000208.html">
+   <LINK REL="Next"  HREF="000210.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Lifetime of Ctypes allocation</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCAAxsn%3DFPGFP3JCZJgn_Kx7XxdZTzAbWpjcOJpSRXHEXb%2B_Xi4Q%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Lifetime of Ctypes allocation">yallop at gmail.com
+       </A><BR>
+    <I>Tue Apr 19 11:33:02 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000208.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+        <LI>Next message: <A HREF="000210.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#209">[ date ]</a>
+              <a href="thread.html#209">[ thread ]</a>
+              <a href="subject.html#209">[ subject ]</a>
+              <a href="author.html#209">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 18 April 2016 at 23:02, Markus M&#252;ller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">llmarkvm at gmail.com</A>&gt; wrote:
+&gt;<i> open Ctypes
+</I>&gt;<i> open Foreign
+</I>&gt;<i> let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+</I>&gt;<i> let v = ref (from_voidp (ptr int) null)
+</I>&gt;<i> let a = ref (from_voidp int null)
+</I>&gt;<i> let b = ref (from_voidp int null)
+</I>&gt;<i> let _ =
+</I>&gt;<i>   v := allocate_n (ptr int) ~count:2 ;
+</I>&gt;<i>   a := allocate int 0 ;
+</I>&gt;<i>   b := allocate int 1 ;
+</I>&gt;<i>   (!v) &lt;-@ (!a);
+</I>&gt;<i>   ((!v) +@ 1) &lt;-@ (!b) ;
+</I>&gt;<i>   f (!v) ; Gc.full_major () ; f (!v)
+</I>&gt;<i>
+</I>&gt;<i> and the following program is fine too.
+</I>&gt;<i>
+</I>&gt;<i> open Ctypes
+</I>&gt;<i> open Foreign
+</I>&gt;<i> let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+</I>&gt;<i> let v = allocate_n (ptr int) ~count:2
+</I>&gt;<i> let a = allocate int 0
+</I>&gt;<i> let b = allocate int 1
+</I>&gt;<i> let _ =
+</I>&gt;<i>   v &lt;-@ a;
+</I>&gt;<i>   (v +@ 1) &lt;-@ b ;
+</I>&gt;<i>   f v ; Gc.full_major () ; f v
+</I>&gt;<i>
+</I>&gt;<i> However, having v, a, b in a local scope does not work.
+</I>&gt;<i>
+</I>&gt;<i> open Ctypes
+</I>&gt;<i> open Foreign
+</I>&gt;<i> let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+</I>&gt;<i> let _ =
+</I>&gt;<i>   let v = ref (from_voidp (ptr int) null) in
+</I>&gt;<i>   let a = ref (from_voidp int null) in
+</I>&gt;<i>   let b = ref (from_voidp int null) in
+</I>&gt;<i>   v := allocate_n (ptr int) ~count:2 ;
+</I>&gt;<i>   a := allocate int 0 ;
+</I>&gt;<i>   b := allocate int 1 ;
+</I>&gt;<i>   (!v) &lt;-@ (!a);
+</I>&gt;<i>   ((!v) +@ 1) &lt;-@ (!b) ;
+</I>&gt;<i>   f (!v) ;
+</I>&gt;<i>   Gc.full_major () ;
+</I>&gt;<i>   f (!v)
+</I>&gt;<i>
+</I>&gt;<i> I fail to see why it does not work in this case.
+</I>
+The GC is free to collect values that are no longer reachable by the
+program, even if there are references to them still &quot;in scope&quot;.  Since
+'a' is not used after the call to Gc.full_major, the collector can
+ignore 'a' when determining whether values are reachable.  Here's a
+simpler program that illustrates the same behaviour
+
+   let say_goodbye _ = print_endline &quot;goodbye&quot;
+
+   let _ =
+     let r = ref (object end) in
+     Gc.finalise say_goodbye !r;
+     Gc.full_major ();
+     print_endline &quot;the end&quot;
+
+On my system this prints
+
+   goodbye
+   the end
+
+i.e. the object is finalised by the call to Gc.full_major, even though
+'r' is still in scope.  Since 'r' is not used after the call, this
+behaviour is entirely legitimate.
+
+I think that using 'allocate' works best when you're actually using
+the pointer it returns to address the memory it allocates.  The need
+to use delicate tricks to keep the allocated memory alive is often a
+sign that a different allocation strategy would be a better choice.
+The choice of strategy will depend on how your application uses
+memory.
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000208.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+	<LI>Next message: <A HREF="000210.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#209">[ date ]</a>
+              <a href="thread.html#209">[ thread ]</a>
+              <a href="subject.html#209">[ subject ]</a>
+              <a href="author.html#209">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,55 @@
+From romain.beauxis at gmail.com  Tue Jan 31 22:31:47 2017
+From: romain.beauxis at gmail.com (Romain Beauxis)
+Date: Tue, 31 Jan 2017 16:31:47 -0600
+Subject: [ocaml-ctypes] Static function callback.
+Message-ID: <CABWZ6OQH_a8MStvt3EES0B8fJ02eSpmHhXSyreu7x0CTcWiLpQ@mail.gmail.com>
+
+Hi guys,
+
+I am playing with a binding for OSX's SecureTransport API. The API
+abstracts away the underlying socket implementation and, thus,
+requires to pass (static) callbacks, which is where I am having
+trouble..
+
+Here are the relevant part of the code:
+
+let fd_read = (...)
+
+let fd_write = (...)
+
+let _set_io_funcs = foreign ~from:lib "SSLSetIOFuncs"
+  (ptr void @-> fd_io_typ @-> fd_io_typ @-> returning int)
+
+let _create_context = (...)
+
+let _release_context = (...)
+
+let init s t =
+  let ctx =
+    _create_context (...)
+  in
+  Gc.finalise _release_context ctx;
+  let read = Root.create fd_read in
+  Gc.finalise Root.release read;
+  let write = Root.create fd_write in
+  Gc.finalise Root.release write;
+  check_err (_set_io_funcs ctx fd_read fd_write);
+  {ctx;read;write}
+
+The trick above is that read and write callbacks are passed at
+initialization and, thus, need to be valid for the life time of the
+handler.
+
+I've tried my best to make sure that the passed callback would be
+immune to Gc issues. Unfortunately, I am still experiencing issues
+with them which, I think, relate to the Gc messing with those.
+
+Basically, if I had some printf inside the fd_* callbacks, the
+compiled binding will sometimes work and some times not.
+
+Besides using C stubs (which I am trying to avoid as an exercise
+here), is there anything else that I could do to make this work?
+
+Thanks for y'all help!
+Romain
+

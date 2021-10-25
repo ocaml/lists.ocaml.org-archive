@@ -1,0 +1,103 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Erlang-like Gen server using Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3CCAK%3DfH%2BiDZTWTn6W21u8iWWbfstg3AnrpX3TbsoNn93ORMocu1Q%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000417.html">
+   <LINK REL="Next"  HREF="000419.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Erlang-like Gen server using Async</H1>
+    <B>David House</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3CCAK%3DfH%2BiDZTWTn6W21u8iWWbfstg3AnrpX3TbsoNn93ORMocu1Q%40mail.gmail.com%3E"
+       TITLE="Erlang-like Gen server using Async">dhouse at janestreet.com
+       </A><BR>
+    <I>Tue Jul  3 07:46:15 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000417.html">Erlang-like Gen server using Async
+</A></li>
+        <LI>Next message: <A HREF="000419.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#418">[ date ]</a>
+              <a href="thread.html#418">[ thread ]</a>
+              <a href="subject.html#418">[ subject ]</a>
+              <a href="author.html#418">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On Tue, Jul 3, 2012 at 5:34 AM, Sam &lt;<A HREF="http://lists.ocaml.org/listinfo/core">sdefabbiakane at gmail.com</A>&gt; wrote:
+&gt;<i> You're refererencing some things in Async's Deferred module (like
+</I>&gt;<i> 'Deferred.return', etc) with their qualified names, which is unnecessary:
+</I>&gt;<i> you can just use 'return'. This is partially a style point, but Deferred is
+</I>&gt;<i> generally understood to be the top-level monad if you have Async open. (This
+</I>&gt;<i> is also the case for some functions in other modules, like printf, which is
+</I>&gt;<i> in the top level in Core.)
+</I>
+Not sure I totally agree -- I think Deferred.return is a clearer name
+than return on its own. I generally try to avoid use of return by
+using map instead of bind as the last chained infix operator, e.g.:
+
+  foo
+  &gt;&gt;= fun a -&gt;
+  bar a
+  &gt;&gt;= fun () -&gt;
+  baz
+  &gt;&gt;| fun c -&gt;
+  quux c
+
+(This also shows another style point I'm a fan of: arrange your code
+with binds/maps on the left, so that it is clear where they all are.
+This is important, because they're basically the possible context
+switch points in your code. So you should be aware where they are. The
+above example looks silly, but generally you have much longer lines
+between the binds, and it looks fine.)
+
+&gt;<i> Generally functions that do deferred things should generally have a Deferred
+</I>&gt;<i> type. Don't use upon to try to give yourself functions of type 'unit'.
+</I>
++1, and in fact I'd say any use of upon is supicious. Note that [x &gt;&gt;&gt;
+f] is equivalent (pretty much) to [whenever (x &gt;&gt;= f)] (at some point
+we are renaming &quot;whenever&quot; to &quot;don't_wait_for&quot; -- I can't remember
+whether that has hit yet). But as you say, you should just let things
+have deferred return types if they do deferred things. This means that
+clients of that function have the choice whether to wait for that
+function (by binding on it), or not to (by calling
+whenever/don't_wait_for).
+
+The only exception is very tight loops, where upon is more efficient
+than bind, because it avoids allocating an extra deferred.
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000417.html">Erlang-like Gen server using Async
+</A></li>
+	<LI>Next message: <A HREF="000419.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#418">[ date ]</a>
+              <a href="thread.html#418">[ thread ]</a>
+              <a href="subject.html#418">[ subject ]</a>
+              <a href="author.html#418">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

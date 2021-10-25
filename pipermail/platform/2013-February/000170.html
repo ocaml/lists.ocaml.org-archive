@@ -1,0 +1,205 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512E0588.3000003%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000171.html">
+   <LINK REL="Next"  HREF="000172.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512E0588.3000003%40lexifi.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Wed Feb 27 13:09:28 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000171.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000172.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#170">[ date ]</a>
+              <a href="thread.html#170">[ thread ]</a>
+              <a href="subject.html#170">[ subject ]</a>
+              <a href="author.html#170">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 02/27/2013 12:51 PM, Leo White wrote:
+&gt;<i> Without an open statement your proposal does not scale well. The main
+</I>&gt;<i> need for namespaces arises out of the fact that people choose the same
+</I>&gt;<i> short names for their modules. This will still be the case for the names
+</I>&gt;<i> people choose within their &quot;.ns&quot; files. As soon as I want to use two
+</I>&gt;<i> libraries that contain modules with the same short name, your proposal
+</I>&gt;<i> will have the meaning of the short name decided by the order of
+</I>&gt;<i> command-line arguments. This seems very fragile.
+</I>
+I want to see concrete examples!  I don't believe that it is common, in 
+the same unit, to access two modules called &quot;List&quot; from two different 
+libraries.  Maybe you want to use both String.Set and Int.Set, but 
+you're not going to &quot;open&quot; String and Int anyway.  You may also want to 
+use Xmllight.parse and Xmlm.parse (although it is not clear that this 
+will happen in the same module), but you're not going to open Xmllight 
+or Xmlm globally in your unit.
+
+&gt;<i> I also think that open statements (even at the top of a file) are a very
+</I>&gt;<i> good thing.
+</I>
+If put at the top of the file, I don't see them as fundamentally 
+different from command-line arguments, and the meaning of the short name 
+is decided by the order of open statements, which is also quite fragile.
+
+And &quot;open statements&quot; (for modules, not even namespaces) are generally 
+considered as a dangerous feature, because they are the source of 
+technical problems (dependency analysis), because they make the code 
+harder to read and refactorize, and because it makes modules more 
+fragile (if a module B is extended with more components, they can hide 
+components with the same name from another module A which is open before 
+B in some client code).  Making &quot;opens&quot; more local is a way to reduce 
+those problems.  I'm thus surprised by your claim that open statements 
+are very good thing.
+
+
+&gt;<i> They show which libraries the file is going to use.
+</I>
+This seems to confirm that what you're aiming at is really a way to 
+specify in the source code which libraries are used.  But then we should 
+push the reasoning further and ensure this specification is the only one 
+required to use a library.  Why should we accept to pass -I / -pp / -ppx 
+flags to the compiler (and specify again libraries at link time) when 
+the information is already part of the source code?
+
+
+&gt;<i> Currently, a file using a library that does not use pack will simply
+</I>&gt;<i> launch straight into using modules with short names that give no
+</I>&gt;<i> indication of their origin.
+</I>
+Many of the third-party libraries I use export a single module, which I 
+never &quot;open&quot;, and whose name is unique enough to avoid clashes (e.g. 
+Postgresql, Sqlite3, Xmlm).  Some libraries use prefixes (Nethtml, with 
+an internal Nethtml_scanner module; Lwt comes with Lwt_util, 
+Lwt_condition, Lwt_mutex, etc).  It would have been crazy, indeed, for 
+Nethtml to have an internal &quot;Scanner&quot; module, or for Lwt to expose a 
+&quot;Mutex&quot; module.  I'm fine with this situation, but I can understand that 
+in some cases, it would make sense, for instance, to alias Lwt_mutex to 
+Mutex in a given project.
+
+So I don't agree with the opinion that -pack is currently the only way 
+to avoid clashes!  It would be useful to get some statistics about the 
+use of -pack in OPAM.
+
+
+ &gt; I must look in the build system to find out
+&gt;<i> what they refer to. By encouraging people to use namespaces, these files
+</I>&gt;<i> will instead start with &quot;open namespace Foo&quot;, and it will be obvious
+</I>&gt;<i> what libraries they are using.
+</I>
+So if you have a program like:
+
+  open namespace Foo
+  open namespace Bar
+
+  (* ... several hundreds of lines ... *)
+
+   .... Baz.parse ...
+
+then, yes, you know that this program uses the Foo and Bar 
+libraries/namespaces, but you have no idea where Baz comes from.  This 
+is fine, as long as you don't have clashes of &quot;short&quot; names, i.e. Foo 
+and Bar are different enough to not provide top-level components of the 
+same name.
+
+&gt;<i> As OPAM (and the platform) become more widely used I expect there to be
+</I>&gt;<i> many more small convenience libraries. This will increase the number of
+</I>&gt;<i> libraries that are being used within a single project, and it will be
+</I>&gt;<i> useful to know from the source files themselves which files use which
+</I>&gt;<i> libraries.
+</I>
+I like this idea of putting more information in the source code about a 
+file &quot;requirements&quot; (let's say, which libraries are used).  This could 
+be interpreted directly by the compiler (if there is a well-defined 
+convention on how libraries are located and invoked) or by a driver such 
+as ocamlfind.  Currently, library dependencies are specified on the 
+command-line (hence in the build system) and I agree it makes sense to 
+allow specifying that in the source code.
+
+&gt;<i> I understand that for backwards compatibility it is useful to be able to
+</I>&gt;<i> use files via both a namespaced name and a traditional name. However,
+</I>&gt;<i> when not worried about backwards compatibility, we should instead be
+</I>&gt;<i> focussed on providing a coherent story about how OCaml components are
+</I>&gt;<i> named and how these names are managed. For me, this means (for a
+</I>&gt;<i> non-backwards compatible library) only providing (or at least actively
+</I>&gt;<i> encouraging) access to components through namespaces.
+</I>
+I understand your point and I think it makes sense if &quot;namespaces&quot; are 
+indeed to be added to the language.
+
+&gt;&gt;<i> Worse: if we use &quot;ocamldep -modules&quot;, this resolution has to be done
+</I>&gt;&gt;<i> by the build system, so this complex logic (which depends on the
+</I>&gt;&gt;<i> location in the source file) will have to be re-implemented in omake
+</I>&gt;&gt;<i> and other build systems around.  It is an important property that
+</I>&gt;&gt;<i> &quot;ocamldep -modules&quot; does not need to look for the existence of
+</I>&gt;&gt;<i> compiled units on the current tree.
+</I>&gt;<i>
+</I>&gt;<i> Firstly, I would like to make clear that this would be no problem for
+</I>&gt;<i> build systems that used makefile formatted ocamldep output.
+</I>
+Indeed.  However, &quot;ocamldep -modules&quot; has been added for good reasons 
+and it is the recommended way to use omake.  (And don't know about 
+ocamlbuild.)  omake is used by some of the largest OCaml code base around.
+
+&gt;<i> &quot;ocamldep -modules&quot; has always produced an over-estimate of the modules
+</I>&gt;<i> that a file uses and then allowed the build system to figure out the
+</I>&gt;<i> rest.
+</I>
+&quot;ocamldep -modules&quot; does not produce more false dependencies than 
+&quot;ocamldep&quot;.  I'd rather say that &quot;ocamldep&quot; (without -modules) misses 
+some dependencies (for generated files which are not yet present when 
+ocamldep is executed).
+
+
+&gt;<i> OCamlDep would simply treat any namespace for which it could find
+</I>&gt;<i> no &quot;.ns&quot; file as an implicit namespace.
+</I>
+I have to admit that I'm a little bit lost and I don't really know which 
+&quot;namespace proposal&quot; we are talking about (mine has only &quot;.ns&quot; file, no 
+other notion of namespaces).
+
+
+
+Alain
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000171.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000172.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#170">[ date ]</a>
+              <a href="thread.html#170">[ thread ]</a>
+              <a href="subject.html#170">[ subject ]</a>
+              <a href="author.html#170">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

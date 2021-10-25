@@ -1,0 +1,89 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20mingw%2C%20ocamlopt%20and%20%22input%20line%20is%20too%20long%22&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9011E9C7385%40Remus.metastack.local%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000066.html">
+   <LINK REL="Next"  HREF="000068.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:wg-windows%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-windows%5D%20mingw%2C%20ocamlopt%20and%20%22input%20line%20is%20too%20long%22&In-Reply-To=%3CE51C5B015DBD1348A1D85763337FB6D9011E9C7385%40Remus.metastack.local%3E"
+       TITLE="[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;">dra-news at metastack.com
+       </A><BR>
+    <I>Thu Jul  7 12:19:17 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000066.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+        <LI>Next message: <A HREF="000068.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#67">[ date ]</a>
+              <a href="thread.html#67">[ thread ]</a>
+              <a href="subject.html#67">[ subject ]</a>
+              <a href="author.html#67">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Alain Frisch wrote:
+&gt;<i> On 07/07/2016 12:27, Andreas Hauptmann wrote:
+</I>&gt;<i> &gt; However there are at least two problems:
+</I>&gt;<i> &gt; - the decision to use bash or not is based on a gross estimation, not
+</I>&gt;<i> &gt; the real command line length (It looks at your object files, not your
+</I>&gt;<i> &gt; include directories)
+</I>&gt;<i> 
+</I>&gt;<i> Indeed, and this is now fixed in the development version.
+</I>&gt;<i> 
+</I>&gt;<i> <A HREF="https://github.com/alainfrisch/flexdll/commit/2bac9b8153b2e98880545f86c435">https://github.com/alainfrisch/flexdll/commit/2bac9b8153b2e98880545f86c435</A>
+</I>&gt;<i> 90f905afe427
+</I>&gt;<i> 
+</I>&gt;<i> &gt; - The wrong quote function is used to write the shell script
+</I>&gt;<i> &gt; (Filename.quote quotes for cmd, not a unix shell,...)
+</I>&gt;<i> 
+</I>&gt;<i> Do you have a reproduction case for this one?
+</I>
+The full story is even more involved than just argument quoting (I did a lot of forensic digging in the code for cygwin1.dll in May). Handling of double-quotes is different from the standard Windows mechanism (described in the somewhat obscurely-named CommandLineToArgvW function in MSDN: <A HREF="https://msdn.microsoft.com/en-us/library/windows/desktop/bb776391(v=vs.85">https://msdn.microsoft.com/en-us/library/windows/desktop/bb776391(v=vs.85</A>).aspx).
+
+The final result of digging (and fruitless requests on the Cygwin list) was:
+  1. When invoking a Cygwin process, it is necessary to go via the win_create_process C primitive from the Unix module (in order to bypass OCaml's correct implementation of CommandLineToArgvW escaping)
+  2. It is necessary to escape the arguments also taking into Cygwin's noglob setting (two entirely different escaping code paths).
+
+For OPAM, which does not need any globbing assistance, this resulted in <A HREF="https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L17-L202.">https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L17-L202.</A> It's working for me so far, but it's clearly going to need @response support implementing soon, as noted in the comments! That code also permits the effect of being able to execute #! scripts directly: <A HREF="https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L369-L421.">https://github.com/dra27/opam/blob/windows/src/core/opamProcess.ml#L369-L421.</A>
+
+
+David
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000066.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+	<LI>Next message: <A HREF="000068.html">[wg-windows] mingw, ocamlopt and &quot;input line is too long&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#67">[ date ]</a>
+              <a href="thread.html#67">[ thread ]</a>
+              <a href="subject.html#67">[ subject ]</a>
+              <a href="author.html#67">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-windows">More information about the wg-windows
+mailing list</a><br>
+</body></html>

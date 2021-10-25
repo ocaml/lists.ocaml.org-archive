@@ -1,0 +1,114 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN	coherently
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Using%20Cstubs.Types.TYPE%20and%20Cstubs.FOREIGN%0A%09coherently&In-Reply-To=%3CCAAxsn%3DHYbL%2BzS%2BxkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000167.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN	coherently</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Using%20Cstubs.Types.TYPE%20and%20Cstubs.FOREIGN%0A%09coherently&In-Reply-To=%3CCAAxsn%3DHYbL%2BzS%2BxkMQxunqAn2U130uJ2hQ2jhSb09mTiZVSQ6A%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN	coherently">yallop at gmail.com
+       </A><BR>
+    <I>Mon May  4 14:04:35 BST 2015</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000167.html">[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN	coherently
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#166">[ date ]</a>
+              <a href="thread.html#166">[ thread ]</a>
+              <a href="subject.html#166">[ subject ]</a>
+              <a href="author.html#166">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 29 April 2015 at 12:40, Si Beaumont &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">simon.beaumont at citrix.com</A>&gt; wrote:
+&gt;<i> However, I wanted to also be able to get the struct layout and constant
+</I>&gt;<i> definitions only available to the C preprocesor without me having to transcribe
+</I>&gt;<i> them into my library (libpci like many other libraries `#define`s a whole bunch
+</I>&gt;<i> of values for flags that need to be passed into functions). FWICT to get this
+</I>&gt;<i> to work I need to create a second functor taking a module with signature
+</I>&gt;<i> Cstubs.Types.TYPE and then use Cstubs.Type.write_c. This will generate
+</I>&gt;<i> a C program which needs to be compiled. This compiled C program can then be run
+</I>&gt;<i> to generate an OCaml module which can be used with my original Bindings
+</I>&gt;<i> functor (gleanings from a few days of hacking and from ctypes
+</I>&gt;<i> mailing-list[4][5]).
+</I>
+Right.
+
+&gt;<i> It seems this pipeline is going to be quite difficult to integrate into a build
+</I>&gt;<i> system like OASIS since I need to compile an auto-generated C program half way
+</I>&gt;<i> through.
+</I>
+It's not trivial, but it's certainly possible.  The async_ssl package
+is a useful example to work from; it binds various constants in the
+Ffi_bindings.types module:
+
+   <A HREF="https://github.com/janestreet/async_ssl/blob/c58a80b7/bindings/ffi_bindings.ml#L1-L40">https://github.com/janestreet/async_ssl/blob/c58a80b7/bindings/ffi_bindings.ml#L1-L40</A>
+
+and uses ocamlbuild rules to set up the appropriate dependencies
+
+   <A HREF="https://github.com/janestreet/async_ssl/blob/c58a80b7/myocamlbuild.ml">https://github.com/janestreet/async_ssl/blob/c58a80b7/myocamlbuild.ml</A>
+
+There's also a bit of _oasis set-up to build the executables:
+
+   <A HREF="https://github.com/janestreet/async_ssl/blob/c58a80b7/_oasis#L84-L97">https://github.com/janestreet/async_ssl/blob/c58a80b7/_oasis#L84-L97</A>
+
+I wonder if it'd be useful for the Ctypes package to include some
+reusable ocamlbuild rules to make this kind of thing easier.
+
+&gt;<i> My final bit of research landed me on an open Bountysource issue[6] on
+</I>&gt;<i> which it looks like there's a plan to smooth this out to make the workflow more
+</I>&gt;<i> like the stub generation for foreign function bindings:
+</I>&gt;<i>
+</I>&gt;&gt;<i> We can address both these concerns with an alternative workflow for
+</I>&gt;&gt;<i> Cstubs_structs.TYPE that follows the same pattern as stub generation for
+</I>&gt;&gt;<i> functions: generate C and ML directly from the functor containing your
+</I>&gt;&gt;<i> bindings, then link the generated C and ML into your program.
+</I>&gt;<i>
+</I>&gt;<i> This sounds fantastic! I was wondering if there is any branch of Ctypes with
+</I>&gt;<i> this functionality yet that I could try out or if there is any expectation to
+</I>&gt;<i> add this in the near-term?
+</I>
+I've just pushed a branch with an implementation of this proposal.
+
+   <A HREF="https://github.com/ocamllabs/ocaml-ctypes/pull/296">https://github.com/ocamllabs/ocaml-ctypes/pull/296</A>
+
+Feedback is very welcome!
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000167.html">[ocaml-ctypes] Using Cstubs.Types.TYPE and Cstubs.FOREIGN	coherently
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#166">[ date ]</a>
+              <a href="thread.html#166">[ thread ]</a>
+              <a href="subject.html#166">[ subject ]</a>
+              <a href="author.html#166">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

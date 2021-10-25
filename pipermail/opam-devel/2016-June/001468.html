@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%20managers%22%3B%0A%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3CCAPFanBEExyHsu%3Dq%2BwJj4Oe9EHCyTTz0%2BSofj%2BW5QBRByqWTeqA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001467.html">
+   <LINK REL="Next"  HREF="001469.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%20managers%22%3B%0A%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3CCAPFanBEExyHsu%3Dq%2BwJj4Oe9EHCyTTz0%2BSofj%2BW5QBRByqWTeqA%40mail.gmail.com%3E"
+       TITLE="[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Jun  9 15:57:05 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001467.html">[opam-devel] OPAM 2.0 features
+</A></li>
+        <LI>Next message: <A HREF="001469.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1468">[ date ]</a>
+              <a href="thread.html#1468">[ thread ]</a>
+              <a href="subject.html#1468">[ subject ]</a>
+              <a href="author.html#1468">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi opam-devel,
+
+Here is a rather cool bachelor thesis that seems relevant to OPAM
+repository management:
+
+  Typosquatting in Programming Language Package Managers
+  Nikolai Philipp Tschacher, March 2016
+  <A HREF="http://incolumitas.com/2016/06/08/typosquatting-package-managers/">http://incolumitas.com/2016/06/08/typosquatting-package-managers/</A>
+
+The described attack is to propose packages whose names are typo-close to
+very popular packages. Instead of &quot;opam install omake&quot; I run &quot;opam install
+omaek&quot;, but &quot;omaek&quot; exists and is attacker-controlled, and its install
+script wreaks havoc on my machine.
+
+This is interesting because it is a way to subvert a specific package that
+is immune to the common defenses against impersonation -- signing a package
+with its maintainers keys, etc. The author of the thesis suggests three
+defense methods:
+
+1. Make package installation sandboxed in such a way that just installing a
+package is harmless as long as its code is not linked and run. (Of course
+this code may be linked and run if a developer also makes a typo in its
+software.)
+
+2. Alert repository administrators when a typo-candidate is proposed for
+integration. (This is especially relevant for repositories with no human
+oversight on package addition, but even for OPAM one may consider that the
+maintainers themselves may be fooled by the typo or not think of the
+security consequences.)
+
+3. Keep a log of the non-existing packages that users commonly try to
+install (good candidates for typos) and alert administrators when a
+matching package is proposed.
+
+I'm sure that the systems expert in the room have plans for (1) already. I
+suspect that opam's architecture does not let us do (3), but I was
+interesting in quickly hacking (2) this morning -- I suppose I like
+typo-detection stuff.
+
+My plan was: in `opam lint`, emit a warning if the linted package name is
+at edit distance 2 or less (but not 0) of an existing package in the
+repository. But this does not quite work; I quickly looked at the code and
+it seems that &quot;opam lint&quot; is meant to be run purely locally, it does not
+have access to a base of packages available in the repository.
+
+So my question: where in the opam-repository QA process should I add a
+script (preferably written in OCaml rather than shell) that gets the name
+of the packages proposed for inclusion, also has access to the name of
+existing packages in the repository, and can fail or warn if the proposed
+one is typo-close to an existing one?
+
+(This test can have false positives, eg. installing lablgtk2 when lablgtk
+exists. It should still fail in a visible way in the UI, but not in a way
+that prevent other, more advanced tests, such as package installability.)
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/9ea91bd0/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/9ea91bd0/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001467.html">[opam-devel] OPAM 2.0 features
+</A></li>
+	<LI>Next message: <A HREF="001469.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1468">[ date ]</a>
+              <a href="thread.html#1468">[ thread ]</a>
+              <a href="subject.html#1468">[ subject ]</a>
+              <a href="author.html#1468">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

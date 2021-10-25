@@ -1,0 +1,135 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Meta Programming from the view of the implementaion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3C510A6989.80706%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000125.html">
+   <LINK REL="Next"  HREF="000148.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Meta Programming from the view of the implementaion</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3C510A6989.80706%40lexifi.com%3E"
+       TITLE="[wg-camlp4] Meta Programming from the view of the implementaion">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Thu Jan 31 12:54:33 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000125.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000148.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#147">[ date ]</a>
+              <a href="thread.html#147">[ thread ]</a>
+              <a href="subject.html#147">[ subject ]</a>
+              <a href="author.html#147">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 01/30/2013 02:18 PM, Hongbo Zhang wrote:
+&gt;<i> Ast Rewriter is *bad *for arbitrary code generation, its neat case is
+</I>&gt;<i> something like bisect.
+</I>
+One of the most widely used kind of Camlp4 extensions today is about 
+code generation based on type declarations (plus some annotations), &#224; la 
+type-conv or deriving.  This seems to be a perfect match for AST 
+rewriters plus attributes.  Don't you agree?
+
+&gt;<i> And Ast Rewriter is not composable at  all,
+</I>&gt;<i> suppose you have two AST Rewriters A,B ,there are no guarantee that  A.B
+</I>&gt;<i> == B.A, it just gives you an illusion that it works, probably it
+</I>&gt;<i> silently fails.
+</I>
+I don't agree.  A and B are functions from AST to AST, so there is a 
+very nice notion of composition: the composition of functions.  It is 
+true that A.B and B.A don't have the same behavior but at least, I can 
+understand what A.B and B.A will do as soon as I know how A and B behave 
+individually, without having to know anything about their implementation.
+
+This is very different from camlp4's model of letting extensions patch a 
+common grammar in place, by removing rules and injecting new ones which 
+can (partially) hide existing ones.  The order in which those updates to 
+the grammar are applied also matters, and it is impossible to know how 
+the combination of two extension behaves without knowing precisely how 
+they are implemented.
+
+I know you have projects to provide a cleaner functional API for 
+grammars, but I don't see how modifications of the concrete syntax can 
+be combined, in full generality, in a predictable way.  It seems you 
+also have plans to get rid of the ability to modify the concrete syntax. 
+  This sounds very reasonable to me.
+
+&gt;<i>     3. How do you implement the expander?  Somehow, you need to parse
+</I>&gt;<i>     the content of the quotation (stored as a string in the AST), which
+</I>&gt;<i>     involves non trivial stuff, like a parser being able to parse OCaml
+</I>&gt;<i>     code mixed with something else.  Personally, I don't know how to
+</I>&gt;<i>     implement the quotation expander with the parsing technologies I'm
+</I>&gt;<i>     familiar with.
+</I>&gt;<i>
+</I>&gt;<i> when you design your DSL, the left part is pretty easy to parse, when
+</I>&gt;<i> you see the delimiter &quot;-&gt;&quot;, invoking an existing parser.
+</I>
+So you need to:
+
+  - Write a custom parser for left parts (regexps), which stops at &quot;-&gt;&quot;.
+To write this parser, you need to use ocamlyacc, menhir, or another 
+tool. (And probably plug the official OCaml lexer?)
+  - Call the official(?) OCaml parser on its &quot;expr&quot; entry and hope that 
+it stops exactly when it encounters the next &quot;|&quot; (does this really work?).
+  - Adapt the locations returned by this parser, or be careful to 
+initialize the lexbuf with locations that match exactly the concrete 
+location of the corresponding part in the original source code.
+
+This seems much more complex than the current implementation of sedlex 
+(or a variant of it where regexps would be written with some concrete 
+syntax), for no obvious benefit.
+
+
+Alain
+
+
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000125.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000148.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#147">[ date ]</a>
+              <a href="thread.html#147">[ thread ]</a>
+              <a href="subject.html#147">[ subject ]</a>
+              <a href="author.html#147">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,138 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [compiler-hacking] Warnings for uncaught exceptions
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:cam-compiler-hacking%40lists.ocaml.org?Subject=Re%3A%20%5Bcompiler-hacking%5D%20Warnings%20for%20uncaught%20exceptions&In-Reply-To=%3CCACVN0VsMgzkYypgbMcrXy1vMDJGWk320hn9gytR5cuP1LaFZSQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000068.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[compiler-hacking] Warnings for uncaught exceptions</H1>
+    <B>KC Sivaramakrishnan</B> 
+    <A HREF="mailto:cam-compiler-hacking%40lists.ocaml.org?Subject=Re%3A%20%5Bcompiler-hacking%5D%20Warnings%20for%20uncaught%20exceptions&In-Reply-To=%3CCACVN0VsMgzkYypgbMcrXy1vMDJGWk320hn9gytR5cuP1LaFZSQ%40mail.gmail.com%3E"
+       TITLE="[compiler-hacking] Warnings for uncaught exceptions">sk826 at cam.ac.uk
+       </A><BR>
+    <I>Sun Jul 31 21:01:26 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000068.html">[compiler-hacking] Warnings for uncaught exceptions
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#69">[ date ]</a>
+              <a href="thread.html#69">[ thread ]</a>
+              <a href="subject.html#69">[ subject ]</a>
+              <a href="author.html#69">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>As a part of the multicore OCaml work, we are developing an effect system
+for OCaml. The effect system could be used for describing *checked*
+exceptions. Leo's developing a prototype [0], and which already looks very
+promising:
+
+===
+
+# effect not_found = Not_found;;
+
+effect not_found = Not_found
+
+# let half x =
+    if x mod 2 = 0 then x / 2
+    else perform Not_found;;
+
+val half : int -[not_found | io]-&gt; int = &lt;fun&gt;
+
+# half 7;;
+
+Characters 0-6:
+  half 7;;
+  ^^^^^^
+Error: This expression performs effect [not_found | io | !~]
+       but an expression was expected that performed [io]
+       Type [not_found | !~] is not compatible with type []
+
+# let not_found_to_opt f x =
+    match f x with
+    | x -&gt; Some x
+    | effect Not_found -&gt; None;;
+
+val not_found_to_opt : ('a -[not_found | !~]-&gt; 'b) =&gt; 'a ~&gt; 'b option =
+&lt;fun&gt;
+
+# not_found_to_opt half 7;;
+
+- : int option = None
+
+# not_found_to_opt half 8;;
+
+- : int option = Some 4
+
+===
+
+[0]: <A HREF="https://github.com/lpw25/ocaml/tree/ecaml">https://github.com/lpw25/ocaml/tree/ecaml</A>
+
+On Sun, Jul 31, 2016 at 8:28 PM, Nik Sultana &lt;<A HREF="http://lists.ocaml.org/listinfo/cam-compiler-hacking">ns441 at cam.ac.uk</A>&gt; wrote:
+
+&gt;<i> I'm not sure if there already exists such functionality for OCaml, but
+</I>&gt;<i> thought that adapting this work to OCaml from SML might make an interesting
+</I>&gt;<i> project for somebody on this list:
+</I>&gt;<i>
+</I>&gt;<i> &quot;Estimating uncaught exceptions in Standard ML programs from type-based
+</I>&gt;<i> equations&quot; by Yi et al.
+</I>&gt;<i> &lt;abstract&gt;
+</I>&gt;<i> We present a static analysis that detects potential runtime exceptions
+</I>&gt;<i> that are raised and never handled inside Standard ML (SML) programs.
+</I>&gt;<i> Contrary to our earlier method (Yi, 1994) based on abstract interpretation,
+</I>&gt;<i> where the input program's control flow is simultaneously computed while our
+</I>&gt;<i> exception analysis progresses, we separate the two phases in a manner
+</I>&gt;<i> similar to conventional data flow analysis. Before the exception analysis
+</I>&gt;<i> begins, we first estimate the input program's control flow from the type
+</I>&gt;<i> information from SML/NJ compiler. Based on this call-graph structure,
+</I>&gt;<i> exception flow is specified as a set of equations, whose solution is
+</I>&gt;<i> computed using an iterative least fixpoint method. A prototype of this
+</I>&gt;<i> analysis is applied to two realistic SML programs (ML-LEX and OR-SML core)
+</I>&gt;<i> and is 3 or 40 times faster than the earlier method and saves memory by 35
+</I>&gt;<i> or 65 percent
+</I>&gt;<i> &lt;/abstract&gt;
+</I>&gt;<i>
+</I>&gt;<i> The full paper's at
+</I>&gt;<i> <A HREF="http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=544613">http://ieeexplore.ieee.org/xpl/articleDetails.jsp?arnumber=544613</A>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Cam-compiler-hacking mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/cam-compiler-hacking">Cam-compiler-hacking at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/cam-compiler-hacking">http://lists.ocaml.org/listinfo/cam-compiler-hacking</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20160731/a4cb1856/attachment.html">http://lists.ocaml.org/pipermail/cam-compiler-hacking/attachments/20160731/a4cb1856/attachment.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000068.html">[compiler-hacking] Warnings for uncaught exceptions
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#69">[ date ]</a>
+              <a href="thread.html#69">[ thread ]</a>
+              <a href="subject.html#69">[ subject ]</a>
+              <a href="author.html#69">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/cam-compiler-hacking">More information about the Cam-compiler-hacking
+mailing list</a><br>
+</body></html>

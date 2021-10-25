@@ -1,0 +1,185 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCACLX4jQO%3DuOx%3Dt9GA-zBRP53hMLcSTCrGgK7Wy_C6RZWgORmqQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000268.html">
+   <LINK REL="Next"  HREF="000276.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3CCACLX4jQO%3DuOx%3Dt9GA-zBRP53hMLcSTCrGgK7Wy_C6RZWgORmqQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">yminsky at janestreet.com
+       </A><BR>
+    <I>Wed Mar 13 12:56:18 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000268.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000276.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#270">[ date ]</a>
+              <a href="thread.html#270">[ thread ]</a>
+              <a href="subject.html#270">[ subject ]</a>
+              <a href="author.html#270">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Wed, Mar 13, 2013 at 7:44 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;<i> Having
+</I>&gt;&gt;<i> namespace opening be a special-case thing that only happens on the
+</I>&gt;&gt;<i> file level and that is hidden from the source just seems like an
+</I>&gt;&gt;<i> unfortunate special-casing of a namespace manipulation tool (like let
+</I>&gt;&gt;<i> and open) that should be available generally.
+</I>&gt;<i>
+</I>&gt;<i> Just to be clear I'm not proposing to have namespace opening at file
+</I>&gt;<i> level, just the hidden opening of modules.
+</I>
+Sorry, my terminology is perhaps a bit confusing.  The way I'm talking
+about it, opening a module, opening a namespace and let bindings are
+all manipulations of the program's name-space.  I guess that's a
+terrible way of saying it.  Should I call those manipulations of the
+naming enviroment?
+
+In any case, I want to do as many environment manipulations in the
+source as possible, and moving module opens to the build system seems
+like a regression for our use-case.
+
+&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I think the awkwardness is more related to how you treat things like:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>    Core#Foo
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> where Foo might be a sub-module of Core#Common.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Can you elaborate a bit?  Why is this case problematic?  I can kind of
+</I>&gt;&gt;<i> see why this is weird, but other than making an explicit requirement
+</I>&gt;&gt;<i> of having an ordered semantics (which to me seems like the right
+</I>&gt;&gt;<i> answer anyway, since it's more in tune with how OCaml's other
+</I>&gt;&gt;<i> namespace manipulation operators work), it seems fairly
+</I>&gt;&gt;<i> straight-ahead.  But I'm probably missing something important.
+</I>&gt;<i>
+</I>&gt;<i> We should propbably stop calling this idea &quot;auto-opening&quot; because it is
+</I>&gt;<i> really about allowing modules to be &quot;included&quot; within a namespace. This
+</I>&gt;<i> is not a small change to the semantics. Without &quot;auto-opens&quot; namespaces
+</I>&gt;<i> are simply a mechanism for controlling the names of compilation units,
+</I>&gt;<i> with them they become a partial replacement modules: able to contain
+</I>&gt;<i> values, types, exception, etc. Having two different features that
+</I>&gt;<i> substantially overlap is normally a bad idea since it can cause a lot of
+</I>&gt;<i> confusion.
+</I>&gt;<i>
+</I>&gt;<i> Without auto-opens the namespace system is completely oblivious to the
+</I>&gt;<i> actual contents of modules. With auto-opens the compiler must look
+</I>&gt;<i> inside modules to work out whether &quot;Core#Foo&quot; refers to a member of Core
+</I>&gt;<i> or a sub-module of one of its auto-opened modules.
+</I>&gt;<i>
+</I>&gt;<i> Also, an ordered semantics is not for free. It makes having a
+</I>&gt;<i> namespace defined in multiple places (as with users adding to existing
+</I>&gt;<i> namespaces) much more fragile.
+</I>&gt;<i>
+</I>&gt;<i> I think this is why people are reluctent to include automatically opened
+</I>&gt;<i> modules in the namespaces proposal: it is quite a large change to the
+</I>&gt;<i> semantics to handle a problem that is only likely to affect a few
+</I>&gt;<i> libraries.
+</I>&gt;<i>
+</I>&gt;<i> However, I think that I can see a way to avoid the problems of an ordered
+</I>&gt;<i> semantics and possible &quot;Core#Foo&quot; conflicts.
+</I>&gt;<i>
+</I>&gt;<i> The basic idea is to define a module named &quot;Core&quot; containing the values
+</I>&gt;<i> that you would like automatically opened, as well as a namespace named
+</I>&gt;<i> &quot;Core&quot;. Then you provide some kind of opening operation that opens both
+</I>&gt;<i> the namespace and the module named &quot;Core&quot;.
+</I>&gt;<i>
+</I>&gt;<i> This avoids the problem of ordering members of namespaces, since there
+</I>&gt;<i> should only be one module called &quot;Core&quot;. Technically there could be
+</I>&gt;<i> multiple &quot;Core&quot; modules in the search path, but we simply use the first
+</I>&gt;<i> one we find just like normal modules.
+</I>&gt;<i>
+</I>&gt;<i> It also avoids the issue of &quot;Core#Foo&quot; conflicts, since &quot;Core#Foo&quot; must
+</I>&gt;<i> refer to the &quot;Foo&quot; member of the &quot;Core&quot; namespace, while &quot;Core.Foo&quot;
+</I>&gt;<i> would refer to the &quot;Foo&quot; sub-module of the &quot;Core&quot; module.
+</I>&gt;<i>
+</I>&gt;<i> This could be added to a namespaces proposal in a number of ways. For
+</I>&gt;<i> example we could allow modules named &quot;Core#_&quot; (or core-_.ml) to be
+</I>&gt;<i> defined. These modules could be refered to directly in programs as
+</I>&gt;<i> &quot;Core&quot;. When the compiler encouters a &quot;open namespace Core&quot; construct it
+</I>&gt;<i> first opens the &quot;Core&quot; namespace, and then it searches for a module
+</I>&gt;<i> named &quot;Core#_&quot; and opens that as well.
+</I>
+I think what you've come around to is pretty similar to what I had
+intended in the first place when I was saying &quot;auto-open modules&quot;.  In
+particular, you're proposing having a module &quot;Core&quot; associated with
+the namespace &quot;Core&quot;, and that the two are automatically opened
+together.  My thought was to do something that is only slightly
+different from that: to be able to associated a list of modules L with
+a namespace N, such that opening N automatically opens L.  That seems
+broadly speaking less confusing and more flexible, rather than relying
+on name collisions.
+
+I think this specifies the role of modules in &quot;open namespace N&quot; and
+&quot;let open namespace N in expr&quot;.  What seems to be in contention is the
+semantics of N#M.  I think Leo and Alain are proposing that this be
+limited to M being another module or namespace, and that it would
+ignore the module opens.  I would have thought it more natural for N#M
+to translate to &quot;let open namespace N in M&quot;, so that M could be either
+a module or a value, and could be present in the namespace N or in the
+list of modules that is auto-opened with N.
+
+What is the argument in favor of the semantic distinction between N#M
+and &quot;let open namespace N in M&quot;?
+
+y
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000268.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000276.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#270">[ date ]</a>
+              <a href="thread.html#270">[ thread ]</a>
+              <a href="subject.html#270">[ subject ]</a>
+              <a href="author.html#270">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

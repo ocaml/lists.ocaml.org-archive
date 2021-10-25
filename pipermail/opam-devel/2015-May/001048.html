@@ -1,0 +1,173 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam2{rpm,deb}
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam2%7Brpm%2Cdeb%7D&In-Reply-To=%3C13C79C58-64AD-4DC6-8EFE-7D5A74F2B7AA%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="001063.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam2{rpm,deb}</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam2%7Brpm%2Cdeb%7D&In-Reply-To=%3C13C79C58-64AD-4DC6-8EFE-7D5A74F2B7AA%40recoil.org%3E"
+       TITLE="[opam-devel] opam2{rpm,deb}">anil at recoil.org
+       </A><BR>
+    <I>Sun May  3 20:14:49 BST 2015</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="001063.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1048">[ date ]</a>
+              <a href="thread.html#1048">[ thread ]</a>
+              <a href="subject.html#1048">[ subject ]</a>
+              <a href="author.html#1048">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 20 Mar 2015, at 23:22, T&#246;r&#246;k Edwin &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">edwin+ml-ocaml at etorok.net</A>&gt; wrote:
+&gt;<i> 
+</I>&gt;<i> Hi,
+</I>&gt;<i> 
+</I>&gt;<i> [On Anil's suggestion I'm moving the discussion to opam-devel.
+</I>&gt;<i> TL;DR: I am about to start writing opam2{rpm,deb} for my package and its dependencies. Does anyone else need such a tool or want to help?]
+</I>
+Apologies for the delay replying -- I continue to see significant interest in a tool like this for generating standalone installable packages easily for end-user tools.
+
+There seems to be a basic tension in upstream OS packaging these days: to add all the libraries for every language as a package, or to just &quot;vendor&quot; third party libraries and build a standalone binary with fewer dependencies.  In OCaml's case the latter works great, just as with Go, due to the static linking.
+
+&gt;<i> I am about to package my own OCaml application for Fedora and Debian, which indirectly depends on 12 opam packages
+</I>&gt;<i> (3 of which already review requests on Fedora's bugzilla as they are shared dependencies with opam itself).
+</I>&gt;<i> I am looking for some automation in preparing spec and Debian templates, for checking their quality, and tracking the packages through their lifecycle,
+</I>&gt;<i> and to avoid making the same common mistakes for each package.
+</I>
+Out of interest, do you also need Ubuntu PPA (or the Fedora equivalent) support?  The issue with upstreaming libraries is the difficulty of managing updates, and so I'd also like to be able to build a complete PPA archive with the latest OPAM libraries.  This shouldn't be too difficult with a mechanical OPAM transformation, but I suspect there will be lots of versioning issues.
+
+&gt;<i> Since such a tool (opam2rpm/opam2deb) doesn't exist now, I'll describe what my idea/requirements are.
+</I>&gt;<i> Please let me know what you think and if you have new / different requirements. Perhaps together we can design/create an opam2rpm tool that will be useful for more than just a oneshot conversion.
+</I>&gt;<i> 
+</I>&gt;<i> I am quite new to packaging, have just recently went through packaging another (non-OCaml) application for Fedora so I've
+</I>&gt;<i> documented a package's (and package maintainer's) states here: <A HREF="https://fedoraproject.org/wiki/Fedora_Package_Lifecycle_notes.">https://fedoraproject.org/wiki/Fedora_Package_Lifecycle_notes.</A>
+</I>&gt;<i> This is still rather incomplete and rough, take it with a grain of salt and consult the official docs when in doubt.
+</I>&gt;<i> 
+</I>&gt;<i> What we have now:
+</I>&gt;<i> * opam metadata: depexts, conf-* opam packages, build rules, constraints, etc.
+</I>&gt;<i> * opam-lib
+</I>&gt;<i> * opam-repository, where some packages implicitly assume a &quot;modern&quot; Linux environment (has native compiler, dynlink, certain tools and C headers, etc.).
+</I>&gt;<i> For distribution packages all these dependencies will have to be made explicit
+</I>&gt;<i> * oasis2deb, generates decent starting point for a Debian package, but fails #3
+</I>&gt;<i> 
+</I>&gt;<i> What are my requirements?
+</I>&gt;<i> #1 (local) opam repository as input, .spec/Debian as output
+</I>&gt;<i> #2 lint the output (both opam and possibly manually edited spec/Debian), there are already external tools for this
+</I>&gt;<i> #3 test that the build requirements are complete, i.e. it builds in a minimal environment. there are external tools mock/pbuilder for a clean/official solution,
+</I>&gt;<i> or docker for an insecure and somewhat faster solution
+</I>&gt;<i> #4 allow to manually modify the generated .spec and debian/ files and still keep track of changes in opam metadata
+</I>&gt;<i> #5 allow incremental refinement of the spec/debian rules, don't require everything to be 100% compliant/correct syntax
+</I>&gt;<i> #6 allow to override opam metadata (could just git clone the opam repo and use that)
+</I>&gt;<i> #7 opam2rpm and opam2deb should be similar to use (i.e. maybe it should be opam2pkg rpm and opam2pkg deb), and I don't necesarely want to limit this to rpm and deb,
+</I>&gt;<i> someone is welcome to create an opam2openbsd or opam2brew, etc.
+</I>&gt;<i> #8 developing the automation tool shouldn't take (significanlty) longer than manually writing the packaging for those 9 packages :)
+</I>&gt;<i> #9 the goal would also be to make it easier for upstream reviewers to review all these packages, at some point we should consider involving them in the discussion once we have some draft tool
+</I>&gt;<i> to make sure we generate good quality packages :)
+</I>
+Complete agreement so far from me.  What are your thoughts, Louis and Thomas?
+
+&gt;<i> Most (but not all) of the packages I need to write spec files for are based on OASIS, so we could try to load the missing metadata from oasis, or detect that oasis is used
+</I>&gt;<i> and simplify some steps, however not all packages use it so I think that starting at the opam metadata is still the right way.
+</I>
+Yeah, the `findlib` file in OPAM was a first step to close the gap between OASIS and OPAM, and we can continue to add automated scripts to keep this information in sync.  It would be good to only depend on one package database for this translation, and OPAM is the outermost layer and so most appropriate.
+
+&gt;<i> What kind of automation is needed for opam2rpm and opam2deb for me:
+</I>&gt;<i> * mapping of opam to Fedora/Debian naming conventions (some opam packages have ocaml- already in them, so take care not to duplicate that)
+</I>&gt;<i> * generate .spec and debian/ file templates from opam metadata + some overrides. If this was just a one-way/one-time conversion I'd go with
+</I>&gt;<i> something simple (perhaps like ocaml-mustache), however see below
+</I>&gt;<i> * check license name compliance (Fedora and Debian have their standard name lists), and make sure the package actually has a license *file*
+</I>&gt;<i> * don't need full roundtrip capability between opam and spec/debian, the tool should serve three purposes only:
+</I>&gt;<i>  * generate initial templates
+</I>&gt;<i>  * show a smart diff
+</I>&gt;<i>  * lint the opam metadata / spec file
+</I>&gt;<i> * shouldn't require to update the conversion tool just to support an obscure corner-case that can be fixed more easily by hand in the spec file
+</I>&gt;<i> * doesn't have to be perfect or support the full features of spec/debian/opam files. lets start with the minimum requirements and add fields/features as we need them
+</I>&gt;<i> * its not a substitute for human review, the final output always has to be tested and reviewed by a human
+</I>
+Yep, I think the last thing is key, since the OPAM version numbers also don't map perfectly onto the upstream packaging ones.  For Debian or Ubuntu, we'd need to bump the extra versions for any small change to the package, whereas OPAM doesn't track these small changes.
+
+&gt;<i> 
+</I>&gt;<i> Implementation thoughts:
+</I>&gt;<i> * ocaml module describing spec file an debian rules with a toplevel type t and nested records, with type 'a field
+</I>&gt;<i> * some form of conversion to/from a string -&gt; string map
+</I>&gt;<i> * a lexer that loads that map from the spec/debian files, and a formatter that generates it (ocamllex + format, or just ocaml-re + printf?)
+</I>&gt;<i> * please if we can lets avoid camlp4 for this, I'd suggest ppx_deriving+cconv or just manually writing the parse/generate calls for the record fields
+</I>&gt;<i> * validation should be optional
+</I>&gt;<i> * fields should be easy to declare (name, of_string, to_string, validate, smart_diff), initially all would be raw strings, more parsing/diffing can be added as needed
+</I>&gt;<i> * some way to fill the 't' type from opam metadata
+</I>&gt;<i> * certain files may not need all this advanced conversion, and might be easier to generate from a text template with substitutions (ocaml-mustache, or mpp?), and just show a textual diff
+</I>&gt;<i> (docdiff at character/word level is quite nice)
+</I>&gt;<i> 
+</I>&gt;<i> Automation for tracking a package through its lifecycle (separate tool):
+</I>&gt;<i> Since packaging an OCaml application can involve packaging/tracking a large number of dependant libraries some tool to track the status of each package (lifecycle)
+</I>&gt;<i> would be useful. This is not specific to OCaml, I'm surprised that upstream distros don't have this already, but anyway using Fedora terminology I want a single CLI tool that can:
+</I>&gt;<i> * query yum repo for stable packages
+</I>&gt;<i> * query pkgdb for existence of package in other releases
+</I>&gt;<i> * query bodhi for pending/testing packages
+</I>&gt;<i> * query koji for builds submitted/completed
+</I>&gt;<i> * query for existence of scm (git) repo
+</I>&gt;<i> * query bugzilla for package review and find out its state (submitted, under review, approved, waiting for scm repo, scm repo created)
+</I>
+Jon Ludlam has been working with Koji recently -- any thoughts on the above?
+
+&gt;<i> For Debian a similar tool that:
+</I>&gt;<i> * query bugs.debian.org for RFP (request for packaging), ITP (intent to package) and its status
+</I>&gt;<i> * query NEW queue for uploaded source package
+</I>&gt;<i> * query package tracker for buildd status
+</I>&gt;<i> * this can also avoid duplicating work, i.e. finding out that someone else is already packaging my package or its dependencies
+</I>&gt;<i> * might also be useful for other packages
+</I>&gt;<i> * can be done manually by visiting a bunch of webpages in turn and searching on each, but there ought to be some CLI tools to help or at least some (web)API
+</I>&gt;<i> * doesn't have to be necesarely written in Ocaml, if we can reuse existing tools and have this just as a shell/python script the better
+</I>&gt;<i> 
+</I>&gt;<i> I wanted to go through the policy docs and write some details here on what is missing from opam metadata, but this mail is long enough and it is late enough already,
+</I>&gt;<i> that I thought to start the discussion with what I have so far, and discuss the details as we go.
+</I>&gt;<i> 
+</I>&gt;<i> Once we agree on the major design points of this tool I plan on starting with opam2rpm, but if someone else wants to own it I'd be more than happy with that as well.
+</I>
+
+I do agree with this all, and that it's the next important stage to make it easier to distribute OCaml applications upstream.  It's quite a bit of work, so perhaps we should transfer this design to the OPAM wiki to make tracking it easier.  Once there is some stability, we can start ticking off various bits of low hanging fruit like the lifecycle query tools, and figure out who can work on what component.
+
+I'm personally keen on seeing this so that we can have binary distributions of Core/Async more easily, as well as distribute the MirageOS command-line more sensibly on Ubuntu and Fedora.  
+
+cheers,
+Anil
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="001063.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1048">[ date ]</a>
+              <a href="thread.html#1048">[ thread ]</a>
+              <a href="subject.html#1048">[ subject ]</a>
+              <a href="author.html#1048">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

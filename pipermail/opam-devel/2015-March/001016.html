@@ -1,0 +1,295 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam2{rpm,deb}
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam2%7Brpm%2Cdeb%7D&In-Reply-To=%3CCAOCAUGMZguS_WuJjsLt7ndznDC%3D_ZfjA0ZbmWPn-cBgOMpCGUw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001015.html">
+   <LINK REL="Next"  HREF="001017.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam2{rpm,deb}</H1>
+    <B>Sylvain Le Gall</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam2%7Brpm%2Cdeb%7D&In-Reply-To=%3CCAOCAUGMZguS_WuJjsLt7ndznDC%3D_ZfjA0ZbmWPn-cBgOMpCGUw%40mail.gmail.com%3E"
+       TITLE="[opam-devel] opam2{rpm,deb}">sylvain+ocaml at le-gall.net
+       </A><BR>
+    <I>Sat Mar 21 09:39:49 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001015.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+        <LI>Next message: <A HREF="001017.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1016">[ date ]</a>
+              <a href="thread.html#1016">[ thread ]</a>
+              <a href="subject.html#1016">[ subject ]</a>
+              <a href="author.html#1016">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le sam. 21 mars 2015 &#224; 10:35, Sylvain Le Gall &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">sylvain+ocaml at le-gall.net</A>&gt; a
+&#233;crit :
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Le sam. 21 mars 2015 &#224; 00:22, T&#246;r&#246;k Edwin &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">edwin+ml-ocaml at etorok.net</A>&gt; a
+</I>&gt;<i> &#233;crit :
+</I>&gt;<i>
+</I>&gt;<i> Hi,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> [On Anil's suggestion I'm moving the discussion to opam-devel.
+</I>&gt;&gt;<i> TL;DR: I am about to start writing opam2{rpm,deb} for my package and its
+</I>&gt;&gt;<i> dependencies. Does anyone else need such a tool or want to help?]
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I am about to package my own OCaml application for Fedora and Debian,
+</I>&gt;&gt;<i> which indirectly depends on 12 opam packages
+</I>&gt;&gt;<i> (3 of which already review requests on Fedora's bugzilla as they are
+</I>&gt;&gt;<i> shared dependencies with opam itself).
+</I>&gt;&gt;<i> I am looking for some automation in preparing spec and Debian templates,
+</I>&gt;&gt;<i> for checking their quality, and tracking the packages through their
+</I>&gt;&gt;<i> lifecycle,
+</I>&gt;&gt;<i> and to avoid making the same common mistakes for each package.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Since such a tool (opam2rpm/opam2deb) doesn't exist now, I'll describe
+</I>&gt;&gt;<i> what my idea/requirements are.
+</I>&gt;&gt;<i> Please let me know what you think and if you have new / different
+</I>&gt;&gt;<i> requirements. Perhaps together we can design/create an opam2rpm tool that
+</I>&gt;&gt;<i> will be useful for more than just a oneshot conversion.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I am quite new to packaging, have just recently went through packaging
+</I>&gt;&gt;<i> another (non-OCaml) application for Fedora so I've
+</I>&gt;&gt;<i> documented a package's (and package maintainer's) states here:
+</I>&gt;&gt;<i> <A HREF="https://fedoraproject.org/wiki/Fedora_Package_Lifecycle_notes.">https://fedoraproject.org/wiki/Fedora_Package_Lifecycle_notes.</A>
+</I>&gt;&gt;<i> This is still rather incomplete and rough, take it with a grain of salt
+</I>&gt;&gt;<i> and consult the official docs when in doubt.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What we have now:
+</I>&gt;&gt;<i> * opam metadata: depexts, conf-* opam packages, build rules, constraints,
+</I>&gt;&gt;<i> etc.
+</I>&gt;&gt;<i> * opam-lib
+</I>&gt;&gt;<i> * opam-repository, where some packages implicitly assume a &quot;modern&quot; Linux
+</I>&gt;&gt;<i> environment (has native compiler, dynlink, certain tools and C headers,
+</I>&gt;&gt;<i> etc.).
+</I>&gt;&gt;<i> For distribution packages all these dependencies will have to be made
+</I>&gt;&gt;<i> explicit
+</I>&gt;&gt;<i> * oasis2deb, generates decent starting point for a Debian package, but
+</I>&gt;&gt;<i> fails #3
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Not sure to understand how oasis2deb fails #3 (test that build requirement
+</I>&gt;<i> is complete).
+</I>&gt;<i>
+</I>&gt;<i> It actually declares build dependencies for the source package, but it
+</I>&gt;<i> doesn't embed the source of the dependencies (which is by the way forbidden
+</I>&gt;<i> by Debian policy) but depends on what should be the package to do it. I.e.
+</I>&gt;<i> it integrates into the target build system.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>Sentence got mixed in my head:
+ It actually declares build dependencies for the source package, but it
+doesn't embed the source of the dependencies. This is, by the way,
+forbidden by Debian policy. So it depends on what the expected
+build-depends package should be (it tries to derive it from the findlib
+package name). The overall generated package integrates into the target
+build system.
+
+
+
+&gt;<i> Example on my dlnasync generated package:
+</I>&gt;<i>
+</I>&gt;<i> Source: dlnasync
+</I>&gt;<i> Section: ocaml
+</I>&gt;<i> Priority: optional
+</I>&gt;<i> Maintainer: Debian OCaml Maintainers &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">debian-ocaml-maint at lists.debian.org</A>&gt;
+</I>&gt;<i> Uploaders:
+</I>&gt;<i>   Sylvain Le Gall &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">sylvain at le-gall.net</A>&gt;
+</I>&gt;<i> Build-Depends:
+</I>&gt;<i>   ocaml-nox (&gt;= 3.11.1-3~),
+</I>&gt;<i>   ocaml-findlib,
+</I>&gt;<i>   ocaml-base-nox,
+</I>&gt;<i>   libsekred-ocaml-dev (&gt;= 0.2.0),
+</I>&gt;<i>   libounit-ocaml-dev (&gt;= 2.0.0),
+</I>&gt;<i>   libocamlnet-ocaml-dev (&gt;= 3.5.1),
+</I>&gt;<i>   libfileutils-ocaml-dev (&gt;= 0.4.2),
+</I>&gt;<i>   libbatteries-ocaml-dev,
+</I>&gt;<i>   libav-tools,
+</I>&gt;<i>   dh-ocaml (&gt;= 0.9~),
+</I>&gt;<i>   debhelper (&gt;= 7.0.50~)
+</I>&gt;<i> Standards-Version: 3.9.1
+</I>&gt;<i> Homepage: <A HREF="http://forge.ocamlcore.org/projects/dlnasync">http://forge.ocamlcore.org/projects/dlnasync</A>
+</I>&gt;<i> Vcs-Git: <A HREF="git://git.debian.org/git/pkg-ocaml-maint/packages/dlnasync.git">git://git.debian.org/git/pkg-ocaml-maint/packages/dlnasync.git</A>
+</I>&gt;<i> Vcs-Browser:
+</I>&gt;<i>   <A HREF="http://git.debian.org/?p=pkg-ocaml-maint/packages/dlnasync.git">http://git.debian.org/?p=pkg-ocaml-maint/packages/dlnasync.git</A>
+</I>&gt;<i>
+</I>&gt;<i> You can see that all build dependencies are here.
+</I>&gt;<i>
+</I>&gt;<i> I made this decision on purpose. If you want to push this kind of tools to
+</I>&gt;<i> build packages to be distributed by the normal RPM/Deb scheme of your
+</I>&gt;<i> distribution, they need to somehow comply with policy.
+</I>&gt;<i>
+</I>&gt;<i> (I also created tools that DON'T do that but I don't publish them because
+</I>&gt;<i> they are basic hacks)
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What are my requirements?
+</I>&gt;&gt;<i> #1 (local) opam repository as input, .spec/Debian as output
+</I>&gt;&gt;<i> #2 lint the output (both opam and possibly manually edited spec/Debian),
+</I>&gt;&gt;<i> there are already external tools for this
+</I>&gt;&gt;<i> #3 test that the build requirements are complete, i.e. it builds in a
+</I>&gt;&gt;<i> minimal environment. there are external tools mock/pbuilder for a
+</I>&gt;&gt;<i> clean/official solution,
+</I>&gt;&gt;<i> or docker for an insecure and somewhat faster solution
+</I>&gt;&gt;<i> #4 allow to manually modify the generated .spec and debian/ files and
+</I>&gt;&gt;<i> still keep track of changes in opam metadata
+</I>&gt;&gt;<i> #5 allow incremental refinement of the spec/debian rules, don't require
+</I>&gt;&gt;<i> everything to be 100% compliant/correct syntax
+</I>&gt;&gt;<i> #6 allow to override opam metadata (could just git clone the opam repo
+</I>&gt;&gt;<i> and use that)
+</I>&gt;&gt;<i> #7 opam2rpm and opam2deb should be similar to use (i.e. maybe it should
+</I>&gt;&gt;<i> be opam2pkg rpm and opam2pkg deb), and I don't necesarely want to limit
+</I>&gt;&gt;<i> this to rpm and deb,
+</I>&gt;&gt;<i> someone is welcome to create an opam2openbsd or opam2brew, etc.
+</I>&gt;&gt;<i> #8 developing the automation tool shouldn't take (significanlty) longer
+</I>&gt;&gt;<i> than manually writing the packaging for those 9 packages :)
+</I>&gt;&gt;<i> #9 the goal would also be to make it easier for upstream reviewers to
+</I>&gt;&gt;<i> review all these packages, at some point we should consider involving them
+</I>&gt;&gt;<i> in the discussion once we have some draft tool
+</I>&gt;&gt;<i> to make sure we generate good quality packages :)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Most (but not all) of the packages I need to write spec files for are
+</I>&gt;&gt;<i> based on OASIS, so we could try to load the missing metadata from oasis, or
+</I>&gt;&gt;<i> detect that oasis is used
+</I>&gt;&gt;<i> and simplify some steps, however not all packages use it so I think that
+</I>&gt;&gt;<i> starting at the opam metadata is still the right way.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> What kind of automation is needed for opam2rpm and opam2deb for me:
+</I>&gt;&gt;<i>  * mapping of opam to Fedora/Debian naming conventions (some opam
+</I>&gt;&gt;<i> packages have ocaml- already in them, so take care not to duplicate that)
+</I>&gt;&gt;<i>  * generate .spec and debian/ file templates from opam metadata + some
+</I>&gt;&gt;<i> overrides. If this was just a one-way/one-time conversion I'd go with
+</I>&gt;&gt;<i> something simple (perhaps like ocaml-mustache), however see below
+</I>&gt;&gt;<i>  * check license name compliance (Fedora and Debian have their standard
+</I>&gt;&gt;<i> name lists), and make sure the package actually has a license *file*
+</I>&gt;&gt;<i>  * don't need full roundtrip capability between opam and spec/debian, the
+</I>&gt;&gt;<i> tool should serve three purposes only:
+</I>&gt;&gt;<i>   * generate initial templates
+</I>&gt;&gt;<i>   * show a smart diff
+</I>&gt;&gt;<i>   * lint the opam metadata / spec file
+</I>&gt;&gt;<i>  * shouldn't require to update the conversion tool just to support an
+</I>&gt;&gt;<i> obscure corner-case that can be fixed more easily by hand in the spec file
+</I>&gt;&gt;<i>  * doesn't have to be perfect or support the full features of
+</I>&gt;&gt;<i> spec/debian/opam files. lets start with the minimum requirements and add
+</I>&gt;&gt;<i> fields/features as we need them
+</I>&gt;&gt;<i>  * its not a substitute for human review, the final output always has to
+</I>&gt;&gt;<i> be tested and reviewed by a human
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Implementation thoughts:
+</I>&gt;&gt;<i>  * ocaml module describing spec file an debian rules with a toplevel type
+</I>&gt;&gt;<i> t and nested records, with type 'a field
+</I>&gt;&gt;<i>  * some form of conversion to/from a string -&gt; string map
+</I>&gt;&gt;<i>  * a lexer that loads that map from the spec/debian files, and a
+</I>&gt;&gt;<i> formatter that generates it (ocamllex + format, or just ocaml-re + printf?)
+</I>&gt;&gt;<i>  * please if we can lets avoid camlp4 for this, I'd suggest
+</I>&gt;&gt;<i> ppx_deriving+cconv or just manually writing the parse/generate calls for
+</I>&gt;&gt;<i> the record fields
+</I>&gt;&gt;<i>  * validation should be optional
+</I>&gt;&gt;<i>  * fields should be easy to declare (name, of_string, to_string,
+</I>&gt;&gt;<i> validate, smart_diff), initially all would be raw strings, more
+</I>&gt;&gt;<i> parsing/diffing can be added as needed
+</I>&gt;&gt;<i>  * some way to fill the 't' type from opam metadata
+</I>&gt;&gt;<i>  * certain files may not need all this advanced conversion, and might be
+</I>&gt;&gt;<i> easier to generate from a text template with substitutions (ocaml-mustache,
+</I>&gt;&gt;<i> or mpp?), and just show a textual diff
+</I>&gt;&gt;<i> (docdiff at character/word level is quite nice)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Automation for tracking a package through its lifecycle (separate tool):
+</I>&gt;&gt;<i> Since packaging an OCaml application can involve packaging/tracking a
+</I>&gt;&gt;<i> large number of dependant libraries some tool to track the status of each
+</I>&gt;&gt;<i> package (lifecycle)
+</I>&gt;&gt;<i> would be useful. This is not specific to OCaml, I'm surprised that
+</I>&gt;&gt;<i> upstream distros don't have this already, but anyway using Fedora
+</I>&gt;&gt;<i> terminology I want a single CLI tool that can:
+</I>&gt;&gt;<i>  * query yum repo for stable packages
+</I>&gt;&gt;<i>  * query pkgdb for existence of package in other releases
+</I>&gt;&gt;<i>  * query bodhi for pending/testing packages
+</I>&gt;&gt;<i>  * query koji for builds submitted/completed
+</I>&gt;&gt;<i>  * query for existence of scm (git) repo
+</I>&gt;&gt;<i>  * query bugzilla for package review and find out its state (submitted,
+</I>&gt;&gt;<i> under review, approved, waiting for scm repo, scm repo created)
+</I>&gt;&gt;<i> For Debian a similar tool that:
+</I>&gt;&gt;<i>  * query bugs.debian.org for RFP (request for packaging), ITP (intent to
+</I>&gt;&gt;<i> package) and its status
+</I>&gt;&gt;<i>  * query NEW queue for uploaded source package
+</I>&gt;&gt;<i>  * query package tracker for buildd status
+</I>&gt;&gt;<i>  * this can also avoid duplicating work, i.e. finding out that someone
+</I>&gt;&gt;<i> else is already packaging my package or its dependencies
+</I>&gt;&gt;<i>  * might also be useful for other packages
+</I>&gt;&gt;<i>  * can be done manually by visiting a bunch of webpages in turn and
+</I>&gt;&gt;<i> searching on each, but there ought to be some CLI tools to help or at least
+</I>&gt;&gt;<i> some (web)API
+</I>&gt;&gt;<i>  * doesn't have to be necesarely written in Ocaml, if we can reuse
+</I>&gt;&gt;<i> existing tools and have this just as a shell/python script the better
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I wanted to go through the policy docs and write some details here on
+</I>&gt;&gt;<i> what is missing from opam metadata, but this mail is long enough and it is
+</I>&gt;&gt;<i> late enough already,
+</I>&gt;&gt;<i> that I thought to start the discussion with what I have so far, and
+</I>&gt;&gt;<i> discuss the details as we go.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Once we agree on the major design points of this tool I plan on starting
+</I>&gt;&gt;<i> with opam2rpm, but if someone else wants to own it I'd be more than happy
+</I>&gt;&gt;<i> with that as well.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Anil also suggested to  look at:
+</I>&gt;&gt;<i> On 03/19/2015 10:15 AM, Anil Madhavapeddy wrote:
+</I>&gt;&gt;<i> &gt; This annotated changeset about a recent update from Jon might be useful
+</I>&gt;&gt;<i> as well:
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; <A HREF="https://github.com/jonludlam/ocaml4021-buildroot/commit/9ef9">https://github.com/jonludlam/ocaml4021-buildroot/commit/9ef9</A>
+</I>&gt;&gt;<i> 554c283ea1cda8f64742b73bb63807b791c7#commitcomment-10071274
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Best regards,
+</I>&gt;&gt;<i> --Edwin
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> opam-devel mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150321/e27e08a2/attachment.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150321/e27e08a2/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001015.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+	<LI>Next message: <A HREF="001017.html">[opam-devel] opam2{rpm,deb}
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1016">[ date ]</a>
+              <a href="thread.html#1016">[ thread ]</a>
+              <a href="subject.html#1016">[ subject ]</a>
+              <a href="author.html#1016">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

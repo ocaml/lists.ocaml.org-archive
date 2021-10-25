@@ -1,0 +1,111 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-devel%5D%20Keeping%20attributes%20in%20.cmi%20files%3F&In-Reply-To=%3C13278AE5-2455-475A-BEA8-9742BE181C23%40math.nagoya-u.ac.jp%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000460.html">
+   <LINK REL="Next"  HREF="000462.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?</H1>
+    <B>Jacques Garrigue</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-devel%5D%20Keeping%20attributes%20in%20.cmi%20files%3F&In-Reply-To=%3C13278AE5-2455-475A-BEA8-9742BE181C23%40math.nagoya-u.ac.jp%3E"
+       TITLE="[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?">garrigue at math.nagoya-u.ac.jp
+       </A><BR>
+    <I>Thu Sep 19 15:04:42 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000460.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+        <LI>Next message: <A HREF="000462.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#461">[ date ]</a>
+              <a href="thread.html#461">[ thread ]</a>
+              <a href="subject.html#461">[ subject ]</a>
+              <a href="author.html#461">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2013/09/19, at 21:16, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+
+&gt;<i> On 09/19/2013 11:07 AM, Jacques Garrigue wrote:
+</I>&gt;&gt;<i> Now, if I understand correctly, you are just reusing syntactic categories, but there is no semantics.
+</I>&gt;<i> 
+</I>&gt;<i> Indeed. In important point, though, is that the default mapper class (Ast_mapper) traverses attributes and extension nodes.  I.e., unless it decides otherwise, a ppx rewriter would typically applies its rewriting to the arguments of attributes and extension nodes he's not aware of. This allows, for instance, to benefits from the services of a conditional compilation (or macro expander) ppx filter in the arguments of attributes to be processed by other ppx filters.
+</I>
+But what are the scoping rules?
+Do you mean that the annotations are actually open terms? Interesting.
+
+&gt;&gt;<i> This creates a problem if you want to keep them in the .cmi.
+</I>&gt;&gt;<i> Clearly, just dumping the syntax tree seems a bit verbose.
+</I>&gt;&gt;<i> You should at least drop the locations.
+</I>&gt;<i> 
+</I>&gt;<i> I expect arguments of attributes to be rather small fragments of syntax, so I don't see any real problem here.  Are you concerned by the size of .cmi file on disk, the time to read them?
+</I>
+Both, as they are connected. Also the fact that this might keep some unnecessary details.
+
+&gt;<i> About locations: we could indeed turn all locations into Location.none before saving the attributes in the .cmi.
+</I>
+Yes, the reason is not only the size, but also that they make the md5 of the cmi fragile.
+
+&gt;&gt;<i> Is it important to keep the format compatible with the syntax tree ?
+</I>&gt;<i> 
+</I>&gt;<i> Internally (for ppx filters), it's useful that attributes are indeed real fragments of the Parsetree, so that an attribute's parameter can be injected in the Parsetree easily if needed.  We could turn to a different representation for the .cmi, but this would require to duplicate a big data type, and I don't see the benefits.
+</I>&gt;<i> 
+</I>&gt;&gt;<i> You could also write this
+</I>&gt;&gt;<i> @@invariant (function A (true, _) | A (_, true) | B (_ :: _) -&gt; true | _ -&gt; false)
+</I>&gt;&gt;<i> can we see this just a short-hand?
+</I>&gt;<i> 
+</I>&gt;<i> What would be the translation for [@foo: type_expr]?
+</I>
+No, I was just trying to understand the semantics. It is clear that types need to be handled differently.
+
+&gt;<i> Of course, one could simplify the internal representation of &quot;payloads&quot; (attribute and extension node arguments) to a single case in the internal representation, and keep alternative syntaxes only as sugar, but what is the benefit?
+</I>
+A more uniform semantics ?
+Again, I do not say that this should be the representation used, but saying that the two are equivalent clarifies the semantics.
+
+&gt;&gt;<i> OK, but it makes it a bit harder to see the interactions with the type system.
+</I>&gt;&gt;<i> If we keep them in types, I'm afraid of the interaction with unification.
+</I>&gt;&gt;<i> Or do you just want a way to keep another version of the type definitions?
+</I>&gt;<i> 
+</I>&gt;<i> I think it would only make sense to keep attributes in type expressions within declarations (type definitions, and maybe also value definitions, e.g. to be able to specify some properties of individual parameters of a function).  *If* we represent them in the internal type algebra, this could be a special kind of node which would be ignored by the unification (or dropped from the representation as soon as a type is instanciated).
+</I>
+Dropping on instantiation might work.
+Ignoring during the unification does not seem to be a good solution, because what remains becomes nondeterministic.
+Keep in mind that all this is pretty fragile, as typedecl relies on unification too&#8230;
+
+	Jacques
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000460.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+	<LI>Next message: <A HREF="000462.html">[wg-camlp4] [Caml-devel] Keeping attributes in .cmi files?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#461">[ date ]</a>
+              <a href="thread.html#461">[ thread ]</a>
+              <a href="subject.html#461">[ subject ]</a>
+              <a href="author.html#461">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

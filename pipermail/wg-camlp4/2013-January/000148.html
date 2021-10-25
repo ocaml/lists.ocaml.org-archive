@@ -1,0 +1,171 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Meta Programming from the view of the implementaion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu6pHKxgbXoqLBVJ-ZCsOMu46PbHZrW-jNNdWpJTfK8t5A%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000147.html">
+   <LINK REL="Next"  HREF="000155.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Meta Programming from the view of the implementaion</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu6pHKxgbXoqLBVJ-ZCsOMu46PbHZrW-jNNdWpJTfK8t5A%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Meta Programming from the view of the implementaion">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Thu Jan 31 13:07:24 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000147.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000155.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#148">[ date ]</a>
+              <a href="thread.html#148">[ thread ]</a>
+              <a href="subject.html#148">[ subject ]</a>
+              <a href="author.html#148">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Jan 31, 2013 at 7:54 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt;wrote:
+
+&gt;<i> On 01/30/2013 02:18 PM, Hongbo Zhang wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Ast Rewriter is *bad *for arbitrary code generation, its neat case is
+</I>&gt;&gt;<i> something like bisect.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> One of the most widely used kind of Camlp4 extensions today is about code
+</I>&gt;<i> generation based on type declarations (plus some annotations), &#224; la
+</I>&gt;<i> type-conv or deriving.  This seems to be a perfect match for AST rewriters
+</I>&gt;<i> plus attributes.  Don't you agree?
+</I>
+This could have a even better solution (not global Ast rewriting) in Fan
+without introducing any global Ast rewriting.
+{:ocaml|
+type t = A of int
+|<i>}
+</I>{:derive|(Print,Eq,Meata,...)|}
+
+
+&gt;<i>
+</I>&gt;<i>  And Ast Rewriter is not composable at  all,
+</I>&gt;&gt;<i> suppose you have two AST Rewriters A,B ,there are no guarantee that  A.B
+</I>&gt;&gt;<i> == B.A, it just gives you an illusion that it works, probably it
+</I>&gt;&gt;<i> silently fails.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I don't agree.  A and B are functions from AST to AST, so there is a very
+</I>&gt;<i> nice notion of composition: the composition of functions.  It is true that
+</I>&gt;<i> A.B and B.A don't have the same behavior but at least, I can understand
+</I>&gt;<i> what A.B and B.A will do as soon as I know how A and B behave individually,
+</I>&gt;<i> without having to know anything about their implementation.
+</I>&gt;<i>
+</I>&gt;<i> For any nontrivial Ast Rewriter, I totally get lost, maybe I am dumb and
+</I>you use objects here(ast_mapper) suppose both ast_mapper try to inject some
+bindings at the beginning, what do you expect here? Besides, there's no
+reason that Ast Rewriter should be pure, once is impure, how shall I reason
+the program?
+
+&gt;<i> I know you have projects to provide a cleaner functional API for grammars,
+</I>&gt;<i> but I don't see how modifications of the concrete syntax can be combined,
+</I>&gt;<i> in full generality, in a predictable way.  It seems you also have plans to
+</I>&gt;<i> get rid of the ability to modify the concrete syntax.  This sounds very
+</I>&gt;<i> reasonable to me.
+</I>&gt;<i>
+</I>&gt;<i> We have provided purely functional grammars API which helps a lot to limit
+</I>the scope of the syntax extension*, if people don't like it, just not
+expose it, or write another frontend with fixed grammar.* But we do have a
+lot of things that Ast Rewriter does not provide, quasiquotation(which I
+think is a *fundamental* difference from ppx), quotation(delimited DSL),
+ast rewriter(the same as ppx), type hook(the example I gave before), lexer
+hook, and lots other stuff
+
+&gt;<i>
+</I>&gt;<i>      3. How do you implement the expander?  Somehow, you need to parse
+</I>&gt;&gt;<i>     the content of the quotation (stored as a string in the AST), which
+</I>&gt;&gt;<i>     involves non trivial stuff, like a parser being able to parse OCaml
+</I>&gt;&gt;<i>     code mixed with something else.  Personally, I don't know how to
+</I>&gt;&gt;<i>     implement the quotation expander with the parsing technologies I'm
+</I>&gt;&gt;<i>     familiar with.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> when you design your DSL, the left part is pretty easy to parse, when
+</I>&gt;&gt;<i> you see the delimiter &quot;-&gt;&quot;, invoking an existing parser.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> So you need to:
+</I>&gt;<i>
+</I>&gt;<i>  - Write a custom parser for left parts (regexps), which stops at &quot;-&gt;&quot;.
+</I>&gt;<i> To write this parser, you need to use ocamlyacc, menhir, or another tool.
+</I>&gt;<i> (And probably plug the official OCaml lexer?)
+</I>&gt;<i>  - Call the official(?) OCaml parser on its &quot;expr&quot; entry and hope that it
+</I>&gt;<i> stops exactly when it encounters the next &quot;|&quot; (does this really work?).
+</I>&gt;<i>  - Adapt the locations returned by this parser, or be careful to
+</I>&gt;<i> initialize the lexbuf with locations that match exactly the concrete
+</I>&gt;<i> location of the corresponding part in the original source code.
+</I>&gt;<i>
+</I>&gt;<i> This is *already implemented in Fan within tens of lines of code,* you
+</I>are much more experienced than me, so I bet you definitely could parse it!
+(I don't consider tens of lines of code is complex.. ) my taste shows that
+its notation is much more elegant than sedlex (imho)
+
+&gt;<i> This seems much more complex than the current implementation of sedlex (or
+</I>&gt;<i> a variant of it where regexps would be written with some concrete syntax),
+</I>&gt;<i> for no obvious benefit.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130131/ca4fee97/attachment-0001.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130131/ca4fee97/attachment-0001.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000147.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000155.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#148">[ date ]</a>
+              <a href="thread.html#148">[ thread ]</a>
+              <a href="subject.html#148">[ subject ]</a>
+              <a href="author.html#148">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

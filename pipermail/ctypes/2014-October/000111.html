@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Defines,	and Structs with platform-specific fields
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAG-KTt_N653_%3DhG1bj3LENXA8fYbS%3D9mfi49Sr8y4-rmi9vqPQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000108.html">
+   <LINK REL="Next"  HREF="000112.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Defines,	and Structs with platform-specific fields</H1>
+    <B>Trevor Smith</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Defines%2C%0A%09and%20Structs%20with%20platform-specific%20fields&In-Reply-To=%3CCAG-KTt_N653_%3DhG1bj3LENXA8fYbS%3D9mfi49Sr8y4-rmi9vqPQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Defines,	and Structs with platform-specific fields">trevorsummerssmith at gmail.com
+       </A><BR>
+    <I>Mon Oct 20 12:29:40 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000108.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+        <LI>Next message: <A HREF="000112.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#111">[ date ]</a>
+              <a href="thread.html#111">[ thread ]</a>
+              <a href="subject.html#111">[ subject ]</a>
+              <a href="author.html#111">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Jeremy,
+
+The allocate/coerce idea sounds great, however that won't play nicely with
+my cross-platform needs... (unless I am misunderstanding something).
+
+Do you have a vague-eta for the struct-layout-from-C-work? Depending on the
+timeline, perhaps it is better for me to finish up the library for unix
+then deal with porting it after that feature is ready.
+
+Thank you.
+
+Trevor
+
+On Mon, Oct 20, 2014 at 4:25 AM, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+
+&gt;<i> On 18 October 2014 12:49, Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">trevorsummerssmith at gmail.com</A>&gt;
+</I>&gt;<i> wrote:
+</I>&gt;<i> &gt; Your suggestion makes sense. If I were to do that -- any suggestions of
+</I>&gt;<i> how
+</I>&gt;<i> &gt; to deal with freeing that memory? Ideally, without adding a lifecycle
+</I>&gt;<i> &quot;free&quot;
+</I>&gt;<i> &gt; call to the user library. My thoughts would be to store the cstruct
+</I>&gt;<i> &gt; reference (malloced by C) in a ref in OCaml, then attach a finalizer to
+</I>&gt;<i> the
+</I>&gt;<i> &gt; OCaml ref that would call the corresponding C free.
+</I>&gt;<i>
+</I>&gt;<i> That approach should work, I think.
+</I>&gt;<i>
+</I>&gt;<i> Another possibility to allocate the struct using Ctypes.allocate or
+</I>&gt;<i> Ctypes.allocate_n -- e.g. by allocating an array of char and coercing
+</I>&gt;<i> the result:
+</I>&gt;<i>
+</I>&gt;<i>     val allocate : ?finalise:('a ptr -&gt; unit) -&gt; 'a typ -&gt; 'a -&gt; 'a ptr
+</I>&gt;<i>     <A HREF="http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate">http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate</A>
+</I>&gt;<i>
+</I>&gt;<i>     val allocate_n : ?finalise:('a ptr -&gt; unit) -&gt; 'a typ -&gt; count:int -&gt;
+</I>&gt;<i> 'a ptr
+</I>&gt;<i>     <A HREF="http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n">http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n</A>
+</I>&gt;<i>
+</I>&gt;<i>     val coerce : 'a typ -&gt; 'b typ -&gt; 'a -&gt; 'b
+</I>&gt;<i>     <A HREF="http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce">http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce</A>
+</I>&gt;<i>
+</I>&gt;<i> The memory allocated by 'allocate' will be freed automatically when
+</I>&gt;<i> there are no OCaml references to the object.  The optional 'finalise'
+</I>&gt;<i> argument is for associating additional cleanup functions, not for
+</I>&gt;<i> freeing the memory.  You may be able to use it to call uv_loop_close,
+</I>&gt;<i> for example.
+</I>&gt;<i>
+</I>&gt;<i> &gt; Aside: I wonder if ctypes could be extended to deal with this cross
+</I>&gt;<i> platform
+</I>&gt;<i> &gt; issue fully in ctypes-land? Have others thought about this?
+</I>&gt;<i>
+</I>&gt;<i> Yes: we're planning to add support for obtaining struct layout from C,
+</I>&gt;<i> much as generated functions stubs are checked against C declarations:
+</I>&gt;<i>
+</I>&gt;<i>     <A HREF="https://github.com/ocamllabs/ocaml-ctypes/issues/62">https://github.com/ocamllabs/ocaml-ctypes/issues/62</A>
+</I>&gt;<i>
+</I>&gt;<i> The feature is taking a little while longer than anticipated to land,
+</I>&gt;<i> unfortunately.
+</I>&gt;<i>
+</I>&gt;<i> &gt; Also: are the maintainers open to documentation contributions? I noticed
+</I>&gt;<i> &gt; that a lot of these questions on the FAQ are currently unanswered. I
+</I>&gt;<i> would
+</I>&gt;<i> &gt; be happy to throw a couple commits with documentation suggestions for the
+</I>&gt;<i> &gt; problems that I am running into.
+</I>&gt;<i>
+</I>&gt;<i> Yes: documentation contributions are very welcome.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20141020/bb55483c/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20141020/bb55483c/attachment.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000108.html">[ocaml-ctypes] Defines,	and Structs with platform-specific fields
+</A></li>
+	<LI>Next message: <A HREF="000112.html">[ocaml-ctypes] Defines, and Structs with platform-specific fields
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#111">[ date ]</a>
+              <a href="thread.html#111">[ thread ]</a>
+              <a href="subject.html#111">[ subject ]</a>
+              <a href="author.html#111">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,1688 @@
+From yallop at gmail.com  Wed Oct  1 10:24:00 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Wed, 1 Oct 2014 10:24:00 +0100
+Subject: [ocaml-ctypes] Inverted stubs
+In-Reply-To: <CAHR=VkyzSt_EwWdyHdir=B_2h0XGmeCSC5BCga4V0TkcB3noMQ@mail.gmail.com>
+References: <CAHR=VkyzSt_EwWdyHdir=B_2h0XGmeCSC5BCga4V0TkcB3noMQ@mail.gmail.com>
+Message-ID: <CAAxsn=EDF_w3cBdD4OQNszZBquQVqHsd3-otmWVbOW=5jwWarw@mail.gmail.com>
+
+On 30 September 2014 11:09, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> First, I would like to report that my first attempt to make bindings
+> using Ctypes for a sizable library was a success, and I would like to
+> congratulate the people behind Ctypes for making such a wonderful
+> library.
+
+Thanks!  We're very glad to hear of your success.
+
+> Now, I would like to generate inverted stubs that match a third party
+> C header file (the same one that I used to make my bindings in the
+> first place). Generally speaking, this should be possible I suppose.
+> However, one of the functions from this interface returns a struct
+> that contains function pointers to all the other functions exposed in
+> the interface. I am reasonably convinced that it is out of the scope
+> of what Ctypes can do, but I wanted to be sure about that.
+
+I think this is something that ctypes can handle.  The trickiest part
+is likely to be the memory management: when you pass an OCaml object
+to C you need to be careful to ensure that the GC can still see it.
+The inverted stubs support is still at an early stage, and in time I
+think we'll develop techniques to make memory management easier.
+
+On to the example.  If I understand correctly you'd like to build an
+interface that looks something like this:
+
+   struct callbacks {
+      int (*arith)(int, int);
+      int (*print)(char *);
+   };
+
+   struct callbacks *build(int id);
+
+Here's how to build a library with the above interface using ctypes.
+First, a definition for the struct:
+
+   (* bindings.ml *)
+   open Ctypes
+
+   let callbacks : [`callback] structure typ = structure "callbacks"
+   let arith = field callbacks "arith"
+                       (Foreign.funptr (int @-> int @-> returning int))
+   let print = field callbacks "print"
+                       (Foreign.funptr (string @-> returning void))
+   let () = seal callbacks
+
+For this example I'll use the simplest possible memory management
+strategy: a cache which holds references to OCaml values returned from
+the 'build' function:
+
+   type state = { arith: int -> int -> int; print: string -> unit }
+   let cache : ([`callback] structure  * state) list ref = ref []
+
+The build function itself allocates and initializes a struct, adds it
+to the cache, and returns it:
+
+   let build id =
+     let state = { arith = (+);
+                   print = Printf.printf "id: %d; msg: %s\n%!" id } in
+     let c = make callbacks in
+     begin
+       setf c arith state.arith;
+       setf c print state.print;
+       cache := (c, state) :: !cache;
+       addr c
+     end
+
+The external interface is described with a functor in the usual way.
+We expose a single function, "build", by passing name, type, and
+implementation to the "internal" function.
+
+    module Bindings(I: Cstubs_inverted.INTERNAL) =
+    struct
+      let _ = I.internal "build" (int @-> returning (ptr callbacks)) build
+    end
+
+I won't post all the build details here, but I've put them in a gist
+so that you can compile and run the example.
+
+   https://gist.github.com/yallop/d196fee1607883493876
+
+It's worth just showing a use of the library here.  Here's a little test client:
+
+   #include "callback_stubs.h"
+   #include <caml/callback.h>
+   #include <stdio.h>
+
+   int main(int argc, char **argv)
+   {
+     /* Initialize the OCaml runtime before calling the library. */
+     char *caml_argv[1] = { NULL };
+     caml_startup(caml_argv);
+
+     struct callbacks *c0 = build(0);
+     struct callbacks *c1 = build(1);
+
+     printf("c0->arith(10, 20) => %d\n", c0->arith(10, 20));
+     printf("c1->arith(30, 40) => %d\n", c0->arith(30, 40));
+     c0->print("printing via c0");
+     c1->print("printing via c1");
+
+     return 0;
+   }
+
+The output is as you'd expect:
+
+   c0->arith(10, 20) => 30
+   c1->arith(30, 40) => 70
+   id: 0; msg: printing via c0
+   id: 1; msg: printing via c1
+
+I hope that helps,
+
+Jeremy.
+
+From hez at 0ok.org  Wed Oct  8 14:19:57 2014
+From: hez at 0ok.org (Hezekiah M. Carty)
+Date: Wed, 8 Oct 2014 09:19:57 -0400
+Subject: [ocaml-ctypes] Binding that works in bytecode,
+	segfaults in native code
+Message-ID: <CAMfPyLBzmU=PnN+83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g@mail.gmail.com>
+
+Hello,
+
+I have been working on and off on ctypes-based OCaml bindings for the
+GDAL library (http://gdal.org).  The process has been quite pleasant
+so far.  The bindings are available here:
+https://github.com/hcarty/ocaml-gdal
+
+I've run into what I expect is a memory management issue with my
+bindings to GDAL's raster warping API.  This section of GDAL handles
+reshaping an image to fit different physical dimensions and/or
+coordinate systems.  This involves a lot of calls from OCaml to C to
+OCaml to C.  The call to the C library involves building and passing
+in a large struct defined here:
+
+http://www.gdal.org/structGDALWarpOptions.html
+
+with the corresponding ctypes binding here:
+
+https://github.com/hcarty/ocaml-gdal/blob/master/src/gdal/warp.ml#L26
+
+examples/warptut.ml in the ocaml-gdal repository is meant to
+illustrate how to use the Warp module.  When warptut.ml is compiled to
+a bytecode executable on my system I can run it without issue.
+However I get a consistent segfault when trying to run the same
+program compiled to native code.  Running both under gdb shows that
+the correct/expected code path within GDAL is taken in the bytecode
+case while an incorrect path involving callbacks to unexpected
+functions is taken in the native code case.
+
+warptut.ml is sprinkled with Gc.full_major calls to try to locate the
+source of the problem.  The actual segfault happens here:
+
+https://github.com/hcarty/ocaml-gdal/blob/master/examples/warptut.ml#L97
+
+A sample input file to test the warptut.{byte, native} is available here:
+
+http://0ok.org/ocaml/rtma2p5.t06z.2dvaranl_ndfd.grb2
+
+You can test warptut with:
+
+./warptut.native rtma2p5.t06z.2dvaranl_ndfd.grb2 out.tif
+
+Running
+
+ocamlbuild warptut.byte
+
+will give the equivalent bytecode executable which can be run the same way.
+
+If anyone is interested in helping debug this issue I'm happy to
+provide more information on how the bindings are structured.  In the
+mean time are there any suggestions or techniques you can recommend to
+help track down the cause of this segfault?  I've tried to ensure that
+I am keeping references to data passed to C on the OCaml end to avoid
+data disappearing but I must have missed something.
+
+The system I've been testing this on is running 64bit Ubuntu 12.04,
+OCaml 4.01.0 and 4.02.0, and the latest ctypes from opam.
+
+Thank you,
+
+Hez
+
+From yallop at gmail.com  Tue Oct 14 12:09:08 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 14 Oct 2014 12:09:08 +0100
+Subject: [ocaml-ctypes] Binding that works in bytecode,
+ segfaults in native code
+In-Reply-To: <CAMfPyLBzmU=PnN+83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g@mail.gmail.com>
+References: <CAMfPyLBzmU=PnN+83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g@mail.gmail.com>
+Message-ID: <CAAxsn=G9T=rHGtZLwNHz4W_VYWg=KywdJTGkB+feWqA7-bCPUA@mail.gmail.com>
+
+On 8 October 2014 14:19, Hezekiah M. Carty <hez at 0ok.org> wrote:
+> In the mean time are there any suggestions or techniques you can recommend to
+> help track down the cause of this segfault?
+
+I think A. Hauptmann's advice elsewhere is worth repeating here, for
+the benefit of anyone who runs into similar issues:
+
+    "Use Gc.compact, not just Gc.full_major. And put it in a often
+called function of your library code, not only at application level. I
+always overlay any suspicious function with a wrapper of this scheme:
+
+     let f .. =
+       Gc.compact ();
+       let x = f .. in
+       Gc.compact ();
+       x
+
+    And then run your application with valgrind. Valgrind did find
+this error instantly."
+    (https://github.com/hcarty/ocaml-gdal/pull/3)
+
+From trevorsummerssmith at gmail.com  Fri Oct 17 12:35:44 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Fri, 17 Oct 2014 07:35:44 -0400
+Subject: [ocaml-ctypes] Defines, and Structs with platform-specific fields
+Message-ID: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+
+Hello,
+
+I am working on a ctypes binding to libuv [https://github.com/joyent/libuv],
+and I have two questions:
+
+1) Is the recommended way to interact with C-defines the way described in
+this thread?
+http://lists.ocaml.org/pipermail/ctypes/2014-February/000064.html
+
+2) What is the recommended way to deal with struct fields that vary
+depending upon platform?
+
+Libuv is a cross platform library, and has platform-specific fields for its
+structs. For example see the struct uv_loop_s.
+
+Defined here https://github.com/joyent/libuv/blob/v1.0.0-rc1/include/uv.h
+Unix specific fields:
+https://github.com/joyent/libuv/blob/v1.0.0-rc1/include/uv-unix.h
+Windows specific fields:
+https://github.com/joyent/libuv/blob/v1.0.0-rc1/include/uv-win.h
+
+Thank you.
+
+Trevor
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141017/d31beee7/attachment.html>
+
+From daniel.buenzli at erratique.ch  Fri Oct 17 14:46:12 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 17 Oct 2014 15:46:12 +0200
+Subject: [ocaml-ctypes] Defines,
+ and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+Message-ID: <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+
+Le vendredi, 17 octobre 2014 ? 13:35, Trevor Smith a ?crit :
+> Hello,
+>  
+> I am working on a ctypes binding to libuv [https://github.com/joyent/libuv], and I have two questions:
+>  
+> 1) Is the recommended way to interact with C-defines the way described in this thread? http://lists.ocaml.org/pipermail/ctypes/2014-February/000064.html
+I think so. If you want to pattern match you can have a look here:
+
+https://github.com/dbuenzli/tsdl/tree/master/support
+https://github.com/dbuenzli/tsdl/blob/master/myocamlbuild.ml#L39
+
+> 2) What is the recommended way to deal with struct fields that vary depending upon platform?
+>  
+> Libuv is a cross platform library, and has platform-specific fields for its structs. For example see the struct uv_loop_s.
+I'm not familiar with the API but having a look at:  
+
+https://github.com/joyent/libuv/blob/v1.0.0-rc1/include/uv.h#L1381
+
+Then I wouldn't bother at all about the private fields, just describe the constant part of the struct (and do you even need to ? It seems only stop_flag is interesting here, you could aswell treat the struct as an abstract data type). Now if really needed I would define C accessors for each private field and raise if the field is not available for the platform and ctypes-bind to these accessors.
+
+Best,
+
+Daniel
+
+
+
+From trevorsummerssmith at gmail.com  Fri Oct 17 18:53:54 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Fri, 17 Oct 2014 13:53:54 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+Message-ID: <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+
+Thank you for your reply Daniel.
+
+About the structs: perhaps I have a fundamental misconception about how
+ctypes works. Libuv functions expect that the caller allocate the memory
+for the struct. My understanding was that adding fields to the struct in
+ctypes would affect the memory that struct takes up. Therefore, the
+different platforms would actually need these separate fields**.
+
+**Some library maintainers get around this by allocating an area for
+extension of a fixed size. This is not the case with libuv.
+
+You are correct though that I don't need to expose many (actually probably
+none) of the Loop's internal fields.
+
+Thoughts?
+
+Trevor
+
+On Friday, October 17, 2014, Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+
+> Le vendredi, 17 octobre 2014 ? 13:35, Trevor Smith a ?crit :
+> > Hello,
+> >
+> > I am working on a ctypes binding to libuv [
+> https://github.com/joyent/libuv], and I have two questions:
+> >
+> > 1) Is the recommended way to interact with C-defines the way described
+> in this thread?
+> http://lists.ocaml.org/pipermail/ctypes/2014-February/000064.html
+> I think so. If you want to pattern match you can have a look here:
+>
+> https://github.com/dbuenzli/tsdl/tree/master/support
+> https://github.com/dbuenzli/tsdl/blob/master/myocamlbuild.ml#L39
+>
+> > 2) What is the recommended way to deal with struct fields that vary
+> depending upon platform?
+> >
+> > Libuv is a cross platform library, and has platform-specific fields for
+> its structs. For example see the struct uv_loop_s.
+> I'm not familiar with the API but having a look at:
+>
+> https://github.com/joyent/libuv/blob/v1.0.0-rc1/include/uv.h#L1381
+>
+> Then I wouldn't bother at all about the private fields, just describe the
+> constant part of the struct (and do you even need to ? It seems only
+> stop_flag is interesting here, you could aswell treat the struct as an
+> abstract data type). Now if really needed I would define C accessors for
+> each private field and raise if the field is not available for the platform
+> and ctypes-bind to these accessors.
+>
+> Best,
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141017/0af4b7b4/attachment.html>
+
+From daniel.buenzli at erratique.ch  Sat Oct 18 10:34:17 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 18 Oct 2014 11:34:17 +0200
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+Message-ID: <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+
+
+
+Le vendredi, 17 octobre 2014 ? 19:53, Trevor Smith a ?crit :
+
+> Thank you for your reply Daniel.
+>  
+> About the structs: perhaps I have a fundamental misconception about how ctypes works. Libuv functions expect that the caller allocate the memory for the struct. My understanding was that adding fields to the struct in ctypes would affect the memory that struct takes up.
+That's correct if you allocate it with ctypes, but you don't need to. Just make a C function that allocates the struct and bind to that function.  
+
+Daniel
+
+
+
+From trevorsummerssmith at gmail.com  Sat Oct 18 12:49:17 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Sat, 18 Oct 2014 07:49:17 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+Message-ID: <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+
+Daniel,
+
+Your suggestion makes sense. If I were to do that -- any suggestions of how
+to deal with freeing that memory? Ideally, without adding a lifecycle
+"free" call to the user library. My thoughts would be to store the cstruct
+reference (malloced by C) in a ref in OCaml, then attach a finalizer to the
+OCaml ref that would call the corresponding C free. I suggest the ref
+because my understanding is that his would be guaranteed to be finalized
+once (as opposed to a normal value which might get copied multiple times).
+Thoughts on this?
+
+Aside: I wonder if ctypes could be extended to deal with this cross
+platform issue fully in ctypes-land? Have others thought about this?
+
+Also: are the maintainers open to documentation contributions? I noticed
+that a lot of these questions on the FAQ are currently unanswered. I would
+be happy to throw a couple commits with documentation suggestions for the
+problems that I am running into.
+
+Trevor
+
+On Sat, Oct 18, 2014 at 5:34 AM, Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+
+>
+>
+> Le vendredi, 17 octobre 2014 ? 19:53, Trevor Smith a ?crit :
+>
+> > Thank you for your reply Daniel.
+> >
+> > About the structs: perhaps I have a fundamental misconception about how
+> ctypes works. Libuv functions expect that the caller allocate the memory
+> for the struct. My understanding was that adding fields to the struct in
+> ctypes would affect the memory that struct takes up.
+> That's correct if you allocate it with ctypes, but you don't need to. Just
+> make a C function that allocates the struct and bind to that function.
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141018/a279e835/attachment.html>
+
+From yallop at gmail.com  Mon Oct 20 09:25:00 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 20 Oct 2014 09:25:00 +0100
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+Message-ID: <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+
+On 18 October 2014 12:49, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> Your suggestion makes sense. If I were to do that -- any suggestions of how
+> to deal with freeing that memory? Ideally, without adding a lifecycle "free"
+> call to the user library. My thoughts would be to store the cstruct
+> reference (malloced by C) in a ref in OCaml, then attach a finalizer to the
+> OCaml ref that would call the corresponding C free.
+
+That approach should work, I think.
+
+Another possibility to allocate the struct using Ctypes.allocate or
+Ctypes.allocate_n -- e.g. by allocating an array of char and coercing
+the result:
+
+    val allocate : ?finalise:('a ptr -> unit) -> 'a typ -> 'a -> 'a ptr
+    http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate
+
+    val allocate_n : ?finalise:('a ptr -> unit) -> 'a typ -> count:int -> 'a ptr
+    http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n
+
+    val coerce : 'a typ -> 'b typ -> 'a -> 'b
+    http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce
+
+The memory allocated by 'allocate' will be freed automatically when
+there are no OCaml references to the object.  The optional 'finalise'
+argument is for associating additional cleanup functions, not for
+freeing the memory.  You may be able to use it to call uv_loop_close,
+for example.
+
+> Aside: I wonder if ctypes could be extended to deal with this cross platform
+> issue fully in ctypes-land? Have others thought about this?
+
+Yes: we're planning to add support for obtaining struct layout from C,
+much as generated functions stubs are checked against C declarations:
+
+    https://github.com/ocamllabs/ocaml-ctypes/issues/62
+
+The feature is taking a little while longer than anticipated to land,
+unfortunately.
+
+> Also: are the maintainers open to documentation contributions? I noticed
+> that a lot of these questions on the FAQ are currently unanswered. I would
+> be happy to throw a couple commits with documentation suggestions for the
+> problems that I am running into.
+
+Yes: documentation contributions are very welcome.
+
+From yallop at gmail.com  Mon Oct 20 10:44:44 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 20 Oct 2014 10:44:44 +0100
+Subject: [ocaml-ctypes] [Caml-list] Library recompilation with OCamljava
+In-Reply-To: <CAK7rcp8PgQzdu4ZDRGaqutzvYqCdyR0wE_APQTTrmj7iS=kyEw@mail.gmail.com>
+References: <CAK7rcp-tsu08M3vOVEDhB5EnUBR29PTVdwmrgR-i3KTMe6jnJQ@mail.gmail.com>
+ <CAK7rcp--ebebx=6fT1P-2LLhsc+JxngYaySDU-2UqTGC90-W0A@mail.gmail.com>
+ <A3165F85-CD87-4C67-90D9-4695A7A8BA75@x9c.fr>
+ <CAK7rcp8PgQzdu4ZDRGaqutzvYqCdyR0wE_APQTTrmj7iS=kyEw@mail.gmail.com>
+Message-ID: <CAAxsn=EO-ZfK03+i2s5DQRfmLv0OK4SbhJyiDVyrvSLb8Zkp6A@mail.gmail.com>
+
+[+cc ctypes at lists.ocaml.org]
+
+On Sat, Oct 18, 2014 at 5:09 AM, forum at x9c.fr <forum at x9c.fr> wrote:
+>> I think a neat way to use a C library from an ocamljava-compiled
+>> program would be to have a Java "backend" for Jeremy Yallop's
+>> ctypes (https://github.com/ocamllabs/ocaml-ctypes).  I never had
+>> the time to implement that, but toyed with this idea and think the
+>> best way to implement it would be to go through JNA
+>> (https://github.com/twall/jna) rather than JNI.  JNA includes a
+>> "dlopen"-like mechanism, and automatically maps simple types from
+>> Java to C. My knowledge of ctypes is quite limited, but I see no
+>> showstopper.
+
+On 18/10/2014, Kenneth Adam Miller <kennethadammiller at gmail.com> wrote:
+> Precisely! ocaml-ctypes is exactly what's being used by the library
+> that I'm porting to call into C sub libraries. It would be really
+> sweet if the ocamljava compiler could detect the ocaml-ctypes and
+> generate these mappings automatically. This would eliminate a lot of
+> error prone code, since C code tends to interpret data raw at some
+> point... How might I got about writing this to boot? I'm moderately
+> new to ocaml, lacking deep expertise in it, but I'm an aggressive
+> learner. Please explain the best path forward, I want to create a
+> robust and reusable solution.
+
+OCaml-Java support is on the wish list for ctypes
+
+    https://github.com/ocamllabs/ocaml-ctypes/issues/13
+
+but we don't have the resources to implement it at present.  Adding
+support would mostly likely only involve changing ctypes itself, not
+OCaml-Java, and is likely to involve writing OCaml-Java
+implementations of the following components:
+
+  (1) memory access, i.e. functions for allocating blocks, for reading
+and writing scalar values to arbitrary addresses, and for viewing C
+objects as bigarrays:
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/memory_stubs.ml
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/bigarray_stubs.ml
+
+  (2) functions for printing primitive (scalar) values:
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/value_printing_stubs.ml
+
+  (3) implementations of signed and unsigned integer types of various sizes:
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/signed.ml
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/unsigned.ml
+
+  (4) functions for converting between OCaml and C string representations
+     https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes/std_view_stubs.ml
+
+plus one of the following approaches for calling functions
+
+  (a) a "dynamic" approach, which resolves symbols and constructs call
+frames at runtime, like the ctypes Foreign module.  This involves two
+components: a dynamic loading interface along the
+      following lines
+      https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/dl.mli
+      and primitives for dynamically constructing and making calls:
+      https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/ctypes-foreign-base/ffi_stubs.ml
+
+  (b) a "static" approach, which generates code to be compiled by the
+standard toolchain:
+      https://github.com/ocamllabs/ocaml-ctypes/blob/master/src/cstubs/cstubs.mli
+
+Note that most of the links above are to internal Ctypes modules, not
+to the interface, which I'd expect to remain largely unchanged.
+
+As Xavier suggests, JNA may be a good starting point for some or all
+of the above.  If someone would like to look at adding OCaml-Java
+support, please feel free to ask questions, either on the GitHub issue
+tracker, or on the ctypes mailing list.
+
+Jeremy.
+
+From hez at 0ok.org  Mon Oct 20 11:39:06 2014
+From: hez at 0ok.org (Hezekiah M. Carty)
+Date: Mon, 20 Oct 2014 06:39:06 -0400
+Subject: [ocaml-ctypes] Binding that works in bytecode,
+ segfaults in native code
+In-Reply-To: <CAAxsn=G9T=rHGtZLwNHz4W_VYWg=KywdJTGkB+feWqA7-bCPUA@mail.gmail.com>
+References: <CAMfPyLBzmU=PnN+83hQ94BZSM2_ujUGSMMgG_7SvkKKBi6uJ-g@mail.gmail.com>
+ <CAAxsn=G9T=rHGtZLwNHz4W_VYWg=KywdJTGkB+feWqA7-bCPUA@mail.gmail.com>
+Message-ID: <CAMfPyLCRpBJsczxSJjRiuYdMgcnYYvt9AxfyZkiw7mNgaaXwhQ@mail.gmail.com>
+
+On Tue, Oct 14, 2014 at 7:09 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 8 October 2014 14:19, Hezekiah M. Carty <hez at 0ok.org> wrote:
+>> In the mean time are there any suggestions or techniques you can recommend to
+>> help track down the cause of this segfault?
+>
+> I think A. Hauptmann's advice elsewhere is worth repeating here, for
+> the benefit of anyone who runs into similar issues:
+>
+>     "Use Gc.compact, not just Gc.full_major. And put it in a often
+> called function of your library code, not only at application level. I
+> always overlay any suspicious function with a wrapper of this scheme:
+>
+>      let f .. =
+>        Gc.compact ();
+>        let x = f .. in
+>        Gc.compact ();
+>        x
+>
+>     And then run your application with valgrind. Valgrind did find
+> this error instantly."
+>     (https://github.com/hcarty/ocaml-gdal/pull/3)
+
+To follow up on the specifics for this case: A finalization/free
+function provided by GDAL was freeing memory I had allocated from
+ctypes leading to a double free.  As A. Hauptmann pointed out in the
+pull request link above, valgrind picked up the mistake and its source
+immediately.  For this crash removing the GDAL-provided finalization
+function was enough to avoid the issue - OCaml + ctypes were already
+freeing everything the finalizer would have freed.
+
+I'm rather embarrassed that I didn't use valgrind in the first place.
+Thanks to A Hauptmann for getting me back on track with these
+bindings.
+
+Hez
+
+From trevorsummerssmith at gmail.com  Mon Oct 20 12:29:40 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Mon, 20 Oct 2014 07:29:40 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+Message-ID: <CAG-KTt_N653_=hG1bj3LENXA8fYbS=9mfi49Sr8y4-rmi9vqPQ@mail.gmail.com>
+
+Jeremy,
+
+The allocate/coerce idea sounds great, however that won't play nicely with
+my cross-platform needs... (unless I am misunderstanding something).
+
+Do you have a vague-eta for the struct-layout-from-C-work? Depending on the
+timeline, perhaps it is better for me to finish up the library for unix
+then deal with porting it after that feature is ready.
+
+Thank you.
+
+Trevor
+
+On Mon, Oct 20, 2014 at 4:25 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 18 October 2014 12:49, Trevor Smith <trevorsummerssmith at gmail.com>
+> wrote:
+> > Your suggestion makes sense. If I were to do that -- any suggestions of
+> how
+> > to deal with freeing that memory? Ideally, without adding a lifecycle
+> "free"
+> > call to the user library. My thoughts would be to store the cstruct
+> > reference (malloced by C) in a ref in OCaml, then attach a finalizer to
+> the
+> > OCaml ref that would call the corresponding C free.
+>
+> That approach should work, I think.
+>
+> Another possibility to allocate the struct using Ctypes.allocate or
+> Ctypes.allocate_n -- e.g. by allocating an array of char and coercing
+> the result:
+>
+>     val allocate : ?finalise:('a ptr -> unit) -> 'a typ -> 'a -> 'a ptr
+>     http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate
+>
+>     val allocate_n : ?finalise:('a ptr -> unit) -> 'a typ -> count:int ->
+> 'a ptr
+>     http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALallocate_n
+>
+>     val coerce : 'a typ -> 'b typ -> 'a -> 'b
+>     http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALcoerce
+>
+> The memory allocated by 'allocate' will be freed automatically when
+> there are no OCaml references to the object.  The optional 'finalise'
+> argument is for associating additional cleanup functions, not for
+> freeing the memory.  You may be able to use it to call uv_loop_close,
+> for example.
+>
+> > Aside: I wonder if ctypes could be extended to deal with this cross
+> platform
+> > issue fully in ctypes-land? Have others thought about this?
+>
+> Yes: we're planning to add support for obtaining struct layout from C,
+> much as generated functions stubs are checked against C declarations:
+>
+>     https://github.com/ocamllabs/ocaml-ctypes/issues/62
+>
+> The feature is taking a little while longer than anticipated to land,
+> unfortunately.
+>
+> > Also: are the maintainers open to documentation contributions? I noticed
+> > that a lot of these questions on the FAQ are currently unanswered. I
+> would
+> > be happy to throw a couple commits with documentation suggestions for the
+> > problems that I am running into.
+>
+> Yes: documentation contributions are very welcome.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141020/bb55483c/attachment.html>
+
+From daniel.buenzli at erratique.ch  Mon Oct 20 12:34:03 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 20 Oct 2014 13:34:03 +0200
+Subject: [ocaml-ctypes] Defines,
+ and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt_N653_=hG1bj3LENXA8fYbS=9mfi49Sr8y4-rmi9vqPQ@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAG-KTt_N653_=hG1bj3LENXA8fYbS=9mfi49Sr8y4-rmi9vqPQ@mail.gmail.com>
+Message-ID: <5A4C5CC8DE874B259CD0BFDE48DB80A3@erratique.ch>
+
+
+
+Le lundi, 20 octobre 2014 ? 13:29, Trevor Smith a ?crit :
+
+> Jeremy,
+>  
+> The allocate/coerce idea sounds great, however that won't play nicely with my cross-platform needs... (unless I am misunderstanding something).
+If you are talking about the size of the struct, just write it with the #define constants and/or make a function that returns the size of the struct. With that number you can then follow Jeremy's proposal.  
+
+Daniel
+
+
+
+From trevorsummerssmith at gmail.com  Mon Oct 20 12:37:37 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Mon, 20 Oct 2014 07:37:37 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <5A4C5CC8DE874B259CD0BFDE48DB80A3@erratique.ch>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAG-KTt_N653_=hG1bj3LENXA8fYbS=9mfi49Sr8y4-rmi9vqPQ@mail.gmail.com>
+ <5A4C5CC8DE874B259CD0BFDE48DB80A3@erratique.ch>
+Message-ID: <CAG-KTt9yDUrb8K9fXQTojp=TLUxTZWi14KPWMeSx_uuPRq_rWQ@mail.gmail.com>
+
+Of course! Thanks Daniel.
+
+On Mon, Oct 20, 2014 at 7:34 AM, Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+
+>
+>
+> Le lundi, 20 octobre 2014 ? 13:29, Trevor Smith a ?crit :
+>
+> > Jeremy,
+> >
+> > The allocate/coerce idea sounds great, however that won't play nicely
+> with my cross-platform needs... (unless I am misunderstanding something).
+> If you are talking about the size of the struct, just write it with the
+> #define constants and/or make a function that returns the size of the
+> struct. With that number you can then follow Jeremy's proposal.
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141020/50cdf6cb/attachment.html>
+
+From yallop at gmail.com  Mon Oct 20 15:10:42 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 20 Oct 2014 15:10:42 +0100
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+Message-ID: <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+
+On 20 October 2014 09:25, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 18 October 2014 12:49, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+>> Your suggestion makes sense. If I were to do that -- any suggestions of how
+>> to deal with freeing that memory? Ideally, without adding a lifecycle "free"
+>> call to the user library. My thoughts would be to store the cstruct
+>> reference (malloced by C) in a ref in OCaml, then attach a finalizer to the
+>> OCaml ref that would call the corresponding C free.
+>
+> That approach should work, I think.
+>
+> Another possibility to allocate the struct using Ctypes.allocate or
+> Ctypes.allocate_n
+
+Yet another possibility: you can avoid the need to write C altogether
+by defining the public interface as a module type, defining the
+platform-specific struct definitions as implementations, and using
+first-class modules (or the build system, if you prefer) to pick an
+appropriate definition for the platform.
+
+For example, you might define the public interface of the uv_loop_s
+structure as follows:
+
+  module type UV_LOOP =
+  sig
+    type t
+    val t : t structure typ
+
+    (* Define the public fields of the struct here *)
+    val data : (unit ptr, t structure) field
+    val active_handles : (uint, t structure) field
+    (* ... other public fields ... *)
+  end
+
+This exposes the fact that the underlying type is a structure, and
+that data, active_handles etc. are fields, so you can use the various
+ctypes functions that deal with structs (make, getf, setf, etc.).
+
+You can then give a platform-specific definition of the struct that
+matches the UV_LOOP interface, and includes (but does not expose) the
+private fields:
+
+  module Uv_loop_windows : Uv_loop =
+  struct
+    type t
+    let t = structure "uv_loop_s"
+    let data = field t "data" (ptr void)
+    let active_handles = field t "active_handles" uint
+    (* ... other public and private fields ... *)
+    let time = field t "time" uint64_t
+    let () = seal t
+  end
+
+Finally, first-class modules make it possible to pick an appropriate
+implementation for the platform:
+
+  module Uv_loop =
+   (val if Sys.os_type = "win32"
+         then (module Uv_loop_windows : UV_LOOP)
+        else if Sys.os_type = "unix"
+         then (module Uv_loop_unix : UV_LOOP)
+        ...
+        else failwith "Unsupported platform")
+
+If you're not keen on first-class modules, an alternative approach is
+to simply use an interface file uv.mli and an implementation file
+uv.ml which is selected from various platform-specific alternatives
+(uv_windows.ml, uv_unix.ml etc.) by the build system.
+
+From daniel.buenzli at erratique.ch  Mon Oct 20 15:40:13 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 20 Oct 2014 16:40:13 +0200
+Subject: [ocaml-ctypes] Defines,
+ and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+Message-ID: <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+
+Le lundi, 20 octobre 2014 ? 16:10, Jeremy Yallop a ?crit :
+> Yet another possibility: you can avoid the need to write C altogether
+> by defining the public interface as a module type, defining the
+> platform-specific struct definitions as implementations, and using
+> first-class modules (or the build system, if you prefer) to pick an
+> appropriate definition for the platform.
+
+While Jeremy's approach is sound, I would advise against it from a maintenance point of view.  
+
+These platform specific fields are labelled as *private* fields in the C interface which means that each time libuv makes a new release you will have to manually check that your description of the c struct in your ctypes is still accurate.  
+
+If the libuv project is well managed you can assume public field changes will be documented in release notes so you'll be warned when you need to do changes. However changes to these privates fields are unlikely to be described so it will be more work for you in the long term.  
+
+Best,
+
+Daniel
+
+
+
+From trevorsummerssmith at gmail.com  Mon Oct 20 16:28:43 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Mon, 20 Oct 2014 11:28:43 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+Message-ID: <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+
+Jeremy -- I like the functor idea + first class modules: it is elegant.
+However I agree with Daniel's point about maintainability.
+
+If I use the allocate w/ a c function that returns the size of the struct I
+will be good to go. Then have ctypes reference public fields and make
+strong wording in the implementation to never allocate a ctype struct using
+make. I think this is a solid plan.
+
+Thanks for all of the help!
+
+Trevor
+
+On Mon, Oct 20, 2014 at 10:40 AM, Daniel B?nzli <daniel.buenzli at erratique.ch
+> wrote:
+
+> Le lundi, 20 octobre 2014 ? 16:10, Jeremy Yallop a ?crit :
+> > Yet another possibility: you can avoid the need to write C altogether
+> > by defining the public interface as a module type, defining the
+> > platform-specific struct definitions as implementations, and using
+> > first-class modules (or the build system, if you prefer) to pick an
+> > appropriate definition for the platform.
+>
+> While Jeremy's approach is sound, I would advise against it from a
+> maintenance point of view.
+>
+> These platform specific fields are labelled as *private* fields in the C
+> interface which means that each time libuv makes a new release you will
+> have to manually check that your description of the c struct in your ctypes
+> is still accurate.
+>
+> If the libuv project is well managed you can assume public field changes
+> will be documented in release notes so you'll be warned when you need to do
+> changes. However changes to these privates fields are unlikely to be
+> described so it will be more work for you in the long term.
+>
+> Best,
+>
+> Daniel
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141020/7fa24d55/attachment.html>
+
+From daniel.buenzli at erratique.ch  Mon Oct 20 16:47:51 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 20 Oct 2014 17:47:51 +0200
+Subject: [ocaml-ctypes] Defines,
+ and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+Message-ID: <42AC86B8F25C47E4BED078D5E20F9696@erratique.ch>
+
+Le lundi, 20 octobre 2014 ? 17:28, Trevor Smith a ?crit :
+> Jeremy -- I like the functor idea + first class modules: it is elegant. However I agree with Daniel's point about maintainability.
+>  
+> If I use the allocate w/ a c function that returns the size of the struct I will be good to go. Then have ctypes reference public fields and make strong wording in the implementation to never allocate a ctype struct using make.  
+Keep all these things abstract from OCaml's point of view: we don't want to program in C, we want to program in OCaml. Treat each struct pointer as an abstract type and defines getter/accessors and creation functions on values of these type. Don't make any of the ctypes types leak in the interface.
+
+See for example the way I handled the SDL_Event type which is a union of many structs:
+
+http://hg.libsdl.org/SDL/file/704a0bfecf75/include/SDL_events.h#l498
+
+Here:
+
+http://erratique.ch/software/tsdl/doc/Tsdl.Sdl.Event.html
+https://github.com/dbuenzli/tsdl/blob/bc18d14b1a28af99ebc30b61e303ee5304055d31/src/tsdl.ml#L3287
+
+Best,
+
+Daniel
+
+
+
+From yallop at gmail.com  Mon Oct 20 21:46:26 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 20 Oct 2014 21:46:26 +0100
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+Message-ID: <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+
+On 20 October 2014 16:28, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> Jeremy -- I like the functor idea + first class modules: it is elegant.
+> However I agree with Daniel's point about maintainability.
+
+Yes, the need to keep things in sync with a potentially changing
+implementation is certainly a drawback.
+
+> If I use the allocate w/ a c function that returns the size of the struct I
+> will be good to go. Then have ctypes reference public fields
+
+Careful: giving a partial definition of the struct in ctypes will work
+well as long as you're dealing with a prefix -- i.e. when the public
+fields are all at the beginning of the struct.  That doesn't appear to
+be the case with libuv, where public and private fields are sometimes
+interleaved.  The other approaches Daniel suggests -- either defining
+accessors in C, or treating the struct types as abstract -- should
+work well, though.
+
+This discussion is a useful reminder that ctypes really needs support
+for retrieving struct layout details from the declared API.  I'll look
+at how to add that support later this week and report back.
+
+From trevorsummerssmith at gmail.com  Tue Oct 21 13:24:41 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Tue, 21 Oct 2014 08:24:41 -0400
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+Message-ID: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+
+Hi all,
+
+In the libuv bindings I am working on there is need for user callbacks. A
+user registers the callback with a function, and then at an arbitrary point
+in time later, the callback code is actually ran (started when the user
+starts the libuv event loop). I had naively thought that I would need to
+keep a reference to the user callback and then release this reference after
+the user callback was actually called (because the callback would be used
+at an arbitrary point in the future and could get gc'd).
+
+I made an example this morning to test this out, however I cannot get it to
+fail (ie throw an CallToExpiredClosure).
+
+Perhaps my assumption is wrong, and I do not have to keep around a
+reference? Or my test is not testing what I think it is?
+
+I see similar discussion that doesn't have a clear resolution here:
+https://github.com/dbuenzli/tgls/issues/6 and
+http://lists.ocaml.org/pipermail/ctypes/2013-December/000028.html
+
+My test code is here:
+https://github.com/trevorsummerssmith/ocaml-libuv/blob/test-lifecycle/test/test_lifecycle.ml
+
+Test it: make && make tests # valgrind seems happy with it
+
+I am running with libuv-1.0.0-rc1
+https://github.com/joyent/libuv/tree/v1.0.0-rc1/ OCaml 4.0.2.1 and on a Mac
+10.9.5
+
+Thanks!
+
+Trevor
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141021/48a6670a/attachment.html>
+
+From yallop at gmail.com  Tue Oct 21 14:13:21 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 21 Oct 2014 14:13:21 +0100
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+Message-ID: <CAAxsn=GTsKzC78PSZhuQFaG2c-DnZmkaaWkOxT773JDyrFSacw@mail.gmail.com>
+
+On 21 October 2014 13:24, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> In the libuv bindings I am working on there is need for user callbacks. A
+> user registers the callback with a function, and then at an arbitrary point
+> in time later, the callback code is actually ran (started when the user
+> starts the libuv event loop). I had naively thought that I would need to
+> keep a reference to the user callback and then release this reference after
+> the user callback was actually called (because the callback would be used at
+> an arbitrary point in the future and could get gc'd).
+
+Yes, that's exactly right.
+
+> I made an example this morning to test this out, however I cannot get it to
+> fail (ie throw an CallToExpiredClosure).
+>
+> Perhaps my assumption is wrong, and I do not have to keep around a
+> reference? Or my test is not testing what I think it is?
+
+It's the latter.  Your callback function
+
+    let cb fs = Printf.printf "XXX Called '%s'\n" (getf !@fs C._path) in
+
+doesn't reference anything from the local environment, so no closure
+is allocated, and there's nothing for the GC to collect.  If you
+change the function to reference the local environment -- for example,
+by adding a dummy use of 'data'
+
+    let cb fs =
+       let _ = Obj.repr data in
+       Printf.printf "XXX Called '%s'\n" (getf !@fs C._path) in
+
+then the test fails with CallToExpiredClosure as expected.  Besides
+inspecting the source of the function, you can check whether a closure
+is allocated by attempting to add a finaliser to the function, which
+will fail for non-closures, or by inspecting the generated cmm (using
+-dcmm), which looks like this for the non-closure case
+
+      (let
+        (cb/1325 "camlTest_lifecycle__17"
+
+(i.e. cb is just a reference to a static function), and like this for
+the closure case:
+
+      (let
+        (cb/1325 (alloc 3319 "camlTest_lifecycle__cb_1325" 3 data/1324)
+
+I hope that helps,
+
+Jeremy.
+
+From daniel.buenzli at erratique.ch  Tue Oct 21 14:14:52 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 21 Oct 2014 15:14:52 +0200
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+Message-ID: <93C139362C0B442299F3217C69D1611D@erratique.ch>
+
+
+
+Le mardi, 21 octobre 2014 ? 14:24, Trevor Smith a ?crit :
+
+> In the libuv bindings I am working on there is need for user callbacks. A user registers the callback with a function, and then at an arbitrary point in time later, the callback code is actually ran (started when the user starts the libuv event loop). I had naively thought that I would need to keep a reference to the user callback and then release this reference after the user callback was actually called (because the callback would be used at an arbitrary point in the future and could get gc'd).
+
+This doesn't answer you question but just another thing to think about, if the callbacks may occur on another thread you should also be careful on acquiring OCaml's runtime lock see for example here:
+
+https://github.com/dbuenzli/tsdl/issues/13
+
+I don't know if the support Jeremy mentions in that discussion was eventually merged in a published version since ctypes's release notes are a little bit hard to track down.  
+
+Best,
+
+Daniel
+
+P.S. Just one comment dont do `let _ = ...` you will soon or later loose a lot of time because you only partially applied a function while you thought the application was total. Use `let () = ...` and use `ignore` if you need to ignore a result ? and sequencing with ; is fine too.
+  
+
+
+From yallop at gmail.com  Tue Oct 21 15:12:33 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 21 Oct 2014 15:12:33 +0100
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <93C139362C0B442299F3217C69D1611D@erratique.ch>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+Message-ID: <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+
+On 21 October 2014 14:14, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> This doesn't answer you question but just another thing to think about, if the callbacks may occur on another thread you should also be careful on acquiring OCaml's runtime lock see for example here:
+>
+> https://github.com/dbuenzli/tsdl/issues/13
+>
+> I don't know if the support Jeremy mentions in that discussion was eventually merged in a published version since ctypes's release notes are a little bit hard to track down.
+
+It's in the master branch, but not in a release yet.  It should be
+included in 0.4.
+
+From trevorsummerssmith at gmail.com  Tue Oct 21 16:01:27 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Tue, 21 Oct 2014 11:01:27 -0400
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+ <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+Message-ID: <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+
+Thanks for all the input!
+
+Jeremy is there an eta for 0.4? For now I will work off of master.
+Thanks
+Trevor
+
+On Tuesday, October 21, 2014, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 21 October 2014 14:14, Daniel B?nzli <daniel.buenzli at erratique.ch
+> <javascript:;>> wrote:
+> > This doesn't answer you question but just another thing to think about,
+> if the callbacks may occur on another thread you should also be careful on
+> acquiring OCaml's runtime lock see for example here:
+> >
+> > https://github.com/dbuenzli/tsdl/issues/13
+> >
+> > I don't know if the support Jeremy mentions in that discussion was
+> eventually merged in a published version since ctypes's release notes are a
+> little bit hard to track down.
+>
+> It's in the master branch, but not in a release yet.  It should be
+> included in 0.4.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141021/6717dd3c/attachment.html>
+
+From yallop at gmail.com  Tue Oct 21 16:05:27 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 21 Oct 2014 16:05:27 +0100
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+ <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+ <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+Message-ID: <CAAxsn=EWHQ-JJ5uUY8h0anvDvrttOTPOz7KogohbCeWq_=6Bsw@mail.gmail.com>
+
+On 21 October 2014 16:01, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> Jeremy is there an eta for 0.4?
+
+There's no ETA, but there is a list of outstanding issues:
+
+   https://github.com/ocamllabs/ocaml-ctypes/milestones/ctypes%200.4
+
+From trevorsummerssmith at gmail.com  Thu Oct 23 11:48:20 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Thu, 23 Oct 2014 06:48:20 -0400
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAAxsn=EWHQ-JJ5uUY8h0anvDvrttOTPOz7KogohbCeWq_=6Bsw@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+ <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+ <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+ <CAAxsn=EWHQ-JJ5uUY8h0anvDvrttOTPOz7KogohbCeWq_=6Bsw@mail.gmail.com>
+Message-ID: <CAG-KTt_tcJDLRRUEztxcdTd_A3rP7myB7T5f-F1B4mze9gD7Zg@mail.gmail.com>
+
+Following up on the earlier conversation of using c-based accessors:
+
+I tried this out this morning. However I am seeing strange behavior with
+the memory addresses. In native code, whenever I pass a pointer through the
+accessor I receive a different address than the original address --
+however, in valgrind the addresses are the same.
+
+Relevant code:
+git clone git at github.com:trevorsummerssmith/ocaml-libuv.git && cd
+ocaml-libuv && git checkout origin/test-lifecycle && make tests
+
+I see, eg:
+
+loop: 0x109d76800
+Handle: 0x9d76800
+Handle: 0x9d76800
+F.
+==============================================================================
+Failure: handle suite:0:accessors
+
+The loop address always starts with '10'. However in valgrind the addresses
+are the same.
+
+The c accessors are in lib_gen/lib_accessors.c, the test is in test/
+test_handle.ml
+
+Thoughts on this? Thanks!
+
+Trevor
+
+On Tue, Oct 21, 2014 at 11:05 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 21 October 2014 16:01, Trevor Smith <trevorsummerssmith at gmail.com>
+> wrote:
+> > Jeremy is there an eta for 0.4?
+>
+> There's no ETA, but there is a list of outstanding issues:
+>
+>    https://github.com/ocamllabs/ocaml-ctypes/milestones/ctypes%200.4
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141023/bc86f62d/attachment.html>
+
+From yallop at gmail.com  Thu Oct 23 12:58:35 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 23 Oct 2014 12:58:35 +0100
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAG-KTt_tcJDLRRUEztxcdTd_A3rP7myB7T5f-F1B4mze9gD7Zg@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+ <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+ <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+ <CAAxsn=EWHQ-JJ5uUY8h0anvDvrttOTPOz7KogohbCeWq_=6Bsw@mail.gmail.com>
+ <CAG-KTt_tcJDLRRUEztxcdTd_A3rP7myB7T5f-F1B4mze9gD7Zg@mail.gmail.com>
+Message-ID: <CAAxsn=GSp4MtqKRd0YRSrcV3YcV0tK6GY_Haqzun1yAEpHdBKg@mail.gmail.com>
+
+On 23 October 2014 11:48, Trevor Smith <trevorsummerssmith at gmail.com> wrote:
+> I tried this out this morning. However I am seeing strange behavior with the
+> memory addresses. In native code, whenever I pass a pointer through the
+> accessor I receive a different address than the original address -- however,
+> in valgrind the addresses are the same.
+>
+> Relevant code:
+> git clone git at github.com:trevorsummerssmith/ocaml-libuv.git && cd
+> ocaml-libuv && git checkout origin/test-lifecycle && make tests
+>
+> I see, eg:
+>
+> loop: 0x109d76800
+> Handle: 0x9d76800
+> Handle: 0x9d76800
+> F.
+> ==============================================================================
+> Failure: handle suite:0:accessors
+>
+> The loop address always starts with '10'. However in valgrind the addresses
+> are the same.
+>
+> The c accessors are in lib_gen/lib_accessors.c, the test is in
+> test/test_handle.ml
+
+The code generated by ctypes doesn't have declarations  for your
+accessor functions in scope, so the C compiler helpfully assumes that
+the functions return (32-bit) ints rather than (64-bit) pointers,
+leading to garbage in the upper bits.  You should be able to fix the
+problem by outputting suitable declarations (perhaps by including a
+header) in libuv_bindgen.ml.
+
+From trevorsummerssmith at gmail.com  Thu Oct 23 13:01:31 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Thu, 23 Oct 2014 08:01:31 -0400
+Subject: [ocaml-ctypes] Lifecycle of a callback?
+In-Reply-To: <CAAxsn=GSp4MtqKRd0YRSrcV3YcV0tK6GY_Haqzun1yAEpHdBKg@mail.gmail.com>
+References: <CAG-KTt_cv9RPtoM9Tn_t3Sa+3c0==u6h5r=YQ36_YLd9KaD4FA@mail.gmail.com>
+ <93C139362C0B442299F3217C69D1611D@erratique.ch>
+ <CAAxsn=Gz8=FKXFk9C_K9sBqNs4ZTK+2N7aFydOudOg62ZS7J3A@mail.gmail.com>
+ <CAG-KTt8pUceFsGALVZZ0oSDs8OtE1y6mvdfaWj=vwKyp8YgeYA@mail.gmail.com>
+ <CAAxsn=EWHQ-JJ5uUY8h0anvDvrttOTPOz7KogohbCeWq_=6Bsw@mail.gmail.com>
+ <CAG-KTt_tcJDLRRUEztxcdTd_A3rP7myB7T5f-F1B4mze9gD7Zg@mail.gmail.com>
+ <CAAxsn=GSp4MtqKRd0YRSrcV3YcV0tK6GY_Haqzun1yAEpHdBKg@mail.gmail.com>
+Message-ID: <CAG-KTt_KhjAOb2n7Ln7Z81wcc0_n8u0W-fzm23WKU-97QF8czw@mail.gmail.com>
+
+Thanks for the quick response Jeremy.
+
+On Thursday, October 23, 2014, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 23 October 2014 11:48, Trevor Smith <trevorsummerssmith at gmail.com
+> <javascript:;>> wrote:
+> > I tried this out this morning. However I am seeing strange behavior with
+> the
+> > memory addresses. In native code, whenever I pass a pointer through the
+> > accessor I receive a different address than the original address --
+> however,
+> > in valgrind the addresses are the same.
+> >
+> > Relevant code:
+> > git clone git at github.com:trevorsummerssmith/ocaml-libuv.git && cd
+> > ocaml-libuv && git checkout origin/test-lifecycle && make tests
+> >
+> > I see, eg:
+> >
+> > loop: 0x109d76800
+> > Handle: 0x9d76800
+> > Handle: 0x9d76800
+> > F.
+> >
+> ==============================================================================
+> > Failure: handle suite:0:accessors
+> >
+> > The loop address always starts with '10'. However in valgrind the
+> addresses
+> > are the same.
+> >
+> > The c accessors are in lib_gen/lib_accessors.c, the test is in
+> > test/test_handle.ml
+>
+> The code generated by ctypes doesn't have declarations  for your
+> accessor functions in scope, so the C compiler helpfully assumes that
+> the functions return (32-bit) ints rather than (64-bit) pointers,
+> leading to garbage in the upper bits.  You should be able to fix the
+> problem by outputting suitable declarations (perhaps by including a
+> header) in libuv_bindgen.ml.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141023/18a9815c/attachment.html>
+
+From yallop at gmail.com  Sat Oct 25 19:31:05 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 25 Oct 2014 19:31:05 +0100
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+ <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+Message-ID: <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+
+On 20 October 2014 21:46, Jeremy Yallop <yallop at gmail.com> wrote:
+> This discussion is a useful reminder that ctypes really needs support
+> for retrieving struct layout details from the declared API.  I'll look
+> at how to add that support later this week and report back.
+
+I've added support for retrieving struct layout from C in a pull request:
+
+    https://github.com/ocamllabs/ocaml-ctypes/pull/62
+
+It works in a very similar fashion to cstubs: you put your struct
+declaration inside a functor
+
+  module Bindings(S : Cstubs_structs.STRUCT) =
+  struct
+    open S
+    let cell       = structure "cell"
+    let payload = field cell int "payload"
+    let next      = field cell (ptr cell) "next"
+    let ()          = seal cell
+  end
+
+and then call Cstubs_structs.write_c to generate an ML module with
+which to instantiate the functor.
+
+The pull request has more details and some illustrative tests.
+
+From ag400 at leicester.ac.uk  Mon Oct 27 12:08:39 2014
+From: ag400 at leicester.ac.uk (Andrea Giugliano)
+Date: Mon, 27 Oct 2014 12:08:39 +0000
+Subject: [ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs
+Message-ID: <544E35C7.1060003@le.ac.uk>
+
+Hello everyone,
+
+I am using ctypes in order to passing null pointers as input of Unix 
+syscalls.
+So far we used the Unix OCaml library to use syscalls (open, chdir, stat),
+but it does not allow passing null pointers as input paths of the 
+syscalls (i.e. mkdir NULL is not possible using OCaml Unix.mkdir).
+
+The thing is I would like to avoid implementing again the logic of Unix 
+operations after having create ctypes stubs,
+instead I was successful so far in using the Unix stubs as my C 
+functions. For instance I can have:
+
+let my_mkdir = Foreign.foreign "unix_mkdir" ~checkerrno:true (string_opt 
+@-> returning int)
+
+Now this does not work with the stat syscall, because it returns a data 
+structure.
+The data structure returned is an OCaml type (indeed it is a Unix C stub 
+I am using),
+ctypes expects a C structure, and I convert the expected C structure in 
+a OCaml type again.
+
+The question is: did anyone of you try to cheat too?
+Is that just a completely wrong use case of ctypes (poor -lazy- me I 
+must implement again the logic of Unix!)?
+Thanks a lot,
+
+Andrea
+
+P.S: I attach the code I was trying to run for the stat function: it 
+worst case it can be used as "don't do this!"
+-------------- next part --------------
+open Ctypes
+open PosixTypes
+open Unsigned
+
+type stats
+let stats : stats structure typ = structure "Stat"
+let ( -:* ) s x = field stats s x
+let st_dev = "st_dev" -:* dev_t
+let st_ino = "st_ino" -:* int
+let st_kind= "st_kind" -:* int
+let st_perm= "st_perm" -:* int
+let st_nlink = "st_nlink" -:* int
+let st_uid = "st_uid" -:* int
+let st_gid = "st_gid" -:* int
+let st_rdev = "st_rdev" -:* int
+let st_size = "st_size" -:* int64_t
+let st_atime = "st_atime" -:* double
+let st_mtime = "st_mtime" -:* double
+let st_ctime = "st_ctime" -:* double
+let () = seal stats
+
+let st_dev_int s = UInt64.to_int (coerce dev_t uint64_t (getf s st_dev))
+let st_ino_int s =  (getf s st_ino)
+let st_nlink_int s = (getf s st_nlink)
+let st_perm_int s = (getf s st_perm)
+let st_kind_kind s = match (getf s st_kind) with | _ -> S_REG
+let st_uid_int s =   (getf s st_uid)
+let st_gid_int s =  (getf s st_gid)
+let st_rdev_int s = (getf s st_rdev)
+let st_size_int s = (getf s st_size)
+let st_atime_float s = (getf s st_atime)
+let st_mtime_float s = (getf s st_mtime)
+let st_ctime_float s =  (getf s st_ctime)
+
+
+let to_unix t = Ctypes.(Unix.LargeFile.({
+                                         st_dev  = st_dev_int t;
+                                         st_ino  = st_ino_int t;
+                                         st_kind = st_kind_kind t;
+                                         st_perm = st_perm_int t;
+                                         st_nlink= st_nlink_int t;
+                                         st_uid  = st_uid_int t;
+                                         st_gid  = st_gid_int t;
+                                         st_rdev = st_rdev_int t;
+                                         st_size = st_size_int t;
+                                         st_atime= st_atime_float t;
+                                         st_mtime= st_mtime_float t;
+                                         st_ctime= st_ctime_float t;
+                                       }))
+let stat = Foreign.foreign "unix_stat_64" ~check_errno:true
+                           (string_opt @-> returning (ptr stats))
+
+From yallop at gmail.com  Tue Oct 28 22:00:38 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 28 Oct 2014 22:00:38 +0000
+Subject: [ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat
+	stubs
+In-Reply-To: <544E35C7.1060003@le.ac.uk>
+References: <544E35C7.1060003@le.ac.uk>
+Message-ID: <CAAxsn=HPW9RjjG+afjW3jNUxvwENCKm4CqrQqmonqY3Z+hzCDw@mail.gmail.com>
+
+On 27 October 2014 12:08, Andrea Giugliano <ag400 at leicester.ac.uk> wrote:
+> I am using ctypes in order to passing null pointers as input of Unix
+> syscalls.
+> So far we used the Unix OCaml library to use syscalls (open, chdir, stat),
+> but it does not allow passing null pointers as input paths of the syscalls
+> (i.e. mkdir NULL is not possible using OCaml Unix.mkdir).
+>
+> The thing is I would like to avoid implementing again the logic of Unix
+> operations after having create ctypes stubs,
+> instead I was successful so far in using the Unix stubs as my C functions.
+> For instance I can have:
+>
+> let my_mkdir = Foreign.foreign "unix_mkdir" ~checkerrno:true (string_opt @->
+> returning int)
+
+While this approach works to some extent, it's not recommended.  The
+unix_mkdir function accepts and returns 'value' values, not strings
+and ints:
+
+   value unix_mkdir(value path, value perm)
+   https://github.com/ocaml/ocaml/blob/98e0051f/otherlibs/unix/mkdir.c#L21
+
+Now, an OCaml string stored in a 'value' is represented similarly to a
+C string -- i.e. as a pointer to the first byte of an array of char --
+so some C functions that accept a 'value' will work as you expect when
+you pass then a string using ctypes.  However, you're likely to run
+into unexpected behaviour very quickly:
+
+   # let string_length = Foreign.foreign "caml_string_length"  (string
+@-> returning int);;
+   val string_length : string -> int = <fun>
+   # string_length "abc";;
+   - : int = -1
+
+There's good news, though: the Unix stubs in the standard library are
+only thin wrappers around system calls, so you won't lose much by
+binding to the system calls directly.  Further, David Sheets has
+already written ctypes bindings to some of the functions you need; his
+bindings don't currently accept null pointers, but you may be able to
+adapt them to your needs:
+
+   https://github.com/dsheets/ocaml-unix-sys-stat/blob/master/lib/ctypes/unix_sys_stat.mli
+
+From trevorsummerssmith at gmail.com  Thu Oct 30 12:34:48 2014
+From: trevorsummerssmith at gmail.com (Trevor Smith)
+Date: Thu, 30 Oct 2014 08:34:48 -0400
+Subject: [ocaml-ctypes] Defines,
+	and Structs with platform-specific fields
+In-Reply-To: <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+References: <CAG-KTt9684d_SCqp_MtaGSuqAhnZ0mNSmGwdw7LQZm_81ShnRQ@mail.gmail.com>
+ <1B1F99FDB4384237A2DC7B1F4C87E4E2@erratique.ch>
+ <CAG-KTt9yHoZiAwiJ-vMmSHt5LMTOhHX3rCjv2FTrvzuEd-YTZw@mail.gmail.com>
+ <B36B4944FE38422AB6DD2EAF2F50CE64@erratique.ch>
+ <CAG-KTt86Xoa6TG0ohXwCcWJ8+C+-Fkv_OCCqyOrSB4M8DyowiQ@mail.gmail.com>
+ <CAAxsn=FPsO2QHVLzNJ09cuLaut-AgsTaXzS0G98j6Nxgn5isAA@mail.gmail.com>
+ <CAAxsn=Hp5ZB8dE+wJi1ZMfbPJ_wbL_vFN+-=VXJRs8NhKU3N9g@mail.gmail.com>
+ <673FCD9F382E4A61A547AE5D74100B12@erratique.ch>
+ <CAG-KTt8xjcYZ877-_oSVepgAqAfFq7g8zLtcM8BZDRB=oTtfSQ@mail.gmail.com>
+ <CAAxsn=FLvwohow+HKO34PLdVjnDEYJi7ecUA29uA_CgBM8w4_w@mail.gmail.com>
+ <CAAxsn=GrfdjkfALb5czrtLYMCLacV5EZbGtK4doVSyWqha8pCg@mail.gmail.com>
+Message-ID: <CAG-KTt8bARJ7_dNr9qhinnzMMC6ER6YCkAmdCWwoBD4JMZp7tA@mail.gmail.com>
+
+Jeremy,
+
+Thanks for this work! I just got a chance this morning to take a look. This
+work should save me a ton of time.
+
+I'm having problems referencing a cstub'd struct within another cstub'd
+struct. Looking at the types it doesn't seem that this would work  - the
+cstubs typ is different than the Ctypes.typ. I reproduced a tiny example in
+the cstubs test files (diff below).
+
+Thoughts? Thanks.
+
+Trevor
+
+Diff:
+
+diff --git a/tests/clib/test_functions.h b/tests/clib/test_functions.h
+index 17ec554..ec0e449 100644
+--- a/tests/clib/test_functions.h
++++ b/tests/clib/test_functions.h
+@@ -164,7 +164,7 @@ void post1_wait2(void);
+ void post2_wait1(void);
+
+ struct s1 { int x1, x2, x3, x4; };
+-struct s2 { int y1, y2, y3, y4; };
++struct s2 { int y1, y2, y3, y4; struct s1 foo; };
+
+ size_t sizeof_s1(void);
+ size_t alignmentof_s1(void);
+diff --git a/tests/test-structs/stubs/types.ml b/tests/test-structs/stubs/
+types.ml
+index d03f497..fc54f25 100644
+--- a/tests/test-structs/stubs/types.ml
++++ b/tests/test-structs/stubs/types.ml
+@@ -21,5 +21,6 @@ struct
+   let s2 : [`s2] structure typ = structure "s2"
+   let y2 = field s2 "y2" int
+   let y1 = field s2 "y1" int
++  let foo = field s2 "foo" s1
+   let () = seal s2
+ end
+
+Build error:
+
+File "tests/test-structs/stubs/types.ml", line 24, characters 32-34:
+Error: This expression has type [ `s1 ] Ctypes.structure S.typ
+       but an expression was expected of type 'a Ctypes.typ = 'a Static.typ
+
+
+On Sat, Oct 25, 2014 at 2:31 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 20 October 2014 21:46, Jeremy Yallop <yallop at gmail.com> wrote:
+> > This discussion is a useful reminder that ctypes really needs support
+> > for retrieving struct layout details from the declared API.  I'll look
+> > at how to add that support later this week and report back.
+>
+> I've added support for retrieving struct layout from C in a pull request:
+>
+>     https://github.com/ocamllabs/ocaml-ctypes/pull/62
+>
+> It works in a very similar fashion to cstubs: you put your struct
+> declaration inside a functor
+>
+>   module Bindings(S : Cstubs_structs.STRUCT) =
+>   struct
+>     open S
+>     let cell       = structure "cell"
+>     let payload = field cell int "payload"
+>     let next      = field cell (ptr cell) "next"
+>     let ()          = seal cell
+>   end
+>
+> and then call Cstubs_structs.write_c to generate an ML module with
+> which to instantiate the functor.
+>
+> The pull request has more details and some illustrative tests.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20141030/48b3ed9f/attachment.html>
+

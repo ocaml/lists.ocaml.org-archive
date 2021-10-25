@@ -1,0 +1,3866 @@
+From anil at recoil.org  Sun May  3 20:14:49 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 3 May 2015 20:14:49 +0100
+Subject: [opam-devel] opam2{rpm,deb}
+In-Reply-To: <550CAB9F.4040508@etorok.net>
+References: <5508AA94.7060100@etorok.net>
+ <01A203A9-C2AD-4032-9133-3204F1D07E89@recoil.org>
+ <5509FDC9.1080107@etorok.net>
+ <5CA7A6A1-3A4A-40DB-A4DE-659750444772@recoil.org>
+ <550CAB9F.4040508@etorok.net>
+Message-ID: <13C79C58-64AD-4DC6-8EFE-7D5A74F2B7AA@recoil.org>
+
+On 20 Mar 2015, at 23:22, T?r?k Edwin <edwin+ml-ocaml at etorok.net> wrote:
+> 
+> Hi,
+> 
+> [On Anil's suggestion I'm moving the discussion to opam-devel.
+> TL;DR: I am about to start writing opam2{rpm,deb} for my package and its dependencies. Does anyone else need such a tool or want to help?]
+
+Apologies for the delay replying -- I continue to see significant interest in a tool like this for generating standalone installable packages easily for end-user tools.
+
+There seems to be a basic tension in upstream OS packaging these days: to add all the libraries for every language as a package, or to just "vendor" third party libraries and build a standalone binary with fewer dependencies.  In OCaml's case the latter works great, just as with Go, due to the static linking.
+
+> I am about to package my own OCaml application for Fedora and Debian, which indirectly depends on 12 opam packages
+> (3 of which already review requests on Fedora's bugzilla as they are shared dependencies with opam itself).
+> I am looking for some automation in preparing spec and Debian templates, for checking their quality, and tracking the packages through their lifecycle,
+> and to avoid making the same common mistakes for each package.
+
+Out of interest, do you also need Ubuntu PPA (or the Fedora equivalent) support?  The issue with upstreaming libraries is the difficulty of managing updates, and so I'd also like to be able to build a complete PPA archive with the latest OPAM libraries.  This shouldn't be too difficult with a mechanical OPAM transformation, but I suspect there will be lots of versioning issues.
+
+> Since such a tool (opam2rpm/opam2deb) doesn't exist now, I'll describe what my idea/requirements are.
+> Please let me know what you think and if you have new / different requirements. Perhaps together we can design/create an opam2rpm tool that will be useful for more than just a oneshot conversion.
+> 
+> I am quite new to packaging, have just recently went through packaging another (non-OCaml) application for Fedora so I've
+> documented a package's (and package maintainer's) states here: https://fedoraproject.org/wiki/Fedora_Package_Lifecycle_notes.
+> This is still rather incomplete and rough, take it with a grain of salt and consult the official docs when in doubt.
+> 
+> What we have now:
+> * opam metadata: depexts, conf-* opam packages, build rules, constraints, etc.
+> * opam-lib
+> * opam-repository, where some packages implicitly assume a "modern" Linux environment (has native compiler, dynlink, certain tools and C headers, etc.).
+> For distribution packages all these dependencies will have to be made explicit
+> * oasis2deb, generates decent starting point for a Debian package, but fails #3
+> 
+> What are my requirements?
+> #1 (local) opam repository as input, .spec/Debian as output
+> #2 lint the output (both opam and possibly manually edited spec/Debian), there are already external tools for this
+> #3 test that the build requirements are complete, i.e. it builds in a minimal environment. there are external tools mock/pbuilder for a clean/official solution,
+> or docker for an insecure and somewhat faster solution
+> #4 allow to manually modify the generated .spec and debian/ files and still keep track of changes in opam metadata
+> #5 allow incremental refinement of the spec/debian rules, don't require everything to be 100% compliant/correct syntax
+> #6 allow to override opam metadata (could just git clone the opam repo and use that)
+> #7 opam2rpm and opam2deb should be similar to use (i.e. maybe it should be opam2pkg rpm and opam2pkg deb), and I don't necesarely want to limit this to rpm and deb,
+> someone is welcome to create an opam2openbsd or opam2brew, etc.
+> #8 developing the automation tool shouldn't take (significanlty) longer than manually writing the packaging for those 9 packages :)
+> #9 the goal would also be to make it easier for upstream reviewers to review all these packages, at some point we should consider involving them in the discussion once we have some draft tool
+> to make sure we generate good quality packages :)
+
+Complete agreement so far from me.  What are your thoughts, Louis and Thomas?
+
+> Most (but not all) of the packages I need to write spec files for are based on OASIS, so we could try to load the missing metadata from oasis, or detect that oasis is used
+> and simplify some steps, however not all packages use it so I think that starting at the opam metadata is still the right way.
+
+Yeah, the `findlib` file in OPAM was a first step to close the gap between OASIS and OPAM, and we can continue to add automated scripts to keep this information in sync.  It would be good to only depend on one package database for this translation, and OPAM is the outermost layer and so most appropriate.
+
+> What kind of automation is needed for opam2rpm and opam2deb for me:
+> * mapping of opam to Fedora/Debian naming conventions (some opam packages have ocaml- already in them, so take care not to duplicate that)
+> * generate .spec and debian/ file templates from opam metadata + some overrides. If this was just a one-way/one-time conversion I'd go with
+> something simple (perhaps like ocaml-mustache), however see below
+> * check license name compliance (Fedora and Debian have their standard name lists), and make sure the package actually has a license *file*
+> * don't need full roundtrip capability between opam and spec/debian, the tool should serve three purposes only:
+>  * generate initial templates
+>  * show a smart diff
+>  * lint the opam metadata / spec file
+> * shouldn't require to update the conversion tool just to support an obscure corner-case that can be fixed more easily by hand in the spec file
+> * doesn't have to be perfect or support the full features of spec/debian/opam files. lets start with the minimum requirements and add fields/features as we need them
+> * its not a substitute for human review, the final output always has to be tested and reviewed by a human
+
+Yep, I think the last thing is key, since the OPAM version numbers also don't map perfectly onto the upstream packaging ones.  For Debian or Ubuntu, we'd need to bump the extra versions for any small change to the package, whereas OPAM doesn't track these small changes.
+
+> 
+> Implementation thoughts:
+> * ocaml module describing spec file an debian rules with a toplevel type t and nested records, with type 'a field
+> * some form of conversion to/from a string -> string map
+> * a lexer that loads that map from the spec/debian files, and a formatter that generates it (ocamllex + format, or just ocaml-re + printf?)
+> * please if we can lets avoid camlp4 for this, I'd suggest ppx_deriving+cconv or just manually writing the parse/generate calls for the record fields
+> * validation should be optional
+> * fields should be easy to declare (name, of_string, to_string, validate, smart_diff), initially all would be raw strings, more parsing/diffing can be added as needed
+> * some way to fill the 't' type from opam metadata
+> * certain files may not need all this advanced conversion, and might be easier to generate from a text template with substitutions (ocaml-mustache, or mpp?), and just show a textual diff
+> (docdiff at character/word level is quite nice)
+> 
+> Automation for tracking a package through its lifecycle (separate tool):
+> Since packaging an OCaml application can involve packaging/tracking a large number of dependant libraries some tool to track the status of each package (lifecycle)
+> would be useful. This is not specific to OCaml, I'm surprised that upstream distros don't have this already, but anyway using Fedora terminology I want a single CLI tool that can:
+> * query yum repo for stable packages
+> * query pkgdb for existence of package in other releases
+> * query bodhi for pending/testing packages
+> * query koji for builds submitted/completed
+> * query for existence of scm (git) repo
+> * query bugzilla for package review and find out its state (submitted, under review, approved, waiting for scm repo, scm repo created)
+
+Jon Ludlam has been working with Koji recently -- any thoughts on the above?
+
+> For Debian a similar tool that:
+> * query bugs.debian.org for RFP (request for packaging), ITP (intent to package) and its status
+> * query NEW queue for uploaded source package
+> * query package tracker for buildd status
+> * this can also avoid duplicating work, i.e. finding out that someone else is already packaging my package or its dependencies
+> * might also be useful for other packages
+> * can be done manually by visiting a bunch of webpages in turn and searching on each, but there ought to be some CLI tools to help or at least some (web)API
+> * doesn't have to be necesarely written in Ocaml, if we can reuse existing tools and have this just as a shell/python script the better
+> 
+> I wanted to go through the policy docs and write some details here on what is missing from opam metadata, but this mail is long enough and it is late enough already,
+> that I thought to start the discussion with what I have so far, and discuss the details as we go.
+> 
+> Once we agree on the major design points of this tool I plan on starting with opam2rpm, but if someone else wants to own it I'd be more than happy with that as well.
+
+
+I do agree with this all, and that it's the next important stage to make it easier to distribute OCaml applications upstream.  It's quite a bit of work, so perhaps we should transfer this design to the OPAM wiki to make tracking it easier.  Once there is some stability, we can start ticking off various bits of low hanging fruit like the lifecycle query tools, and figure out who can work on what component.
+
+I'm personally keen on seeing this so that we can have binary distributions of Core/Async more easily, as well as distribute the MirageOS command-line more sensibly on Ubuntu and Fedora.  
+
+cheers,
+Anil
+
+From anil at recoil.org  Mon May  4 16:52:34 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 4 May 2015 08:52:34 -0700
+Subject: [opam-devel] opam 1.2.2rc2 -> release?
+Message-ID: <73770C41-D885-4A36-A581-FD70F01421DD@recoil.org>
+
+I've gone ahead somewhat optimistically and uploaded rc2 as OPAM-1.2.2 release to the Ubuntu PPA experimental archive. Louis, if you can give me the green light, I'll move it over to the stable repositories.
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Thu May  7 06:45:50 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 07 May 2015 14:45:50 +0900
+Subject: [opam-devel] opam 1.2.2rc2 -> release?
+In-Reply-To: <73770C41-D885-4A36-A581-FD70F01421DD@recoil.org>
+References: <73770C41-D885-4A36-A581-FD70F01421DD@recoil.org>
+Message-ID: <21361023.ckzCDdFzkx@agaric>
+
+No blocker on my side: let's go!
+
+> - Anil Madhavapeddy, 04/05/2015 08:52 -
+> I've gone ahead somewhat optimistically and uploaded rc2 as OPAM-1.2.2 release to the Ubuntu PPA experimental archive. Louis, if you can give me the green light, I'll move it over to the stable repositories.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150507/77d3f3b9/attachment.sig>
+
+From louis.gesbert at ocamlpro.com  Thu May  7 07:09:33 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 07 May 2015 15:09:33 +0900
+Subject: [opam-devel] opam 1.2.2rc2 -> release?
+In-Reply-To: <21361023.ckzCDdFzkx@agaric>
+References: <73770C41-D885-4A36-A581-FD70F01421DD@recoil.org>
+ <21361023.ckzCDdFzkx@agaric>
+Message-ID: <4503083.aLnqq9mXHE@agaric>
+
+Released on github (renamed 1.2.2-rc2 to 1.2.2) ; announcement PRed to the platform blog.
+
+> - Louis Gesbert, 07/05/2015 14:45 -
+> No blocker on my side: let's go!
+> 
+> > - Anil Madhavapeddy, 04/05/2015 08:52 -
+> > I've gone ahead somewhat optimistically and uploaded rc2 as OPAM-1.2.2 release to the Ubuntu PPA experimental archive. Louis, if you can give me the green light, I'll move it over to the stable repositories.
+> > 
+> > -anil
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150507/b903010d/attachment.sig>
+
+From talex5 at gmail.com  Thu May  7 12:09:51 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 7 May 2015 12:09:51 +0100
+Subject: [opam-devel] opam 1.2.2rc2 -> release?
+In-Reply-To: <4503083.aLnqq9mXHE@agaric>
+References: <73770C41-D885-4A36-A581-FD70F01421DD@recoil.org>
+ <21361023.ckzCDdFzkx@agaric> <4503083.aLnqq9mXHE@agaric>
+Message-ID: <CAG4opy-14ypnTBsqmwRp7cQbkh0e7fF+ApDFSWPOb09bKt68dg@mail.gmail.com>
+
+I've updated the 0install packages too. There are binaries for Linux
+x86/x86_64, ARM (CubieTruck) and now OS X Yosemite? too:
+
+  http://tools.ocaml.org/opam.xml
+
+To upgrade now without waiting for it to be marked as stable:
+
+  0install update opam --not-before=1.2.2
+
+Note: this is my version 1.2.2-1, which is 1.2.2 plus a backport of
+https://github.com/ocaml/opam/issues/2142 (which is always needed for
+0install).
+
+
+On 7 May 2015 at 07:09, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> Released on github (renamed 1.2.2-rc2 to 1.2.2) ; announcement PRed to the platform blog.
+>
+>> - Louis Gesbert, 07/05/2015 14:45 -
+>> No blocker on my side: let's go!
+>>
+>> > - Anil Madhavapeddy, 04/05/2015 08:52 -
+>> > I've gone ahead somewhat optimistically and uploaded rc2 as OPAM-1.2.2 release to the Ubuntu PPA experimental archive. Louis, if you can give me the green light, I'll move it over to the stable repositories.
+>> >
+>> > -anil
+>> > _______________________________________________
+>> > opam-devel mailing list
+>> > opam-devel at lists.ocaml.org
+>> > http://lists.ocaml.org/listinfo/opam-devel
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From roberto at dicosmo.org  Thu May  7 15:38:35 2015
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 7 May 2015 16:38:35 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+Message-ID: <20150507143835.GA9624@traveler>
+
+Dear fellow Opam developers, 
+
+     We are proud to announce the first public release of a new and fully
+refactored version of OWS, the Opam Weather Service, and we are now reaching out
+to everybody on opam-devel for feedback and contribution to its evolution.
+
+If you are in hurry, the short message is: 
+
+  - explore the dashboard available online at http://ows.irill.org/ ! 
+
+    The packages listed there are arranged by package name and sorted according
+    to the number of issues found on all available versions, you can click on a
+    package to get details of these issues, and zone-in on specific packages
+    using the search box. 
+
+    On http://ows.irill.org/latest/today/summary.html you will find the list of
+    the causes of package installability problems, sorted by their impact:
+    packages causing the largest number of problems come first, to help focus
+    developer energy when improving the quality of the Opam repository
+
+  - use this information to look after the packages you are responsible for:
+    hints on how to fix dependency issues are displayed for each package
+
+  - if you want new features, make suggestions or report a bug, look at the
+    source code, available under AGPL from https://github.com/OCamlPro/ows
+    You are very welcome to contribute using github
+
+--
+Pietro Abate, Roberto Di Cosmo, Louis Gesbert and Fabrice Le Fessant
+
+
+Here are more details for who wants to know more.
+-------------------------------------------------
+
+OWS and distcheck
+
+Built on top of the distcheck tool from the dose library [1], OWS scans daily
+the packages in the Opam repository to spot all packages that cannot be
+installed at all because of dependency issues, and presents a dashboard that
+provides a bird's eye overview of the state of the repository.
+
+This static check is blazingly fast and does not require any physical
+installation: it catches *all* dependency issues, and it catches *only*
+dependency issues, so it does not replaces the other testing tools that are
+needed to catch compilation, configuration and installation issues encountered
+when actually deploying a package.
+
+A dashboard based on distcheck has been used in the Debian distribution for
+almost ten years [2], and we know well that it can be extremely beneficial to
+improve a package repository if it is properly integrated in a quality assurance
+process.
+
+A full paper describing how distcheck has been used is going to be presented at
+MSR 2015 in a week [3]; a preprint is already availabe [4].
+
+The new OWS
+--------------------
+
+An experimental prototype of OWS has been running for almost a year; the new
+version we unveil today is rebuilt from scratch in order to:
+
+ - clearly separate the presentation of the results in a dashboard from the
+   distcheck backend from dose: this required changes to opam, dose and
+   distcheck
+
+ - provide improved presentation of the results, in order to facilitate
+   the identification of the most problematic packages
+
+ - make available all relevant source code, properly released under an
+   Open Source licence, written by Pietro Abate (Inria/Irill)
+
+[1] http://dose.gforge.inria.fr/
+[2] http://qa.debian.org/dose
+[3] http://2015.msrconf.org/program.php 
+[4] http://www.dicosmo.org/preprints/msr-2015-distcheck.pdf
+
+From markus.mottl at gmail.com  Thu May  7 16:13:31 2015
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Thu, 7 May 2015 11:13:31 -0400
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <20150507143835.GA9624@traveler>
+References: <20150507143835.GA9624@traveler>
+Message-ID: <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+
+Hi,
+
+awesome, that's a very helpful service, thanks for your work!
+
+Here are two features that would be great to have: email notifications
+if a maintainer has failing packages.  A search function that searches
+the list of package maintainers so that people can get a quick
+overview of all packages they maintain.
+
+Best regards,
+Markus
+
+On Thu, May 7, 2015 at 10:38 AM, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> Dear fellow Opam developers,
+>
+>      We are proud to announce the first public release of a new and fully
+> refactored version of OWS, the Opam Weather Service, and we are now reaching out
+> to everybody on opam-devel for feedback and contribution to its evolution.
+>
+> If you are in hurry, the short message is:
+>
+>   - explore the dashboard available online at http://ows.irill.org/ !
+>
+>     The packages listed there are arranged by package name and sorted according
+>     to the number of issues found on all available versions, you can click on a
+>     package to get details of these issues, and zone-in on specific packages
+>     using the search box.
+>
+>     On http://ows.irill.org/latest/today/summary.html you will find the list of
+>     the causes of package installability problems, sorted by their impact:
+>     packages causing the largest number of problems come first, to help focus
+>     developer energy when improving the quality of the Opam repository
+>
+>   - use this information to look after the packages you are responsible for:
+>     hints on how to fix dependency issues are displayed for each package
+>
+>   - if you want new features, make suggestions or report a bug, look at the
+>     source code, available under AGPL from https://github.com/OCamlPro/ows
+>     You are very welcome to contribute using github
+>
+> --
+> Pietro Abate, Roberto Di Cosmo, Louis Gesbert and Fabrice Le Fessant
+>
+>
+> Here are more details for who wants to know more.
+> -------------------------------------------------
+>
+> OWS and distcheck
+>
+> Built on top of the distcheck tool from the dose library [1], OWS scans daily
+> the packages in the Opam repository to spot all packages that cannot be
+> installed at all because of dependency issues, and presents a dashboard that
+> provides a bird's eye overview of the state of the repository.
+>
+> This static check is blazingly fast and does not require any physical
+> installation: it catches *all* dependency issues, and it catches *only*
+> dependency issues, so it does not replaces the other testing tools that are
+> needed to catch compilation, configuration and installation issues encountered
+> when actually deploying a package.
+>
+> A dashboard based on distcheck has been used in the Debian distribution for
+> almost ten years [2], and we know well that it can be extremely beneficial to
+> improve a package repository if it is properly integrated in a quality assurance
+> process.
+>
+> A full paper describing how distcheck has been used is going to be presented at
+> MSR 2015 in a week [3]; a preprint is already availabe [4].
+>
+> The new OWS
+> --------------------
+>
+> An experimental prototype of OWS has been running for almost a year; the new
+> version we unveil today is rebuilt from scratch in order to:
+>
+>  - clearly separate the presentation of the results in a dashboard from the
+>    distcheck backend from dose: this required changes to opam, dose and
+>    distcheck
+>
+>  - provide improved presentation of the results, in order to facilitate
+>    the identification of the most problematic packages
+>
+>  - make available all relevant source code, properly released under an
+>    Open Source licence, written by Pietro Abate (Inria/Irill)
+>
+> [1] http://dose.gforge.inria.fr/
+> [2] http://qa.debian.org/dose
+> [3] http://2015.msrconf.org/program.php
+> [4] http://www.dicosmo.org/preprints/msr-2015-distcheck.pdf
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From roberto at dicosmo.org  Thu May  7 18:57:13 2015
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 7 May 2015 19:57:13 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+References: <20150507143835.GA9624@traveler>
+ <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+Message-ID: <CAJBwKuUjR+836xhjQqjC8Je1D=-ygFry7GAO_Gak5W0t81NHew@mail.gmail.com>
+
+Thanks for opening the issues on the bts... any help in implementing these
+features would be highly welcome.
+
+2015-05-07 17:13 GMT+02:00 Markus Mottl <markus.mottl at gmail.com>:
+
+> Hi,
+>
+> awesome, that's a very helpful service, thanks for your work!
+>
+> Here are two features that would be great to have: email notifications
+> if a maintainer has failing packages.  A search function that searches
+> the list of package maintainers so that people can get a quick
+> overview of all packages they maintain.
+>
+> Best regards,
+> Markus
+>
+> On Thu, May 7, 2015 at 10:38 AM, Roberto Di Cosmo <roberto at dicosmo.org>
+> wrote:
+> > Dear fellow Opam developers,
+> >
+> >      We are proud to announce the first public release of a new and fully
+> > refactored version of OWS, the Opam Weather Service, and we are now
+> reaching out
+> > to everybody on opam-devel for feedback and contribution to its
+> evolution.
+> >
+> > If you are in hurry, the short message is:
+> >
+> >   - explore the dashboard available online at http://ows.irill.org/ !
+> >
+> >     The packages listed there are arranged by package name and sorted
+> according
+> >     to the number of issues found on all available versions, you can
+> click on a
+> >     package to get details of these issues, and zone-in on specific
+> packages
+> >     using the search box.
+> >
+> >     On http://ows.irill.org/latest/today/summary.html you will find the
+> list of
+> >     the causes of package installability problems, sorted by their
+> impact:
+> >     packages causing the largest number of problems come first, to help
+> focus
+> >     developer energy when improving the quality of the Opam repository
+> >
+> >   - use this information to look after the packages you are responsible
+> for:
+> >     hints on how to fix dependency issues are displayed for each package
+> >
+> >   - if you want new features, make suggestions or report a bug, look at
+> the
+> >     source code, available under AGPL from
+> https://github.com/OCamlPro/ows
+> >     You are very welcome to contribute using github
+> >
+> > --
+> > Pietro Abate, Roberto Di Cosmo, Louis Gesbert and Fabrice Le Fessant
+> >
+> >
+> > Here are more details for who wants to know more.
+> > -------------------------------------------------
+> >
+> > OWS and distcheck
+> >
+> > Built on top of the distcheck tool from the dose library [1], OWS scans
+> daily
+> > the packages in the Opam repository to spot all packages that cannot be
+> > installed at all because of dependency issues, and presents a dashboard
+> that
+> > provides a bird's eye overview of the state of the repository.
+> >
+> > This static check is blazingly fast and does not require any physical
+> > installation: it catches *all* dependency issues, and it catches *only*
+> > dependency issues, so it does not replaces the other testing tools that
+> are
+> > needed to catch compilation, configuration and installation issues
+> encountered
+> > when actually deploying a package.
+> >
+> > A dashboard based on distcheck has been used in the Debian distribution
+> for
+> > almost ten years [2], and we know well that it can be extremely
+> beneficial to
+> > improve a package repository if it is properly integrated in a quality
+> assurance
+> > process.
+> >
+> > A full paper describing how distcheck has been used is going to be
+> presented at
+> > MSR 2015 in a week [3]; a preprint is already availabe [4].
+> >
+> > The new OWS
+> > --------------------
+> >
+> > An experimental prototype of OWS has been running for almost a year; the
+> new
+> > version we unveil today is rebuilt from scratch in order to:
+> >
+> >  - clearly separate the presentation of the results in a dashboard from
+> the
+> >    distcheck backend from dose: this required changes to opam, dose and
+> >    distcheck
+> >
+> >  - provide improved presentation of the results, in order to facilitate
+> >    the identification of the most problematic packages
+> >
+> >  - make available all relevant source code, properly released under an
+> >    Open Source licence, written by Pietro Abate (Inria/Irill)
+> >
+> > [1] http://dose.gforge.inria.fr/
+> > [2] http://qa.debian.org/dose
+> > [3] http://2015.msrconf.org/program.php
+> > [4] http://www.dicosmo.org/preprints/msr-2015-distcheck.pdf
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+>
+>
+>
+> --
+> Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+>
+
+
+
+-- 
+Roberto Di Cosmo
+
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+
+Bureau 320 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150507/a990fafc/attachment-0001.html>
+
+From anil at recoil.org  Thu May  7 22:05:34 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 7 May 2015 14:05:34 -0700
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+References: <20150507143835.GA9624@traveler>
+ <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+Message-ID: <DBA8650E-0810-4AF8-9356-5C55493D01B9@recoil.org>
+
+Yes, this is excellent!  I'm not entirely sure how to interpret the data
+as a package maintainer yet, but this much testing cannot be a bad thing :-)
+
+Is the data available as a JSON or other structured feed?  It would make it
+easier to consume rather than clicking through the web page.  Just curious
+in case that already exists, and if not I can add it.
+
+thanks
+Anil
+
+> On 7 May 2015, at 08:13, Markus Mottl <markus.mottl at gmail.com> wrote:
+> 
+> Hi,
+> 
+> awesome, that's a very helpful service, thanks for your work!
+> 
+> Here are two features that would be great to have: email notifications
+> if a maintainer has failing packages.  A search function that searches
+> the list of package maintainers so that people can get a quick
+> overview of all packages they maintain.
+> 
+> Best regards,
+> Markus
+> 
+> On Thu, May 7, 2015 at 10:38 AM, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+>> Dear fellow Opam developers,
+>> 
+>>     We are proud to announce the first public release of a new and fully
+>> refactored version of OWS, the Opam Weather Service, and we are now reaching out
+>> to everybody on opam-devel for feedback and contribution to its evolution.
+>> 
+>> If you are in hurry, the short message is:
+>> 
+>>  - explore the dashboard available online at http://ows.irill.org/ !
+>> 
+>>    The packages listed there are arranged by package name and sorted according
+>>    to the number of issues found on all available versions, you can click on a
+>>    package to get details of these issues, and zone-in on specific packages
+>>    using the search box.
+>> 
+>>    On http://ows.irill.org/latest/today/summary.html you will find the list of
+>>    the causes of package installability problems, sorted by their impact:
+>>    packages causing the largest number of problems come first, to help focus
+>>    developer energy when improving the quality of the Opam repository
+>> 
+>>  - use this information to look after the packages you are responsible for:
+>>    hints on how to fix dependency issues are displayed for each package
+>> 
+>>  - if you want new features, make suggestions or report a bug, look at the
+>>    source code, available under AGPL from https://github.com/OCamlPro/ows
+>>    You are very welcome to contribute using github
+>> 
+>> --
+>> Pietro Abate, Roberto Di Cosmo, Louis Gesbert and Fabrice Le Fessant
+>> 
+>> 
+>> Here are more details for who wants to know more.
+>> -------------------------------------------------
+>> 
+>> OWS and distcheck
+>> 
+>> Built on top of the distcheck tool from the dose library [1], OWS scans daily
+>> the packages in the Opam repository to spot all packages that cannot be
+>> installed at all because of dependency issues, and presents a dashboard that
+>> provides a bird's eye overview of the state of the repository.
+>> 
+>> This static check is blazingly fast and does not require any physical
+>> installation: it catches *all* dependency issues, and it catches *only*
+>> dependency issues, so it does not replaces the other testing tools that are
+>> needed to catch compilation, configuration and installation issues encountered
+>> when actually deploying a package.
+>> 
+>> A dashboard based on distcheck has been used in the Debian distribution for
+>> almost ten years [2], and we know well that it can be extremely beneficial to
+>> improve a package repository if it is properly integrated in a quality assurance
+>> process.
+>> 
+>> A full paper describing how distcheck has been used is going to be presented at
+>> MSR 2015 in a week [3]; a preprint is already availabe [4].
+>> 
+>> The new OWS
+>> --------------------
+>> 
+>> An experimental prototype of OWS has been running for almost a year; the new
+>> version we unveil today is rebuilt from scratch in order to:
+>> 
+>> - clearly separate the presentation of the results in a dashboard from the
+>>   distcheck backend from dose: this required changes to opam, dose and
+>>   distcheck
+>> 
+>> - provide improved presentation of the results, in order to facilitate
+>>   the identification of the most problematic packages
+>> 
+>> - make available all relevant source code, properly released under an
+>>   Open Source licence, written by Pietro Abate (Inria/Irill)
+>> 
+>> [1] http://dose.gforge.inria.fr/
+>> [2] http://qa.debian.org/dose
+>> [3] http://2015.msrconf.org/program.php
+>> [4] http://www.dicosmo.org/preprints/msr-2015-distcheck.pdf
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> 
+> 
+> -- 
+> Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From Pietro.Abate at pps.univ-paris-diderot.fr  Fri May  8 08:21:55 2015
+From: Pietro.Abate at pps.univ-paris-diderot.fr (Pietro Abate)
+Date: Fri, 8 May 2015 09:21:55 +0200
+Subject: [opam-devel] ANNOUNCE: OWS, the Opam Wheather Service
+In-Reply-To: <DBA8650E-0810-4AF8-9356-5C55493D01B9@recoil.org>
+References: <20150507143835.GA9624@traveler>
+ <CAP_800r3dp4apk92WJ_RMPrikv9EAk28YQ7APa2Uzes8S-NMcQ@mail.gmail.com>
+ <DBA8650E-0810-4AF8-9356-5C55493D01B9@recoil.org>
+Message-ID: <20150508072155.GA5645@zed.irill.org>
+
+Thank you all for the positive feedback.
+
+On 07/05/15 14:05, Anil Madhavapeddy wrote:
+> Is the data available as a JSON or other structured feed?  It would make it
+> easier to consume rather than clicking through the web page.  Just curious
+> in case that already exists, and if not I can add it.
+
+The data can be made available also in json, and this is not the case
+at the moment. I'm also working on a small REST api to directly query
+OWS . I invite all to submit bugs and feature requests on github. We
+would love to have more contributors on board and transform ows in a
+community oriented project. I'll be happy to coordinate all
+development efforts.
+
+p
+
+From talex5 at gmail.com  Thu May 14 13:30:56 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 14 May 2015 13:30:56 +0100
+Subject: [opam-devel] Using the new travis containers
+Message-ID: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+
+Travis is currently migrating over to using containers for builds.
+These start much faster than the old full VMs, but they don't give you
+root access. This means that you can't use sudo to install packages
+and should instead list them in your .travis.yml file.
+
+Here's the confg that CueKeeper uses:
+
+  https://github.com/talex5/cuekeeper/blob/master/.travis.yml
+
+In summary:
+
+1. Add the `avsm` PPA to get an up-to-date OCaml.
+2. List all debs you need ahead of time.
+3. Put `FORK_USER=talex5 FORK_BRANCH=containers` in `env` so that it
+uses my branch of ocaml-travisci-skeleton (tracking PR here:
+https://github.com/ocaml/ocaml-travisci-skeleton/pull/41)
+4. If using mirage, use `PINS=mirage` and use `mirage configure --no-depext`.
+
+Notes:
+
+- All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+
+- aspcud is not whitelisted (I've requested it here:
+https://github.com/travis-ci/travis-ci/issues/3898), which means that
+the opam deb doesn't work reliably. Instead, my branch gets opam and
+aspcud via 0install.
+
+- There's no obvious way to specify which version of ocaml you want.
+Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+constraint?
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From anil at recoil.org  Thu May 14 15:58:37 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 14 May 2015 15:58:37 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+Message-ID: <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+
+On 14 May 2015, at 13:30, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> Travis is currently migrating over to using containers for builds.
+> These start much faster than the old full VMs, but they don't give you
+> root access. This means that you can't use sudo to install packages
+> and should instead list them in your .travis.yml file.
+> 
+> Here's the confg that CueKeeper uses:
+> 
+>  https://github.com/talex5/cuekeeper/blob/master/.travis.yml
+> 
+> In summary:
+> 
+> 1. Add the `avsm` PPA to get an up-to-date OCaml.
+> 2. List all debs you need ahead of time.
+> 3. Put `FORK_USER=talex5 FORK_BRANCH=containers` in `env` so that it
+> uses my branch of ocaml-travisci-skeleton (tracking PR here:
+> https://github.com/ocaml/ocaml-travisci-skeleton/pull/41)
+> 4. If using mirage, use `PINS=mirage` and use `mirage configure --no-depext`.
+
+I'm honoured to be whitelisted by Travis :-)
+
+It would be useful to have a command to generate the Travis file with
+the full APT list.  What's the OPAM 1.2.x command to generate the depext
+recursive list?
+
+   opam pin add hdhcp
+   opam install -e ubuntu hdhcp
+
+Shows me no depexts, so is there a new command with "opam list" or similar
+that I'm meant to use?
+
+
+> 
+> Notes:
+> 
+> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+> 
+> - aspcud is not whitelisted (I've requested it here:
+> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+> the opam deb doesn't work reliably. Instead, my branch gets opam and
+> aspcud via 0install.
+> 
+> - There's no obvious way to specify which version of ocaml you want.
+> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+> constraint?
+
+I publish several PPAs for each combination of OPAM and OCaml:
+
+https://launchpad.net/~avsm
+
+Is it possible to select the right PPA repository from this list,
+or does this require individual whitelisting from Travis?
+
+-anil
+
+From talex5 at gmail.com  Thu May 14 16:07:13 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Thu, 14 May 2015 16:07:13 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+Message-ID: <CAG4opy-qL_ANAuiUG5sf0jrZc2H8K=OpLB2i_7bYnupkEqnxUQ@mail.gmail.com>
+
+On 14 May 2015 at 15:58, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 14 May 2015, at 13:30, Thomas Leonard <talex5 at gmail.com> wrote:
+>>
+>> Travis is currently migrating over to using containers for builds.
+>> These start much faster than the old full VMs, but they don't give you
+>> root access. This means that you can't use sudo to install packages
+>> and should instead list them in your .travis.yml file.
+>>
+>> Here's the confg that CueKeeper uses:
+>>
+>>  https://github.com/talex5/cuekeeper/blob/master/.travis.yml
+>>
+>> In summary:
+>>
+>> 1. Add the `avsm` PPA to get an up-to-date OCaml.
+>> 2. List all debs you need ahead of time.
+>> 3. Put `FORK_USER=talex5 FORK_BRANCH=containers` in `env` so that it
+>> uses my branch of ocaml-travisci-skeleton (tracking PR here:
+>> https://github.com/ocaml/ocaml-travisci-skeleton/pull/41)
+>> 4. If using mirage, use `PINS=mirage` and use `mirage configure --no-depext`.
+>
+> I'm honoured to be whitelisted by Travis :-)
+
+Indeed, this means you have root in their containers, and thus (I
+think) to their hosting VMs too.
+
+> It would be useful to have a command to generate the Travis file with
+> the full APT list.  What's the OPAM 1.2.x command to generate the depext
+> recursive list?
+>
+>    opam pin add hdhcp
+>    opam install -e ubuntu hdhcp
+>
+> Shows me no depexts, so is there a new command with "opam list" or similar
+> that I'm meant to use?
+>
+>
+>>
+>> Notes:
+>>
+>> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+>>
+>> - aspcud is not whitelisted (I've requested it here:
+>> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+>> the opam deb doesn't work reliably. Instead, my branch gets opam and
+>> aspcud via 0install.
+>>
+>> - There's no obvious way to specify which version of ocaml you want.
+>> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+>> constraint?
+>
+> I publish several PPAs for each combination of OPAM and OCaml:
+>
+> https://launchpad.net/~avsm
+>
+> Is it possible to select the right PPA repository from this list,
+> or does this require individual whitelisting from Travis?
+
+The entry is here:
+
+https://github.com/travis-ci/apt-source-whitelist/blob/63454fd9da89fce908ab316a69defa28f34c1743/ubuntu.json#L2
+
+{ "alias": "avsm", "sourceline": "ppa:avsm/ppa", "key_url": null },
+
+So I'm guessting it's just this one.
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From thomas at gazagnaire.org  Thu May 14 16:42:43 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 14 May 2015 16:42:43 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <CAG4opy-qL_ANAuiUG5sf0jrZc2H8K=OpLB2i_7bYnupkEqnxUQ@mail.gmail.com>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+ <CAG4opy-qL_ANAuiUG5sf0jrZc2H8K=OpLB2i_7bYnupkEqnxUQ@mail.gmail.com>
+Message-ID: <87647FBB-4633-4EDF-91FB-06200CABC706@gazagnaire.org>
+
+>>   opam pin add hdhcp
+>>   opam install -e ubuntu hdhcp
+
+opam list -e ubuntu dhcp --short
+
+
+>> 
+>> Shows me no depexts, so is there a new command with "opam list" or similar
+>> that I'm meant to use?
+>> 
+>> 
+>>> 
+>>> Notes:
+>>> 
+>>> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+>>> 
+>>> - aspcud is not whitelisted (I've requested it here:
+>>> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+>>> the opam deb doesn't work reliably. Instead, my branch gets opam and
+>>> aspcud via 0install.
+>>> 
+>>> - There's no obvious way to specify which version of ocaml you want.
+>>> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+>>> constraint?
+>> 
+>> I publish several PPAs for each combination of OPAM and OCaml:
+>> 
+>> https://launchpad.net/~avsm
+>> 
+>> Is it possible to select the right PPA repository from this list,
+>> or does this require individual whitelisting from Travis?
+> 
+> The entry is here:
+> 
+> https://github.com/travis-ci/apt-source-whitelist/blob/63454fd9da89fce908ab316a69defa28f34c1743/ubuntu.json#L2
+> 
+> { "alias": "avsm", "sourceline": "ppa:avsm/ppa", "key_url": null },
+> 
+> So I'm guessting it's just this one.
+> 
+> 
+> -- 
+> Dr Thomas Leonard        http://roscidus.com/blog/
+> GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Thu May 14 17:23:20 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 14 May 2015 17:23:20 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <87647FBB-4633-4EDF-91FB-06200CABC706@gazagnaire.org>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+ <CAG4opy-qL_ANAuiUG5sf0jrZc2H8K=OpLB2i_7bYnupkEqnxUQ@mail.gmail.com>
+ <87647FBB-4633-4EDF-91FB-06200CABC706@gazagnaire.org>
+Message-ID: <692630BB-88BA-4D42-96ED-153CF19A9ED2@recoil.org>
+
+
+> On 14 May 2015, at 16:42, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>>>  opam pin add hdhcp
+>>>  opam install -e ubuntu hdhcp
+> 
+> opam list -e ubuntu dhcp --short
+
+But how do I get it recursively?
+
+    $ opam list -e ubuntu hdhcp --short --rec
+    
+    $ opam list -e ubuntu ctypes-foreign
+    libffi-dev
+
+And ctypes-foreign is a dependency in the local hdhcp file:
+
+opam-version: "1.2"
+name: "hdhcp"
+maintainer: "haesbaert at haesbaert.org"
+version: "0.0.1"
+authors: [ "Christiano F. Haesbaert" ]
+license: "ISC"
+homepage: "https://github.com/haesbaert/hdhcp"
+dev-repo: "https://github.com/haesbaert/hdhcp.git"
+bug-reports: "https://github.com/haesbaert/hdhcp/issues"
+tags: [ "org:mirage" ]
+build: [ "./build.sh" ]
+install: [ ]
+remove: [ ]
+depends: [
+  "base-bytes"
+  "type_conv"
+  "ocamlfind" {build}
+  "cmdliner" {build & >= "0.9.4"}
+  "cstruct" {>= "1.3.0"}
+  "sexplib" {>= "109.53.00"}
+  "lwt"     {>= "2.4.3"}
+  "ipaddr"  {>= "2.5.0"}
+  "ctypes"  {>= "0.4.0"}
+  "ctypes-foreign"
+  "extunix"
+  "menhir"
+]
+available: [ocaml-version >= "4.01.0"]
+
+
+
+-anil
+
+> 
+> 
+>>> 
+>>> Shows me no depexts, so is there a new command with "opam list" or similar
+>>> that I'm meant to use?
+>>> 
+>>> 
+>>>> 
+>>>> Notes:
+>>>> 
+>>>> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+>>>> 
+>>>> - aspcud is not whitelisted (I've requested it here:
+>>>> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+>>>> the opam deb doesn't work reliably. Instead, my branch gets opam and
+>>>> aspcud via 0install.
+>>>> 
+>>>> - There's no obvious way to specify which version of ocaml you want.
+>>>> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+>>>> constraint?
+>>> 
+>>> I publish several PPAs for each combination of OPAM and OCaml:
+>>> 
+>>> https://launchpad.net/~avsm
+>>> 
+>>> Is it possible to select the right PPA repository from this list,
+>>> or does this require individual whitelisting from Travis?
+>> 
+>> The entry is here:
+>> 
+>> https://github.com/travis-ci/apt-source-whitelist/blob/63454fd9da89fce908ab316a69defa28f34c1743/ubuntu.json#L2
+>> 
+>> { "alias": "avsm", "sourceline": "ppa:avsm/ppa", "key_url": null },
+>> 
+>> So I'm guessting it's just this one.
+>> 
+>> 
+>> -- 
+>> Dr Thomas Leonard        http://roscidus.com/blog/
+>> GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From edwin+ml-ocaml at etorok.net  Thu May 14 18:13:54 2015
+From: edwin+ml-ocaml at etorok.net (=?UTF-8?B?VMO2csO2ayBFZHdpbg==?=)
+Date: Thu, 14 May 2015 20:13:54 +0300
+Subject: [opam-devel] opam2{rpm,deb}
+In-Reply-To: <13C79C58-64AD-4DC6-8EFE-7D5A74F2B7AA@recoil.org>
+References: <5508AA94.7060100@etorok.net>
+ <01A203A9-C2AD-4032-9133-3204F1D07E89@recoil.org>
+ <5509FDC9.1080107@etorok.net>
+ <5CA7A6A1-3A4A-40DB-A4DE-659750444772@recoil.org>
+ <550CAB9F.4040508@etorok.net>
+ <13C79C58-64AD-4DC6-8EFE-7D5A74F2B7AA@recoil.org>
+Message-ID: <5554D7D2.1050003@etorok.net>
+
+On 05/03/2015 10:14 PM, Anil Madhavapeddy wrote:
+> On 20 Mar 2015, at 23:22, T?r?k Edwin <edwin+ml-ocaml at etorok.net>
+> wrote:
+>> 
+>> Hi,
+>> 
+>> [On Anil's suggestion I'm moving the discussion to opam-devel. 
+>> TL;DR: I am about to start writing opam2{rpm,deb} for my package
+>> and its dependencies. Does anyone else need such a tool or want to
+>> help?]
+> 
+> Apologies for the delay replying -- I continue to see significant
+> interest in a tool like this for generating standalone installable
+> packages easily for end-user tools.
+> 
+> There seems to be a basic tension in upstream OS packaging these
+> days: to add all the libraries for every language as a package, or to
+> just "vendor" third party libraries and build a standalone binary
+> with fewer dependencies.  In OCaml's case the latter works great,
+> just as with Go, due to the static linking.
+
+I think opam2debian might be useful for this, but such packages won't be/aren't meant to be
+accepted in upstream distributions.
+
+
+> Out of interest, do you also need Ubuntu PPA (or the Fedora
+> equivalent) support?  The issue with upstreaming libraries is the
+> difficulty of managing updates, and so I'd also like to be able to
+> build a complete PPA archive with the latest OPAM libraries.  This
+> shouldn't be too difficult with a mechanical OPAM transformation, but
+> I suspect there will be lots of versioning issues.
+
+*Iff* Debian also had a PPA yes, otherwise its just easier to point people to just one 
+place (either the OpenSUSE build service like you do for opam, or repositories hosted on your own domain).
+
+I use the latter for my company, the tools to build repos (reprepro, createrepo) are fairly easy to use,
+it is just that whole cycle of building packages / repositories / QA takes a full day's of work to reach
+the desired result for just the 4 packages we have, and I can't see how that could scale up to the hundreds that OPAM has.
+For that somehow the whole build process should be more incremental and more parallelizable, i.e. more like a Makefile, but I'm not sure
+how well the current tools would support such a workflow. 
+
+> 
+> Yeah, the `findlib` file in OPAM was a first step to close the gap
+> between OASIS and OPAM, and we can continue to add automated scripts
+> to keep this information in sync.  It would be good to only depend on
+> one package database for this translation, and OPAM is the outermost
+> layer and so most appropriate.
+> 
+> 
+> Yep, I think the last thing is key, since the OPAM version numbers
+> also don't map perfectly onto the upstream packaging ones.  For
+> Debian or Ubuntu, we'd need to bump the extra versions for any small
+> change to the package, whereas OPAM doesn't track these small
+> changes.
+> 
+> 
+> I do agree with this all, and that it's the next important stage to
+> make it easier to distribute OCaml applications upstream.  It's quite
+> a bit of work, so perhaps we should transfer this design to the OPAM
+> wiki to make tracking it easier.
+
+Wiki page posted here: https://github.com/ocaml/opam/wiki/opam2%7Brpm,deb%7D
+
+I'm known for overcomplicating/overengineering designs, so take this with a grain of salt and consider it more a wishlist
+than a definite plan.
+
+I think the short version is:
+ * there is no canonical source of metadata, we should have tools to compare the existing sources though (opam, _oasis, debian/control and .spec) to let package maintainer
+decide the correct metadata / to let upstream sync the metadata
+ * we should have tools that track package (and it dependencies') lifecycle in various major distributions from review -> actual release to avoid dupplication of effort
+or see where help is needed (e.g. such a tool would say that in fedora: opam -> ocaml-re APPROVED -> FE-NEEDSPONSOR jonludlam, or aspcud -> gringo -> clasp REVIEW PENDING)
+
+>  Once there is some stability, we can start ticking off various bits of low hanging fruit like the lifecycle query tools, and figure out who can work on what component.
+
+Yes I think small tools with less ambitious goals would be a good start. I'm mostly interesting in version constraints and C dependencies, so I put some ideas concerning that on the wiki too.
+
+> 
+> I'm personally keen on seeing this so that we can have binary
+> distributions of Core/Async more easily, as well as distribute the
+> MirageOS command-line more sensibly on Ubuntu and Fedora.
+> 
+
+Best regards,
+--Edwin
+
+From thomas at gazagnaire.org  Thu May 14 21:40:11 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 14 May 2015 21:40:11 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <692630BB-88BA-4D42-96ED-153CF19A9ED2@recoil.org>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <E91762B9-4D7C-466B-AD91-5D52C55F662B@recoil.org>
+ <CAG4opy-qL_ANAuiUG5sf0jrZc2H8K=OpLB2i_7bYnupkEqnxUQ@mail.gmail.com>
+ <87647FBB-4633-4EDF-91FB-06200CABC706@gazagnaire.org>
+ <692630BB-88BA-4D42-96ED-153CF19A9ED2@recoil.org>
+Message-ID: <5138CAD5-CDDC-440D-AC77-92AF0068CEBA@gazagnaire.org>
+
+> But how do I get it recursively?
+> 
+>    $ opam list -e ubuntu hdhcp --short --rec
+> 
+>    $ opam list -e ubuntu ctypes-foreign
+>    libffi-dev
+
+This seems to do the trick:
+
+$ opam list -e ubuntu --short --rec --required-by hdhcp 
+
+> 
+> And ctypes-foreign is a dependency in the local hdhcp file:
+> 
+> opam-version: "1.2"
+> name: "hdhcp"
+> maintainer: "haesbaert at haesbaert.org"
+> version: "0.0.1"
+> authors: [ "Christiano F. Haesbaert" ]
+> license: "ISC"
+> homepage: "https://github.com/haesbaert/hdhcp"
+> dev-repo: "https://github.com/haesbaert/hdhcp.git"
+> bug-reports: "https://github.com/haesbaert/hdhcp/issues"
+> tags: [ "org:mirage" ]
+> build: [ "./build.sh" ]
+> install: [ ]
+> remove: [ ]
+> depends: [
+>  "base-bytes"
+>  "type_conv"
+>  "ocamlfind" {build}
+>  "cmdliner" {build & >= "0.9.4"}
+>  "cstruct" {>= "1.3.0"}
+>  "sexplib" {>= "109.53.00"}
+>  "lwt"     {>= "2.4.3"}
+>  "ipaddr"  {>= "2.5.0"}
+>  "ctypes"  {>= "0.4.0"}
+>  "ctypes-foreign"
+>  "extunix"
+>  "menhir"
+> ]
+> available: [ocaml-version >= "4.01.0"]
+> 
+> 
+> 
+> -anil
+> 
+>> 
+>> 
+>>>> 
+>>>> Shows me no depexts, so is there a new command with "opam list" or similar
+>>>> that I'm meant to use?
+>>>> 
+>>>> 
+>>>>> 
+>>>>> Notes:
+>>>>> 
+>>>>> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+>>>>> 
+>>>>> - aspcud is not whitelisted (I've requested it here:
+>>>>> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+>>>>> the opam deb doesn't work reliably. Instead, my branch gets opam and
+>>>>> aspcud via 0install.
+>>>>> 
+>>>>> - There's no obvious way to specify which version of ocaml you want.
+>>>>> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+>>>>> constraint?
+>>>> 
+>>>> I publish several PPAs for each combination of OPAM and OCaml:
+>>>> 
+>>>> https://launchpad.net/~avsm
+>>>> 
+>>>> Is it possible to select the right PPA repository from this list,
+>>>> or does this require individual whitelisting from Travis?
+>>> 
+>>> The entry is here:
+>>> 
+>>> https://github.com/travis-ci/apt-source-whitelist/blob/63454fd9da89fce908ab316a69defa28f34c1743/ubuntu.json#L2
+>>> 
+>>> { "alias": "avsm", "sourceline": "ppa:avsm/ppa", "key_url": null },
+>>> 
+>>> So I'm guessting it's just this one.
+>>> 
+>>> 
+>>> -- 
+>>> Dr Thomas Leonard        http://roscidus.com/blog/
+>>> GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+>>> _______________________________________________
+>>> opam-devel mailing list
+>>> opam-devel at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+
+
+From louis.gesbert at ocamlpro.com  Fri May 15 01:18:17 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Fri, 15 May 2015 09:18:17 +0900
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <5138CAD5-CDDC-440D-AC77-92AF0068CEBA@gazagnaire.org>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <692630BB-88BA-4D42-96ED-153CF19A9ED2@recoil.org>
+ <5138CAD5-CDDC-440D-AC77-92AF0068CEBA@gazagnaire.org>
+Message-ID: <3546736.NVNna0dPcv@agaric>
+
+You could use `opam depext` as a reminder:
+
+    % opam depext hdhcp --debug     
+    + uname -m
+    + uname -s
+    + lsb_release -i -s
+    # Detecting depexts using flags: x86_64 linux debian
+    + opam list --safe --recursive --external=x86_64,linux,debian --required-by=hdhcp
+
+(the `--safe` guarantees it doesn't get any write locks or ask questions, it's typically used in competion scripts)
+
+Otherwise, if Travis leaves more outside of the build scripts, that's a good thing, both for time and for reliability of the tests!
+
+> - Thomas Gazagnaire, 14/05/2015 21:40 -
+> > But how do I get it recursively?
+> > 
+> >    $ opam list -e ubuntu hdhcp --short --rec
+> > 
+> >    $ opam list -e ubuntu ctypes-foreign
+> >    libffi-dev
+> 
+> This seems to do the trick:
+> 
+> $ opam list -e ubuntu --short --rec --required-by hdhcp 
+> 
+> > 
+> > And ctypes-foreign is a dependency in the local hdhcp file:
+> > 
+> > opam-version: "1.2"
+> > name: "hdhcp"
+> > maintainer: "haesbaert at haesbaert.org"
+> > version: "0.0.1"
+> > authors: [ "Christiano F. Haesbaert" ]
+> > license: "ISC"
+> > homepage: "https://github.com/haesbaert/hdhcp"
+> > dev-repo: "https://github.com/haesbaert/hdhcp.git"
+> > bug-reports: "https://github.com/haesbaert/hdhcp/issues"
+> > tags: [ "org:mirage" ]
+> > build: [ "./build.sh" ]
+> > install: [ ]
+> > remove: [ ]
+> > depends: [
+> >  "base-bytes"
+> >  "type_conv"
+> >  "ocamlfind" {build}
+> >  "cmdliner" {build & >= "0.9.4"}
+> >  "cstruct" {>= "1.3.0"}
+> >  "sexplib" {>= "109.53.00"}
+> >  "lwt"     {>= "2.4.3"}
+> >  "ipaddr"  {>= "2.5.0"}
+> >  "ctypes"  {>= "0.4.0"}
+> >  "ctypes-foreign"
+> >  "extunix"
+> >  "menhir"
+> > ]
+> > available: [ocaml-version >= "4.01.0"]
+> > 
+> > 
+> > 
+> > -anil
+> > 
+> >> 
+> >> 
+> >>>> 
+> >>>> Shows me no depexts, so is there a new command with "opam list" or similar
+> >>>> that I'm meant to use?
+> >>>> 
+> >>>> 
+> >>>>> 
+> >>>>> Notes:
+> >>>>> 
+> >>>>> - All debs and PPAs must be whitelisted by Travis. avsm is whitelisted already.
+> >>>>> 
+> >>>>> - aspcud is not whitelisted (I've requested it here:
+> >>>>> https://github.com/travis-ci/travis-ci/issues/3898), which means that
+> >>>>> the opam deb doesn't work reliably. Instead, my branch gets opam and
+> >>>>> aspcud via 0install.
+> >>>>> 
+> >>>>> - There's no obvious way to specify which version of ocaml you want.
+> >>>>> Perhaps Anil could add e.g. an `ocaml-4.01` with a suitable version
+> >>>>> constraint?
+> >>>> 
+> >>>> I publish several PPAs for each combination of OPAM and OCaml:
+> >>>> 
+> >>>> https://launchpad.net/~avsm
+> >>>> 
+> >>>> Is it possible to select the right PPA repository from this list,
+> >>>> or does this require individual whitelisting from Travis?
+> >>> 
+> >>> The entry is here:
+> >>> 
+> >>> https://github.com/travis-ci/apt-source-whitelist/blob/63454fd9da89fce908ab316a69defa28f34c1743/ubuntu.json#L2
+> >>> 
+> >>> { "alias": "avsm", "sourceline": "ppa:avsm/ppa", "key_url": null },
+> >>> 
+> >>> So I'm guessting it's just this one.
+> >>> 
+> >>> 
+> >> 
+> > 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150515/bcc4bdc4/attachment.sig>
+
+From Christophe.Troestler at umons.ac.be  Fri May 15 11:07:06 2015
+From: Christophe.Troestler at umons.ac.be (Christophe Troestler)
+Date: Fri, 15 May 2015 12:07:06 +0200
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+Message-ID: <20150515.120706.1564601605972769800.Christophe.Troestler@umons.ac.be>
+
+Hi,
+
+On Thu, 14 May 2015 13:30:56 +0100, Thomas Leonard wrote:
+> 
+> Travis is currently migrating over to using containers for builds.
+> These start much faster than the old full VMs, but they don't give you
+> root access.
+
+I guess the containers are only for Linux and not for OSX, right?  If
+so, one may want to have two different scripts in the repository: one
+using containers and one using VMs and allowing OSX.
+
+Best,
+C.
+
+From talex5 at gmail.com  Fri May 15 15:51:54 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Fri, 15 May 2015 15:51:54 +0100
+Subject: [opam-devel] Using the new travis containers
+In-Reply-To: <20150515.120706.1564601605972769800.Christophe.Troestler@umons.ac.be>
+References: <CAG4opy9BGWesrASYXDf4=rr9b6JxWR3cuYbrcpDUf2fgPjUtEg@mail.gmail.com>
+ <20150515.120706.1564601605972769800.Christophe.Troestler@umons.ac.be>
+Message-ID: <CAG4opy8cx-6WiZTmTVcF7_fsCkvhAB1ryhd1hhxc3hvdqS5Etw@mail.gmail.com>
+
+On 15 May 2015 at 11:07, Christophe Troestler
+<Christophe.Troestler at umons.ac.be> wrote:
+> Hi,
+>
+> On Thu, 14 May 2015 13:30:56 +0100, Thomas Leonard wrote:
+>>
+>> Travis is currently migrating over to using containers for builds.
+>> These start much faster than the old full VMs, but they don't give you
+>> root access.
+>
+> I guess the containers are only for Linux and not for OSX, right?  If
+> so, one may want to have two different scripts in the repository: one
+> using containers and one using VMs and allowing OSX.
+
+It looks like you can use "matrix" for this:
+
+  https://github.com/travis-ci/travis-ci/issues/3715
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From daniel.buenzli at erratique.ch  Fri May 15 22:10:22 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 15 May 2015 23:10:22 +0200
+Subject: [opam-devel] On the new mixed mode pins
+Message-ID: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+
+Hello,
+
+Having recently upgraded my opam installation to 1.2.1. I had the pleasure of having my pins unknowingly converted to git mixed-mode. (Bad) experiences with this further confirmed me that while I was not planning to use them these pins are an inherently bad idea. Since mixed-mode is the default when you pin a VCS I also claim that as currently implemented they make opam, by default, a much less usable system in practice.  
+
+In this message I would like to both indicate what I think is wrong about mixed mode and propose an other way of having the functionality of mixed mode ? which I understand as being able to `opam reinstall` a pin by using the on-disk state of tracked files without having to commit them to the repo. This new model would result in a system that is less brittle, easier to use and easier to understand. I'm especially interested if this would satisfy the needs of the users who were proponents of the mixed mode which IIRC included both ThomasL and David Sheets.  
+   
+# The problem  
+
+The problem is that in general you should always be able to make `opam update -u` with peace of mind, that is without having to worry about the state of the *working* directory your pins' repositories. This may not be a problem for you if you have one or two pins, but it doesn't scale if you have tens of them.
+
+Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+
+For me the design of mixed-mode pins and pins in general does not acknowledge that the fact that a git's repo directory is a *working* directory whose state doesn't always represent something you would actually like opam to catch and (re)install on an `opam update -u`. You want to be able to tell opam exactly *when* it is allowed to consider the working directory as a state to catch.
+
+# A mental model of VCS pins
+
+For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+
+# Getting rid of mixed mode
+
+So what I propose is to drop mixed-mode and go back to the initial system we had with only path and VCS pins. The behaviour of `pin add` and pins is as follows:
+
+* pin add $PATH, a path pin that rsyncs $PATH
+* pin add -k $VCS $PATH#branch, a $VCS pin that tracks $PATH's repo branch #branch
+* pin add -k $VCS $PATH, a $VCS pin that tracks $PATH's repo's default branch
+
+The VCS pins simply upgrade whenever the corresponding branch updates.  
+
+# Recovering mixed-mode functionality
+
+As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `?dirty` or `?working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall ?dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall ?dirty PKG` which will force a reinstall.
+
+I think that this would make a much more usable and and conceptually clean model of VCS pins.
+
+But I'm curious if that would satisfy the users of mixed-mode pins.  
+
+Best,
+
+Daniel
+
+  
+
+
+
+
+
+
+
+
+
+
+
+
+From daniel.buenzli at erratique.ch  Sat May 16 08:24:34 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 16 May 2015 09:24:34 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+Message-ID: <9948F52F7D2142CD90181493CC8DEAD8@erratique.ch>
+
+> # Getting rid of mixed mode
+> 
+> So what I propose is to drop mixed-mode and go back to the initial system we had with only path and VCS pins. The behaviour of `pin add` and pins is as follows:
+> 
+> * pin add $PATH, a path pin that rsyncs $PATH
+> * pin add -k $VCS $PATH#branch, a $VCS pin that tracks $PATH's repo branch #branch
+> * pin add -k $VCS $PATH, a $VCS pin that tracks $PATH's repo's default branch
+> 
+> The VCS pins simply upgrade whenever the corresponding branch updates.
+Also this actually corresponds to what a remote VCS pin is and does. It feels right that the system does not differentiate in behaviour between local and remote VCS pins.
+
+
+Daniel
+
+
+
+From talex5 at gmail.com  Sat May 16 11:11:06 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Sat, 16 May 2015 11:11:06 +0100
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+Message-ID: <CAG4opy_n12sd57r5OrEHhDPLWZc0cctWEdyEsQENo1ySAZLF-w@mail.gmail.com>
+
+On 15 May 2015 at 22:10, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Hello,
+>
+> Having recently upgraded my opam installation to 1.2.1. I had the pleasure of having my pins unknowingly converted to git mixed-mode. (Bad) experiences with this further confirmed me that while I was not planning to use them these pins are an inherently bad idea. Since mixed-mode is the default when you pin a VCS I also claim that as currently implemented they make opam, by default, a much less usable system in practice.
+>
+> In this message I would like to both indicate what I think is wrong about mixed mode and propose an other way of having the functionality of mixed mode ? which I understand as being able to `opam reinstall` a pin by using the on-disk state of tracked files without having to commit them to the repo. This new model would result in a system that is less brittle, easier to use and easier to understand. I'm especially interested if this would satisfy the needs of the users who were proponents of the mixed mode which IIRC included both ThomasL and David Sheets.
+
+The problems with the two previous modes were:
+
+- In VCS mode, you make a change, recompile everything (which often
+takes ages), test it and eventually reaslise your change wasn't
+included because you didn't commit.
+
+- In path mode, it rsyncs files you don't want (setup.data, setup.log,
+etc), often leading to it installing the new files in the wrong place,
+or mysterious build failures.
+
+The new default seems to have fixed this, and I'm happy with it so
+far. Having an explicit --dirty flag wouldn't solve the problem for
+me, because if I could remember to use --dirty then I could remember
+to commit too.
+
+Since the old mode is still available, the question is just about
+choosing a default, which comes down to user expectations. My
+expectation is that pinning a directory gets you the directory, not a
+branch in its VCS, but only a user survey would reveal what other
+people expect.
+
+> # The problem
+>
+> The problem is that in general you should always be able to make `opam update -u` with peace of mind, that is without having to worry about the state of the *working* directory your pins' repositories. This may not be a problem for you if you have one or two pins, but it doesn't scale if you have tens of them.
+>
+> Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+>
+> For me the design of mixed-mode pins and pins in general does not acknowledge that the fact that a git's repo directory is a *working* directory whose state doesn't always represent something you would actually like opam to catch and (re)install on an `opam update -u`. You want to be able to tell opam exactly *when* it is allowed to consider the working directory as a state to catch.
+>
+> # A mental model of VCS pins
+>
+> For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+>
+> # Getting rid of mixed mode
+>
+> So what I propose is to drop mixed-mode and go back to the initial system we had with only path and VCS pins. The behaviour of `pin add` and pins is as follows:
+>
+> * pin add $PATH, a path pin that rsyncs $PATH
+> * pin add -k $VCS $PATH#branch, a $VCS pin that tracks $PATH's repo branch #branch
+> * pin add -k $VCS $PATH, a $VCS pin that tracks $PATH's repo's default branch
+>
+> The VCS pins simply upgrade whenever the corresponding branch updates.
+>
+> # Recovering mixed-mode functionality
+>
+> As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `?dirty` or `?working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall ?dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall ?dirty PKG` which will force a reinstall.
+>
+> I think that this would make a much more usable and and conceptually clean model of VCS pins.
+>
+> But I'm curious if that would satisfy the users of mixed-mode pins.
+>
+> Best,
+>
+> Daniel
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From daniel.buenzli at erratique.ch  Sat May 16 12:20:19 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 16 May 2015 13:20:19 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAG4opy_n12sd57r5OrEHhDPLWZc0cctWEdyEsQENo1ySAZLF-w@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAG4opy_n12sd57r5OrEHhDPLWZc0cctWEdyEsQENo1ySAZLF-w@mail.gmail.com>
+Message-ID: <CBB65E25D9CE4670BC1C6D167C80272E@erratique.ch>
+
+Le samedi, 16 mai 2015 ? 12:11, Thomas Leonard a ?crit :
+> The problems with the two previous modes were:
+>  
+> - In VCS mode, you make a change, recompile everything (which often
+> takes ages), test it and eventually reaslise your change wasn't
+> included because you didn't commit.
+>  
+
+I'm not sure I understand this. If you forget to commit, the pin will not update, so nothing will recompile when you do an `opam update -u` and hence I don't see what takes ages here.  
+
+It seems to me that the desire for mixed-mode was rather to avoid going through the pain of staging/committing/reamending a fix until you are sure it actually works. With that respect it seems to me that the ?dirty flags solves that problem quite well without the brittles of mixed-mode (and actually something I would be keen to use myself).
+
+I will also add that in practice mixed-mode can end up wasting a lot of your time as it can quickly ruin your opam install if you are not careful about the working directory of the pinned repo and that the package has many dependencies (case in point: cmdliner). Again, making sure that the working repo of each of your pin is in the right state whenever you `opam update -u` is unreasonable and cannot scale beyond a few pins.
+
+> Since the old mode is still available, the question is just about
+> choosing a default, which comes down to user expectations. My
+> expectation is that pinning a directory gets you the directory, not a
+> branch in its VCS, but only a user survey would reveal what other
+> people expect.
+>  
+
+I don't think we need a user survey here. Consistency can be our guide. The fact that at the moment:
+
+opam pin -k git $PATH
+opam pin -k git $URL
+
+differ widely in the operational end results should raise some flags.
+
+Best,
+
+Daniel
+
+From sheets at alum.mit.edu  Sat May 16 12:22:30 2015
+From: sheets at alum.mit.edu (David Sheets)
+Date: Sat, 16 May 2015 12:22:30 +0100
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+Message-ID: <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+
+On Fri, May 15, 2015 at 10:10 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Hello,
+>
+> Having recently upgraded my opam installation to 1.2.1. I had the pleasure of having my pins unknowingly converted to git mixed-mode. (Bad) experiences with this further confirmed me that while I was not planning to use them these pins are an inherently bad idea. Since mixed-mode is the default when you pin a VCS I also claim that as currently implemented they make opam, by default, a much less usable system in practice.
+>
+> In this message I would like to both indicate what I think is wrong about mixed mode and propose an other way of having the functionality of mixed mode ? which I understand as being able to `opam reinstall` a pin by using the on-disk state of tracked files without having to commit them to the repo. This new model would result in a system that is less brittle, easier to use and easier to understand. I'm especially interested if this would satisfy the needs of the users who were proponents of the mixed mode which IIRC included both ThomasL and David Sheets.
+>
+> # The problem
+>
+> The problem is that in general you should always be able to make `opam update -u` with peace of mind, that is without having to worry about the state of the *working* directory your pins' repositories. This may not be a problem for you if you have one or two pins, but it doesn't scale if you have tens of them.
+
+Thank you for writing this up. It really helps to have a lucid
+description of the problem and proposed solution. :-)
+
+I don't usually use `opam update -u` because I don't usually want to
+deal with whatever rebuilds and errors may occur. I like to know and
+directly approve of upgrades as they become necessary for other work.
+I think it's really valuable to have people developing with both lazy
+upgrade and eager upgrade strategies to cover the version-space. Many
+times, I've found incorrect version constraints due to this strategy
+(breakages in minor revs or point releases). Sometimes, I use `opam
+update -u` to clean up lagging versions. I do this maybe once a month
+when I explicitly think about it and not during interactive
+development.
+
+> Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+
+When developing with mixed mode, I typically stash changes that aren't
+compilable. I use `git add -p` and `git stash --keep-index` a lot for
+both the opam workflow and separating changes into logical commits.
+
+> For me the design of mixed-mode pins and pins in general does not acknowledge that the fact that a git's repo directory is a *working* directory whose state doesn't always represent something you would actually like opam to catch and (re)install on an `opam update -u`. You want to be able to tell opam exactly *when* it is allowed to consider the working directory as a state to catch.
+
+I think that, whatever the outcome of these discussions, the mixed VCS
+vs. explicit branch VCS modes should be made clearly distinct.
+
+> # A mental model of VCS pins
+>
+> For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+>
+> # Getting rid of mixed mode
+>
+> So what I propose is to drop mixed-mode and go back to the initial system we had with only path and VCS pins. The behaviour of `pin add` and pins is as follows:
+>
+> * pin add $PATH, a path pin that rsyncs $PATH
+> * pin add -k $VCS $PATH#branch, a $VCS pin that tracks $PATH's repo branch #branch
+> * pin add -k $VCS $PATH, a $VCS pin that tracks $PATH's repo's default branch
+
+Afaik, git conventionally uses 'master' but this is only convention
+and there is no mechanism to change this. Is that correct?
+
+> The VCS pins simply upgrade whenever the corresponding branch updates.
+>
+> # Recovering mixed-mode functionality
+>
+> As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `?dirty` or `?working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall ?dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall ?dirty PKG` which will force a reinstall.
+
+If we go this route, I'd like a short form of the flag. Also, I
+believe it should be added to `opam upgrade` as well.
+
+What happens with a branch pin that is dirty-updated? Does it take the
+working tree or only the working tree if the branch is the same? Or
+the working tree with the file filter of the branch specified? It
+seems that working tree filtered by *current* branch is simplest which
+you suggested.
+
+> I think that this would make a much more usable and and conceptually clean model of VCS pins.
+
+This is definitely a cleaner model than what we currently have. Do you
+have objections against a solution using a pin parameter like `opam
+pin -k git+dirty repo` which would behave as mixed mode currently does
+except imply `--dirty` on relevant operations? I believe you mentioned
+something about mode reduction in the GitHub thread regarding this. If
+that is your objection, could you please elaborate on the distinction
+between the current pin kind modes, the command-line mode you've
+proposed, and the `+dirty` mode?
+
+> But I'm curious if that would satisfy the users of mixed-mode pins.
+
+As Thomas Leonard says, it has the new potential for surprise (and
+another default behavior change) but it is definitely much improved
+from the current situation.
+
+> Best,
+
+Thanks,
+
+David
+
+> Daniel
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From daniel.buenzli at erratique.ch  Sat May 16 14:00:14 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 16 May 2015 15:00:14 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+Message-ID: <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+
+Le samedi, 16 mai 2015 ? 13:22, David Sheets a ?crit :
+> I don't usually use `opam update -u`
+
+Right me neither, I do both operations in sequence but usually don't have a close look at the proposition. I tend to trust the work of the opam repo maintainers (shouldn't I ?).
+  
+> I think that, whatever the outcome of these discussions, the mixed VCS
+> vs. explicit branch VCS modes should be made clearly distinct.
+
+Yes, that was my initial reaction and proposal in this comment:  
+
+https://github.com/ocaml/opam/issues/2141#issuecomment-101994075
+
+But by thinking more about this, I had the impression that we could kill a few concepts and get a simpler and better system for the end-user.  
+  
+> Afaik, git conventionally uses 'master' but this is only convention
+> and there is no mechanism to change this. Is that correct?
+
+In fact if we wanted to be consistent with what a `git clone` would do (the least surprising in my opinion), we should maybe rather take the repository's current active branch whenever we `opam pin -k git $PATH`.
+
+> What happens with a branch pin that is dirty-updated? Does it take the
+> working tree or only the working tree if the branch is the same?
+
+I would say let's keep this simple. This should mean: take the on-disk state of git-tracked files currently checked out in the working directory of the pin's git repo. Don't lookup branch information.
+  
+> Or the working tree with the file filter of the branch specified? It
+> seems that working tree filtered by *current* branch is simplest which
+> you suggested.
+
+Not sure what you mean by file-filter. If you mean only take the on-disk state of the git-tracked files that are checked out in the working directory *and* are also tracked by the branch then I think the semantics is too tricky.  
+
+I really want this to be obvious: now look at all the git-tracked files in the repo's working directory and try to use this for installing. (For this reason ?working-dir may be a better name than ?dirty, also it happens that `-w` is not used whereas `-d` is).
+  
+> > I think that this would make a much more usable and and conceptually clean model of VCS pins.
+>  
+> This is definitely a cleaner model than what we currently have. Do you
+> have objections against a solution using a pin parameter like `opam
+> pin -k git+dirty repo` which would behave as mixed mode currently does
+> except imply `--dirty` on relevant operations?
+
+Did you mean "would behave as mixed mode currently does *by* implying `?dirty` on relevant operations ?"
+
+No strong objection, but my initial aim was to try to reduce the pin modes to simplify the system both conceptually and from an implementation point of view. To me non automatic ?dirty seems to be the only sane way of working with VCS pins if you need to scale. If you need something that always auto-syncs on sources you can still use path pins (as long as you do not build anything in them).
+
+It seems [1] that Louis tried to avoid having explicit dirty modes as it doubles the number of modes, but I think that by doing so the pin system became semantically much too obscure (cf. the comment I mentioned above).  
+  
+[1] https://github.com/ocaml/opam/issues/2033#issuecomment-76321338
+
+Best,
+
+Daniel
+
+
+
+
+From sheets at alum.mit.edu  Sat May 16 14:40:30 2015
+From: sheets at alum.mit.edu (David Sheets)
+Date: Sat, 16 May 2015 14:40:30 +0100
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+ <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+Message-ID: <CAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR=Bsmfotsu-jx1Ghw@mail.gmail.com>
+
+On Sat, May 16, 2015 at 2:00 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le samedi, 16 mai 2015 ? 13:22, David Sheets a ?crit :
+>> I don't usually use `opam update -u`
+>
+> Right me neither, I do both operations in sequence but usually don't have a close look at the proposition. I tend to trust the work of the opam repo maintainers (shouldn't I ?).
+
+As we bring more test systems online and automate their integration,
+yes, this will become safer. My primary reason for lazily upgrading is
+timeliness. I prefer to let the solver determine the minimal plan to
+satisfy my requirements. I definitely trust the opam repo maintainers
+more than I should for package lower bounds and this is one aspect of
+repository health that we're working on with increased testing.
+
+>> I think that, whatever the outcome of these discussions, the mixed VCS
+>> vs. explicit branch VCS modes should be made clearly distinct.
+>
+> Yes, that was my initial reaction and proposal in this comment:
+>
+> https://github.com/ocaml/opam/issues/2141#issuecomment-101994075
+>
+> But by thinking more about this, I had the impression that we could kill a few concepts and get a simpler and better system for the end-user.
+
+Indeed I believe the current meaning could be simplified and
+clarified. My recollection is that we realized that defaulting to VCS
+pins *alone* required too much VCS manipulation in the simplest cases
+of new users or small pin counts. In response to that issue, Louis
+expediently and cleverly devised the current mixed mode pinning. I
+agree it could use revision and, retrospectively, explicit dirty
+requests would have been a cleaner design.
+
+>> Afaik, git conventionally uses 'master' but this is only convention
+>> and there is no mechanism to change this. Is that correct?
+>
+> In fact if we wanted to be consistent with what a `git clone` would do (the least surprising in my opinion), we should maybe rather take the repository's current active branch whenever we `opam pin -k git $PATH`.
+
+Agreed. This is the same VCS reference semantic that the mixed mode
+VCS pins currently have. This does make the VCS mode dependent on
+local working tree state and divergent from a remote repository but I
+believe this state is so small and 'obvious' as to be acceptable.
+
+>> What happens with a branch pin that is dirty-updated? Does it take the
+>> working tree or only the working tree if the branch is the same?
+>
+> I would say let's keep this simple. This should mean: take the on-disk state of git-tracked files currently checked out in the working directory of the pin's git repo. Don't lookup branch information.
+>
+>> Or the working tree with the file filter of the branch specified? It
+>> seems that working tree filtered by *current* branch is simplest which
+>> you suggested.
+>
+> Not sure what you mean by file-filter. If you mean only take the on-disk state of the git-tracked files that are checked out in the working directory *and* are also tracked by the branch then I think the semantics is too tricky.
+
+Yes. I think ignoring any branch pin in the case of working directory
+installs is a little strange but does make some kind of sense. After
+all, it is called working directory...
+
+> I really want this to be obvious: now look at all the git-tracked files in the repo's working directory and try to use this for installing. (For this reason ?working-dir may be a better name than ?dirty, also it happens that `-w` is not used whereas `-d` is).
+
+in the repo's working directory *on the currently checked out branch regardless*
+
+>> > I think that this would make a much more usable and and conceptually clean model of VCS pins.
+>>
+>> This is definitely a cleaner model than what we currently have. Do you
+>> have objections against a solution using a pin parameter like `opam
+>> pin -k git+dirty repo` which would behave as mixed mode currently does
+>> except imply `--dirty` on relevant operations?
+>
+> Did you mean "would behave as mixed mode currently does *by* implying `?dirty` on relevant operations ?"
+
+Yes, sorry for the confusion.
+
+> No strong objection, but my initial aim was to try to reduce the pin modes to simplify the system both conceptually and from an implementation point of view. To me non automatic ?dirty seems to be the only sane way of working with VCS pins if you need to scale. If you need something that always auto-syncs on sources you can still use path pins (as long as you do not build anything in them).
+
+I think it really depends on your development practices and/or use of
+indiscriminate upgrade. I'd be happy in a world where I have an escape
+hatch (--working-dir) from the VCS pin. "+dirty" simply retains the
+current behavior if desired or as default. I don't know if it's worth
+implementation for user consistency/quick-and-dirty introduction.
+
+I would like a message printed when pins are synced in a VCS mode that
+would sync differently in a dirty mode.
+
+> It seems [1] that Louis tried to avoid having explicit dirty modes as it doubles the number of modes, but I think that by doing so the pin system became semantically much too obscure (cf. the comment I mentioned above).
+
+It's like a higher-order pin mode ('path+dirty' = 'path'?).
+
+> [1] https://github.com/ocaml/opam/issues/2033#issuecomment-76321338
+
+Thanks,
+
+David
+
+From daniel.buenzli at erratique.ch  Sat May 16 15:08:07 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 16 May 2015 16:08:07 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR=Bsmfotsu-jx1Ghw@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+ <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+ <CAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR=Bsmfotsu-jx1Ghw@mail.gmail.com>
+Message-ID: <D7CDF84CE27444FB9317775DA826B859@erratique.ch>
+
+Le samedi, 16 mai 2015 ? 15:40, David Sheets a ?crit :
+> > In fact if we wanted to be consistent with what a `git clone` would do (the least surprising in my opinion), we should maybe rather take the repository's current active branch whenever we `opam pin -k git $PATH`.
+>  
+> Agreed. This is the same VCS reference semantic that the mixed mode
+> VCS pins currently have. This does make the VCS mode dependent on
+> local working tree state and divergent from a remote repository but I
+> believe this state is so small and 'obvious' as to be acceptable.
+
+Note to be sure we understood the same: we pick up the branch that is current whenever `opam pin -k git $PATH` is invoked and then sticks to that branch (so that the pin is not subject to working directory changes, my obsession).
+
+Daniel
+
+
+
+From kosmo.zb at gmail.com  Sat May 16 15:24:50 2015
+From: kosmo.zb at gmail.com (David Sheets)
+Date: Sat, 16 May 2015 15:24:50 +0100
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <D7CDF84CE27444FB9317775DA826B859@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+ <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+ <CAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR=Bsmfotsu-jx1Ghw@mail.gmail.com>
+ <D7CDF84CE27444FB9317775DA826B859@erratique.ch>
+Message-ID: <CAAWM5TyV3Ehy16pD35fNJB5VyW7BX0iD3TiQqOJJWCK6iA3azA@mail.gmail.com>
+
+On Sat, May 16, 2015 at 3:08 PM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le samedi, 16 mai 2015 ? 15:40, David Sheets a ?crit :
+>> > In fact if we wanted to be consistent with what a `git clone` would do (the least surprising in my opinion), we should maybe rather take the repository's current active branch whenever we `opam pin -k git $PATH`.
+>>
+>> Agreed. This is the same VCS reference semantic that the mixed mode
+>> VCS pins currently have. This does make the VCS mode dependent on
+>> local working tree state and divergent from a remote repository but I
+>> believe this state is so small and 'obvious' as to be acceptable.
+>
+> Note to be sure we understood the same: we pick up the branch that is current whenever `opam pin -k git $PATH` is invoked and then sticks to that branch (so that the pin is not subject to working directory changes, my obsession).
+
+Ah, I had not understood that. To ensure clarity, here are the two options:
+
+1. `opam pin -k git add $PKG $PATH` -> $PKG#$BRANCH
+2. `opam pin -k git add $PKG $PATH` -> $PKG which tracks the currently
+checked out branch
+
+I believe you propose 1 which removes branch-less pins altogether and
+does not refer to local state. I like this design. Re-pinning can be
+used to switch branches.
+
+From daniel.buenzli at erratique.ch  Sat May 16 15:40:24 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 16 May 2015 16:40:24 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAAWM5TyV3Ehy16pD35fNJB5VyW7BX0iD3TiQqOJJWCK6iA3azA@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+ <5F553E91F9FA4D94AA3D02C5784ED8E4@erratique.ch>
+ <CAAWM5TxP1kG6pHeDLYGR3B1LLGwGA5EepR=Bsmfotsu-jx1Ghw@mail.gmail.com>
+ <D7CDF84CE27444FB9317775DA826B859@erratique.ch>
+ <CAAWM5TyV3Ehy16pD35fNJB5VyW7BX0iD3TiQqOJJWCK6iA3azA@mail.gmail.com>
+Message-ID: <1F3276BEBE42461498DECCCE39B2087C@erratique.ch>
+
+Le samedi, 16 mai 2015 ? 16:24, David Sheets a ?crit :
+> Ah, I had not understood that. To ensure clarity, here are the two options:
+>  
+> 1. `opam pin -k git add $PKG $PATH` -> $PKG#$BRANCH
+> 2. `opam pin -k git add $PKG $PATH` -> $PKG which tracks the currently
+> checked out branch  
+
+In git terms:
+
+1. Tracks the result of `git symbolic-ref HEAD` at pin time.
+2. Tracks HEAD.
+  
+> I believe you propose 1 which removes branch-less pins altogether and
+> does not refer to local state. I like this design. Re-pinning can be
+> used to switch branches.
+
+Yes. That's exactly my impression.  
+
+Best,
+
+Daniel   
+
+
+
+From louis.gesbert at ocamlpro.com  Mon May 18 03:27:14 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 18 May 2015 11:27:14 +0900
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+Message-ID: <4808119.gUVmi0AQhx@agaric>
+
+Thanks Daniel for this review. I think the main mistake here was to advertise mixed-mode as VC pin, while it is functionnally much closer to *path* pin, simply adding a filter to the synched files -- and was indeed devised more as a fix for dirty files in path pins than as a workaround the need to commit in git, which was only an annoyance to those using it to get rid of build artefacts.
+
+> dsheets:
+> I don't usually use `opam update -u` because I don't usually want to
+> deal with whatever rebuilds and errors may occur. I like to know and
+> directly approve of upgrades as they become necessary for other work.
+> I think it's really valuable to have people developing with both lazy
+> upgrade and eager upgrade strategies to cover the version-space. Many
+> times, I've found incorrect version constraints due to this strategy
+> (breakages in minor revs or point releases). Sometimes, I use `opam
+> update -u` to clean up lagging versions. I do this maybe once a month
+> when I explicitly think about it and not during interactive
+> development.
+
+Exactly. I don't often run `opam upgrade` either, but yet have to admit I have already been bitten a couple times by Daniel's issue, which was quite easy to fix as I don't maintain as many interdependant packages.
+
+Note that unless you switch the package you work on in the middle of a change, this is mitigated if you directly test your package using OPAM. Of course, it's not realistic if you have other packages depending on it; and there is no easy way to rollback, since OPAM currently doesn't take binary snapshots and removes every dependent package first.
+
+Now what we wanted to support with mixed pins is more or less this:
+- Quickly trying a change on the trunk in an existing package (opam source --dev --pin)
+- Creating a new package with an easy round-trip for test and update (http://opam.ocaml.org/doc/Packaging.html) -- this requires a working dir pin.
+- It seems fair to expect that if I have some working directory and ask OPAM to pin to it, it will take its current state by default (having this not work only if the dir is VCed is a bit weird).
+
+I think the last is actually the main point here: less confusing when you start, and then we wanted mixed-mode as an improvement of path pins. Daniel is probably right that this should have nothing to do with users of `-k git`.
+
+> > Daniel:
+> > Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+
+Note that you might want to do `opam update --repositories` to not update your pinned packages' states: that would probably give you some more peace of mind.
+
+> > For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+
+Indeed, currently the default is to sync with `HEAD`; we could detect the checked out branch at pinning time and automatically pin to `git://xxx#branch` as was later suggested (for local pins only ?). Setting explicitely to `#HEAD` would remain available anyway -- existing pins without branch should be converted ?
+
+> > As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `?dirty` or `?working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall ?dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall ?dirty PKG` which will force a reinstall.
+
+It can be useful, but saves the need to commit without saving the need to _remember_ to commit (or use -w instead) ; as such it only half solves the problem IMHO...
+
+> What happens with a branch pin that is dirty-updated? Does it take the
+> working tree or only the working tree if the branch is the same?
+> 
+> > I would say let's keep this simple. This should mean: take the on-disk state
+> > of git-tracked files currently checked out in the working directory of the
+> > pin's git repo. Don't lookup branch information.
+
+Yes, branch in mixed-mode pin doesn't make sense, that's a reason why it's currently turned on when there is no explicit branch set. I can't see a case where you would want to take the list of tracked files from something else than HEAD.
+
+Here is another idea to explore -- we suppose ./ is git-controlled:
+```
+$ opam pin add -k git foo ./    # or
+$ opam pin add -k auto foo ./
+git pinned to currently checked out branch
+
+$ opam pin add foo ./
+[NOTE] ./ is git-controlled, but this will pin to the working directory directly. Use `--kind git` if you want OPAM to track the current git branch instead.
+Do you want to synchronise only the git-tracked files ? [Y/n] 
+```
+
+It amounts to having a separate path/git mixed mode, but the interface probably makes more sense. It could be made explicit with `-k path/git`.
+
+Daniel: see what happens when you're not using OPAM's dev branch ? ;)
+
+Cheers,
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150518/6db29a5e/attachment.sig>
+
+From daniel.buenzli at erratique.ch  Mon May 18 14:00:42 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 18 May 2015 15:00:42 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <4808119.gUVmi0AQhx@agaric>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <CAAWM5TyZTqNERzdvU0mBtZ0CLY5KrxEM2WXjZQK3MQfMQS2m1g@mail.gmail.com>
+ <4808119.gUVmi0AQhx@agaric>
+Message-ID: <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+
+Le lundi, 18 mai 2015 ? 04:27, Louis Gesbert a ?crit :
+> Now what we wanted to support with mixed pins is more or less this:
+> - Quickly trying a change on the trunk in an existing package (opam source --dev --pin)
+> - Creating a new package with an easy round-trip for test and update (http://opam.ocaml.org/doc/Packaging.html) -- this requires a working dir pin.
+
+I think these two cases are quite well supported by VCS pin + -w. The added benefit of -w is that once you are done with the task, the pin will automatically operate in a safe way (by which I mean not sensitive to working directory changes). This seems especially important for the first usage scenario since existing packages may have a lot of dependencies and thus the potential to ruin your opam install in case of problems.
+  
+> - It seems fair to expect that if I have some working directory and ask OPAM to pin to it, it will take its current state by default (having this not work only if the dir is VCed is a bit weird).
+
+What I understand here is that `opam pin add PATH` should default to some form of path pinning. I have no problem with this (being constrained by the "no magic rule").  
+  
+
+
+> > > For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+> >  
+>  
+> Indeed, currently the default is to sync with `HEAD`; we could detect the checked out branch at pinning time and automatically pin to `git://xxx#branch` as was later suggested (for local pins only ?). Setting explicitely to `#HEAD` would remain available anyway -- existing pins without branch should be converted ?
+
+My mental operational model of `opam -kgit add pin REPO` has always been (apparently wrong?):
+
+1. opam makes its own private `git clone REPO`  
+2. opam runs `git pull` on this clone on opam `update`
+
+regardless of whether R is a path or an url. If we agree on this model then yes the branch should be set to the branch seen at pin time since this is the way `git clone` works.
+
+Regarding converting existing non-mixed mode pins (if that still exists ?) I would say they should be converted to #HEAD so that they retain the previous semantics for existing installations.
+
+> > > As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `?dirty` or `?working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall ?dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall ?dirty PKG` which will force a reinstall.
+> It can be useful, but saves the need to commit without saving the need to _remember_ to commit (or use -w instead) ; as such it only half solves the problem IMHO...
+
+I still don't get this idea of forgetting to remember to commit. If you forget to commit the pin simply does not update and you see it immediately, so its cost is negligible and I don't think there is a real problem to solve here.  
+
+For me the problem to solve is *to have* (vs *to forget*) to commit  when you are working on a fix. In these situation, the fact that you have to commit, implies the sequence stage?commit?update?upgrade?(amend?update?upgrade)+ until satisfaction which involves a lot of painful VCS operations and is very costly.
+
+Here again if you forget the `-w` the pin will not update and you will quickly realize you forgot the `-w`. If you are a heavy user of working dir updates it will become a second nature to issue that `-w` when you update your pin (as it became a second nature to me to do a -kgit on my pin adds to avoid path pinning).
+
+> Yes, branch in mixed-mode pin doesn't make sense, that's a reason why it's currently turned on when there is no explicit branch set. I can't see a case where you would want to take the list of tracked files from something else than HEAD.
+>  
+> Here is another idea to explore -- we suppose ./ is git-controlled:
+> ```
+> $ opam pin add -k git foo ./ # or
+> $ opam pin add -k auto foo ./
+> git pinned to currently checked out branch
+
+I don't think there's the need to have an option for this, it can simply be mentioned in the docs that if you want this you need to pin on REPO#HEAD. I'm pretty sure that in practice what you want most of the time from a VCS pin is to have opam being decoupled from your working directory altogether.
+
+> $ opam pin add foo ./
+> [NOTE] ./ is git-controlled, but this will pin to the working directory directly. Use `--kind git` if you want OPAM to track the current git branch instead.
+> Do you want to synchronise only the git-tracked files ? [Y/n]  
+> ```
+
+I think you should add `and the .git dir` aswell to be precise. But then I would still claim that had we the `-w` this mode wouldn't be needed. What I don't like with the above is that the system encourages users to use unsafe pin modes and create brittle opam install for themselves. I would rather see the above invocation as simply path-pinning with the NOTE mentioning `-kgit`.
+
+> Daniel: see what happens when you're not using OPAM's dev branch ? ;)
+Aaah but it's because I trust you? I could have taken the beta though, but OTOH it's the kind of problems that you only see on longer term usage.   
+
+Best,
+
+Daniel
+
+
+
+
+
+From martin at lucina.net  Tue May 19 09:50:17 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 10:50:17 +0200
+Subject: [opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,
+	OPAM integration
+Message-ID: <20150519085016.GB10420@nodbug.lucina.net>
+
+[Re-sending with correct opam-devel address]
+
+Hi all,
+
+I'm working on getting OCaml and Mirage OS running on top of the rumprun
+unikernel stack[1].
+
+Rumprun provides a unikernel stack with a POSIXy (NetBSD-HEAD) userspace
+and can run on Xen, QEMU/KVM, bare metal and POSIX userspace.  The
+resulting Mirage + rumprun unikernel will thus be able to run on all of the
+platforms rumprun supports.
+
+The first step to get this working is building an OCaml cross compiler that
+uses the rumprun cross compiler as its backend for building C code and
+linking.
+
+I've researched the various cross-compilation options for OCaml and for now
+have based my code off the approach used by Peter Zotov in his
+`opam-android' repository[2].
+
+My work in progress OPAM repository is here:
+
+https://github.com/mato/opam-rumprun
+
+This is enough to get an OCaml "Hello, World" running on rumprun, and I've
+also tested that the Unix package works as expected. So far so good.
+
+However, in order to get Mirage to compile, I need to cross-compile Lwt and
+that does not work as expected:
+
+    $ OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -configure --prefix /home/mato/.opam/system/x86_64-rumprun-netbsd/ --disable-libev
+
+Results in:
+
+    not checking for pkg-config
+    not checking for libev
+    testing for pthread: ........................... unavailable
+    not checking for glib
+
+    The following recquired C libraries are missing: pthread.
+
+The reason this happens is that discover.ml is invoking the following
+compile command:
+
+/home/mato/projects/rumpkernel/rumprun/app-tools/rumprun-xen-cc -fno-defer-pop -Wall -D_FILE_OFFSET_BITS=64 -D_REENTRANT -c -I/usr/include -o /tmp/lwt_stubf12ac7.o -I/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/ocaml /tmp/lwt_stubf12ac7.c
+
+Note the inclusion of -I/usr/include -- this is presumably there so that
+the system OCaml compiler's headers are available, however it results in a
+conflict between the NetBSD headers provided by rumprun and the system
+headers.
+
+What can be done to fix the above? Should I be using a host compiler built
+and installed by OPAM rather than the system compiler (4.02.1-1ppa3~precise
+on Debian wheezy). [I'll try this and see if it helps...]
+
+I tried to hack around the problem by using --enable-android-target, that
+causes discover.ml to succeed and the build then proceeds, failing on a
+different problem:
+
+E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so' doesn't exist.")
+
+This is expected; the rumprun toolchain does not support dynamic linking
+and I have configured the ocaml-rumprun compiler with -no-shared-libs. Is
+there some way to tell OASIS to not expect any shared libraries to be
+built?
+
+General questions:
+
+1) Is this the right strategy for building an OCaml cross-compiler and
+integrating with OPAM?
+
+AFAICS there are multiple approaches being used in the wild and OCaml
+upstream *claims* to include support for cross-compiling via -host and
+-target, however that support is not actually functional?
+
+For the rumprun support to be as user-friendly as possible, we need an easy
+way of switching the backend rumprun cross-compiler and linker used by
+ocaml when the user wants to switch platforms or architectures. The
+approach used by the android repository I based my work off implies either:
+
+a) the user would have to *reinstall* the cross compiler (specifying eg.
+RUMPRUN_CC in the environment) and all packages using native code whenever
+they want to switch the backend compiler.
+
+b) we would have to provide different opam packages of the compiler and
+native libraries (Lwt) for each platform/arch combination supported by
+rumprun. This is unmanageable.
+
+2) Is there an easy way to switch ocamlc and the various other parts of the
+build system(s) involved into a verbose mode so that I can see what
+compilers are being invoked and why they fail? At the moment I'm using
+`strace' for this :-/
+
+All ideas and help much appreciated,
+
+Cheers,
+
+Martin
+
+[1] http://wiki.rumpkernel.org/Repo%3A-rumprun
+[2] https://github.com/whitequark/opam-android
+
+From whitequark at whitequark.org  Tue May 19 12:09:03 2015
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Tue, 19 May 2015 14:09:03 +0300
+Subject: [opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,
+	OPAM integration
+In-Reply-To: <20150519085016.GB10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+Message-ID: <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+
+On 2015-05-19 11:50, Martin Lucina wrote:
+> Rumprun provides a unikernel stack with a POSIXy (NetBSD-HEAD) 
+> userspace
+> and can run on Xen, QEMU/KVM, bare metal and POSIX userspace.  The
+> resulting Mirage + rumprun unikernel will thus be able to run on all of 
+> the
+> platforms rumprun supports.
+
+Nice!
+
+>     $ OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -configure --prefix
+> /home/mato/.opam/system/x86_64-rumprun-netbsd/ --disable-libev
+> 
+> Results in:
+> 
+>     not checking for pkg-config
+>     not checking for libev
+>     testing for pthread: ........................... unavailable
+>     not checking for glib
+> 
+>     The following recquired C libraries are missing: pthread.
+> 
+> The reason this happens is that discover.ml is invoking the following
+> compile command:
+> 
+> /home/mato/projects/rumpkernel/rumprun/app-tools/rumprun-xen-cc
+> -fno-defer-pop -Wall -D_FILE_OFFSET_BITS=64 -D_REENTRANT -c
+> -I/usr/include -o /tmp/lwt_stubf12ac7.o
+> -I/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/ocaml
+> /tmp/lwt_stubf12ac7.c
+> 
+> Note the inclusion of -I/usr/include -- this is presumably there so 
+> that
+> the system OCaml compiler's headers are available, however it results 
+> in a
+> conflict between the NetBSD headers provided by rumprun and the system
+> headers.
+> 
+> What can be done to fix the above? Should I be using a host compiler 
+> built
+> and installed by OPAM rather than the system compiler 
+> (4.02.1-1ppa3~precise
+> on Debian wheezy). [I'll try this and see if it helps...]
+
+No. This is an issue with Lwt's discover.ml script. You're going in
+the right direction below, though using --enable-android-target
+for this is a bit awkward.
+
+> 
+> I tried to hack around the problem by using --enable-android-target, 
+> that
+> causes discover.ml to succeed and the build then proceeds, failing on a
+> different problem:
+> 
+> E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+> doesn't exist.")
+> 
+> This is expected; the rumprun toolchain does not support dynamic 
+> linking
+> and I have configured the ocaml-rumprun compiler with -no-shared-libs. 
+> Is
+> there some way to tell OASIS to not expect any shared libraries to be
+> built?
+
+Nope. OASIS is painfully inflexible, especially when cross-compiling.
+You can probably patch setup.ml so that it thinks that the current
+OCaml is built without dynlink, but this is package-specific.
+
+> 
+> General questions:
+> 
+> 1) Is this the right strategy for building an OCaml cross-compiler and
+> integrating with OPAM?
+> 
+> AFAICS there are multiple approaches being used in the wild and OCaml
+> upstream *claims* to include support for cross-compiling via -host and
+> -target, however that support is not actually functional?
+
+Cross-compiling is not there yet. The switches are only half functional,
+if you're lucky.
+
+> 
+> For the rumprun support to be as user-friendly as possible, we need an 
+> easy
+> way of switching the backend rumprun cross-compiler and linker used by
+> ocaml when the user wants to switch platforms or architectures. The
+> approach used by the android repository I based my work off implies 
+> either:
+> 
+> a) the user would have to *reinstall* the cross compiler (specifying 
+> eg.
+> RUMPRUN_CC in the environment) and all packages using native code 
+> whenever
+> they want to switch the backend compiler.
+
+Correct. This is what opam-android uses.
+
+> 
+> b) we would have to provide different opam packages of the compiler and
+> native libraries (Lwt) for each platform/arch combination supported by
+> rumprun. This is unmanageable.
+
+This could be done with a script (horrible but functional).
+
+There was some talk over teaching OPAM that one package might be 
+installed
+in several 'variants', but there is no code to do that yet at all, and 
+it
+will probably be a substantial amount of work to integrate this with
+the dependency solver.
+
+opam-android would /greatly/ benefit from that as well, for much
+the same reasons.
+
+> 
+> 2) Is there an easy way to switch ocamlc and the various other parts of 
+> the
+> build system(s) involved into a verbose mode so that I can see what
+> compilers are being invoked and why they fail? At the moment I'm using
+> `strace' for this :-/
+
+ocamlfind c -verbose; ocamlc -verbose
+
+> 
+> All ideas and help much appreciated,
+> 
+> Cheers,
+> 
+> Martin
+> 
+> [1] http://wiki.rumpkernel.org/Repo%3A-rumprun
+> [2] https://github.com/whitequark/opam-android
+
+-- 
+Peter Zotov
+
+From thomas at gazagnaire.org  Tue May 19 12:49:43 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 19 May 2015 12:49:43 +0100
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+	Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519085016.GB10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+Message-ID: <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+
+Hi Martin,
+
+> My work in progress OPAM repository is here:
+> 
+> https://github.com/mato/opam-rumprun
+> 
+> This is enough to get an OCaml "Hello, World" running on rumprun, and I've
+> also tested that the Unix package works as expected. So far so good.
+
+That's really great! Looking forward to use MirageOS on bare metal :p
+
+> However, in order to get Mirage to compile, I need to cross-compile Lwt and
+> that does not work as expected:
+> 
+>    $ OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -configure --prefix /home/mato/.opam/system/x86_64-rumprun-netbsd/ --disable-libev
+> 
+> Results in:
+> 
+>    not checking for pkg-config
+>    not checking for libev
+>    testing for pthread: ........................... unavailable
+>    not checking for glib
+> 
+>    The following recquired C libraries are missing: pthread.
+> 
+> The reason this happens is that discover.ml is invoking the following
+> compile command:
+> 
+> /home/mato/projects/rumpkernel/rumprun/app-tools/rumprun-xen-cc -fno-defer-pop -Wall -D_FILE_OFFSET_BITS=64 -D_REENTRANT -c -I/usr/include -o /tmp/lwt_stubf12ac7.o -I/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/ocaml /tmp/lwt_stubf12ac7.c
+> 
+> Note the inclusion of -I/usr/include -- this is presumably there so that
+> the system OCaml compiler's headers are available, however it results in a
+> conflict between the NetBSD headers provided by rumprun and the system
+> headers.
+> 
+> What can be done to fix the above? Should I be using a host compiler built
+> and installed by OPAM rather than the system compiler (4.02.1-1ppa3~precise
+> on Debian wheezy). [I'll try this and see if it helps...]
+
+Lwt's discover.ml is unfortunately known to be very ad hoc and often breaks so I am not very surprised. Usually patches to fix it sent upstream are kindly accepted (until someone be brave enough to completely rewrite that file). In the meantime, maybe passing `-use-pthread false` to discover.ml using `./configure --disable-pthread` could help.
+
+> I tried to hack around the problem by using --enable-android-target, that
+> causes discover.ml to succeed and the build then proceeds, failing on a
+> different problem:
+> 
+> E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so' doesn't exist.")
+> 
+> This is expected; the rumprun toolchain does not support dynamic linking
+> and I have configured the ocaml-rumprun compiler with -no-shared-libs. Is
+> there some way to tell OASIS to not expect any shared libraries to be
+> built?
+
+This is tricky, it requires a mix of ocamlbuild, oasis and oasis hackery. I found http://komar.bitcheese.net/en/howto_link_c_lib_statically_with_ocaml_app which might help.
+
+> 
+> General questions:
+> 
+> 1) Is this the right strategy for building an OCaml cross-compiler and
+> integrating with OPAM?
+> 
+> AFAICS there are multiple approaches being used in the wild and OCaml
+> upstream *claims* to include support for cross-compiling via -host and
+> -target, however that support is not actually functional?
+
+Where did you see these options? I've seen commits in OCaml trunk to have a better support for cross compilation, not totally sure what it the status of it though. Also, Andy Ray (in /cc) also started a similar effort to cross-compile ocaml to FPGA. I really hope all of this would converge, and that we can add the proper support for it in opam at one pont.
+
+Sorry to not be able to help much, but I think the topic is quite important one but very hard as it will need to be address problems in in the whole toolchain: ocaml, ocamlfind, ocamlbuild, oasis, opam, ... 
+
+> 2) Is there an easy way to switch ocamlc and the various other parts of the
+> build system(s) involved into a verbose mode so that I can see what
+> compilers are being invoked and why they fail? At the moment I'm using
+> `strace' for this :-/
+
+Unfortunately the tools have all separate option for this:
+
+ocamlfind -verbose
+ocamlbuild -classic-display
+opam <command> -verbose
+
+You can control opam verbosity via an environment variable but I don't think it's possible for the other tools.
+
+Best,
+Thomas
+
+> 
+> All ideas and help much appreciated,
+> 
+> Cheers,
+> 
+> Martin
+> 
+> [1] http://wiki.rumpkernel.org/Repo%3A-rumprun
+> [2] https://github.com/whitequark/opam-android
+> 
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+
+
+From martin at lucina.net  Tue May 19 14:58:07 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 15:58:07 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+Message-ID: <20150519135807.GD10420@nodbug.lucina.net>
+
+On Tuesday, 19.05.2015 at?14:09, Peter Zotov wrote:
+> >What can be done to fix the above? Should I be using a host
+> >compiler built
+> >and installed by OPAM rather than the system compiler
+> >(4.02.1-1ppa3~precise
+> >on Debian wheezy). [I'll try this and see if it helps...]
+> 
+> No. This is an issue with Lwt's discover.ml script. You're going in
+> the right direction below, though using --enable-android-target
+> for this is a bit awkward.
+
+I'll see what I can do to fix discover.ml better, but given that I know
+almost no OCaml it might take a while.
+
+> 
+> >
+> >I tried to hack around the problem by using
+> >--enable-android-target, that
+> >causes discover.ml to succeed and the build then proceeds, failing on a
+> >different problem:
+> >
+> >E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+> >doesn't exist.")
+> >
+> >This is expected; the rumprun toolchain does not support dynamic
+> >linking
+> >and I have configured the ocaml-rumprun compiler with
+> >-no-shared-libs. Is
+> >there some way to tell OASIS to not expect any shared libraries to be
+> >built?
+> 
+> Nope. OASIS is painfully inflexible, especially when cross-compiling.
+> You can probably patch setup.ml so that it thinks that the current
+> OCaml is built without dynlink, but this is package-specific.
+
+Turns out it's a two-line patch, at least in the case of Lwt:
+
+https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433
+
+> >AFAICS there are multiple approaches being used in the wild and OCaml
+> >upstream *claims* to include support for cross-compiling via -host and
+> >-target, however that support is not actually functional?
+> 
+> Cross-compiling is not there yet. The switches are only half functional,
+> if you're lucky.
+
+Yeah, I figured that out after battling with it for a day or so, then found
+your patches which mostly[*] worked.
+
+[*: It seems that the Github mirror at ocaml/ocaml is a bit slow, I was
+going to write about how I couldn't get your 4.02.02 compiler package to
+work without patches, but it looks like the commit for PR#6266 has landed
+on Github now, couldn't see it yesterday.]
+
+> >For the rumprun support to be as user-friendly as possible, we
+> >need an easy
+> >way of switching the backend rumprun cross-compiler and linker used by
+> >ocaml when the user wants to switch platforms or architectures. The
+> >approach used by the android repository I based my work off
+> >implies either:
+> >
+> >a) the user would have to *reinstall* the cross compiler
+> >(specifying eg.
+> >RUMPRUN_CC in the environment) and all packages using native code
+> >whenever
+> >they want to switch the backend compiler.
+> 
+> Correct. This is what opam-android uses.
+
+And, as I just found out now, it's not just the native packages, it's *all*
+packages that need to be rebuilt. So, for Mirage I'd have to produce
+-rumprun variants of all its dependent packages, right? This would include
+teaching the "mirage configure" script about them.
+
+This begs the question, why did you use the approach of building the
+cross-compiler as a normal OPAM package, rather than as a compiler package?
+
+If I understand correctly how "OPAM switch" works, then the latter option
+would at least get rid of the need to deal with the -android (or -rumprun)
+renaming of packages since each compiler has its own set of packages.
+
+Obviously, there'd still have to be some way of getting
+the OCAMLFIND_TOOLCHAIN and/or other cross-compilation patches into the
+system but at first glance it seems like it would be more flexible than
+adding suffixes to package names.
+
+Thoughts?
+
+Martin
+
+From martin at lucina.net  Tue May 19 15:12:51 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 16:12:51 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+Message-ID: <20150519141251.GF10420@nodbug.lucina.net>
+
+Hi Thomas,
+
+On Tuesday, 19.05.2015 at?12:49, Thomas Gazagnaire wrote:
+> Lwt's discover.ml is unfortunately known to be very ad hoc and often breaks so I am not very surprised. Usually patches to fix it sent upstream are kindly accepted (until someone be brave enough to completely rewrite that file). In the meantime, maybe passing `-use-pthread false` to discover.ml using `./configure --disable-pthread` could help.
+
+I can't disable pthread since that would leave it with no threading engine
+at all. As I wrote in my reply to Peter, I'll try and hack around the
+problem, or just abuse --enable-android-target for now.
+
+> > This is expected; the rumprun toolchain does not support dynamic linking
+> > and I have configured the ocaml-rumprun compiler with -no-shared-libs. Is
+> > there some way to tell OASIS to not expect any shared libraries to be
+> > built?
+> 
+> This is tricky, it requires a mix of ocamlbuild, oasis and oasis hackery. I found http://komar.bitcheese.net/en/howto_link_c_lib_statically_with_ocaml_app which might help.
+
+The problem is not telling the OCaml compiler not to build shared
+libraries, the cross compiler already knows not to do that. It's telling
+OASIS about the fact that the OCaml compiler it's using will not build
+shared libraries.
+
+> Where did you see these options? I've seen commits in OCaml trunk to have
+> a better support for cross compilation, not totally sure what it the
+> status of it though. Also, Andy Ray (in /cc) also started a similar
+> effort to cross-compile ocaml to FPGA. I really hope all of this would
+> converge, and that we can add the proper support for it in opam at one
+> pont.
+
+They are mentioned in the INSTALL file as early as OCaml 4.02.01, however
+as Peter confirmed they don't actually work without extra patches. What
+I've done is run OCaml configure on a NetBSD box and then hand-edited the
+result, and patched the 4.02.01 compiler with Peter's cross-compiling patch
+(https://github.com/whitequark/opam-android/blob/master/packages/ocaml-android32.4.02.1/files/patches/0002-Add-crude-cross-compiling-support.patch)
+
+In theory PR#6266 (https://github.com/ocaml/ocaml/commit/c1e26ad14aec62cefe3d5fb24cf8702caa39db2b) might fix these options to let me run OCaml configure directly against the rumprun cross compiler but I've not tried yet.
+
+> Sorry to not be able to help much, but I think the topic is quite important one but very hard as it will need to be address problems in in the whole toolchain: ocaml, ocamlfind, ocamlbuild, oasis, opam, ... 
+
+No problem, thanks for your input. I'm sure with enough persistence we'll
+get there.
+
+Martin
+
+From whitequark at whitequark.org  Tue May 19 15:15:42 2015
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Tue, 19 May 2015 17:15:42 +0300
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+	Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519135807.GD10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+Message-ID: <bfeaccab16596564cb4ecf775ae7bd70@whitequark.org>
+
+On 2015-05-19 16:58, Martin Lucina wrote:
+> This begs the question, why did you use the approach of building the
+> cross-compiler as a normal OPAM package, rather than as a compiler 
+> package?
+
+Because the cross-compiler needs a normal compiler (and its runtime)
+to build and execute. Because many packages (from camlp4 to ppx)
+depend on build-time components that execute on the host arch.
+You also still have to add suffix to the version number, or else
+there would be a conflict (I think).
+
+-- 
+Peter Zotov
+
+From martin at lucina.net  Tue May 19 15:39:35 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 16:39:35 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <bfeaccab16596564cb4ecf775ae7bd70@whitequark.org>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <bfeaccab16596564cb4ecf775ae7bd70@whitequark.org>
+Message-ID: <20150519143935.GG10420@nodbug.lucina.net>
+
+On Tuesday, 19.05.2015 at?17:15, Peter Zotov wrote:
+> On 2015-05-19 16:58, Martin Lucina wrote:
+> >This begs the question, why did you use the approach of building the
+> >cross-compiler as a normal OPAM package, rather than as a compiler
+> >package?
+> 
+> Because the cross-compiler needs a normal compiler (and its runtime)
+> to build and execute. Because many packages (from camlp4 to ppx)
+> depend on build-time components that execute on the host arch.
+> You also still have to add suffix to the version number, or else
+> there would be a conflict (I think).
+
+Wouldn't the presence of an external (non-OPAM) compiler on the host be
+enough to execute the cross-compiler and build-time code from packages?
+That's more or less what your patches already do to bootstrap the
+compiler...
+
+Martin
+
+From martin at lucina.net  Tue May 19 15:44:25 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 16:44:25 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519141251.GF10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+ <20150519141251.GF10420@nodbug.lucina.net>
+Message-ID: <20150519144425.GH10420@nodbug.lucina.net>
+
+On Tuesday, 19.05.2015 at?16:12, Martin Lucina wrote:
+> In theory PR#6266 (https://github.com/ocaml/ocaml/commit/c1e26ad14aec62cefe3d5fb24cf8702caa39db2b) might fix these options to let me run OCaml configure directly against the rumprun cross compiler but I've not tried yet.
+
+See also https://github.com/ocaml/ocaml/pull/182/commits which is another
+unrelated(?) effort by people doing an iOS port that Anil pointed me to.
+
+Would be great if this would all converge. What I don't understand is why
+upstream OCaml 4.02.01 claims to support cross-compilation but doesn't; was
+this original effort abandoned by upstream? If so, why?
+
+Martin
+
+
+From daniel.buenzli at erratique.ch  Tue May 19 15:48:22 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 19 May 2015 16:48:22 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519144425.GH10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+ <20150519141251.GF10420@nodbug.lucina.net>
+ <20150519144425.GH10420@nodbug.lucina.net>
+Message-ID: <58032E21FC304B29AF7973A5BF3ACDD7@erratique.ch>
+
+Le mardi, 19 mai 2015 ? 16:44, Martin Lucina a ?crit :
+> What I don't understand is why
+> upstream OCaml 4.02.01 claims to support cross-compilation but doesn't; was
+> this original effort abandoned by upstream? If so, why?
+
+Where do you see that ? This is news to me. Some work is being done right now [1] but I don't think anybody ever claimed there was support for cross-compilation in 4.02.   
+
+Daniel
+
+[1] http://caml.inria.fr/mantis/view.php?id=6266
+
+
+  
+
+
+
+From martin at lucina.net  Tue May 19 15:53:24 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Tue, 19 May 2015 16:53:24 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <58032E21FC304B29AF7973A5BF3ACDD7@erratique.ch>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+ <20150519141251.GF10420@nodbug.lucina.net>
+ <20150519144425.GH10420@nodbug.lucina.net>
+ <58032E21FC304B29AF7973A5BF3ACDD7@erratique.ch>
+Message-ID: <20150519145324.GI10420@nodbug.lucina.net>
+
+On Tuesday, 19.05.2015 at?16:48, Daniel B?nzli wrote:
+> Le mardi, 19 mai 2015 ? 16:44, Martin Lucina a ?crit :
+> > What I don't understand is why
+> > upstream OCaml 4.02.01 claims to support cross-compilation but doesn't; was
+> > this original effort abandoned by upstream? If so, why?
+> 
+> Where do you see that ? This is news to me. Some work is being done right now [1] but I don't think anybody ever claimed there was support for cross-compilation in 4.02.   
+
+In the 4.02.1 INSTALL file[1], which documents a "-target" option and says
+it will produce a cross-compiler.  The switch is even accepted by
+configure, but the guts don't actually work.
+
+Perhaps some commit snuck in to 4.02.1 which shouldn't have?
+
+Martin
+
+[1] https://github.com/ocaml/ocaml/blob/4.02.1/INSTALL#L68
+
+From gabriel.scherer at gmail.com  Tue May 19 15:57:37 2015
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Tue, 19 May 2015 16:57:37 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519145324.GI10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+ <20150519141251.GF10420@nodbug.lucina.net>
+ <20150519144425.GH10420@nodbug.lucina.net>
+ <58032E21FC304B29AF7973A5BF3ACDD7@erratique.ch>
+ <20150519145324.GI10420@nodbug.lucina.net>
+Message-ID: <CAPFanBFyUwtG-Lr4iTatihvrzQEPSbizgGtws8xzca4O2_tvPg@mail.gmail.com>
+
+Indeed, this seems to be a side-effect of the partial merge of Adrien
+Nader's patches; he was working on cross-compilation in trunk between
+releases 4.01 and 4.02.
+
+http://caml.inria.fr/mantis/view.php?id=5737
+https://github.com/ocaml/ocaml/commit/dda5f84f7c47de4cb1225de77ec723bacb06e905
+
+On Tue, May 19, 2015 at 4:53 PM, Martin Lucina <martin at lucina.net> wrote:
+
+> On Tuesday, 19.05.2015 at 16:48, Daniel B?nzli wrote:
+> > Le mardi, 19 mai 2015 ? 16:44, Martin Lucina a ?crit :
+> > > What I don't understand is why
+> > > upstream OCaml 4.02.01 claims to support cross-compilation but
+> doesn't; was
+> > > this original effort abandoned by upstream? If so, why?
+> >
+> > Where do you see that ? This is news to me. Some work is being done
+> right now [1] but I don't think anybody ever claimed there was support for
+> cross-compilation in 4.02.
+>
+> In the 4.02.1 INSTALL file[1], which documents a "-target" option and says
+> it will produce a cross-compiler.  The switch is even accepted by
+> configure, but the guts don't actually work.
+>
+> Perhaps some commit snuck in to 4.02.1 which shouldn't have?
+>
+> Martin
+>
+> [1] https://github.com/ocaml/ocaml/blob/4.02.1/INSTALL#L68
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150519/bd96bc60/attachment.html>
+
+From thomas at gazagnaire.org  Tue May 19 16:22:50 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 19 May 2015 16:22:50 +0100
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+	Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519135807.GD10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+Message-ID: <FAC10121-D961-42CB-B2D5-2058098D3346@gazagnaire.org>
+
+> And, as I just found out now, it's not just the native packages, it's *all*
+> packages that need to be rebuilt. So, for Mirage I'd have to produce
+> -rumprun variants of all its dependent packages, right? This would include
+> teaching the "mirage configure" script about them.
+
+We already partly do that to cross-compile the C stubs for Xen (such as gmp for the TLS stack to work on Xen). The upcoming 2.5.0 release of mirage will have improved support for this. See gmp-xen[1] and some ugly ocamlfind hackery to pass the right options at link time, used by mirage configure[2] when generating the Makefile.
+
+Clearly the situation will not scale well as we will have to patch every package using C stubs. I'm looking forward to have full support cross-compilation in the whole toolchain (to start with the build tools).
+
+--
+Thomas
+
+[1]: https://github.com/ocaml/opam-repository/tree/master/packages/gmp-xen/gmp-xen.6.0.0
+[2]: https://github.com/ocaml/opam-repository/blob/master/packages/zarith/zarith.1.3/files/xen_linkopts.patch
+[3]: https://github.com/mirage/mirage/blob/master/lib/mirage.ml#L2248
+
+> 
+> This begs the question, why did you use the approach of building the
+> cross-compiler as a normal OPAM package, rather than as a compiler package?
+> 
+> If I understand correctly how "OPAM switch" works, then the latter option
+> would at least get rid of the need to deal with the -android (or -rumprun)
+> renaming of packages since each compiler has its own set of packages.
+> 
+> Obviously, there'd still have to be some way of getting
+> the OCAMLFIND_TOOLCHAIN and/or other cross-compilation patches into the
+> system but at first glance it seems like it would be more flexible than
+> adding suffixes to package names.
+> 
+> Thoughts?
+> 
+> Martin
+> 
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+
+
+From no263 at dpmms.cam.ac.uk  Tue May 19 17:01:06 2015
+From: no263 at dpmms.cam.ac.uk (Nicolas Ojeda Bar)
+Date: Tue, 19 May 2015 17:01:06 +0100
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <FAC10121-D961-42CB-B2D5-2058098D3346@gazagnaire.org>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <FAC10121-D961-42CB-B2D5-2058098D3346@gazagnaire.org>
+Message-ID: <CAPunWhBFGhx7ROhGwC+D-coBH1FJSXLsTMDiYWx1RzP9RAx=Nw@mail.gmail.com>
+
+Just to add my 2 cents,
+
+I am currently hacking away at a RISC-V cross-compiler and so have
+been looking into the cross-compilation support quite a bit.
+I found that a recent commit to the 4.02 branch to be quite promising, see
+
+https://github.com/ocaml/ocaml/commit/f1f28e10ae4f7b76e7b92a2e72ce1fb8a33d86a9
+
+You can try this out by doing
+
+opam switch 4.02.0+trunk
+
+A couple of things that you need in order to use the cross-compilation support:
+- You need the host ocaml system to be the same version as the version
+of the cross-compiler (in this case, 4.02)
+- You need an ANSI C cross-compiler named <target>-gcc.
+- It is not possible to cross-compile between different word sizes
+(this is related to the use of Nativeint in the compiler and quite
+orthogonal to the build system issues).
+
+With this switch, I was eventually able to cross-compile the
+native-code compiler (and runtime system) to RISC-V.  Unfortunately I
+cannot yet test anything because I still need to port some assembly
+bits to plug in the runtime system into the generated programs, but
+the assembly generated looks promising.
+
+Best wishes,
+Nicolas
+
+
+On Tue, May 19, 2015 at 4:22 PM, Thomas Gazagnaire
+<thomas at gazagnaire.org> wrote:
+>> And, as I just found out now, it's not just the native packages, it's *all*
+>> packages that need to be rebuilt. So, for Mirage I'd have to produce
+>> -rumprun variants of all its dependent packages, right? This would include
+>> teaching the "mirage configure" script about them.
+>
+> We already partly do that to cross-compile the C stubs for Xen (such as gmp for the TLS stack to work on Xen). The upcoming 2.5.0 release of mirage will have improved support for this. See gmp-xen[1] and some ugly ocamlfind hackery to pass the right options at link time, used by mirage configure[2] when generating the Makefile.
+>
+> Clearly the situation will not scale well as we will have to patch every package using C stubs. I'm looking forward to have full support cross-compilation in the whole toolchain (to start with the build tools).
+>
+> --
+> Thomas
+>
+> [1]: https://github.com/ocaml/opam-repository/tree/master/packages/gmp-xen/gmp-xen.6.0.0
+> [2]: https://github.com/ocaml/opam-repository/blob/master/packages/zarith/zarith.1.3/files/xen_linkopts.patch
+> [3]: https://github.com/mirage/mirage/blob/master/lib/mirage.ml#L2248
+>
+>>
+>> This begs the question, why did you use the approach of building the
+>> cross-compiler as a normal OPAM package, rather than as a compiler package?
+>>
+>> If I understand correctly how "OPAM switch" works, then the latter option
+>> would at least get rid of the need to deal with the -android (or -rumprun)
+>> renaming of packages since each compiler has its own set of packages.
+>>
+>> Obviously, there'd still have to be some way of getting
+>> the OCAMLFIND_TOOLCHAIN and/or other cross-compilation patches into the
+>> system but at first glance it seems like it would be more flexible than
+>> adding suffixes to package names.
+>>
+>> Thoughts?
+>>
+>> Martin
+>>
+>> _______________________________________________
+>> MirageOS-devel mailing list
+>> MirageOS-devel at lists.xenproject.org
+>> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From adrien at notk.org  Tue May 19 19:27:23 2015
+From: adrien at notk.org (Adrien Nader)
+Date: Tue, 19 May 2015 20:27:23 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <CAPFanBFyUwtG-Lr4iTatihvrzQEPSbizgGtws8xzca4O2_tvPg@mail.gmail.com>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <0671D956-7339-455E-8D07-FCB1BFC47924@gazagnaire.org>
+ <20150519141251.GF10420@nodbug.lucina.net>
+ <20150519144425.GH10420@nodbug.lucina.net>
+ <58032E21FC304B29AF7973A5BF3ACDD7@erratique.ch>
+ <20150519145324.GI10420@nodbug.lucina.net>
+ <CAPFanBFyUwtG-Lr4iTatihvrzQEPSbizgGtws8xzca4O2_tvPg@mail.gmail.com>
+Message-ID: <20150519182723.GA11500@notk.org>
+
+Hi,
+
+Thanks for Cc'ing me.
+
+I'm sorry, the mail got a bit long and I'm a quite tired so if anything
+isn't clear, don't hesitate to give up reading the sentence or paragraph
+and ask for a clarification.
+
+
+The work needed to properly support cross-compilation, including for
+Windows, is bigger than what we had thought at first. Back then I was
+able to find some more time but then it got clear that we had to put
+things into perspective and use a new approach.
+
+So far there's part of the infrastructure (configure for instance) but
+not everything. It was never intended by me that 4.02 advertised
+OOTB cross-compilation support. It was still thought that there would be
+work needed by each set of people building their cross-compilers but
+that at least that work would be reduced.
+
+I was also very very reluctant to advertise it early because of the
+"oh-shiny" factor: there are some hidden bugs and people rushing on
+cross-compilation will mostly get them broken binaries. One example I
+got was a top-level value not being initialized; think about it for a
+second, it's very difficult to spot, can go unnoticed for a long time
+and can have very bad consequences.
+
+It seems that it mostly worked and not too many people tried to jump on
+it.
+
+I know Peter had some fairly good results for Android. That was
+completely out of my scope and there are some heavy differences caused
+by the Makefile.nt files (among others) so his setup was really simpler
+than mine. Nevertheless I'd really prefer that support got more complete
+before featuring cross as non-beta.
+
+The reason these commits made it in 4.02 is that, well, back then 4.02
+was still called "pre", i.e. was under development. The commits also
+didn't negatively impact what was already there yet had to be merged
+because the time to rebase the patch-set was longer than the time
+between two needs to do it.
+
+Currently I'm a bit overloaded with work but we're down to one week
+before release at work so that should really free time. The approach I
+chose now is to split things some more inside OCaml in order to be able
+to actually get some progress: the current build system is very brittle.
+
+I started http://caml.inria.fr/mantis/view.php?id=6773 which splits
+apart the build of the non-compiler executables and after that, their
+Makefile.nt files can be easily killed (needs some work but not much).
+Once that is done, the other Makefile.nt files need to be killed and
+from my short testing it'll be much simpler than it currently is. They
+have been a large time sink for the cross-compilation work and should
+really be removed first.
+
+Once these are done it is a matter of going back to bug 5737, check the
+patchlist and look at what's not done yet. The scope should be reduced
+so much compared to when I started that I expect the changes to be much
+simpler.
+
+-- 
+Adrien Nader
+
+On Tue, May 19, 2015, Gabriel Scherer wrote:
+> Indeed, this seems to be a side-effect of the partial merge of Adrien
+> Nader's patches; he was working on cross-compilation in trunk between
+> releases 4.01 and 4.02.
+> 
+> http://caml.inria.fr/mantis/view.php?id=5737
+> https://github.com/ocaml/ocaml/commit/dda5f84f7c47de4cb1225de77ec723bacb06e905
+> 
+> On Tue, May 19, 2015 at 4:53 PM, Martin Lucina <martin at lucina.net> wrote:
+> 
+> > On Tuesday, 19.05.2015 at 16:48, Daniel B?nzli wrote:
+> > > Le mardi, 19 mai 2015 ? 16:44, Martin Lucina a ?crit :
+> > > > What I don't understand is why
+> > > > upstream OCaml 4.02.01 claims to support cross-compilation but
+> > doesn't; was
+> > > > this original effort abandoned by upstream? If so, why?
+> > >
+> > > Where do you see that ? This is news to me. Some work is being done
+> > right now [1] but I don't think anybody ever claimed there was support for
+> > cross-compilation in 4.02.
+> >
+> > In the 4.02.1 INSTALL file[1], which documents a "-target" option and says
+> > it will produce a cross-compiler.  The switch is even accepted by
+> > configure, but the guts don't actually work.
+> >
+> > Perhaps some commit snuck in to 4.02.1 which shouldn't have?
+> >
+> > Martin
+> >
+> > [1] https://github.com/ocaml/ocaml/blob/4.02.1/INSTALL#L68
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+> >
+
+From whitequark at whitequark.org  Tue May 19 19:35:42 2015
+From: whitequark at whitequark.org (Peter Zotov)
+Date: Tue, 19 May 2015 21:35:42 +0300
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+	Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519143935.GG10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <bfeaccab16596564cb4ecf775ae7bd70@whitequark.org>
+ <20150519143935.GG10420@nodbug.lucina.net>
+Message-ID: <e16672c645ad966d40434af5944e6df6@whitequark.org>
+
+On 2015-05-19 17:39, Martin Lucina wrote:
+> On Tuesday, 19.05.2015 at?17:15, Peter Zotov wrote:
+>> On 2015-05-19 16:58, Martin Lucina wrote:
+>> >This begs the question, why did you use the approach of building the
+>> >cross-compiler as a normal OPAM package, rather than as a compiler
+>> >package?
+>> 
+>> Because the cross-compiler needs a normal compiler (and its runtime)
+>> to build and execute. Because many packages (from camlp4 to ppx)
+>> depend on build-time components that execute on the host arch.
+>> You also still have to add suffix to the version number, or else
+>> there would be a conflict (I think).
+> 
+> Wouldn't the presence of an external (non-OPAM) compiler on the host be
+> enough to execute the cross-compiler and build-time code from packages?
+> That's more or less what your patches already do to bootstrap the
+> compiler...
+
+Yes. In fact, it works with the OPAM switch `system`. One problem is
+that it only works if the bitness of host/target matches due to
+a compiler issue, and another is that some people, like me, do not
+use system compilers at all.
+
+But, it does cover your use case anyway.
+
+> 
+> Martin
+
+-- 
+Peter Zotov
+
+From louis.gesbert at ocamlpro.com  Wed May 20 03:18:15 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 20 May 2015 11:18:15 +0900
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <4808119.gUVmi0AQhx@agaric> <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+Message-ID: <4382509.34tsiFjLMf@agaric>
+
+> What I understand here is that `opam pin add PATH` should default to some form of path pinning. I have no problem with this (being constrained by the "no magic rule").  
+
+Indeed -- but then it's fair to consider mixed mode as "some form of path pinning" :)
+
+> My mental operational model of `opam -kgit add pin REPO` has always been (apparently wrong?):
+> 
+> 1. opam makes its own private `git clone REPO`  
+> 2. opam runs `git pull` on this clone on opam `update`
+> 
+> regardless of whether R is a path or an url. If we agree on this model then yes the branch should be set to the branch seen at pin time since this is the way `git clone` works.
+> 
+> Regarding converting existing non-mixed mode pins (if that still exists ?) I would say they should be converted to #HEAD so that they retain the previous semantics for existing installations.
+
+Indeed, not how it worked, but that sounds fair enough. Shouldn't be too disruptive to current user if we print clearly "OPAM will track the xxx branch of ..." in the pinning message.
+
+> I still don't get this idea of forgetting to remember to commit. If you forget to commit the pin simply does not update and you see it immediately, so its cost is negligible and I don't think there is a real problem to solve here.  
+> 
+> For me the problem to solve is *to have* (vs *to forget*) to commit  when you are working on a fix. In these situation, the fact that you have to commit, implies the sequence stage?commit?update?upgrade?(amend?update?upgrade)+ until satisfaction which involves a lot of painful VCS operations and is very costly.
+> 
+> Here again if you forget the `-w` the pin will not update and you will quickly realize you forgot the `-w`. If you are a heavy user of working dir updates it will become a second nature to issue that `-w` when you update your pin (as it became a second nature to me to do a -kgit on my pin adds to avoid path pinning).
+
+hm, indeed your idea fits better into the "actively working on project y" / "working somewhere else". Maybe the new interface wouldn't cause problems if we use a message like:
+
+    No new commits on branch <branch> of <pkgname>; use
+    'opam update -w <pkgname>' if you want OPAM to temporarily use its
+    working directory.`
+
+this should probably only be printed on an explicit `opam update <pkgname>` though. Or more importantly on an explicit install/reinstall/upgrade (which triggers update automatically).
+
+> > $ opam pin add -k git foo ./ # or
+> > $ opam pin add -k auto foo ./
+> > git pinned to currently checked out branch
+> 
+> I don't think there's the need to have an option for this, it can simply be mentioned in the docs that if you want this you need to pin on REPO#HEAD. I'm pretty sure that in practice what you want most of the time from a VCS pin is to have opam being decoupled from your working directory altogether.
+
+Sorry, that wasn't clear, I did mean "currently checked out branch _at time of pinning_" in both cases. "auto" is just to detect the right VCS.
+
+> > $ opam pin add foo ./
+> > [NOTE] ./ is git-controlled, but this will pin to the working directory directly. Use `--kind git` if you want OPAM to track the current git branch instead.
+> > Do you want to synchronise only the git-tracked files ? [Y/n]  
+> 
+> I think you should add `and the .git dir` aswell to be precise. But then I would still claim that had we the `-w` this mode wouldn't be needed. What I don't like with the above is that the system encourages users to use unsafe pin modes and create brittle opam install for themselves. I would rather see the above invocation as simply path-pinning with the NOTE mentioning `-kgit`.
+
+Alright. My point was that "mixed" mode still seems more useful than raw "path" mode in general, so discarding the better one felt weird. But that's notwithstanding the complexity overhead that makes it harder to understand what's going on -- and this may be a good enough reason to tip the balance.
+
+> > Daniel: see what happens when you're not using OPAM's dev branch ? ;)
+> Aaah but it's because I trust you? I could have taken the beta though, but OTOH it's the kind of problems that you only see on longer term usage.   
+
+True enough. Well none of these changes seem too disruptive to not add in 1.3.
+
+Cheers,
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150520/dcf34b83/attachment.sig>
+
+From sylvain+ocaml at le-gall.net  Wed May 20 10:29:38 2015
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Wed, 20 May 2015 09:29:38 +0000
+Subject: [opam-devel] Cross-compiling OCaml, Mirage OS for rumprun,
+	OPAM integration
+In-Reply-To: <20150519085016.GB10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+Message-ID: <CAOCAUGNFOuyVJf8HUdqwhCHYZOAr1vhQ1Po3FR4HPosX4PS3iQ@mail.gmail.com>
+
+Le mar. 19 mai 2015 ? 10:50, Martin Lucina <martin at lucina.net> a ?crit :
+
+> [Re-sending with correct opam-devel address]
+>
+> Hi all,
+>
+> I'm working on getting OCaml and Mirage OS running on top of the rumprun
+> unikernel stack[1].
+>
+> Rumprun provides a unikernel stack with a POSIXy (NetBSD-HEAD) userspace
+> and can run on Xen, QEMU/KVM, bare metal and POSIX userspace.  The
+> resulting Mirage + rumprun unikernel will thus be able to run on all of the
+> platforms rumprun supports.
+>
+> The first step to get this working is building an OCaml cross compiler that
+> uses the rumprun cross compiler as its backend for building C code and
+> linking.
+>
+> I've researched the various cross-compilation options for OCaml and for now
+> have based my code off the approach used by Peter Zotov in his
+> `opam-android' repository[2].
+>
+> My work in progress OPAM repository is here:
+>
+> https://github.com/mato/opam-rumprun
+>
+> This is enough to get an OCaml "Hello, World" running on rumprun, and I've
+> also tested that the Unix package works as expected. So far so good.
+>
+> However, in order to get Mirage to compile, I need to cross-compile Lwt and
+> that does not work as expected:
+>
+>     $ OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -configure --prefix
+> /home/mato/.opam/system/x86_64-rumprun-netbsd/ --disable-libev
+>
+> Results in:
+>
+>     not checking for pkg-config
+>     not checking for libev
+>     testing for pthread: ........................... unavailable
+>     not checking for glib
+>
+>     The following recquired C libraries are missing: pthread.
+>
+> The reason this happens is that discover.ml is invoking the following
+> compile command:
+>
+> /home/mato/projects/rumpkernel/rumprun/app-tools/rumprun-xen-cc
+> -fno-defer-pop -Wall -D_FILE_OFFSET_BITS=64 -D_REENTRANT -c -I/usr/include
+> -o /tmp/lwt_stubf12ac7.o
+> -I/home/mato/.opam/system/x86_64-rumprun-netbsd/lib/ocaml
+> /tmp/lwt_stubf12ac7.c
+>
+> Note the inclusion of -I/usr/include -- this is presumably there so that
+> the system OCaml compiler's headers are available, however it results in a
+> conflict between the NetBSD headers provided by rumprun and the system
+> headers.
+>
+> What can be done to fix the above? Should I be using a host compiler built
+> and installed by OPAM rather than the system compiler (4.02.1-1ppa3~precise
+> on Debian wheezy). [I'll try this and see if it helps...]
+>
+> I tried to hack around the problem by using --enable-android-target, that
+> causes discover.ml to succeed and the build then proceeds, failing on a
+> different problem:
+>
+> E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+> doesn't exist.")
+>
+> This is expected; the rumprun toolchain does not support dynamic linking
+> and I have configured the ocaml-rumprun compiler with -no-shared-libs. Is
+> there some way to tell OASIS to not expect any shared libraries to be
+> built?
+>
+
+I suppose it will require to patch src/oasis/OASISLibrary l201 to have
+ext_lib be an option rather than a string. OASIS can be forked and PR sent
+on github, feel free to send a PR about that.
+
+
+>
+> General questions:
+>
+> 1) Is this the right strategy for building an OCaml cross-compiler and
+> integrating with OPAM?
+>
+> AFAICS there are multiple approaches being used in the wild and OCaml
+> upstream *claims* to include support for cross-compiling via -host and
+> -target, however that support is not actually functional?
+>
+> For the rumprun support to be as user-friendly as possible, we need an easy
+> way of switching the backend rumprun cross-compiler and linker used by
+> ocaml when the user wants to switch platforms or architectures. The
+> approach used by the android repository I based my work off implies either:
+>
+> a) the user would have to *reinstall* the cross compiler (specifying eg.
+> RUMPRUN_CC in the environment) and all packages using native code whenever
+> they want to switch the backend compiler.
+>
+> b) we would have to provide different opam packages of the compiler and
+> native libraries (Lwt) for each platform/arch combination supported by
+> rumprun. This is unmanageable.
+>
+> 2) Is there an easy way to switch ocamlc and the various other parts of the
+> build system(s) involved into a verbose mode so that I can see what
+> compilers are being invoked and why they fail? At the moment I'm using
+> `strace' for this :-/
+>
+> All ideas and help much appreciated,
+>
+> Cheers,
+>
+> Martin
+>
+> [1] http://wiki.rumpkernel.org/Repo%3A-rumprun
+> [2] https://github.com/whitequark/opam-android
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150520/cfe0a4b4/attachment-0001.html>
+
+From martin at lucina.net  Wed May 20 11:02:20 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Wed, 20 May 2015 12:02:20 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150519135807.GD10420@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+Message-ID: <20150520100220.GB5283@nodbug.lucina.net>
+
+On Tuesday, 19.05.2015 at?15:58, Martin Lucina wrote:
+> > >E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+> > >doesn't exist.")
+> > >
+> > >This is expected; the rumprun toolchain does not support dynamic
+> > >linking
+> > >and I have configured the ocaml-rumprun compiler with
+> > >-no-shared-libs. Is
+> > >there some way to tell OASIS to not expect any shared libraries to be
+> > >built?
+> > 
+> > Nope. OASIS is painfully inflexible, especially when cross-compiling.
+> > You can probably patch setup.ml so that it thinks that the current
+> > OCaml is built without dynlink, but this is package-specific.
+> 
+> Turns out it's a two-line patch, at least in the case of Lwt:
+> 
+> https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433
+
+Getting further through the list of Mirage dependencies, trying to get
+sexplib building for rumprun hits another different problem with OASIS:
+
+I use the following commands to build sexplib-rumprun, similar to what the
+android build does:
+
+  ["ocaml" "setup.ml" "-configure" "--prefix" "${prefix}/x86_64-rumprun-netbsd" "--disable-syntax"]
+  ["ocamlbuild" "-use-ocamlfind" "-just-plugin"]
+  ["env" "OCAMLFIND_TOOLCHAIN=rumprun" "ocaml" "setup.ml" "-build"]
+  ["env" "OCAMLFIND_TOOLCHAIN=rumprun" "ocaml" "setup.ml" "-install"]
+  ["find" sexplib:lib "-name" "pa_sexp_conv.*" "-exec" "ln" "-sf" "{}" "%{prefix}%/x86_64-rumprun-netbsd/lib/sexplib/" ";"] { type_conv-rumprun:installed }
+
+Now, sexplib tries to build a .cmxs which won't work with the rumprun
+toolchain, so I've patched its setup.ml to force native_dynlink to be
+false:
+
+https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch
+
+The problem I'm seeing is that if I run "opam install sexplib-rumprun
+--verbose", it fails in the setup.ml -install setup with a stack overflow:
+
+- Installed /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/sexplib_unix.cmx
+- Installed /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/META
+- E: Stack overflow
+[ERROR] The compilation of sexplib-rumprun failed at "env
+        OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -install".
+
+However: If I run the OPAM build commands from a shell in the build
+directory for sexplib, the install step works fine.
+
+Any ideas?
+
+Martin
+
+From martin at lucina.net  Wed May 20 11:43:08 2015
+From: martin at lucina.net (Martin Lucina)
+Date: Wed, 20 May 2015 12:43:08 +0200
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150520100220.GB5283@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <20150520100220.GB5283@nodbug.lucina.net>
+Message-ID: <20150520104308.GC5283@nodbug.lucina.net>
+
+On Wednesday, 20.05.2015 at?12:02, Martin Lucina wrote:
+> Getting further through the list of Mirage dependencies, trying to get
+> sexplib building for rumprun hits another different problem with OASIS:
+
+*facepalm* Ok, sorry, this was caused by a two-character typo:
+
+["ocaml" "setup.ml" "-configure" "--prefix" "${prefix}/x86_64-rumprun-netbsd" "--disable-syntax"]
+
+should have been
+
+["ocaml" "setup.ml" "-configure" "--prefix" "%{prefix}%/x86_64-rumprun-netbsd" "--disable-syntax"]
+
+Still, "Stack overflow" is not a terribly descriptive error :-)
+
+Sorry for the noise.
+
+Martin
+
+From anil at recoil.org  Wed May 20 11:58:19 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 20 May 2015 11:58:19 +0100
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+	Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150520104308.GC5283@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <20150520100220.GB5283@nodbug.lucina.net>
+ <20150520104308.GC5283@nodbug.lucina.net>
+Message-ID: <20365AE3-9561-4BCB-B845-81B42229B9A7@recoil.org>
+
+On 20 May 2015, at 11:43, Martin Lucina <martin at lucina.net> wrote:
+> 
+> On Wednesday, 20.05.2015 at 12:02, Martin Lucina wrote:
+>> Getting further through the list of Mirage dependencies, trying to get
+>> sexplib building for rumprun hits another different problem with OASIS:
+> 
+> *facepalm* Ok, sorry, this was caused by a two-character typo:
+> 
+> ["ocaml" "setup.ml" "-configure" "--prefix" "${prefix}/x86_64-rumprun-netbsd" "--disable-syntax"]
+> 
+> should have been
+> 
+> ["ocaml" "setup.ml" "-configure" "--prefix" "%{prefix}%/x86_64-rumprun-netbsd" "--disable-syntax"]
+> 
+> Still, "Stack overflow" is not a terribly descriptive error :-)
+> 
+
+That's definitely worth filing an upstream bug report about :-)
+
+-anil
+
+
+From daniel.buenzli at erratique.ch  Wed May 20 12:55:38 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 20 May 2015 13:55:38 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <4382509.34tsiFjLMf@agaric>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <4808119.gUVmi0AQhx@agaric>
+ <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+ <4382509.34tsiFjLMf@agaric>
+Message-ID: <9C014DA8D5554CA5BBCAEACD08BD367C@erratique.ch>
+
+Le mercredi, 20 mai 2015 ? 04:18, Louis Gesbert a ?crit :
+> Indeed, not how it worked, but that sounds fair enough. Shouldn't be too disruptive to current user if we print clearly "OPAM will track the xxx branch of ..." in the pinning message.
+I also think that the `pin list` dashboard should be more explicit, # at the end of the repo url are hard to parse. I would rather like to have that printed as
+$PKG git $BRANCH $REPO (instead of $PKG git $REPO#$BRANCH).
+
+> Or more importantly on an explicit install/reinstall/upgrade (which triggers update automatically).
+Aaah I think I now understand, this idea of forgetting to commit ThomasL was mentioning. If you `reinstall` then you may effectively not *see* that you forgot to commit since this *forces* the installation regardless. Are we missing a command that says "reinstall if there is a new commit" or is this simply `update -u PIN` ?
+
+> True enough. Well none of these changes seem too disruptive to not add in 1.3.
+I have opened an issue for this here https://github.com/ocaml/opam/issues/2156
+
+If you want me to make the issue more precise please tell. Also if you need help with the documentation bits update once the changes have been made (man page, general opam documentation) I can give a hand.
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Wed May 20 13:02:11 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 20 May 2015 14:02:11 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <9C014DA8D5554CA5BBCAEACD08BD367C@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <4808119.gUVmi0AQhx@agaric>
+ <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+ <4382509.34tsiFjLMf@agaric>
+ <9C014DA8D5554CA5BBCAEACD08BD367C@erratique.ch>
+Message-ID: <D8CAE327427D4EB7A06F71BC340FD7A8@erratique.ch>
+
+Sending Louis' answer to the list about the reinstall problem (I made an unwanted off-list glitch).  
+
+Message transmis :
+> De : Louis Gesbert <louis.gesbert at ocamlpro.com>
+> ? : Daniel B?nzli <daniel.buenzli at erratique.ch>
+> Date : mercredi, 20 mai 2015 13:53:58
+> Sujet : Re: [opam-devel] On the new mixed mode pins
+>  
+> > - Daniel B?nzli, 20/05/2015 12:42 -
+> > Le mercredi, 20 mai 2015 ? 04:18, Louis Gesbert a ?crit :
+> > > Indeed, not how it worked, but that sounds fair enough. Shouldn't be too disruptive to current user if we print clearly "OPAM will track the xxx branch of ..." in the pinning message.
+> >  
+> > I also think that the `pin list` dashboard should be more explicit, # at the end of the repo url are hard to parse. I would rather like to have that printed as
+> >  
+> > $PKG git $BRANCH $REPO (instead of $PKG git $REPO#$BRANCH).  
+> > > Or more importantly on an explicit install/reinstall/upgrade (which triggers update automatically).
+> >  
+> > Aaah I think I now understand, this idea of forgetting to commit ThomasL was mentioning. If you `reinstall` then you may effectively not *see* that you forgot to commit since this *forces* the installation regardless. Are we missing a command that says "reinstall if there is a new commit" or is this simply `update -u PIN` ?
+>  
+> Yes, `opam upgrade` does it. Also, due to some magic, `opam upgrade PIN` is sufficient, as it will first force an update of PIN. It's convenient, and harmless enough since it would generally make little sense otherwise.
+>  
+> > > True enough. Well none of these changes seem too disruptive to not add in 1.3.
+> > I have opened an issue for this here https://github.com/ocaml/opam/issues/2156  
+> >  
+> > If you want me to make the issue more precise please tell. Also if you need help with the documentation bits update once the changes have been made (man page, general opam documentation) I can give a hand.
+>  
+> Thanks! Your help in such matters is valuable.
+
+From talex5 at gmail.com  Wed May 20 13:40:17 2015
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Wed, 20 May 2015 13:40:17 +0100
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <D8CAE327427D4EB7A06F71BC340FD7A8@erratique.ch>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <4808119.gUVmi0AQhx@agaric>
+ <50B69F36C78E455099E95C3FAE2636C9@erratique.ch>
+ <4382509.34tsiFjLMf@agaric>
+ <9C014DA8D5554CA5BBCAEACD08BD367C@erratique.ch>
+ <D8CAE327427D4EB7A06F71BC340FD7A8@erratique.ch>
+Message-ID: <CAG4opy_hPJ82Urp=h40RQVr52CokgqNBF-ajwFHKE7JzL32qGA@mail.gmail.com>
+
+On 20 May 2015 at 13:02, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Sending Louis' answer to the list about the reinstall problem (I made an unwanted off-list glitch).
+>
+> Message transmis :
+>> De : Louis Gesbert <louis.gesbert at ocamlpro.com>
+>> ? : Daniel B?nzli <daniel.buenzli at erratique.ch>
+>> Date : mercredi, 20 mai 2015 13:53:58
+>> Sujet : Re: [opam-devel] On the new mixed mode pins
+>>
+>> > - Daniel B?nzli, 20/05/2015 12:42 -
+>> > Le mercredi, 20 mai 2015 ? 04:18, Louis Gesbert a ?crit :
+>> > > Indeed, not how it worked, but that sounds fair enough. Shouldn't be too disruptive to current user if we print clearly "OPAM will track the xxx branch of ..." in the pinning message.
+>> >
+>> > I also think that the `pin list` dashboard should be more explicit, # at the end of the repo url are hard to parse. I would rather like to have that printed as
+>> >
+>> > $PKG git $BRANCH $REPO (instead of $PKG git $REPO#$BRANCH).
+>> > > Or more importantly on an explicit install/reinstall/upgrade (which triggers update automatically).
+>> >
+>> > Aaah I think I now understand, this idea of forgetting to commit ThomasL was mentioning. If you `reinstall` then you may effectively not *see* that you forgot to commit since this *forces* the installation regardless. Are we missing a command that says "reinstall if there is a new commit" or is this simply `update -u PIN` ?
+>>
+>> Yes, `opam upgrade` does it. Also, due to some magic, `opam upgrade PIN` is sufficient, as it will first force an update of PIN. It's convenient, and harmless enough since it would generally make little sense otherwise.
+
+Ah, this is useful! I had indeed been using "reinstall" to test out
+changes. I'll try using "upgrade" now, since that also covers the case
+where you forgot to pin the directory at all (or unpinned it, or
+pinned it on a different switch).
+
+>> > > True enough. Well none of these changes seem too disruptive to not add in 1.3.
+>> > I have opened an issue for this here https://github.com/ocaml/opam/issues/2156
+>> >
+>> > If you want me to make the issue more precise please tell. Also if you need help with the documentation bits update once the changes have been made (man page, general opam documentation) I can give a hand.
+>>
+>> Thanks! Your help in such matters is valuable.
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+
+-- 
+Dr Thomas Leonard        http://roscidus.com/blog/
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From louis.gesbert at ocamlpro.com  Thu May 21 06:00:25 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 21 May 2015 14:00:25 +0900
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <CAG4opy_hPJ82Urp=h40RQVr52CokgqNBF-ajwFHKE7JzL32qGA@mail.gmail.com>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <D8CAE327427D4EB7A06F71BC340FD7A8@erratique.ch>
+ <CAG4opy_hPJ82Urp=h40RQVr52CokgqNBF-ajwFHKE7JzL32qGA@mail.gmail.com>
+Message-ID: <3143738.gXHQql48aK@agaric>
+
+> >> Yes, `opam upgrade` does it. Also, due to some magic, `opam upgrade PIN` is sufficient, as it will first force an update of PIN. It's convenient, and harmless enough since it would generally make little sense otherwise.
+> 
+> Ah, this is useful! I had indeed been using "reinstall" to test out
+> changes. I'll try using "upgrade" now, since that also covers the case
+> where you forgot to pin the directory at all (or unpinned it, or
+> pinned it on a different switch).
+
+I think the interface could still be improved though, as when prior installation failed, `upgrade` will return an error while `reinstall` will install normally after prompting for confirmation. You generally don't want to deal with different commands depending on the current state of the package when you're testing.
+
+In any case, `opam reinstall` could print a helpful `[NOTE]` when reinstalling a pinned/dev package that has no changes, just in case.
+
+Maybe an `opam build`, or `opam install --build-only` to only check but not install (and run recompilations of dependants) could be useful, too. But we already have too many options.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150521/deadc44a/attachment.sig>
+
+From sylvain+ocaml at le-gall.net  Thu May 21 08:00:14 2015
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Thu, 21 May 2015 07:00:14 +0000
+Subject: [opam-devel] [MirageOS-devel] Cross-compiling OCaml,
+ Mirage OS for rumprun, OPAM integration
+In-Reply-To: <20150520100220.GB5283@nodbug.lucina.net>
+References: <20150519085016.GB10420@nodbug.lucina.net>
+ <ead9b8457cfa0007dd71c32655cc6bf1@whitequark.org>
+ <20150519135807.GD10420@nodbug.lucina.net>
+ <20150520100220.GB5283@nodbug.lucina.net>
+Message-ID: <CAOCAUGP99HhCT8zbb9tAAn_ZWLqr87j2+tgeXkuFE3pSnZxdaA@mail.gmail.com>
+
+Le mer. 20 mai 2015 ? 12:02, Martin Lucina <martin at lucina.net> a ?crit :
+
+> On Tuesday, 19.05.2015 at 15:58, Martin Lucina wrote:
+> > > >E: Failure("Expected built file '_build/src/unix/dlllwt-unix_stubs.so'
+> > > >doesn't exist.")
+> > > >
+> > > >This is expected; the rumprun toolchain does not support dynamic
+> > > >linking
+> > > >and I have configured the ocaml-rumprun compiler with
+> > > >-no-shared-libs. Is
+> > > >there some way to tell OASIS to not expect any shared libraries to be
+> > > >built?
+> > >
+> > > Nope. OASIS is painfully inflexible, especially when cross-compiling.
+> > > You can probably patch setup.ml so that it thinks that the current
+> > > OCaml is built without dynlink, but this is package-specific.
+> >
+> > Turns out it's a two-line patch, at least in the case of Lwt:
+> >
+> >
+> https://github.com/mato/opam-rumprun/commit/3d3a9f0b46a21370c7b619e14cbfddec90acf433
+>
+> Getting further through the list of Mirage dependencies, trying to get
+> sexplib building for rumprun hits another different problem with OASIS:
+>
+> I use the following commands to build sexplib-rumprun, similar to what the
+> android build does:
+>
+>   ["ocaml" "setup.ml" "-configure" "--prefix"
+> "${prefix}/x86_64-rumprun-netbsd" "--disable-syntax"]
+>   ["ocamlbuild" "-use-ocamlfind" "-just-plugin"]
+>   ["env" "OCAMLFIND_TOOLCHAIN=rumprun" "ocaml" "setup.ml" "-build"]
+>   ["env" "OCAMLFIND_TOOLCHAIN=rumprun" "ocaml" "setup.ml" "-install"]
+>   ["find" sexplib:lib "-name" "pa_sexp_conv.*" "-exec" "ln" "-sf" "{}"
+> "%{prefix}%/x86_64-rumprun-netbsd/lib/sexplib/" ";"] {
+> type_conv-rumprun:installed }
+>
+> Now, sexplib tries to build a .cmxs which won't work with the rumprun
+> toolchain, so I've patched its setup.ml to force native_dynlink to be
+> false:
+>
+>
+> https://github.com/mato/opam-rumprun/blob/master/packages/sexplib-rumprun.112.24.01/files/patches/oasis-disable-dynlink.patch
+>
+>
+I think it would be far easier to add '--override native_dynlink false' to
+the configure step.
+
+
+> The problem I'm seeing is that if I run "opam install sexplib-rumprun
+> --verbose", it fails in the setup.ml -install setup with a stack overflow:
+>
+> - Installed
+> /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/sexplib_unix.cmx
+> - Installed
+> /home/mato/.opam/system/x86_64-rumprun-netbsd/lib/sexplib_unix/META
+> - E: Stack overflow
+> [ERROR] The compilation of sexplib-rumprun failed at "env
+>         OCAMLFIND_TOOLCHAIN=rumprun ocaml setup.ml -install".
+>
+> However: If I run the OPAM build commands from a shell in the build
+> directory for sexplib, the install step works fine.
+>
+> Any ideas?
+>
+> Martin
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20150521/9e66020e/attachment.html>
+
+From daniel.buenzli at erratique.ch  Thu May 21 10:11:17 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 21 May 2015 11:11:17 +0200
+Subject: [opam-devel] On the new mixed mode pins
+In-Reply-To: <3143738.gXHQql48aK@agaric>
+References: <8186A22AEF7E4CEF96ACBE4D5276A4CD@erratique.ch>
+ <D8CAE327427D4EB7A06F71BC340FD7A8@erratique.ch>
+ <CAG4opy_hPJ82Urp=h40RQVr52CokgqNBF-ajwFHKE7JzL32qGA@mail.gmail.com>
+ <3143738.gXHQql48aK@agaric>
+Message-ID: <08D229C11B994761BAD12C82FEED4ABB@erratique.ch>
+
+Le jeudi, 21 mai 2015 ? 07:00, Louis Gesbert a ?crit :
+> But we already have too many options.
+
+Yes. Maybe `opam upgrade` can simply prompt for installation if the package is not installed (like reinstall proposes to install IIRC). This would allow to consistently use `upgrade` for handling pins with clear signs if they do not update and use `reinstall` only for forcing reinstalls.  
+
+Daniel
+  
+  
+
+
+
+From cagdas.bozman at ocamlpro.com  Thu May 28 09:48:26 2015
+From: cagdas.bozman at ocamlpro.com (=?windows-1252?Q?=C7agdas_Bozman?=)
+Date: Thu, 28 May 2015 10:48:26 +0200
+Subject: [opam-devel] regular bulk builds: now with HTML output!
+In-Reply-To: <243EC830-6304-46FB-BEC7-117FD33D9E67@recoil.org>
+References: <243EC830-6304-46FB-BEC7-117FD33D9E67@recoil.org>
+Message-ID: <5566D65A.8010800@ocamlpro.com>
+
+On 01/08/2015 07:52 PM, Anil Madhavapeddy wrote:
+> http://www.recoil.org/~avsm/opam-bulk/  (temporary URL)
+
+This is very nice and useful ! How can we contribute to opam-bulk project ?
+
+-- ?agdas
+
+
+From thomas at gazagnaire.org  Sat May 30 19:19:59 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Sat, 30 May 2015 20:19:59 +0200
+Subject: [opam-devel] regular bulk builds: now with HTML output!
+In-Reply-To: <5566D65A.8010800@ocamlpro.com>
+References: <243EC830-6304-46FB-BEC7-117FD33D9E67@recoil.org>
+ <5566D65A.8010800@ocamlpro.com>
+Message-ID: <772F00A5-E161-4ECF-9805-01AE4FBF70F6@gazagnaire.org>
+
+> On 01/08/2015 07:52 PM, Anil Madhavapeddy wrote:
+>> http://www.recoil.org/~avsm/opam-bulk/  (temporary URL)
+> 
+> This is very nice and useful ! How can we contribute to opam-bulk project ?
+
+This is now live at http://opam.ocaml.org/builds/ (click on the SHA1s to get the build table).
+
+The source code is there: https://github.com/avsm/ocaml-docker-scripts
+
+Thomas
+
+

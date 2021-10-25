@@ -1,0 +1,152 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCADKNfh%2BFuBp6WcvMAs0_dgApRfXSep%2Be0VZpQCmLLnOQiceSXg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000335.html">
+   <LINK REL="Next"  HREF="000341.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCADKNfh%2BFuBp6WcvMAs0_dgApRfXSep%2Be0VZpQCmLLnOQiceSXg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">yminsky at gmail.com
+       </A><BR>
+    <I>Tue Mar 19 10:57:49 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000335.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000341.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#339">[ date ]</a>
+              <a href="thread.html#339">[ thread ]</a>
+              <a href="subject.html#339">[ subject ]</a>
+              <a href="author.html#339">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I agree with Leo that this seems like an awkward departure from the
+semantics of naming elsewhere in OCaml.
+
+For what it's worth, most of the time, namespace declarations will
+happen only at the beginning of a file, at which point Alain's
+semantics don't change anything.  I think that means that the
+precision he is looking for can most of the time be obtained without
+changing the semantics in the way he describes.
+
+y
+
+On Tue, Mar 19, 2013 at 6:11 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;<i> Consider the following piece of code:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>  module X = struct let x = 1 end
+</I>&gt;&gt;<i>  open namespace Foo
+</I>&gt;&gt;<i>  let a = X.x
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> and assume that there is a module Foo#X.  Would X.x refer to this module, or to the one defined defined on the first
+</I>&gt;&gt;<i> line?
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> While the second semantics may be easier to implement, it would be
+</I>&gt;<i> completely counter-intuitive to OCaml programmers.
+</I>&gt;<i>
+</I>&gt;&gt;<i> [...] I see only two ways to implement the first semantics:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>     - Scan the search path for all foo-*.cmi files when processing the &quot;open namespace&quot; statement (i.e. use Sys.readdir,
+</I>&gt;&gt;<i> and not only Sys.file_exists as today), in addition to the search path files.  This would probably work ok with most
+</I>&gt;&gt;<i> current build systems, but it would prevent from doing &quot;live&quot; discovery of dependencies by instrumentation of system
+</I>&gt;&gt;<i> calls (I've created a few years ago a toy build tool based on capturing calls to open/stat though LD_PRELOAD, and it
+</I>&gt;&gt;<i> worked quite well).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>     - Completely change the representation of the typing environments to maintain a list of &quot;layers&quot; made either of
+</I>&gt;&gt;<i> local scopes or namespace opens.
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Neither of these options seems particularly problematic to me. The
+</I>&gt;<i> first one might be more in line with checking that some &quot;foo-*.cmi&quot;
+</I>&gt;<i> exists when the Foo namespace is opened so that typos produce an error
+</I>&gt;<i> or warning. But if Sys.readdir is a problem then the second option is
+</I>&gt;<i> perfectly viable.
+</I>&gt;<i>
+</I>&gt;&gt;<i>   (ii) It allows to write more robust code w.r.t. to future additions to namespaces.  With namespaces, library authors
+</I>&gt;&gt;<i> won't hesitate to use &quot;short&quot; names for their modules and the risk is high that a &quot;open namespace&quot; statement hide local
+</I>&gt;&gt;<i> modules when the library is extended.
+</I>&gt;<i>
+</I>&gt;<i> This is basically just an argument against &quot;open namespace&quot; shadowing
+</I>&gt;<i> things but, as Yaron has said, OCaml uses shadowing all the time and it
+</I>&gt;<i> doesn't seem to have caused too many problems. If in doubt use explicit
+</I>&gt;<i> references instead of opens.
+</I>&gt;<i>
+</I>&gt;&gt;<i>   (iii) It makes dependency analysis more precise (and code easier to read).  In the example above, ocamldep knows (with
+</I>&gt;&gt;<i> the second semantics) that there is no dependency to an external unit X.
+</I>&gt;<i>
+</I>&gt;<i> This is no worse than how ocamldep currently handles modules contained
+</I>&gt;<i> within other modules.
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000335.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000341.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#339">[ date ]</a>
+              <a href="thread.html#339">[ thread ]</a>
+              <a href="subject.html#339">[ subject ]</a>
+              <a href="author.html#339">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

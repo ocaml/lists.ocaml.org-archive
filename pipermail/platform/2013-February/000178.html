@@ -1,0 +1,178 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512E413C.1060602%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000176.html">
+   <LINK REL="Next"  HREF="000179.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512E413C.1060602%40etorok.net%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Wed Feb 27 17:24:12 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000176.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000179.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#178">[ date ]</a>
+              <a href="thread.html#178">[ thread ]</a>
+              <a href="subject.html#178">[ subject ]</a>
+              <a href="author.html#178">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 02/27/2013 06:31 PM, Yaron Minsky wrote:
+&gt;<i> Let me try to summarize the current situation about the argument
+</I>&gt;<i> between Alain, Leo and myself.  I think Leo and I are roughly on the
+</I>&gt;<i> same page, but I may be missing things.
+</I>&gt;<i> 
+</I>&gt;<i> - MAKING LONG NAMES AVAILABLE.  Alain prefers to have unambiguous long
+</I>&gt;<i>   names that are usable in a first class way.  I find this mildly
+</I>&gt;<i>   distasteful, but would be OK with it as long as it was well hidden
+</I>&gt;<i>   from the user by default.  Long names shouldn't show up by default
+</I>&gt;<i>   in source files, error messages or documentation.  I view this as
+</I>&gt;<i>   quite important for usability of namespaces.
+</I>&gt;<i> 
+</I>&gt;<i> - SOURCE-LEVEL OPENS.  Alain would prefer to have namespace
+</I>&gt;<i>   manipulations restricted to the command line, and therefore the
+</I>&gt;<i>   build system.  He thinks of namespaces as something that should be
+</I>&gt;<i>   used pretty rarely (or at least, there should be very few
+</I>&gt;<i>   namespaces), and it's therefore OK to push them to the outside.
+</I>&gt;<i> 
+</I>&gt;<i>   Leo and I both believe this is a big mistake.  We expect opens to
+</I>&gt;<i>   happen fairly commonly, and for there to be many different libraries
+</I>&gt;<i>   that are organized as namespaces.
+</I>&gt;<i> 
+</I>&gt;<i>   Alain doubts that there would be many module-name clashes.  I
+</I>&gt;<i>   disagree on this point as does Leo.  We use packed modules
+</I>&gt;<i>   pervasively (for /every/ library), and as a result, we have lots of
+</I>&gt;<i>   little namespaces, and lots of repeated names within them (names
+</I>&gt;<i>   like Common, Protocol, Spec, Config, etc.)
+</I>&gt;<i> 
+</I>&gt;<i>   My biggest objection to having opens be at the build system level is
+</I>&gt;<i>   that it makes your code more ambiguous.  When you do namespace
+</I>&gt;<i>   manipulations, you very much want to see what's happening by
+</I>&gt;<i>   inspecting the source.  We have a vigorous code review system here,
+</I>&gt;<i>   and I don't want to start adding code review of the build rules to
+</I>&gt;<i>   it, and this change would require that.
+</I>&gt;<i> 
+</I>&gt;<i>   Alain's claim that opens are a bad thing also seems wrong to me.
+</I>&gt;<i>   opens should be rare, but all of our proposals involve the
+</I>&gt;<i>   equivalent of opening a namespace.  Alain is not saying we should
+</I>&gt;<i>   have none of that (after all, we're all glad that Pervasives is
+</I>&gt;<i>   opened!).  But what Alain is proposing is to make opening a
+</I>&gt;<i>   namespace silent at the source level.  This strikes me as a grave
+</I>&gt;<i>   error.
+</I>&gt;<i> 
+</I>&gt;<i> - NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+</I>&gt;<i>   namespace to also implicitly open some modules, this essentially
+</I>&gt;<i>   adding values to the search path in addition to modules.  I would be
+</I>&gt;<i>   sad to lose this feature, but I don't think it's absolutely
+</I>&gt;<i>   essential.  It would merely add boilerplate.  Roughly speaking,
+</I>&gt;<i>   every time a user of Core writes
+</I>&gt;<i> 
+</I>&gt;<i>      open namespace Core#Std
+</I>&gt;<i> 
+</I>&gt;<i>   instead of
+</I>&gt;<i> 
+</I>&gt;<i>      open namespace Core#Std
+</I>&gt;<i>      open Core#Std.Common
+</I>&gt;<i> 
+</I>&gt;<i>   they're making a mistake.  I'd like to avoid this error, and I don't
+</I>&gt;<i>   know really what the objection to the feature is, but in the worst
+</I>&gt;<i>   case, we can add a syntax extension to work around this problem,
+</I>&gt;<i>   using a -ppx transformer to add the open ourselves.
+</I>
+I'd like to add a suggestion  for the last last two requirements, from an OCaml user's perspective (i.e. not a platform/platform library implementor).
+I don't feel too strongly about what the exact syntax or build system requirements are for namespaces, its just a suggestion.
+
+core/std/common.mli:
+namespace Core#Std
+(* define a module Common in the Core#Std namespace.
+ *  Effect: rename module to Core#Std.Common in the .cmi *)
+....
+
+core/std/common.ml:
+namespace Core#Std
+(* define a module Common in the Core#Std namespace.
+ *  Effect: rename module to Core#Std.Common in the .cmi *)
+....
+
+Optionally one could also specify -root &lt;path&gt; on the cmdline to automatically create a namespace based on directory hierarchy.
+If both are specified its checked that they are equal, and if not an error is shown.
+
+core.mli:
+namespace Std = struct
+  module Core#Std.Common (* defines that this module is part of the namespace *)
+  module Core#SomethingElse.SomeOtherModule
+  open Core#Std.Common
+  (* defines the Core#Std namespace in the .cmi, and the list of default opens to Core#Std.Common *)
+  (* each namespace must have a .cmi named after its toplevel name
+end
+
+
+file_using_core.ml:
+open Core#Std (* this opens the Core#Std namespace, and the Core#Std.Common module *)
+(* Core#Std is of type 'namespace', so the compiler would know you open a namespace without having to explicitly say so with a keyword *)
+
+(* you could even write *)
+open Core (* opens Core namespace *)
+open Std.Common (* opens Core#Std.Common module *)
+
+namespace aliasing, and toplevel use:
+&gt;<i> namespace Foo = Core#Std
+</I>namespace Foo = &lt;
+  module Core#Std.Common: sig .... end
+  module Core#Std.SomeModule: sig .... end
+   ... all modules ...
+  open Core#Std.Common
+
+How to find the module Foo#Bar.M:
+ when searching for .cmi files:
+   look for foo.cmi, and check namespace definitions inside
+ when searching for .cmx/.cmo files (this is not optimal!):
+   look for m.cmx/m.cmo, and check that full module name is good, skip to next in search path if not
+ when searching for .cmxa/.cma files:
+   look for a foo.cmxa/foo.cma -&gt; defines all modules for namespace Foo.
+At link time only the modules that are actually used are kept (since opening a namespace doesn't have side-effects, unused namespaces/modules can be thrown away).
+
+Best regards,
+--Edwin
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000176.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000179.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#178">[ date ]</a>
+              <a href="thread.html#178">[ thread ]</a>
+              <a href="subject.html#178">[ subject ]</a>
+              <a href="author.html#178">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

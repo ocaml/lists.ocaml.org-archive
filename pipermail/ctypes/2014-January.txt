@@ -1,0 +1,596 @@
+From cgaebel at janestreet.com  Tue Jan  7 13:45:20 2014
+From: cgaebel at janestreet.com (Clark Gaebel)
+Date: Tue, 7 Jan 2014 08:45:20 -0500
+Subject: [ocaml-ctypes] Arrays from C to Ocaml
+Message-ID: <CAG8p3yU+Uj571E2VSd=QKGmemetP3UbkNu9psD0VnRFuqdzRyg@mail.gmail.com>
+
+What's the proper way in ctypes to interface with the following api:
+
+void read_some_data(context* ctx, void* buffer, int length);
+
+where read_some_data pulls some private data out of the given opaque
+context and writes it into the given buffer, without blocking internally.
+
+Ideally, I'd want something in OCaml that looks like:
+
+val read_some_data : ctx -> len:int -> string
+
+and the only way I see of doing this is going through bigstring first. But
+this means two copies: one from C -> bigstring and one from bigstring ->
+string.
+
+Is there a better way?
+
+  - Clark
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140107/47a52110/attachment.html>
+
+From yallop at gmail.com  Tue Jan  7 16:04:57 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 7 Jan 2014 16:04:57 +0000
+Subject: [ocaml-ctypes] Arrays from C to Ocaml
+In-Reply-To: <CAG8p3yU+Uj571E2VSd=QKGmemetP3UbkNu9psD0VnRFuqdzRyg@mail.gmail.com>
+References: <CAG8p3yU+Uj571E2VSd=QKGmemetP3UbkNu9psD0VnRFuqdzRyg@mail.gmail.com>
+Message-ID: <CAAxsn=EcYi+5-J3gBDzXsTKkup3Y9q7zZ+QzBAz500Uq8Sk2kw@mail.gmail.com>
+
+On 7 January 2014 13:45, Clark Gaebel <cgaebel at janestreet.com> wrote:
+> What's the proper way in ctypes to interface with the following api:
+>
+> void read_some_data(context* ctx, void* buffer, int length);
+>
+> where read_some_data pulls some private data out of the given opaque context
+> and writes it into the given buffer, without blocking internally.
+>
+> Ideally, I'd want something in OCaml that looks like:
+>
+> val read_some_data : ctx -> len:int -> string
+>
+> and the only way I see of doing this is going through bigstring first. But
+> this means two copies: one from C -> bigstring and one from bigstring ->
+> string.
+
+For the moment ctypes doesn't provide any way to pass OCaml heap
+addresses to C, so moving between OCaml strings and C arrays always
+involves a copy.
+
+From travis.brady at gmail.com  Tue Jan  7 16:49:37 2014
+From: travis.brady at gmail.com (Travis Brady)
+Date: Tue, 7 Jan 2014 10:49:37 -0600
+Subject: [ocaml-ctypes] Structs with malloc allocated fields
+In-Reply-To: <CAAxsn=HtWu=5rZNSLS9OkZgBMhBqAzfDgK2JZN3UM1SgYMMjGw@mail.gmail.com>
+References: <CABHK4nVYayyS00_DAn6t3=0t11Gh2fYfuhcViQ7os7=4fDWZFg@mail.gmail.com>
+ <CAAxsn=HtWu=5rZNSLS9OkZgBMhBqAzfDgK2JZN3UM1SgYMMjGw@mail.gmail.com>
+Message-ID: <CABHK4nUf4==a2Am2wJonnpT0zdE3HQRoQKns35henYczuKyvug@mail.gmail.com>
+
+Thank you, Jeremy.  This is exactly what I needed.
+
+Thank you as well for Ctypes, from my brief use so far it seems great.
+
+Travis
+
+
+On Tue, Dec 17, 2013 at 5:33 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 17 December 2013 04:46, Travis Brady <travis.brady at gmail.com> wrote:
+> > I'm wrapping a simple library that contains a few functions that call
+> malloc
+> > or realloc internally to allocate a few struct members and I'm wondering
+> how
+> > to make those behave with Ctypes and the GC.
+> >
+> > The library exposes structname_free functions where applicable, but I'm
+> not
+> > certain how to tell Ctypes how to use them or if I even need to at all.
+>
+> There are several possible approaches to consider.  One approach is to
+> simply write C-style code in OCaml, binding the structname_free
+> functions and explicitly calling them when you know that it's safe to
+> do so.  This will probably work best if the lifetime of the struct is
+> easy to predict -- for example, if it's associated with a file
+> descriptor or other resource that also needs to be explicitly
+> released.
+>
+> Another approach is to register the destructor functions with the GC
+> so that they're called automatically when ctypes no longer has a
+> reference to the memory.  This approach should work well where you're
+> allocating the memory from ctypes, since the hooks for registering
+> destructor functions are currently associated with the ctypes
+> allocation functions such as make
+> (http://ocamllabs.github.io/ocaml-ctypes/Ctypes.html#VALmake).
+>
+> Here's a simple example with a struct whose fields point to memory
+> dynamically allocated by C code.  The unmanaged_person function shows
+> the C-style approach, with explicit deallocation; the managed_person
+> function shows the GC-based approach, using the finaliser argument to
+> the make function to register the destructor:
+>
+>    $ cat example_stubs.c
+>    #include <stdlib.h>
+>    #include <string.h>
+>    #include <stdio.h>
+>
+>    struct person { char *name; int age; };
+>
+>    void initialize_person(struct person *p, const char *name, int age)
+>    {
+>      p->name = malloc(strlen(name) + 1);
+>      strcpy(p->name, name);
+>      p->age = age;
+>    }
+>
+>    void destroy_person(struct person *p)
+>    {
+>      printf("goodbye %s (age %d)\n", p->name, p->age);
+>      free(p->name);
+>    }
+>    $ cat example.ml
+>    open Ctypes
+>    open Foreign
+>
+>    type person
+>    let person : person structure typ = structure "person"
+>    let name = field person "name" string
+>    let age = field person "age" int
+>    let () = seal person
+>
+>    let initialize_person = foreign "initialize_person"
+>      (ptr person @-> string @-> int @-> returning void)
+>
+>    let destroy_person = foreign "destroy_person"
+>      (ptr person @-> returning void)
+>
+>    (* Allocate a `person' value, registering the destructor function
+> with the GC *)
+>    let managed_person ~name ~age =
+>      let p = make ~finalise:(fun p -> destroy_person (addr p)) person in
+>      initialize_person (addr p) name age;
+>      p
+>
+>    (* Allocate a `person' value that must be explicitly deallocated *)
+>    let unmanaged_person ~name ~age =
+>      let p = make person in
+>      initialize_person (addr p) name age;
+>      p
+>    $ ocamlfind ocamlc -c -package ctypes example_stubs.c example.ml
+>    $ ocamlmklib -o example example_stubs.o example.cmo
+>    $ ocaml
+>            OCaml version 4.01.0
+>
+>    # #use "topfind";;
+>    [...]
+>    # #require "ctypes.foreign";;
+>    [...]
+>    # #load "example.cma";;
+>    # open Example;;
+>    # let mcc = unmanaged_person "Mrs McCave" 40;;
+>    val mcc : (Example.person, [ `Struct ]) Ctypes.structured = <abstr>
+>    # let () = for i = 1 to 23 do ignore (managed_person ~name:"Dave"
+> ~age:i) done;;
+>    # Gc.full_major ();;
+>    goodbye Dave (age 23)
+>    goodbye Dave (age 22)
+>    goodbye Dave (age 21)
+>    goodbye Dave (age 20)
+>    goodbye Dave (age 19)
+>    goodbye Dave (age 18)
+>    goodbye Dave (age 17)
+>    goodbye Dave (age 16)
+>    goodbye Dave (age 15)
+>    goodbye Dave (age 14)
+>    goodbye Dave (age 13)
+>    goodbye Dave (age 12)
+>    goodbye Dave (age 11)
+>    goodbye Dave (age 10)
+>    goodbye Dave (age 9)
+>    goodbye Dave (age 8)
+>    goodbye Dave (age 7)
+>    goodbye Dave (age 6)
+>    goodbye Dave (age 5)
+>    goodbye Dave (age 4)
+>    goodbye Dave (age 3)
+>    goodbye Dave (age 2)
+>    goodbye Dave (age 1)
+>    - : unit = ()
+>    # destroy_person (Ctypes.addr mcc);;
+>    goodbye Mrs McCave (age 40)
+>    - : unit = ()
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140107/52a30d00/attachment.html>
+
+From cgaebel at janestreet.com  Tue Jan  7 19:34:31 2014
+From: cgaebel at janestreet.com (Clark Gaebel)
+Date: Tue, 7 Jan 2014 14:34:31 -0500
+Subject: [ocaml-ctypes] Arrays from C to Ocaml
+In-Reply-To: <CAAxsn=EcYi+5-J3gBDzXsTKkup3Y9q7zZ+QzBAz500Uq8Sk2kw@mail.gmail.com>
+References: <CAG8p3yU+Uj571E2VSd=QKGmemetP3UbkNu9psD0VnRFuqdzRyg@mail.gmail.com>
+ <CAAxsn=EcYi+5-J3gBDzXsTKkup3Y9q7zZ+QzBAz500Uq8Sk2kw@mail.gmail.com>
+Message-ID: <CAG8p3yXD2PvwK6i2knqy-ZBEeKhE8fibggSPYZh8_6vCb74WGQ@mail.gmail.com>
+
+Ok. Thanks anyways!
+
+  - Clark
+
+
+On Tue, Jan 7, 2014 at 11:04 AM, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 7 January 2014 13:45, Clark Gaebel <cgaebel at janestreet.com> wrote:
+> > What's the proper way in ctypes to interface with the following api:
+> >
+> > void read_some_data(context* ctx, void* buffer, int length);
+> >
+> > where read_some_data pulls some private data out of the given opaque
+> context
+> > and writes it into the given buffer, without blocking internally.
+> >
+> > Ideally, I'd want something in OCaml that looks like:
+> >
+> > val read_some_data : ctx -> len:int -> string
+> >
+> > and the only way I see of doing this is going through bigstring first.
+> But
+> > this means two copies: one from C -> bigstring and one from bigstring ->
+> > string.
+>
+> For the moment ctypes doesn't provide any way to pass OCaml heap
+> addresses to C, so moving between OCaml strings and C arrays always
+> involves a copy.
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20140107/54a488b5/attachment-0001.html>
+
+From daniel.buenzli at erratique.ch  Wed Jan 29 10:38:44 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 29 Jan 2014 11:38:44 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+Message-ID: <DC1A5D8122554149A593278594B9025F@erratique.ch>
+
+Le samedi, 28 d?cembre 2013 ? 21:23, Jeremy Yallop a ?crit :
+> There do seem to have been some issues with -no_compact_unwind and libffi:
+>  
+> https://ghc.haskell.org/trac/ghc/ticket/5019  
+
+This is becoming slightly annoying for me as I would like to use a 4.01.0 feature only (Printexc.get_callstack).  
+
+I have to admit I have a very poor understanding of the issue, -no_compact_unwind is not documented in man ld, but the option -warn_compact_unwind says this [1]. Here are the options I'm contemplating, I'll gladly take comments before I spend time on this.  
+
+* Patch the compiler to remove the option, what will it entail ?  
+* Try with libffi HEAD to see if the issue was maybe fixed. To brew experts, is there an quick easy way/pointer to instructions of doing that with brew ? I'm spoilt by opam pin.
+
+Thanks,  
+
+Daniel
+
+[1]
+-warn_compact_unwind
+When producing a final linked image, the linker processes the
+__eh_frame section and produces an __unwind_info section.
+Most FDE entries in the __eh_frame can be represented by a
+32-bit value in the __unwind_info section. The option issues
+a warning for any function whose FDE cannot be expressed in
+the compact unwind format.
+
+
+
+
+From anil at recoil.org  Wed Jan 29 11:22:45 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 29 Jan 2014 11:22:45 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <DC1A5D8122554149A593278594B9025F@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+Message-ID: <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+
+On 29 Jan 2014, at 10:38, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+
+> Le samedi, 28 d?cembre 2013 ? 21:23, Jeremy Yallop a ?crit :
+>> There do seem to have been some issues with -no_compact_unwind and libffi:
+>> 
+>> https://ghc.haskell.org/trac/ghc/ticket/5019  
+> 
+> This is becoming slightly annoying for me as I would like to use a 4.01.0 feature only (Printexc.get_callstack).  
+
+One immediate alternative is to experiment with the stub generation that's entered ctypes-trunk, as part of https://github.com/ocamllabs/ocaml-ctypes/pull/124
+
+The Makefiles are the most complex part of stub generation (predictably), but it should give you a mode where your bindings can be output as static C code and linked in as normal C stubs are.  It will avoid the dependency on libffi and sidestep your bug, and give us the time to track it down properly.
+
+(It would also be very useful to ensure that your use of ctypes is compatible with stub generation, as that's an important goal of the library)
+
+-anil
+
+From kosmo.zb at gmail.com  Wed Jan 29 11:41:49 2014
+From: kosmo.zb at gmail.com (David Sheets)
+Date: Wed, 29 Jan 2014 11:41:49 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <DC1A5D8122554149A593278594B9025F@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+Message-ID: <CAAWM5TxUgQQFFs_oFt-OnJSu8mUwBbUAwpifhF7YdsOSLY0gag@mail.gmail.com>
+
+On Wed, Jan 29, 2014 at 10:38 AM, Daniel B?nzli
+<daniel.buenzli at erratique.ch> wrote:
+> Le samedi, 28 d?cembre 2013 ? 21:23, Jeremy Yallop a ?crit :
+>> There do seem to have been some issues with -no_compact_unwind and libffi:
+>>
+>> https://ghc.haskell.org/trac/ghc/ticket/5019
+>
+> This is becoming slightly annoying for me as I would like to use a 4.01.0 feature only (Printexc.get_callstack).
+>
+> I have to admit I have a very poor understanding of the issue, -no_compact_unwind is not documented in man ld, but the option -warn_compact_unwind says this [1]. Here are the options I'm contemplating, I'll gladly take comments before I spend time on this.
+>
+> * Patch the compiler to remove the option, what will it entail ?
+> * Try with libffi HEAD to see if the issue was maybe fixed. To brew experts, is there an quick easy way/pointer to instructions of doing that with brew ? I'm spoilt by opam pin.
+
+We did this for libsodium a few months ago. See
+<https://github.com/amirmc/homebrew/commit/f1ae9826cd61cb0ae3b2ea0271dee66699c53734>.
+To understand the magic, I used the wiki enterable via
+<https://github.com/Homebrew/homebrew/wiki/Formula-Cookbook>. Good
+luck, it's Ruby.
+
+David
+
+> Thanks,
+>
+> Daniel
+>
+> [1]
+> -warn_compact_unwind
+> When producing a final linked image, the linker processes the
+> __eh_frame section and produces an __unwind_info section.
+> Most FDE entries in the __eh_frame can be represented by a
+> 32-bit value in the __unwind_info section. The option issues
+> a warning for any function whose FDE cannot be expressed in
+> the compact unwind format.
+>
+>
+>
+> _______________________________________________
+> Ctypes mailing list
+> Ctypes at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/ctypes
+
+From daniel.buenzli at erratique.ch  Wed Jan 29 12:35:44 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 29 Jan 2014 13:35:44 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+Message-ID: <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+
+Le mercredi, 29 janvier 2014 ? 12:22, Anil Madhavapeddy a ?crit :
+> One immediate alternative is to experiment with the stub generation that's entered ctypes-trunk, as part of https://github.com/ocamllabs/ocaml-ctypes/pull/124
+
+Yes I thought about this and I will certainly do it eventually, but I'm kind on a tight schedule right now and I fear it may take me too much time.
+
+One question about that though: in the tgls library I have to lookup symbols dynamically and that `stub` argument in `Foreign.foreign` [1] is very handy for that. Do I still get that support "for free" ? Had no time to look into the details, prefer to wait for proper docs...
+
+
+Le mercredi, 29 janvier 2014 ? 12:41, David Sheets a ?crit :
+> To understand the magic, I used the wiki enterable via
+
+
+
+> <https://github.com/Homebrew/homebrew/wiki/Formula-Cookbook>. Good
+
+
+Thanks David.  
+
+Will report about my investigations when I get into that, I'll at least check in the following weeks that the bug still with the libffi's head.
+
+Daniel
+
+[1] http://ocamllabs.github.io/ocaml-ctypes/Foreign.html#VALforeign
+
+
+
+From yallop at gmail.com  Thu Jan 30 10:39:45 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 30 Jan 2014 10:39:45 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+Message-ID: <CAAxsn=Hiq7xVRQib0pFNyRxPryt=4WaUKopYiVRwNnfqFBCRzA@mail.gmail.com>
+
+On 29 January 2014 12:35, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Le mercredi, 29 janvier 2014 ? 12:22, Anil Madhavapeddy a ?crit :
+>> One immediate alternative is to experiment with the stub generation that's entered ctypes-trunk, as part of https://github.com/ocamllabs/ocaml-ctypes/pull/124
+>
+> Yes I thought about this and I will certainly do it eventually, but I'm kind on a tight schedule right now and I fear it may take me too much time.
+>
+> One question about that though: in the tgls library I have to lookup symbols dynamically and that `stub` argument in `Foreign.foreign` [1] is very handy for that. Do I still get that support "for free" ? Had no time to look into the details, prefer to wait for proper docs...
+
+Looking up symbols dynamically will probably be trickier out of the
+box, since stub generation tries to move as much as possible to
+compile time.  If your goal is to have functions which look the same
+whether the underlying symbol is available or not, and which raise an
+exception when called then things are straightforward enough.  Here's
+an example that checks function availability during stub generation
+and generates either a working stub or a function that raises an
+exception.
+
+$ cat optstubgen.ml
+let candidates =
+  let open Ctypes in [
+    "dirname", (string @-> returning string);
+    "basename", (string @-> returning string);
+    "getExtension", (string @-> returning string);
+  ]
+
+let exists symbol =
+  try let _ = Dl.dlsym ?handle:None ~symbol in true
+  with Dl.DL_error _ -> false
+
+let with_formatter filename fn =
+  let outch = open_out filename in
+  let cleanup () = close_out outch in
+  try let fmt = Format.formatter_of_out_channel outch in
+      fn fmt;
+      Format.pp_print_flush fmt ();
+      cleanup ()
+  with e ->
+    cleanup (); raise e
+
+let c_header = "
+#include <libgen.h>
+#include \"ctypes/cstubs_internals.h\"
+"
+
+let () =
+  begin
+    with_formatter "bindings.ml" (fun mlfmt ->
+    with_formatter "bindings.mli" (fun mlifmt ->
+    with_formatter "bindings_stubs.c" (fun cfmt ->
+      Format.fprintf cfmt "%s@\n" c_header;
+      ListLabels.iter candidates
+        ~f:(fun (cname, fn) ->
+         let open Cstubs in
+         let stub_name = "test_stub_" ^ cname in
+          write_signature cname mlifmt fn;
+          if exists cname then begin
+            write_c ~cname ~stub_name cfmt fn;
+            write_ml ~stub_name ~external_name:cname mlfmt fn
+          end else
+            Format.fprintf mlfmt "let %s _ = failwith \"%s unavailable\""
+              cname cname))))
+  end
+$ ocamlfind opt -package ctypes.stubs,ctypes.foreign -linkpkg
+optstubgen.ml -o optstubgen
+$ ./optstubgen
+$ ocamlfind ocamlmktop -o bindings.top -custom  -linkpkg -package
+ctypes.stubs -I `ocamlc -where`/.. bindings_stubs.c bindings.mli
+bindings.ml
+$ ./bindings.top
+        OCaml version 4.01.0
+
+# module Bindings = Bindings;;
+module Bindings :
+  sig
+    val dirname : string -> string
+    val basename : string -> string
+    val getExtension : string -> string
+  end
+# Bindings.dirname "/tmp/blah.c";;
+- : string = "/tmp"
+# Bindings.basename "/tmp/blah.c";;
+- : string = "blah.c"
+# Bindings.getExtension "/tmp/blah.c";;
+Exception: Failure "getExtension unavailable".
+#
+
+From daniel.buenzli at erratique.ch  Thu Jan 30 12:59:05 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 30 Jan 2014 13:59:05 +0100
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <CAAxsn=Hiq7xVRQib0pFNyRxPryt=4WaUKopYiVRwNnfqFBCRzA@mail.gmail.com>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <CAAxsn=Hiq7xVRQib0pFNyRxPryt=4WaUKopYiVRwNnfqFBCRzA@mail.gmail.com>
+Message-ID: <FC739AD5BE5248CAACE4BD9145BAC6EE@erratique.ch>
+
+Le jeudi, 30 janvier 2014 ? 11:39, Jeremy Yallop a ?crit :
+> Here's an example that checks function availability during stub generation
+> and generates either a working stub or a function that raises an
+> exception.
+
+In fact you really need to look them up dynamically (e.g. if you want to distribute binaries). What do you think about this approach (which is basically the technique I wrote about here [1]). Would I be able doable with the current stub generation ?
+
+1) Lookup function pointer with Dl.dlsym. which results in an otptional fun ptr.
+2) Generate stub that has a fun ptr as a first argument, in the stub if fun ptr is None, raise, otherwise invoke.  
+
+Best,
+
+Daniel
+
+[1] http://lists.ocaml.org/pipermail/ctypes/2013-December/000033.html
+
+From yallop at gmail.com  Thu Jan 30 13:35:03 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Thu, 30 Jan 2014 13:35:03 +0000
+Subject: [ocaml-ctypes] Spinning process on osx
+In-Reply-To: <FC739AD5BE5248CAACE4BD9145BAC6EE@erratique.ch>
+References: <A71CECB09FED44B1A83A217E602DAD25@erratique.ch>
+ <CAAxsn=GoMSn2hEydg_ND46+1h-H3uYSUieFeKNZwvw9T=YzRGw@mail.gmail.com>
+ <77A6ADA6A1CE4CCE874F266EAA9324DF@erratique.ch>
+ <C0BECBDE584E4730A1FEA585A1EA59AF@erratique.ch>
+ <A6CC3EBBE41841E79519A7AC9F97544A@erratique.ch>
+ <CAAxsn=EgYG_v1_b6pNeqUbbVvDdOPNK6iyazOm9YqTZyNVRQsA@mail.gmail.com>
+ <DC1A5D8122554149A593278594B9025F@erratique.ch>
+ <9D16F320-1A31-47CD-AC2E-8D235A2DB984@recoil.org>
+ <206B0BFA9D924551916F19AF9B333A3B@erratique.ch>
+ <CAAxsn=Hiq7xVRQib0pFNyRxPryt=4WaUKopYiVRwNnfqFBCRzA@mail.gmail.com>
+ <FC739AD5BE5248CAACE4BD9145BAC6EE@erratique.ch>
+Message-ID: <CAAxsn=E2+5nY=5g5sJ=Y8+MxxTGBaXZy9cy_O7VautXMWs5GrA@mail.gmail.com>
+
+On 30 January 2014 12:59, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> Le jeudi, 30 janvier 2014 ? 11:39, Jeremy Yallop a ?crit :
+>> Here's an example that checks function availability during stub generation
+>> and generates either a working stub or a function that raises an
+>> exception.
+>
+> In fact you really need to look them up dynamically (e.g. if you want to distribute binaries). What do you think about this approach (which is basically the technique I wrote about here [1]). Would I be able doable with the current stub generation ?
+>
+> 1) Lookup function pointer with Dl.dlsym. which results in an otptional fun ptr.
+> 2) Generate stub that has a fun ptr as a first argument, in the stub if fun ptr is None, raise, otherwise invoke.
+
+Yes, I think that could be made to work.  If you have C99- or
+GCC-style variadic macros, then you could probably generate one stub
+per type wrapping a function application macro:
+
+   #define funcall(f, args...) f(args)
+
+Each generated stub would then accept a function pointer and its
+arguments, unwrap them at the appropriate type, and apply the
+function.  You could keep the check for whether the function pointer
+is null in OCaml (my preference), or extend the macro to perform null
+checking as well.
+
+Using Foreign.funptr for the function argument would work, but then
+you'd still have the dependency on libffi.  It should be possible to
+write a simpler version of funptr that only wraps C function pointers
+(e.g. as returned from dlsym) rather than OCaml functions, which would
+make it possible to eliminate libffi altogether.  Let me know if some
+example code would be useful.
+

@@ -1,0 +1,171 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam binary snapshot
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGNNJreXhAAGJ_ovHKgkH_-sPD%2B933CwFsyyxF7Tuhcvqw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000250.html">
+   <LINK REL="Next"  HREF="000252.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam binary snapshot</H1>
+    <B>Sylvain Le Gall</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGNNJreXhAAGJ_ovHKgkH_-sPD%2B933CwFsyyxF7Tuhcvqw%40mail.gmail.com%3E"
+       TITLE="[opam-devel] opam binary snapshot">sylvain+ocaml at le-gall.net
+       </A><BR>
+    <I>Mon Nov  4 21:36:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000250.html">[opam-devel] opam binary snapshot
+</A></li>
+        <LI>Next message: <A HREF="000252.html">[opam-devel] opam binary snapshot
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#251">[ date ]</a>
+              <a href="thread.html#251">[ thread ]</a>
+              <a href="subject.html#251">[ subject ]</a>
+              <a href="author.html#251">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>2013/11/4 Mika Illouz &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">mika at illouz.net</A>&gt;:
+&gt;<i> Hi Everyone,
+</I>&gt;<i>
+</I>&gt;<i> Thanks for the discussion. A tool which publishes an existing OPAM
+</I>&gt;<i> installation as one or more deb's would match our internal needs
+</I>&gt;<i> rather nicely.  Since my knowlege of OPAM's and Debian's package
+</I>&gt;<i> systems is superficial, I don't understand two technical questions:
+</I>&gt;<i> First, how would the tool infer the dependencies to non-opam packages
+</I>&gt;<i> managed by debian?  (Sylvain says this is easy).
+</I>
+For runtime dependencies (once the package is built), this is rather
+easy. Debian maintainer script detect exec and library and compute
+dependencies from there. I.e:
+
+$ ldd /usr/bin/man
+        linux-vdso.so.1 =&gt;  (0x00007fff7a9ff000)
+        libmandb-2.6.2.so =&gt; /usr/lib/man-db/libmandb-2.6.2.so
+        libman-2.6.2.so =&gt; /usr/lib/man-db/libman-2.6.2.so
+        libgdbm.so.3 =&gt; /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+        libpipeline.so.1 =&gt; /usr/lib/x86_64-linux-gnu/libpipeline.so.1
+        libc.so.6 =&gt; /lib/x86_64-linux-gnu/libc.so.6
+        libz.so.1 =&gt; /lib/x86_64-linux-gnu/libz.so.1
+        /lib64/ld-linux-x86-64.so.2
+
+Then you just have to ask the packaging system which package provide
+the given libraries:
+$  dpkg -S /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+libgdbm3:amd64: /usr/lib/x86_64-linux-gnu/libgdbm.so.3
+
+Et voila ! You know that /usr/bin/man depends on the package libgdbm3.
+
+For OCaml binary:
+- native: works just as a normal binary:
+$ ldd /usr/bin/unison-gtk
+        linux-vdso.so.1 =&gt;  (0x00007fff8efa6000)
+        libgtk-x11-2.0.so.0 =&gt;  ...
+
+- bytecode: the binary itself doesn't have dependencies, but if it has
+a non-OCaml dependencies, there will be a .so somewhere (stub
+libraries) that will create the link.
+
+All above is what is needed to compute runtime dependencies. We have
+additional tools to compute dependencies of .cmo/.cmx/.cmxa/.cma but
+this doesn't apply to what I want to do sine the generated package
+should be self-contained (except in the case of compiler=system, but I
+have injected a the usual Debian OCaml Maintainer trick for that by
+depending on ocaml-nox-${F:OCamlABI}).
+
+Now there are remaining problem:
+- build dependencies cannot be guessed
+- runtime dependencies on executable cannot be guessed (e.g. if you
+use Sys.command &quot;patch&quot; it is hard to guess that you depend on patch)
+
+I plan to solve this through a small DB, should be enough to start.
+
+&gt;<i>  Second, how would it
+</I>&gt;<i> expose individual OPAM packages as debian packages?  On one extreme,
+</I>&gt;<i> the entire OPAM installation is packaged as one deb; on the other, a
+</I>&gt;<i> debian package is created from each corresponding OPAM package.
+</I>
+I plan to create on big source package containing a checkout of the
+repository and a script that allow to build the package on specific
+architecture. Basically you get:
+opam2debian-le-gall.net-4.01_20131104.tar.gz
+opam2debian-le-gall.net-4.01_20131104.dsc
+
+This is the bare minimum to have a source package, then on each arch
+(i386, amd64, armhf) you extract the source package and build it. This
+will generate:
+opam2debian-le-gall.net_20131104_amd64.deb (or _i386 or _armhf).
+opam2debian-le-gall.net_20131104_amd64.changes (or _i386 or _armhf).
+
+You just have to sign the changes file before uploading.
+
+Note that given the way I built it, you ALSO get a snapshot of the
+OPAM repository inside the archive! Which means that if you want to
+build additional packages, you will use the snapshot from inside the
+debian package you are building!
+
+I am trying to see how I will translate the copyright to be nice to
+upstream contributor (this is a pretty big issue, trying to figure a
+solution).
+
+&gt;<i>
+</I>&gt;<i> While this approach calls for a tool separate from OPAM itself, it
+</I>&gt;<i> preserves OPAM's OS/distribution-neutrality.
+</I>&gt;<i>
+</I>&gt;<i> On Oct 31 2013, Fabrice Le Fessant wrote:
+</I>&gt;&gt;<i> Is it important to target RPMs and DEBs, or would it be enough to
+</I>&gt;&gt;<i> have binary packages _inside_ opam ? i.e. &quot;opam install MYPACKAGE&quot;
+</I>&gt;&gt;<i> would install binary versions instead of source versions of
+</I>&gt;&gt;<i> MYPACKAGE and all its dependencies ?
+</I>&gt;<i>
+</I>&gt;<i> Fabrice: I'm not sure I understand what your are proposing.  One of my
+</I>&gt;<i> goals is to be able to distribute deb's derived from OPAM, but without
+</I>&gt;<i> requiring OPAM.
+</I>&gt;<i>
+</I>&gt;<i> On Oct 31 2013, Sylvain le Gall wrote:
+</I>&gt;&gt;<i> Maybe you are talking about directly generating a binary .deb ? (like
+</I>&gt;&gt;<i> directly an ar archive, but that is super tricky to do)
+</I>&gt;<i>
+</I>&gt;<i> Sylvain:  I think that's what I want ...
+</I>&gt;<i>
+</I>&gt;&gt;<i> I could not resist the temptation to start the project:
+</I>&gt;&gt;<i> <A HREF="https://github.com/gildor478/opam2debian">https://github.com/gildor478/opam2debian</A>
+</I>&gt;<i>
+</I>&gt;<i> Cool!
+</I>&gt;<i>
+</I>&gt;<i> thanks
+</I>&gt;<i> mika illouz
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000250.html">[opam-devel] opam binary snapshot
+</A></li>
+	<LI>Next message: <A HREF="000252.html">[opam-devel] opam binary snapshot
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#251">[ date ]</a>
+              <a href="thread.html#251">[ thread ]</a>
+              <a href="subject.html#251">[ subject ]</a>
+              <a href="author.html#251">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

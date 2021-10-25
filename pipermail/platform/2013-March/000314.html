@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Changes to my previous proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCACLX4jSHbJRhVXkCYLJbyvVQnegTAADVx8dTtNXtjGj9mNoMFQ%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000313.html">
+   <LINK REL="Next"  HREF="000316.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Changes to my previous proposal for namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Changes%20to%20my%20previous%20proposal%20for%20namespaces&In-Reply-To=%3CCACLX4jSHbJRhVXkCYLJbyvVQnegTAADVx8dTtNXtjGj9mNoMFQ%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Changes to my previous proposal for namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Mon Mar 18 15:46:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000313.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000316.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#314">[ date ]</a>
+              <a href="thread.html#314">[ thread ]</a>
+              <a href="subject.html#314">[ subject ]</a>
+              <a href="author.html#314">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Mon, Mar 18, 2013 at 11:15 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+&gt;&gt;<i> Leo's main argument is that systematically using Pervasives is more
+</I>&gt;&gt;<i> predictable for users (that may not want to have to look at namespace
+</I>&gt;&gt;<i> descriptions to know which compilation units will be opened by
+</I>&gt;&gt;<i> default).
+</I>&gt;<i>
+</I>&gt;<i> That's certainly an argument, but it is not my main one.
+</I>&gt;<i>
+</I>&gt;&gt;<i> I'd say in practice it's rather obvious at medium scale (for any given
+</I>&gt;&gt;<i> software project) which module is meant to be the
+</I>&gt;&gt;<i> Pervasives/Std/Prelude one, and large scale composability by default
+</I>&gt;&gt;<i> could be a better choice.
+</I>&gt;<i>
+</I>&gt;<i> I don't think I've actually suggested providing any means for defining a
+</I>&gt;<i> new namespace as the composition of existing namespaces. Nor do I have
+</I>&gt;<i> any particular use cases for that feature.
+</I>&gt;<i>
+</I>&gt;<i> However, my proposal does allow a namespace to be specified across
+</I>&gt;<i> multiple locations, and it is important that these specifications are
+</I>&gt;<i> composable.
+</I>&gt;<i>
+</I>&gt;<i> The ordering between these separate specifications will inevitably be
+</I>&gt;<i> under-specified, depending on things like the order of command-line
+</I>&gt;<i> arguments. That means that any semantics relying on that ordering will
+</I>&gt;<i> be potentially fragile. The best we can hope to achieve is to make sure
+</I>&gt;<i> that conflicts between specifications are as obvious to the user as
+</I>&gt;<i> possible.
+</I>&gt;<i>
+</I>&gt;<i> We are discussing two possible semantics for &quot;automatically opened
+</I>&gt;<i> modules&quot;:
+</I>&gt;<i>
+</I>&gt;<i> 1. Supporting a list of auto-opened modules. The automatic open of these
+</I>&gt;<i>    modules is morally equivalent to merging their contents into a single
+</I>&gt;<i>    &quot;Pervasives&quot; module and then opening that module.
+</I>&gt;<i>
+</I>&gt;<i> 2. Only supporting a single &quot;Pervasives&quot; module. Trying to specify two
+</I>&gt;<i>    &quot;Pervasives&quot; modules will simply result in one of those modules being
+</I>&gt;<i>    chosen ahead of the other.
+</I>&gt;<i>
+</I>&gt;<i> Of these two semantics, the second one is much more likely to bring
+</I>&gt;<i> conflicts to the attention of the user. The first one is more likely to
+</I>&gt;<i> hide accidental conflicts resulting in potential bugs.
+</I>&gt;<i>
+</I>&gt;<i> The second semantics also ensures that conflicts between namespace
+</I>&gt;<i> specifications only occur at the level of whole compilation units,
+</I>&gt;<i> rather than at the level of individual values and types.
+</I>&gt;<i>
+</I>&gt;<i> In summary, any semantics for &quot;automatically opened modules&quot; will not
+</I>&gt;<i> compose well. So it would be better to provide a system that obviously
+</I>&gt;<i> doesn't compose than to provide a system that pretends to compose, and
+</I>&gt;<i> may hide potential bugs.
+</I>
+Just to be clear, do you agree with Gabriel's claim that that
+
+open namespace A
+open namespace B
+
+will open A#Pervasives and then open B#Pervasives?
+
+As to your larger point, I basically disagree that the possibility of
+shadowing implied by (1) is something to be avoided.  Module opens
+behave this way, and within Jane Street we've used them extensively,
+using limited, purposeful shadowing, for a decade, and to good effect
+as far as I can tell.
+
+I basically don't see where your belief that automatically opened
+modules are semantically problematic and uncomposeable arises from.
+Certainly, my experience with packed modules argues in the other
+direction.  Do you propose to delete the possibility of shadowing from
+the module language as well?
+
+y
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000313.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000316.html">[ocaml-platform] Changes to my previous proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#314">[ date ]</a>
+              <a href="thread.html#314">[ thread ]</a>
+              <a href="subject.html#314">[ subject ]</a>
+              <a href="author.html#314">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

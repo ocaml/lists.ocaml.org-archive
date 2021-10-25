@@ -1,0 +1,126 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] OPAM 2.0 features
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C002e01d1b732%2420915be0%2461b413a0%24%40metastack.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001455.html">
+   <LINK REL="Next"  HREF="001457.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] OPAM 2.0 features</H1>
+    <B>David Allsopp</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20OPAM%202.0%20features&In-Reply-To=%3C002e01d1b732%2420915be0%2461b413a0%24%40metastack.com%3E"
+       TITLE="[opam-devel] OPAM 2.0 features">dra-news at metastack.com
+       </A><BR>
+    <I>Thu May 26 10:36:48 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001455.html">[opam-devel] docker hub update?
+</A></li>
+        <LI>Next message: <A HREF="001457.html">[opam-devel] OPAM 2.0 features
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1456">[ date ]</a>
+              <a href="thread.html#1456">[ thread ]</a>
+              <a href="subject.html#1456">[ subject ]</a>
+              <a href="author.html#1456">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi (Louis mainly, I expect!),
+
+	I've rebased work I've been very slowly doing onto the OPAM 2.0
+alpha release and have been starting to get opam switch to work. There are a
+few things which I need to be able to do for this, and I'm wondering if
+there any opinions (or even existing features I've missed) as to
+mechanisms...
+
+1. Downloading a package from several tarballs
+	I've not finished delving into the full details, but I think I'm
+correct that the url file / section can only specify a single archive, even
+if it can be made available by multiple transports? Bootstrapping OCaml on
+Windows requires two tarballs, so I was going to extend the url system to
+allow multiple tarballs to be specified (with control over where in the
+overall tree they are extracted), rather than hackily including the second
+one in files and extracting it using a build command.
+
+2. Specifying package variables at opam switch install 
+	I've extended the ocaml package variables to include three new ones:
+ocaml-arch (which is exactly the architecture determined by OCaml's
+configure script), ocaml-cc (which is &quot;cl&quot; for a Microsoft C compiler based
+OCaml or &quot;cc&quot; for the rest of the world), and ocaml-libc (which is &quot;msvc&quot;
+for the four native Windows OCaml ports and &quot;libc&quot; for the rest of the
+world).
+
+	At OPAM switch time, one selects which Windows port you get by
+specifying these three variables. So, for example, mingw64 is
+ocaml-arch=amd64, ocaml-cc=cc, ocaml-libc=msvc; msvc32 is ocaml-arch=i386,
+ocaml-cc=cl, ocaml-libc=msvc; cygwin64 is ocaml-arch=amd64, ocaml-cc=cc,
+ocaml-libc=libc.
+
+	My question is how to specify these - the concept of &quot;architecture&quot;,
+&quot;C compiler type&quot; and &quot;C runtime library&quot; is generic enough that it doesn't
+feel too bad to have opam switch --cc=cl --arch=amd64 4.03.0 and have the
+package initialise ocaml-arch, etc. based on those globally available
+variables. However, is there any plan (or existing feature) for a more
+generic way of specifying package input variables? (discussed in
+<A HREF="https://github.com/ocaml/opam/issues/2247">https://github.com/ocaml/opam/issues/2247</A>).
+
+3. Upgrading dependent packages for the root
+	Any Windows OCaml installation will depend upon FlexDLL objects
+compiled with the specific C compiler combination. Although in principle
+these could be shared between multiple switches (the object files vary
+according ocaml-cc, ocaml-libc and ocaml-arch; not ocaml-version), it makes
+sense to compile these two object files per-switch, rather than introduce
+yet another installation layer.
+
+	This means that in addition to the base packages, the Windows OCaml
+package depends on a flexdll package. Is there any philosophical reason for
+that not to be part of opam upgrade? Obviously, one doesn't want to be
+trying to upgrade the ocaml package, but why lock its dependencies at a
+given version? It would be quite nice if a new version of flexdll is
+released to be able to have opam upgrade notice that flexdll can be
+upgraded, determine that the root package must therefore be recompiled and
+so automatically recompile the entire switch.
+
+	Is it just for philosophical reasons that the dependencies of the
+root package are not considered for upgrade or is there a technical
+consideration?
+
+TIA,
+
+
+David
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001455.html">[opam-devel] docker hub update?
+</A></li>
+	<LI>Next message: <A HREF="001457.html">[opam-devel] OPAM 2.0 features
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1456">[ date ]</a>
+              <a href="thread.html#1456">[ thread ]</a>
+              <a href="subject.html#1456">[ subject ]</a>
+              <a href="author.html#1456">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

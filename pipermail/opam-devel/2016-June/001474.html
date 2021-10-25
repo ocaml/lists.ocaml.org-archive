@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%0A%20managers%22%3B%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3C1932276.AAcH1812VX%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001473.html">
+   <LINK REL="Next"  HREF="001475.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%0A%20managers%22%3B%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3C1932276.AAcH1812VX%40maitake%3E"
+       TITLE="[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Thu Jun  9 18:02:16 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001473.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+        <LI>Next message: <A HREF="001475.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1474">[ date ]</a>
+              <a href="thread.html#1474">[ thread ]</a>
+              <a href="subject.html#1474">[ subject ]</a>
+              <a href="author.html#1474">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> 1. Make package installation sandboxed in such a way that just installing a
+</I>&gt;<i> package is harmless as long as its code is not linked and run. (Of course
+</I>&gt;<i> this code may be linked and run if a developer also makes a typo in its
+</I>&gt;<i> software.)
+</I>
+This is already possible, but Linux-only, and requires a local setup (opam 
+allows wrappers for package commands, and I wrote some scripts based on Linux 
+namespaces to restrict network and FS access. Not quite secure at the moment 
+but could be made so). I intended this mainly for CI (and paranoid users), and 
+am already using it locally.
+
+&gt;<i> So my question: where in the opam-repository QA process should I add a
+</I>&gt;<i> script (preferably written in OCaml rather than shell) that gets the name
+</I>&gt;<i> of the packages proposed for inclusion, also has access to the name of
+</I>&gt;<i> existing packages in the repository, and can fail or warn if the proposed
+</I>&gt;<i> one is typo-close to an existing one?
+</I>&gt;<i> 
+</I>&gt;<i> (This test can have false positives, eg. installing lablgtk2 when lablgtk
+</I>&gt;<i> exists. It should still fail in a visible way in the UI, but not in a way
+</I>&gt;<i> that prevent other, more advanced tests, such as package installability.)
+</I>
+My intention was to add a function for this kind of package/repo checks in 
+src/state/opamFileTools.ml, taking an additional switch_state as parameter, 
+and returning type as `lint`. Then opamMain can (optionally ?) load a state 
+and aggregate the results before printing.
+
+Thanks !
+Louis
+
+
+Le Thursday 09 June 2016, 10:57:05 Gabriel Scherer a &#233;crit :
+&gt;<i> Hi opam-devel,
+</I>&gt;<i> 
+</I>&gt;<i> Here is a rather cool bachelor thesis that seems relevant to OPAM
+</I>&gt;<i> repository management:
+</I>&gt;<i> 
+</I>&gt;<i>   Typosquatting in Programming Language Package Managers
+</I>&gt;<i>   Nikolai Philipp Tschacher, March 2016
+</I>&gt;<i>   <A HREF="http://incolumitas.com/2016/06/08/typosquatting-package-managers/">http://incolumitas.com/2016/06/08/typosquatting-package-managers/</A>
+</I>&gt;<i> 
+</I>&gt;<i> The described attack is to propose packages whose names are typo-close to
+</I>&gt;<i> very popular packages. Instead of &quot;opam install omake&quot; I run &quot;opam install
+</I>&gt;<i> omaek&quot;, but &quot;omaek&quot; exists and is attacker-controlled, and its install
+</I>&gt;<i> script wreaks havoc on my machine.
+</I>&gt;<i> 
+</I>&gt;<i> This is interesting because it is a way to subvert a specific package that
+</I>&gt;<i> is immune to the common defenses against impersonation -- signing a package
+</I>&gt;<i> with its maintainers keys, etc. The author of the thesis suggests three
+</I>&gt;<i> defense methods:
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 2. Alert repository administrators when a typo-candidate is proposed for
+</I>&gt;<i> integration. (This is especially relevant for repositories with no human
+</I>&gt;<i> oversight on package addition, but even for OPAM one may consider that the
+</I>&gt;<i> maintainers themselves may be fooled by the typo or not think of the
+</I>&gt;<i> security consequences.)
+</I>&gt;<i> 
+</I>&gt;<i> 3. Keep a log of the non-existing packages that users commonly try to
+</I>&gt;<i> install (good candidates for typos) and alert administrators when a
+</I>&gt;<i> matching package is proposed.
+</I>&gt;<i> 
+</I>&gt;<i> I'm sure that the systems expert in the room have plans for (1) already. I
+</I>&gt;<i> suspect that opam's architecture does not let us do (3), but I was
+</I>&gt;<i> interesting in quickly hacking (2) this morning -- I suppose I like
+</I>&gt;<i> typo-detection stuff.
+</I>&gt;<i> 
+</I>&gt;<i> My plan was: in `opam lint`, emit a warning if the linted package name is
+</I>&gt;<i> at edit distance 2 or less (but not 0) of an existing package in the
+</I>&gt;<i> repository. But this does not quite work; I quickly looked at the code and
+</I>&gt;<i> it seems that &quot;opam lint&quot; is meant to be run purely locally, it does not
+</I>&gt;<i> have access to a base of packages available in the repository.
+</I>&gt;<i> 
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001473.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+	<LI>Next message: <A HREF="001475.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1474">[ date ]</a>
+              <a href="thread.html#1474">[ thread ]</a>
+              <a href="subject.html#1474">[ subject ]</a>
+              <a href="author.html#1474">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

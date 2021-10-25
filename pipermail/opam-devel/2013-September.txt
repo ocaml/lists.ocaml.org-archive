@@ -1,0 +1,715 @@
+From pgj at elte.hu  Thu Sep  5 18:39:24 2013
+From: pgj at elte.hu (PALI Gabor Janos)
+Date: Thu, 5 Sep 2013 19:39:24 +0200
+Subject: [opam-devel] Globally-installed OPAM Packages?
+Message-ID: <20130905173924.GA15650@caesar.elte.hu>
+
+[cross-posting for both Mirage and OPAM developers]
+Hi there,
+
+I am working on a FreeBSD/amd64 kernel module backend for Mirage, which
+requires a dedicated cross-compiler due to some special requirements on the
+generated code.  One of the consequences of those requirements that the
+compiler cannot create ELF binaries for some of the dependent packages or
+the unit tests fail.  This is fine, as binaries are usually not needed,
+only the libraries.
+
+Hence I have started to submit changes to the package maintainers, like
+in case of dyntype [1].  However, Anil suggested to generalize this into
+the concept of "no executables" which is basically an environment variable
+which, when set, implies disabling building binaries for the given package.
+This could be then set for the Mirage/kFreeBSD cross-compiler so no binaries
+are built in that case.
+
+However, there are some packages, for it would need binaries still in order
+to be able to work.  An example of this is mirari [2], the Mirage build tool.
+Anil recommended to use mirari of the host system instead, but the problem
+is that mirari (and executables for OPAM packages, in general, I think) can
+only be installed per toolchain.  That is, even if I install mirari with the
+standard compiler, it becomes hidden once I switch back to the Mirage/kFreeBSD
+cross-compiler to build the rest of the packages.
+
+Apparently a host mirari cannot be installed on the system globally, unless
+it is compiled from the sources manually, probably.  (Mirari is not available
+as a binary package on FreeBSD unlike the OCaml compiler or OPAM.)  I cannot
+build and install mirari to some global location either, as other packages,
+e.g. mirage-www, depend on it as a package.
+
+Are there any (non-hackish) solutions for this issue in the OPAM world? 
+
+[1] https://github.com/mirage/dyntype/pull/4
+[2] http://opam.ocamlpro.com/pkg/mirari.0.9.7.html
+
+From thomas at ocamlpro.com  Fri Sep  6 11:11:58 2013
+From: thomas at ocamlpro.com (Thomas Gazagnaire)
+Date: Fri, 6 Sep 2013 11:11:58 +0100
+Subject: [opam-devel] Globally-installed OPAM Packages?
+In-Reply-To: <20130905173924.GA15650@caesar.elte.hu>
+References: <20130905173924.GA15650@caesar.elte.hu>
+Message-ID: <FD964E23-B031-4520-8FAA-4C53E59614DD@ocamlpro.com>
+
+Hi,
+
+> Are there any (non-hackish) solutions for this issue in the OPAM world? 
+
+Unfortunately not really, so I'm very interested to get your use-cases and your feedback on this.
+
+If what you need is just to not generate binaries and you never need to link your libraries, I guess you can go with a simple scheme where you install host and target library and binaries in different OPAM switches, configure OPAM to use the target env by default and add the host bin directory to your PATH (and path your target compiler to never generate binaries).
+
+    opam switch host -alias-of system
+    opam install PKG1 .... PKGn --switch=host # host libraries and binaries
+
+    opam switch target -alias-of <your patched compiler name>
+    eval `opam config env`
+    export PATH=$(opam config var bin --switch=host):$PATH
+    opam install PKG1 ... PKGn  # target libraries
+
+I guess it would be annoying as you had to duplicate every package installation on the two switches (using `opam install PKG --switch=host && opam install PKG).
+
+Less hackish solution require to have a whole build system chain (ie. ocamlopt + ocamlfind) which manage cross-compilation well, and I'm afraid we don't have that yet out-of-the box.
+
+Best,
+Thomas
+
+From anil at recoil.org  Wed Sep 18 11:07:46 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 18 Sep 2013 11:07:46 +0100
+Subject: [opam-devel] [ocaml-infra] Is there a compilation farm for
+	OCaml open source projects somewhere?
+In-Reply-To: <87y56vs42g.fsf@gmail.com>
+References: <5232B4EB.1090702@riken.jp>
+ <FF82363B-F91C-4692-931B-20E222DD4A21@recoil.org> <5237B7E4.1090808@riken.jp>
+ <0FA6E4BD-04FC-4522-962B-0154EC01AC27@cam.ac.uk> <87y56vs42g.fsf@gmail.com>
+Message-ID: <FA56D7F8-C31A-4455-A799-5ED66F3CF4D0@recoil.org>
+
+[CCing opam-devel]
+
+It would certainly make sense to do some of it with TravisCI, but it hits
+its limits fairly quickly (non-Linux, non-x86, constraint exploration).
+
+I've been meaning to try Mike Lin's Travis/OPAM integration for ages, so
+if you get a chance to refresh his script with OPAM 1.0/trunk and give
+it a shot, I'd love to use it myself.
+
+http://blog.mlin.net/2013/02/testing-ocaml-projects-on-travis-ci.html
+
+(more testing always better, as long as someone can triage it, and Travis
+is very convenient to use indeed!)
+
+-anil
+
+On 17 Sep 2013, at 19:20, Malcolm Matalka <mmatalka at gmail.com> wrote:
+
+> Can't a lot of this be done with TravisCI?  I have not used it but I'm
+> under the impression it allows you to run whatever you want across many
+> virtualized environments.
+> 
+> Amir Chaudhry <amc79 at cam.ac.uk> writes:
+> 
+>> --
+>> sent via mobile
+>> 
+>> On 17 Sep 2013, at 03:01, Francois Berenger <berenger at riken.jp> wrote:
+>> 
+>>> On 09/17/2013 03:14 AM, Anil Madhavapeddy wrote:
+>>>> On 13 Sep 2013, at 07:47, Francois Berenger <berenger at riken.jp> wrote:
+>>>> 
+>>>>> For example, are all the packages in OPAM
+>>>>> checked regularly to compile on various architectures?
+>>> 
+>>> As I have some packages in OPAM (vector3, dolog),
+>>> I would like to receive an automatic e-mail if one of my packages is broken on some arch.
+>> 
+>> Since we're using GitHub in the workflow and plan to update the pull request thread with OCamlot comments, anyone involved in (or watching) the PR thread would automatically receive updates via GitHub. We need stable links for this to work properly. 
+>> 
+>> You can get an idea of the workflow via the screen cast I made earlier this year:
+>> http://vimeo.com/61768273
+>> 
+>> 
+>> 
+>>>> There is; see my recent write up on its status here:
+>>>> http://anil.recoil.org/2013/09/09/ocamlot-autotriaging.html
+>>>> 
+>>>> We're working on making the results more easily accessible via
+>>>> permalinking and archiving, but for now the results are triaged
+>>>> by me in OPAM bugs such as:
+>>>> https://github.com/OCamlPro/opam-repository/issues/1029
+>>>> 
+>>>> Fixes to any of those most welcome!
+>>>> 
+>>>> -anil
+>>> 
+>>> _______________________________________________
+>>> Infrastructure mailing list
+>>> Infrastructure at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/infrastructure
+>> _______________________________________________
+>> Infrastructure mailing list
+>> Infrastructure at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/infrastructure
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+> 
+
+
+From sylvain+ocaml at le-gall.net  Wed Sep 18 12:55:53 2013
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Wed, 18 Sep 2013 13:55:53 +0200
+Subject: [opam-devel] [ocaml-infra] Is there a compilation farm for
+ OCaml open source projects somewhere?
+In-Reply-To: <FA56D7F8-C31A-4455-A799-5ED66F3CF4D0@recoil.org>
+References: <5232B4EB.1090702@riken.jp>
+ <FF82363B-F91C-4692-931B-20E222DD4A21@recoil.org>
+ <5237B7E4.1090808@riken.jp>
+ <0FA6E4BD-04FC-4522-962B-0154EC01AC27@cam.ac.uk>
+ <87y56vs42g.fsf@gmail.com>
+ <FA56D7F8-C31A-4455-A799-5ED66F3CF4D0@recoil.org>
+Message-ID: <CAOCAUGNcCj23G2d5xR9be8_O1L-CpdExr-DY6cL0NKGBALurmg@mail.gmail.com>
+
+2013/9/18 Anil Madhavapeddy <anil at recoil.org>:
+> [CCing opam-devel]
+>
+> It would certainly make sense to do some of it with TravisCI, but it hits
+> its limits fairly quickly (non-Linux, non-x86, constraint exploration).
+>
+> I've been meaning to try Mike Lin's Travis/OPAM integration for ages, so
+> if you get a chance to refresh his script with OPAM 1.0/trunk and give
+> it a shot, I'd love to use it myself.
+>
+> http://blog.mlin.net/2013/02/testing-ocaml-projects-on-travis-ci.html
+>
+> (more testing always better, as long as someone can triage it, and Travis
+> is very convenient to use indeed!)
+>
+
++1 if someone can spend time on this. I'll add a .travis.yml to my
+github project if it is possible (even though I have a running
+Jenkins).
+
+All this builder (Travis/Jenkins/ocamlot) are good to test a project
+in non upstream developper environment and helps to catch obvious
+error that will happen the first time someone else than the mani
+developper try to build an OCaml project.
+
+If you need tester, I am all for it.
+
+Regards
+Sylvain
+
+> -anil
+>
+> On 17 Sep 2013, at 19:20, Malcolm Matalka <mmatalka at gmail.com> wrote:
+>
+>> Can't a lot of this be done with TravisCI?  I have not used it but I'm
+>> under the impression it allows you to run whatever you want across many
+>> virtualized environments.
+>>
+>> Amir Chaudhry <amc79 at cam.ac.uk> writes:
+>>
+>>> --
+>>> sent via mobile
+>>>
+>>> On 17 Sep 2013, at 03:01, Francois Berenger <berenger at riken.jp> wrote:
+>>>
+>>>> On 09/17/2013 03:14 AM, Anil Madhavapeddy wrote:
+>>>>> On 13 Sep 2013, at 07:47, Francois Berenger <berenger at riken.jp> wrote:
+>>>>>
+>>>>>> For example, are all the packages in OPAM
+>>>>>> checked regularly to compile on various architectures?
+>>>>
+>>>> As I have some packages in OPAM (vector3, dolog),
+>>>> I would like to receive an automatic e-mail if one of my packages is broken on some arch.
+>>>
+>>> Since we're using GitHub in the workflow and plan to update the pull request thread with OCamlot comments, anyone involved in (or watching) the PR thread would automatically receive updates via GitHub. We need stable links for this to work properly.
+>>>
+>>> You can get an idea of the workflow via the screen cast I made earlier this year:
+>>> http://vimeo.com/61768273
+>>>
+>>>
+>>>
+>>>>> There is; see my recent write up on its status here:
+>>>>> http://anil.recoil.org/2013/09/09/ocamlot-autotriaging.html
+>>>>>
+>>>>> We're working on making the results more easily accessible via
+>>>>> permalinking and archiving, but for now the results are triaged
+>>>>> by me in OPAM bugs such as:
+>>>>> https://github.com/OCamlPro/opam-repository/issues/1029
+>>>>>
+>>>>> Fixes to any of those most welcome!
+>>>>>
+>>>>> -anil
+>>>>
+>>>> _______________________________________________
+>>>> Infrastructure mailing list
+>>>> Infrastructure at lists.ocaml.org
+>>>> http://lists.ocaml.org/listinfo/infrastructure
+>>> _______________________________________________
+>>> Infrastructure mailing list
+>>> Infrastructure at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/infrastructure
+>> _______________________________________________
+>> Infrastructure mailing list
+>> Infrastructure at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/infrastructure
+>>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From anil at recoil.org  Wed Sep 18 16:58:03 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 18 Sep 2013 16:58:03 +0100
+Subject: [opam-devel] mirage, opam and cross-compiling... ?
+In-Reply-To: <4C20415C7327A849961F3B8421413725010CD5506A81@EXCHANGE1.ad.nottingham.ac.uk>
+References: <CAGS5m-=RrjSfqcFbMCoRpYa3OB_x5F=dgDZp3=nMuf0GEWnKPQ@mail.gmail.com>
+ <CAG_esB1gqHKH=_fd_4cx1JJvWR2o+psKOtFWwmdPieOxi+z=Og@mail.gmail.com>
+ <CAGS5m-=KO7qjUO5=k4kFAwv_xMTTbhDfOvkkBqWVZiaNFTd9kQ@mail.gmail.com>
+ <CAG_esB3PxNWKfcWWJ77ruxoyVB9J0vY=TDYagLR_yemyfJNk8w@mail.gmail.com>,
+ <CAGS5m-maiacDJKQSdktHA+P_qF-Unbmvj5EDXU=PcNbDZ7U6QA@mail.gmail.com>
+ <87A0C928-9B3F-46DB-A2EF-188FFEBB424F@eu.citrix.com>
+ <1057E5A7-1A94-4541-979A-1821CFF65AD1@recoil.org>
+ <4C20415C7327A849961F3B8421413725010CD5506A81@EXCHANGE1.ad.nottingham.ac.uk>
+Message-ID: <8972A91E-F38D-4D98-B100-BAE25D17F987@recoil.org>
+
+On 18 Sep 2013, at 12:44, Christopher Greenhalgh <Chris.Greenhalgh at nottingham.ac.uk> wrote:
+
+> Is there something that passes for best practice when it comes to cross-compiling, ocaml and opam? 
+> 
+
+[I'm CCing opam-devel on this question, as it's pertinent to ongoing work in the trunk of OCaml]
+
+> I've spent the morning looking but ocaml cross-compiling seems to be rather ad hoc at the moment. And the approach I've taken so far following Vouillon with separate target-specific opam packages doesn't seem entirely satisfactory...
+> 
+> it would seem "better" to be able to switch to a cross-compiler and build standard (or at least cross-compilation-compatible) packages auto-magically. And it would be super-nice if this didn't require any changes to "simple" packages, which in turn implies that cross-compiling tools are the default and the cross-compiler's ocamlbuild is wise to cross-compiling. Other build tools (esp. oasis) could then also be extended to turn out sensible defaults when cross-compiling (e.g. using BuildTools fields).
+
+Right -- the problem with cross-compiling OCaml historically has been a few points:
+
+- the OCaml toolchain itself didn't support building cross-tools
+- there's no standard for specifying an equivalent to CFLAGS/CC in OCaml build systems -- everyone defines their own.
+
+The former is being solved in 4.2 trunk now (I believe not yet fully cross-arch, but certainly cross-os).  The latter is why an Android-specific OPAM target is what the existing repository does.
+
+However, I think we're in much better to solve this properly now with compiler switches, but it will require doing two things:
+
+- define an OPAM switch that generates the cross-libraries.  This switch will be incapable of executing the binaries it produces, so it's probably best to generate a host toolchain *and* a separate cross toolchain with a different prefix.
+
+- add patches to existing build systems to use the cross tools (such as OASIS, as you mention).  This still requires an overlay patchset in OPAM, but it's far easier to manage and feed upstream that a set of ad-hoc patches.
+
+- the annoying ones are usually syntax extensions, which need to be built as host libraries and not target libraries.  We have a way to sidestep this as of a few weeks ago.  Leo White has built a specialized compiler driver that bypasses the usual compiler parse tree, and instead statically links in some camlp4 extensions.  This is not only faster, but it avoids dynamic linking in the compiler completely!  Most of our syntax extension requirements are actually pretty minimal (the Lwt one, and perhaps Sexplib and Cow), so we could just link those into one mega-compiler-driver that works on all the source code that we care about.
+
+https://github.com/lpw25/ocaml-with-pp
+
+I'm playing with this at the moment in order to build a js_of_ocaml toplevel for the Real World OCaml website, so let me know how you get along with it.
+
+> I added some notes to the end of my mirage-on-android working notes, https://github.com/cgreenhalgh/opensharingtoolkit/blob/master/docs/mirageonandroid.md
+> 
+> But I'm wondering if this is already in hand somewhere or better tackled otherwise?
+
+Your notes are incredibly useful -- I think it's time to kickstart some of the cross-compilation work now that the OCaml 4.01 release is out of the way.  This also gives us a useful direction in OPAM development in terms of build system requirements (if you can cross-architecture compile it, then it'll probably work anywhere@)
+
+-anil
+
+From Chris.Greenhalgh at nottingham.ac.uk  Thu Sep 19 09:55:55 2013
+From: Chris.Greenhalgh at nottingham.ac.uk (Christopher Greenhalgh)
+Date: Thu, 19 Sep 2013 09:55:55 +0100
+Subject: [opam-devel] mirage, opam and cross-compiling... ?
+In-Reply-To: <8972A91E-F38D-4D98-B100-BAE25D17F987@recoil.org>
+References: <CAGS5m-=RrjSfqcFbMCoRpYa3OB_x5F=dgDZp3=nMuf0GEWnKPQ@mail.gmail.com>
+ <CAG_esB1gqHKH=_fd_4cx1JJvWR2o+psKOtFWwmdPieOxi+z=Og@mail.gmail.com>
+ <CAGS5m-=KO7qjUO5=k4kFAwv_xMTTbhDfOvkkBqWVZiaNFTd9kQ@mail.gmail.com>
+ <CAG_esB3PxNWKfcWWJ77ruxoyVB9J0vY=TDYagLR_yemyfJNk8w@mail.gmail.com>,
+ <CAGS5m-maiacDJKQSdktHA+P_qF-Unbmvj5EDXU=PcNbDZ7U6QA@mail.gmail.com>
+ <87A0C928-9B3F-46DB-A2EF-188FFEBB424F@eu.citrix.com>
+ <1057E5A7-1A94-4541-979A-1821CFF65AD1@recoil.org>
+ <4C20415C7327A849961F3B8421413725010CD5506A81@EXCHANGE1.ad.nottingham.ac.uk>
+ <8972A91E-F38D-4D98-B100-BAE25D17F987@recoil.org>
+Message-ID: <4C20415C7327A849961F3B8421413725010CD5506A95@EXCHANGE1.ad.nottingham.ac.uk>
+
+On 18 September 2013 16:58 Anil Madhavapeddy wrote:
+
+>- there's no standard for specifying an equivalent to CFLAGS/CC in OCaml build systems -- everyone defines their own.
+
+I did some thinking about (something that turned out to be equivalent to) this and I came up with what - to me - seems like a sensible scheme; for posterity I've noted it here: https://github.com/cgreenhalgh/ocaml-crosscompiling/blob/master/docs/toolchainproposal.md 
+but probably it should be fed somewhere else as it would involve a new flag in all the ocaml commands...
+
+>- the annoying ones are usually syntax extensions, which need to be built as host libraries and not target libraries.  We have a way to sidestep this as of a few weeks ago.  Leo White has built a specialized compiler driver that bypasses the usual compiler parse tree, and instead statically links in some camlp4 extensions.  This is not only faster, but it avoids dynamic linking in the compiler completely!  Most of our syntax extension requirements are actually pretty minimal (the Lwt one, and perhaps Sexplib and Cow), so we could just link those into one mega-compiler-driver that works on all the source code that we care about.
+
+With and ocaml-android cross-compiler this seems to have 'just worked' so far, presumably because it is using the syntax extensions as bytecode only and they have no dependencies on native libraries. (I haven't dug enough to see exactly what is going on yet). Potentially fragile, though...
+
+p.s.  I've left a link but moved my notes to a new git repo, https://github.com/cgreenhalgh/ocaml-crosscompiling )
+
+Cheers
+Chris
+
+This message and any attachment are intended solely for the addressee and may contain confidential information. If you have received this message in error, please send it back to me, and immediately delete it.   Please do not use, copy or disclose the information contained in this message or in any attachment.  Any views or opinions expressed by the author of this email do not necessarily reflect the views of the University of Nottingham.
+
+This message has been checked for viruses but the contents of an attachment
+may still contain software viruses which could damage your computer system, you are advised to perform your own checks. Email communications with the University of Nottingham may be monitored as permitted by UK legislation.
+
+
+
+
+
+From fabien.dagnat at telecom-bretagne.eu  Thu Sep 19 10:19:27 2013
+From: fabien.dagnat at telecom-bretagne.eu (Dagnat Fabien)
+Date: Thu, 19 Sep 2013 11:19:27 +0200
+Subject: [opam-devel] .opam
+Message-ID: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+
+Hello,
+The documentation abstracts .opam as $opam suggesting that we can install the opam repository anywhere but I can't find any documentation on how to do that. Can someone point me where to look at?
+
+Are there any experiments on sharing part of a repository to avoid duplicating some basic common elements?
+
+Fabien
+	Fabien DAGNAT
+Ma?tre de conf?rences au d?partement informatique
+Responsable de la fili?re Syst?mes Logiciels et R?seaux
+T?l. : (0 | 33) 2 29 00 14 09 Technop?le Brest-Iroise, CS 83818
+29238 Brest Cedex 3, France 
+
+Une ?cole de l'Institut Mines-T?l?com     
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130919/9eea6ee7/attachment.html>
+
+From anil at recoil.org  Thu Sep 19 10:28:18 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 19 Sep 2013 10:28:18 +0100
+Subject: [opam-devel] .opam
+In-Reply-To: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+References: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+Message-ID: <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+
+On 19 Sep 2013, at 10:19, Dagnat Fabien <fabien.dagnat at telecom-bretagne.eu> wrote:
+
+> Hello,
+> The documentation abstracts .opam as $opam suggesting that we can install the opam repository anywhere but I can't find any documentation on how to do that. Can someone point me where to look at?
+
+From `man opam`:
+
+    -r ROOT, --root=ROOT (absent=~/.opam)
+       Use ROOT as the current root path. This is equivalent to setting $OPAMROOT to ROOT.
+
+> Are there any experiments on sharing part of a repository to avoid duplicating some basic common elements?
+
+Not sure what you're looking to do here -- what do you want to vary between repositories?
+
+-anil
+
+From fabien.dagnat at telecom-bretagne.eu  Thu Sep 19 12:03:30 2013
+From: fabien.dagnat at telecom-bretagne.eu (Dagnat Fabien)
+Date: Thu, 19 Sep 2013 13:03:30 +0200
+Subject: [opam-devel] .opam
+In-Reply-To: <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+References: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+ <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+Message-ID: <6A7442C4-3A8C-4D92-B391-E82C8CCFCC5E@telecom-bretagne.eu>
+
+
+Le 19 sept. 2013 ? 11:28, Anil Madhavapeddy <anil at recoil.org> a ?crit :
+
+> On 19 Sep 2013, at 10:19, Dagnat Fabien <fabien.dagnat at telecom-bretagne.eu> wrote:
+> 
+>> Hello,
+>> The documentation abstracts .opam as $opam suggesting that we can install the opam repository anywhere but I can't find any documentation on how to do that. Can someone point me where to look at?
+> 
+> From `man opam`:
+> 
+>    -r ROOT, --root=ROOT (absent=~/.opam)
+>       Use ROOT as the current root path. This is equivalent to setting $OPAMROOT to ROOT.
+Ok, I hadn't thought of using man:-(
+> 
+>> Are there any experiments on sharing part of a repository to avoid duplicating some basic common elements?
+> 
+> Not sure what you're looking to do here -- what do you want to vary between repositories?
+Share some parts: for example a stable caml shared by several users and keeping the ability to install some libraries or switches on per user basis.
+> 
+> -anil
+Fabien
+	Fabien DAGNAT
+Ma?tre de conf?rences au d?partement informatique
+Responsable de la fili?re Syst?mes Logiciels et R?seaux
+T?l. : (0 | 33) 2 29 00 14 09 Technop?le Brest-Iroise, CS 83818
+29238 Brest Cedex 3, France 
+
+Une ?cole de l'Institut Mines-T?l?com     
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20130919/bb88bf23/attachment-0001.html>
+
+From roberto at dicosmo.org  Thu Sep 19 12:43:48 2013
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 19 Sep 2013 13:43:48 +0200
+Subject: [opam-devel] .opam
+In-Reply-To: <6A7442C4-3A8C-4D92-B391-E82C8CCFCC5E@telecom-bretagne.eu>
+References: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+ <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+ <6A7442C4-3A8C-4D92-B391-E82C8CCFCC5E@telecom-bretagne.eu>
+Message-ID: <20130919114348.GA22072@voyager>
+
+On Thu, Sep 19, 2013 at 01:03:30PM +0200, Dagnat Fabien wrote:
+<snip>
+> Share some parts: for example a stable caml shared by several users and keeping
+> the ability to install some libraries or switches on per user basis.
+> 
+
+Indeed, this is something which would greatly help.
+
+In Python, they have virtualenv for doing this, see
+
+  http://www.pythonforbeginners.com/basics/python-virtualenv-usage/
+
+--
+Roberto
+
+From anil at recoil.org  Thu Sep 19 13:28:37 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 19 Sep 2013 13:28:37 +0100
+Subject: [opam-devel] .opam
+In-Reply-To: <20130919114348.GA22072@voyager>
+References: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+ <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+ <6A7442C4-3A8C-4D92-B391-E82C8CCFCC5E@telecom-bretagne.eu>
+ <20130919114348.GA22072@voyager>
+Message-ID: <C1EF2393-2530-4532-8B8D-9BF3363A3ACB@recoil.org>
+
+On 19 Sep 2013, at 12:43, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+
+> On Thu, Sep 19, 2013 at 01:03:30PM +0200, Dagnat Fabien wrote:
+> <snip>
+>> Share some parts: for example a stable caml shared by several users and keeping
+>> the ability to install some libraries or switches on per user basis.
+>> 
+> 
+> Indeed, this is something which would greatly help.
+> 
+> In Python, they have virtualenv for doing this, see
+> 
+>  http://www.pythonforbeginners.com/basics/python-virtualenv-usage/
+
+Is there any reason storing the contents of .opam in a Git repository
+wouldn't work for this?
+
+The biggest blocker with is the lack of support for relocating an OCaml
+toolchain to a different directory, so you would need to make this work
+with a system compiler to begin with.
+
+-anil
+
+
+From roberto at dicosmo.org  Thu Sep 19 13:49:54 2013
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Thu, 19 Sep 2013 14:49:54 +0200
+Subject: [opam-devel] .opam
+In-Reply-To: <C1EF2393-2530-4532-8B8D-9BF3363A3ACB@recoil.org>
+References: <9F3F482E-5788-4224-BAD9-36FC2156C230@telecom-bretagne.eu>
+ <04FFC4FB-2BD8-4CE8-A416-0DF720685B5E@recoil.org>
+ <6A7442C4-3A8C-4D92-B391-E82C8CCFCC5E@telecom-bretagne.eu>
+ <20130919114348.GA22072@voyager>
+ <C1EF2393-2530-4532-8B8D-9BF3363A3ACB@recoil.org>
+Message-ID: <20130919124954.GB3626@voyager>
+
+On Thu, Sep 19, 2013 at 01:28:37PM +0100, Anil Madhavapeddy wrote:
+> On 19 Sep 2013, at 12:43, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> 
+> > On Thu, Sep 19, 2013 at 01:03:30PM +0200, Dagnat Fabien wrote:
+> > <snip>
+> >> Share some parts: for example a stable caml shared by several users and keeping
+> >> the ability to install some libraries or switches on per user basis.
+> >> 
+> > 
+> > Indeed, this is something which would greatly help.
+> > 
+> > In Python, they have virtualenv for doing this, see
+> > 
+> >  http://www.pythonforbeginners.com/basics/python-virtualenv-usage/
+> 
+> Is there any reason storing the contents of .opam in a Git repository
+> wouldn't work for this?
+> 
+
+You mean, to share common pieces and avoid exploding the disk quota?
+Of course, the hash-based approach used in git is in principle the
+right solution, but in practice, AFAIK, git as a tool is not built
+to work in a multi-user environment (I mean, a shared .git repo accessed by
+multiple users at a time, each keeping a local view of the components,
+and yet sharing all of them).
+
+One of the uses of virtualenv is with the
+
+ --system-site-packages
+
+option to provide the proper symbolic links to the system-wide
+installation (and replacing system-wide packages with local copies
+if this needs be).
+
+If one wants to spend time on this for opam, a good start would
+be a little brainstorming session in front of a blackboard to see
+how to accommodate:
+
+ - performing a shallow clone of a reference shared repo into a user
+   .opam
+
+ - installing/overriding packages in the shared repo with local copies
+   when requested by the user
+
+ - fixing/garbage collecting a local repo:
+
+   + if a shared package disappears, opam for the local user should notice
+     and install locally a replacement version
+
+   + if a shared package appears, opam for the local user should notice
+     and replace the local copy with a link to the shared one
+
+All this might be more complex than one thinks, due to the need to handle
+the permissions on the file systems...
+
+--
+Roberto
+
+
+
+
+> -anil
+> 
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From anil at recoil.org  Fri Sep 20 10:50:18 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 20 Sep 2013 10:50:18 +0100
+Subject: [opam-devel] [Caml-list] Opam use for teaching lab
+	infrastructure
+In-Reply-To: <CAC3Lx=bOr9r+-Puk5XOrpKsyB5Rnjygxf1+cBQ+_MG64xZokPw@mail.gmail.com>
+References: <F93DEE93-3068-4EC7-BFAB-6646D8D4CFE3@telecom-bretagne.eu>
+ <20130919105039.GA27278@voyager>
+ <CAC3Lx=bOr9r+-Puk5XOrpKsyB5Rnjygxf1+cBQ+_MG64xZokPw@mail.gmail.com>
+Message-ID: <0BB2D8EF-DFED-4970-9D3E-3A43ED1BFCF2@recoil.org>
+
+On 20 Sep 2013, at 10:40, David MENTRE <dmentre at linux-france.org> wrote:
+> 
+> 
+> 2013/9/19 Roberto Di Cosmo <roberto at dicosmo.org>:
+>> 
+>>      You may need to help them installing the necessary development environment
+>>      (gcc, m4, devl libraries, etc.), I do not know how to avoid this on a
+>>      random laptop :-(
+> 
+> I am trying this approach: installing opam on a fresh Debian virtual
+> machine for "students". With opam, how do you guess the needed
+> external libraries?
+> 
+> With tarballs, I am usually reading the INSTALL or README file and
+> install needed Debian packages. But how do I access to this
+> information for opam packages? Is there a list somewhere of external
+> (to opam) dependencies?
+
+I maintained a rough set of monolithic dependencies in the jenkins/ source
+directory of OPAM:
+https://github.com/OCamlPro/opam/blob/master/jenkins/10-opam-prepare.sh
+
+This is temporary, as OPAM 1.1dev has better support for describing external
+dependencies within the package description via the `depexts` field.
+The design of this is sketched out in:
+
+http://anil.recoil.org/2013/09/09/ocamlot-autotriaging.html
+(look for 'external system dependencies')
+
+I'm still gluing together a sample version of this on Debian/OpenBSD, so
+I'll mail this list requesting maintainers to help describe their external
+dependencies when I have a working local setup with some sample packages.
+
+For now, contributing to the monolithic install script above is welcome,
+as I can use that as a reference when porting dexpexts over.
+
+cheers,
+Anil
+
+From dmentre at linux-france.org  Fri Sep 20 13:12:01 2013
+From: dmentre at linux-france.org (David MENTRE)
+Date: Fri, 20 Sep 2013 14:12:01 +0200
+Subject: [opam-devel] [Caml-list] Opam use for teaching lab
+	infrastructure
+In-Reply-To: <0BB2D8EF-DFED-4970-9D3E-3A43ED1BFCF2@recoil.org>
+References: <F93DEE93-3068-4EC7-BFAB-6646D8D4CFE3@telecom-bretagne.eu>
+ <20130919105039.GA27278@voyager>
+ <CAC3Lx=bOr9r+-Puk5XOrpKsyB5Rnjygxf1+cBQ+_MG64xZokPw@mail.gmail.com>
+ <0BB2D8EF-DFED-4970-9D3E-3A43ED1BFCF2@recoil.org>
+Message-ID: <CAC3Lx=ah40A3mLdJH6NiZLwa6cwGt+1C7pNujKNFFOtWz7cZMw@mail.gmail.com>
+
+Hello,
+
+2013/9/20 Anil Madhavapeddy <anil at recoil.org>:
+> I maintained a rough set of monolithic dependencies in the jenkins/ source
+> directory of OPAM:
+> https://github.com/OCamlPro/opam/blob/master/jenkins/10-opam-prepare.sh
+
+Thanks!
+
+david
+
+From anil at recoil.org  Mon Sep 30 01:34:18 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 30 Sep 2013 01:34:18 +0100
+Subject: [opam-devel] [ocaml-platform] OCamlot
+In-Reply-To: <83B10F50-5E11-4138-8F37-0B84FE98953E@cl.cam.ac.uk>
+References: <CADxsiea1f67q52Hj2BBsmPddWLW45kBpZXDK+QFsQv+jMVMvpw@mail.gmail.com>
+ <56A82DFE-1A63-4577-B498-D552F75BBF99@cam.ac.uk>
+ <CADxsiebn6ZmfDARZucy5MWR5h2HLxnV0E6D2o4e1v5Gyh0oEfg@mail.gmail.com>
+ <83B10F50-5E11-4138-8F37-0B84FE98953E@cl.cam.ac.uk>
+Message-ID: <7EF81292-D1E9-4A12-8654-B57260CB3A1D@recoil.org>
+
+On 13 Feb 2013, at 22:42, Anil Madhavapeddy <avsm2 at cl.cam.ac.uk> wrote:
+
+> On 13 Feb 2013, at 21:24, Mike Lin <mlin at mlin.net> wrote:
+>> 
+>> So therefore we build one from scratch!!??
+> <snip>
+>> 
+>> I'd asked whether options like that were thoroughly considered before deciding to invent one here, and I'm sorry but I haven't gotten that impression so far. 
+> 
+> Yeah, of course.  As with all these things, there's a combination of broad requirements ("does it build on X") with rather specialised ones ("I need to fork this OPAM chroot to build these 3 variants in independent copy-on-write trees").
+
+Mike,
+
+I just wanted to update you on this thread:
+http://anil.recoil.org/2013/09/30/travis-and-ocaml.html
+
+I went back and looked at Travis again due to the pull request feature, and it's now really ideal for all the frontend requirements.  We're finding a happy compromise with doing the basic testing with Travis, and using it to fire off the more sophisticated tests using OCamlot on the backend.  All in all, very smooth stuff, and this is now live for OPAM.
+
+The main difference with the scripts from your blog post is that I built a matrix of PPA packages for all the various versions of OCaml and OPAM, so it's less resource intensive for the Travis folk.
+
+I wonder if it's worth proposing native OCaml/OPAM support within Travis itself, once OPAM 1.1  is released...
+
+-anil
+

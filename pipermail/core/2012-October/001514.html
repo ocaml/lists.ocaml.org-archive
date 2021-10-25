@@ -1,0 +1,92 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> using Async from the toplevel
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20using%20Async%20from%20the%20toplevel&In-Reply-To=%3CCAPYVAiLmp7zTc5xrVXVJ9GRZacK4ojCBYkOHs8wRwxQPw5XqXw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001512.html">
+   <LINK REL="Next"  HREF="001515.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>using Async from the toplevel</H1>
+    <B>Stephen Weeks</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20using%20Async%20from%20the%20toplevel&In-Reply-To=%3CCAPYVAiLmp7zTc5xrVXVJ9GRZacK4ojCBYkOHs8wRwxQPw5XqXw%40mail.gmail.com%3E"
+       TITLE="using Async from the toplevel">sweeks at janestreet.com
+       </A><BR>
+    <I>Wed Oct 10 00:25:27 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001512.html">using Async from the toplevel
+</A></li>
+        <LI>Next message: <A HREF="001515.html">using Async from the toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1514">[ date ]</a>
+              <a href="thread.html#1514">[ thread ]</a>
+              <a href="subject.html#1514">[ subject ]</a>
+              <a href="author.html#1514">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+With the OCaml toplevel and async scheduler running in different
+threads, we need to guarantee that they don't interfere with each
+other.  It is not necessary to stop the async scheduler; we just have
+to prevent it from running while the toplevel is evaluating an input
+expression.  This can be accomplished by having the toplevel hold the
+async lock while it is evaluating an input expression, and is part of
+what is done by wrapping the expression in [block_on_async_exn]:
+
+  val block_on_async_exn : (unit -&gt; 'a Deferred.t) -&gt; 'a
+
+[block_on_async_exn] also waits until the deferred becomes determined,
+which may or may not be desirable.  The only key point for correctness
+is the locking.  So, all we really need is [run_in_async_exn], which
+acquires the lock, but does not block:
+
+  val run_in_async_exn : (unit -&gt; 'a) -&gt; 'a
+
+If people want the ability to block the async scheduler from running,
+we could easily add the following functions to [Async.Thread_safe]:
+
+  val  pause_scheduler : unit -&gt; unit
+  val resume_scheduler : unit -&gt; unit
+
+Calling [pause_scheduler] would block until it can acquire the async
+lock, at which point the scheduler would be prevented from running.
+One can then do whatever one wants, without interference from async,
+and then, when one is finished, call [resume_scheduler].
+
+But, I've never heard a need for these at Jane Street; we've been able
+to get by with [{block_on,run_in}_async_exn].
+
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001512.html">using Async from the toplevel
+</A></li>
+	<LI>Next message: <A HREF="001515.html">using Async from the toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1514">[ date ]</a>
+              <a href="thread.html#1514">[ thread ]</a>
+              <a href="subject.html#1514">[ subject ]</a>
+              <a href="author.html#1514">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

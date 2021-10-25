@@ -1,0 +1,890 @@
+From daniel.buenzli at erratique.ch  Thu Oct  1 17:20:25 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 1 Oct 2015 17:20:25 +0100
+Subject: [opam-devel] depexts homebrew taps
+Message-ID: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+
+Hello,  
+
+Is it possible to specify packages living in homebrew taps in the depext field of an opam package ? 
+
+Daniel 
+
+
+
+From anil at recoil.org  Thu Oct  1 17:59:54 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 1 Oct 2015 17:59:54 +0100
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+Message-ID: <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+
+On 1 Oct 2015, at 17:20, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> Hello,  
+> 
+> Is it possible to specify packages living in homebrew taps in the depext field of an opam package ? 
+
+Not taps, just the main Homebrew.  However, this should be easy enough to add by doing a bit of parsing of the package name I guess.
+
+[ ["osx" "homebrew"] ["tap/package"] ]
+
+In fact, would that just work as-is?
+
+-anil
+
+From daniel.buenzli at erratique.ch  Thu Oct  1 18:27:09 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 1 Oct 2015 18:27:09 +0100
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+ <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+Message-ID: <394A542115E949FD99677CA56360E28E@erratique.ch>
+
+Thanks for the suggestion. In fact if I issue:
+
+  brew install ARMmbed/homebrew-formulae/arm-none-eabi-gcc
+
+Login to my github account get requests on the cli (!?). But if I do a:
+
+  brew tap ARMmbed/homebrew-formulae/
+  brew install arm-none-eabi-gcc
+
+Any idea about what may be going on ? 
+
+Best, 
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Sat Oct  3 11:53:11 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 3 Oct 2015 11:53:11 +0100
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+ <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+Message-ID: <B9A69A1AE31F4EA2A514E7F7454AD87A@erratique.ch>
+
+Le jeudi, 1 octobre 2015 ? 17:59, Anil Madhavapeddy a ?crit :
+> [ ["osx" "homebrew"] ["tap/package"] ]
+>  
+> In fact, would that just work as-is?
+For the record, yes it does. It seems that brew is even able to find were the tap lies and automatically add it. In my case it ended up being tap/formulae/package (armmbed/formulae/arm-none-eabi-gcc) but that may be due to the way the tap is structured.  
+
+Best,  
+
+Daniel
+
+
+
+From anil at recoil.org  Sun Oct  4 10:26:47 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 4 Oct 2015 10:26:47 +0100
+Subject: [opam-devel] distfiles for ocaml.janestreet.com need an SSL upgrade
+Message-ID: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+
+(x-posting to opam-devel as an fyi in case anyone else runs into this)
+
+Using OSX 10.11 results in an SSLv3 error from the upstream distfile server
+on ocaml.janestreet.com.  Could it please be reconfigured to use TLS 1.0 or
+higher?  Workaround is to "brew install wget", which is less secure out of the box.
+
+  $ curl --write-out %{http_code}\n --insecure --retry 3 --retry-delay 2 -OL
+    https://ocaml.janestreet.com/ocaml-core/113.00/files/sexplib-113.00.00.tar.gz
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+  curl: (56) SSLRead() return error -9841
+
+Louis, this manifests as a hard-to-debug error, since the curl command line
+doesn't seem to get output anywhere (even when using OPAMDEBUG=1).  Is there
+some other way than modifying the OPAM source code to see all the commands
+that are being shelled out?
+
+-anil
+
+From d at lobraico.com  Sun Oct  4 15:41:29 2015
+From: d at lobraico.com (Dominick LoBraico)
+Date: Sun, 4 Oct 2015 10:41:29 -0400
+Subject: [opam-devel] distfiles for ocaml.janestreet.com need an SSL
+	upgrade
+In-Reply-To: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+References: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+Message-ID: <CAJEVGC_1kBcA7ufeALoyNNwgEkJ2x0MCwb_DKUZnvpH9mXzN9Q@mail.gmail.com>
+
+Hmm, I can reproduce the error your seeing on 10.10.4 as well but it's
+not clear to me that this is an SSLv3 issue.
+
+$ openssl s_client -connect ocaml.janestreet.com:443 -ssl3
+CONNECTED(00000003)
+51476:error:14094410:SSL routines:SSL3_READ_BYTES:sslv3 alert
+handshake failure:/SourceCache/OpenSSL098/OpenSSL098-52.30.1/src/ssl/s3_pkt.c:1145:SSL
+alert number 40
+51476:error:1409E0E5:SSL routines:SSL3_WRITE_BYTES:ssl handshake
+failure:/SourceCache/OpenSSL098/OpenSSL098-52.30.1/src/ssl/s3_pkt.c:566:
+
+I'm investigating.
+
+On Sun, Oct 4, 2015 at 5:26 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> (x-posting to opam-devel as an fyi in case anyone else runs into this)
+>
+> Using OSX 10.11 results in an SSLv3 error from the upstream distfile server
+> on ocaml.janestreet.com.  Could it please be reconfigured to use TLS 1.0 or
+> higher?  Workaround is to "brew install wget", which is less secure out of the box.
+>
+>   $ curl --write-out %{http_code}\n --insecure --retry 3 --retry-delay 2 -OL
+>     https://ocaml.janestreet.com/ocaml-core/113.00/files/sexplib-113.00.00.tar.gz
+>   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+>                                  Dload  Upload   Total   Spent    Left  Speed
+>   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+>   curl: (56) SSLRead() return error -9841
+>
+> Louis, this manifests as a hard-to-debug error, since the curl command line
+> doesn't seem to get output anywhere (even when using OPAMDEBUG=1).  Is there
+> some other way than modifying the OPAM source code to see all the commands
+> that are being shelled out?
+>
+> -anil
+>
+> --
+> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
+
+From anil at recoil.org  Sun Oct  4 17:40:26 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 4 Oct 2015 17:40:26 +0100
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <B9A69A1AE31F4EA2A514E7F7454AD87A@erratique.ch>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+ <D65A8364-AB5E-461D-82C5-8B92A9A06114@recoil.org>
+ <B9A69A1AE31F4EA2A514E7F7454AD87A@erratique.ch>
+Message-ID: <DC32E7C0-78C9-484A-841E-B87F60180ECA@recoil.org>
+
+On 3 Oct 2015, at 11:53, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> Le jeudi, 1 octobre 2015 ? 17:59, Anil Madhavapeddy a ?crit :
+>> [ ["osx" "homebrew"] ["tap/package"] ]
+>> 
+>> In fact, would that just work as-is?
+> For the record, yes it does. It seems that brew is even able to find were the tap lies and automatically add it. In my case it ended up being tap/formulae/package (armmbed/formulae/arm-none-eabi-gcc) but that may be due to the way the tap is structured.  
+
+Great!  I wonder if there's a lesson there for OPAM.  I could imagine having an auto-fork shortcut so that you could do:
+
+$ opam install janestreet/type_conv
+
+to get their latest tap.  I guess our equivalent is an explicit URL, which is much more flexible, but sadly more verbose due to the need for a separate pin step rather than a single installation instruction.
+
+-anil
+
+From louis.gesbert at ocamlpro.com  Mon Oct  5 01:50:01 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 05 Oct 2015 09:50:01 +0900
+Subject: [opam-devel] distfiles for ocaml.janestreet.com need an SSL
+ upgrade
+In-Reply-To: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+References: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+Message-ID: <2084028.8va5ezu7yd@agaric>
+
+> Louis, this manifests as a hard-to-debug error, since the curl command line
+> doesn't seem to get output anywhere (even when using OPAMDEBUG=1).  Is there
+> some other way than modifying the OPAM source code to see all the commands
+> that are being shelled out?
+
+Yes: download commands are printed with `-vv`, all commands with `-vvv`. This is because you are generally most interested in build commands ; might lack documentation though, I will check.
+
+From louis.gesbert at ocamlpro.com  Mon Oct  5 01:54:17 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 05 Oct 2015 09:54:17 +0900
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <DC32E7C0-78C9-484A-841E-B87F60180ECA@recoil.org>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+ <B9A69A1AE31F4EA2A514E7F7454AD87A@erratique.ch>
+ <DC32E7C0-78C9-484A-841E-B87F60180ECA@recoil.org>
+Message-ID: <2031426.2sLNxvgtd0@agaric>
+
+Well, `opam pin add --dev type_conv` is a bit more verbose, but it will prompt for install or upgrade with a single command. It could be possible to install the dev version as a one-shot, without pinning, but I don't think that would be a good idea, since opam will likely want to downgrade it on any later upgrade or if needing recompilation...
+
+> - Anil Madhavapeddy, 04/10/2015 17:40 -
+> On 3 Oct 2015, at 11:53, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> > 
+> > Le jeudi, 1 octobre 2015 ? 17:59, Anil Madhavapeddy a ?crit :
+> >> [ ["osx" "homebrew"] ["tap/package"] ]
+> >> 
+> >> In fact, would that just work as-is?
+> > For the record, yes it does. It seems that brew is even able to find were the tap lies and automatically add it. In my case it ended up being tap/formulae/package (armmbed/formulae/arm-none-eabi-gcc) but that may be due to the way the tap is structured.  
+> 
+> Great!  I wonder if there's a lesson there for OPAM.  I could imagine having an auto-fork shortcut so that you could do:
+> 
+> $ opam install janestreet/type_conv
+> 
+> to get their latest tap.  I guess our equivalent is an explicit URL, which is much more flexible, but sadly more verbose due to the need for a separate pin step rather than a single installation instruction.
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+From anil at recoil.org  Mon Oct  5 08:06:37 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 5 Oct 2015 08:06:37 +0100
+Subject: [opam-devel] depexts homebrew taps
+In-Reply-To: <2031426.2sLNxvgtd0@agaric>
+References: <AB2CF5B1A1EF447DB62804D5FD4AEAD3@erratique.ch>
+ <B9A69A1AE31F4EA2A514E7F7454AD87A@erratique.ch>
+ <DC32E7C0-78C9-484A-841E-B87F60180ECA@recoil.org> <2031426.2sLNxvgtd0@agaric>
+Message-ID: <75826D35-2659-412C-9DE2-56987A812614@recoil.org>
+
+Yeah, we generally do have a more powerful engine underlying OPAM, so I can see the difficulties here...
+
+-anil
+
+> On 5 Oct 2015, at 01:54, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+> Well, `opam pin add --dev type_conv` is a bit more verbose, but it will prompt for install or upgrade with a single command. It could be possible to install the dev version as a one-shot, without pinning, but I don't think that would be a good idea, since opam will likely want to downgrade it on any later upgrade or if needing recompilation...
+> 
+>> - Anil Madhavapeddy, 04/10/2015 17:40 -
+>> On 3 Oct 2015, at 11:53, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+>>> 
+>>> Le jeudi, 1 octobre 2015 ? 17:59, Anil Madhavapeddy a ?crit :
+>>>> [ ["osx" "homebrew"] ["tap/package"] ]
+>>>> 
+>>>> In fact, would that just work as-is?
+>>> For the record, yes it does. It seems that brew is even able to find were the tap lies and automatically add it. In my case it ended up being tap/formulae/package (armmbed/formulae/arm-none-eabi-gcc) but that may be due to the way the tap is structured.  
+>> 
+>> Great!  I wonder if there's a lesson there for OPAM.  I could imagine having an auto-fork shortcut so that you could do:
+>> 
+>> $ opam install janestreet/type_conv
+>> 
+>> to get their latest tap.  I guess our equivalent is an explicit URL, which is much more flexible, but sadly more verbose due to the need for a separate pin step rather than a single installation instruction.
+>> 
+>> -anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Mon Oct  5 08:08:07 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 5 Oct 2015 08:08:07 +0100
+Subject: [opam-devel] distfiles for ocaml.janestreet.com need an SSL
+	upgrade
+In-Reply-To: <2084028.8va5ezu7yd@agaric>
+References: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+ <2084028.8va5ezu7yd@agaric>
+Message-ID: <A05A8AA2-5BEC-44F3-84B9-A8CE58947E92@recoil.org>
+
+
+> On 5 Oct 2015, at 01:50, Louis Gesbert <louis.gesbert at ocamlpro.com> wrote:
+> 
+>> Louis, this manifests as a hard-to-debug error, since the curl command line
+>> doesn't seem to get output anywhere (even when using OPAMDEBUG=1).  Is there
+>> some other way than modifying the OPAM source code to see all the commands
+>> that are being shelled out?
+> 
+> Yes: download commands are printed with `-vv`, all commands with `-vvv`. This is because you are generally most interested in build commands ; might lack documentation though, I will check.
+
+It's documented in `opam --help` under the verbose flag.  Just need to set OPAMVERBOSE=3 to get the desire output.  Thanks!
+
+-anil
+
+From daniel.buenzli at erratique.ch  Mon Oct 12 14:53:56 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 12 Oct 2015 14:53:56 +0100
+Subject: [opam-devel] Compilers as packages doc ?
+Message-ID: <16EFDCF2849F433AACF2543D69876C37@erratique.ch>
+
+Is the compiler as packages proposal documented somewhere ? I'm especially interested in knowing how it differs from the opam we know now. And is it already implemented ? 
+
+Daniel 
+
+
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 01:31:29 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 01:31:29 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+Message-ID: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+
+Hello,   
+
+I started to write down a few ideas for supporting multiple architecture (i.e. cross-compilation) in opam. It's far from complete, glosses over many details and maybe too simplistic ? but I have the feeling that it's better to try to keep things simple in that setting.
+
+I will certainly not be the person who can fill in all the details ? especially on how to solve and resolve dependencies, I'm sure the solver experts have a better idea of what is needed here than what I'm proposing. People who are familiar with `apt` multi-architecture support may also be in a better position to design this.
+
+So I just dumped my broken set of ideas on the opam wiki so that people can help to improve it and bring it to a full proposal:  
+
+https://github.com/ocaml/opam/wiki/opam-multiarch
+
+Feedback and discussion about the general approach is better done on this list I think. And this should start with whether the support should be handled as an inter or intra switch feature; this proposal being the latter (for these reasons [1]). I know there were attempts at the former so it would be nice if we could reach consensus on this first.
+
+Best,  
+
+Daniel
+
+[1] https://github.com/ocaml/opam/wiki/opam-multiarch#alternative-designs
+
+
+
+
+
+
+From louis.gesbert at ocamlpro.com  Tue Oct 13 02:54:18 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 13 Oct 2015 10:54:18 +0900
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+Message-ID: <3466884.lI5aZcPVx6@maitake>
+
+Nice, well-explained proposal!
+
+I'm not very familiar with cross-compilation, and this has the huge merit of 
+being easy to understand -- hence to handle, I guess.
+
+I have some remarks on the installability checks: recursively trying to solve 
+the cross-arch package dependencies would be a bad idea, and what you propose 
+wouldn't scale well to upgrades, removals, etc. -- thankfully, the solver 
+should be able to do the work for us yet again.
+
+This is like the multi-switch proposal in some way: before calling the solver, 
+all packages (or just those that have some dependency differences between 
+archs, maybe), are duplicated for all archs, and put in the same cudf universe 
+under different names. But then, we can add mutual dependencies between the 
+instances of a given package on each architecture, and this separately for 
+each version of the package. This way, we can be sure they will always be 
+installed together, keeping the desired "one list of packages for all archs". 
+Cycles are a problem for resolving installation actions, obviously, but they 
+are not for the solver.
+
+After the solver call, we can merge back the instances of each package in the 
+returned solution: the package set is guaranteed to be consistent for every 
+arch, while having a single version of each package across them.
+
+This wouldn't impact the `arch-specific:` field (which _could_ also make the 
+package unavailable in case none of its specific arches is present on the 
+switch, to avoid confusion ?).
+
+I also have a question on build order: is it specified across archs ? Should 
+only `build` always be first ?
+Also, we could probably make it so that `xbin` is an alias for `bin` in the 
+case of the build arch, so that the change is invisible when not doing cross-
+compilation.
+
+I don't otherwise see any big difficulties for implementing this in opam!
+
+Best,
+Louis
+
+
+Le mardi 13 octobre 2015, 01:31:29 Daniel B?nzli a ?crit :
+> Hello,
+> 
+> I started to write down a few ideas for supporting multiple architecture
+> (i.e. cross-compilation) in opam. It's far from complete, glosses over many
+> details and maybe too simplistic ? but I have the feeling that it's better
+> to try to keep things simple in that setting.
+> 
+> I will certainly not be the person who can fill in all the details ?
+> especially on how to solve and resolve dependencies, I'm sure the solver
+> experts have a better idea of what is needed here than what I'm proposing.
+> People who are familiar with `apt` multi-architecture support may also be
+> in a better position to design this.
+> 
+> So I just dumped my broken set of ideas on the opam wiki so that people can
+> help to improve it and bring it to a full proposal:
+> 
+> https://github.com/ocaml/opam/wiki/opam-multiarch
+> 
+> Feedback and discussion about the general approach is better done on this
+> list I think. And this should start with whether the support should be
+> handled as an inter or intra switch feature; this proposal being the latter
+> (for these reasons [1]). I know there were attempts at the former so it
+> would be nice if we could reach consensus on this first.
+> 
+> Best,
+> 
+> Daniel
+> 
+> [1] https://github.com/ocaml/opam/wiki/opam-multiarch#alternative-designs
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 11:22:50 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 11:22:50 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <3466884.lI5aZcPVx6@maitake>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <3466884.lI5aZcPVx6@maitake>
+Message-ID: <77E2A4654A9D4F3C96EAB6D7D57E40D1@erratique.ch>
+
+Le mardi, 13 octobre 2015 ? 02:54, Louis Gesbert a ?crit :
+> I'm not very familiar with cross-compilation, and this has the huge merit of
+> being easy to understand -- hence to handle, I guess.
+
+Neither do I except in the past with systems that handle all the crap for you transparently like xcode and recently with my bare metal experiments [1]. The goal is to try to align the build tools and opam so that in the end library makers and packagers don't have to think much to have their cross lunch. Especially if they are not fundamentally interested in it while their users may be. In particular we don't want to have to maintain separate opam-repositories, like opam-android has to, to enable cross-compilation since this can't possibly scale.
+
+
+
+> I have some remarks on the installability checks: recursively trying to solve
+> the cross-arch package dependencies would be a bad idea, and what you propose  
+> wouldn't scale well to upgrades, removals, etc. -- thankfully, the solver  
+> should be able to do the work for us yet again.
+
+I was suspecting that, I'm glad you have a solution to the problem.
+
+> This wouldn't impact the `arch-specific:` field (which _could_ also make the
+> package unavailable in case none of its specific arches is present on the  
+> switch, to avoid confusion ?).
+
+Why not. I'm still a little bit dubious about this part of the proposal: fundamentally the person making such a package could simply declare it available on all architecture and concretely do a nop in its install instructions on the non `arch-specific:` architectures. My concern here was about meta-data information loss: such a package would look like installable on each architecture but it is architecture specific, a fact that we would no longer see in the package metadata. I think we could do without this if it simplifies things but metadata information would be lost.
+
+> I also have a question on build order: is it specified across archs ?  
+I would say no so that we can parallelize the build as much as possible. Concretely we assume that architectures live in isolation possibly only being able to see the build architecture for technical build reasons.
+
+
+> Should only `build` always be first ?
+Yes `build` should be first (I updated the doc to make that clear), so that a package can possibly refer to its counter part or those of its dependencies in the build architecture ? but I'd say that a package with a good build system which is able to distinguish his build and host products and whose dependencies share that property should not need to be able to do that.
+
+> Also, we could probably make it so that `xbin` is an alias for `bin` in the  
+> case of the build arch, so that the change is invisible when not doing cross-
+> compilation.
+
+Yes.
+  
+> I don't otherwise see any big difficulties for implementing this in opam!
+
+Cool. Having that could open up quite a few nice opportunities.  
+
+Best,  
+
+Daniel
+
+[1] http://erratique.ch/software/rpi-boot-ocaml
+  
+
+
+From thomas at gazagnaire.org  Tue Oct 13 11:23:34 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 13 Oct 2015 11:23:34 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+Message-ID: <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+
+The proposal looks fine to me.
+
+One thing what I'd like is the system to stay simple when people don't use cross-compilation. That might mean maybe renaming `build-os` to `os` so that things stays as they are when build-os = host-os = os. Could also mean that `build-prefix` is a special case and don't contains the `<arch>` suffix. 
+
+About the automatic installation of packages when adding a new architecture to the switch: I'm not very found of that. I usually misspell my `git remote add` commands and I'm happy to have `git remote set-url` and `git fetch` as separate commands. So maybe in this case, just lazily install the missing packages for the new arch on `opam upgrade` and `opam install`. So I think that the constraint: "all installed packages should have the same version for all the architectures" is fine, but the constraint "all installed packages should be installed on all architectures" is too strong. So maybe you want `opam install --arch`. 
+
+Thomas
+
+> On 13 Oct 2015, at 01:31, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> Hello,   
+> 
+> I started to write down a few ideas for supporting multiple architecture (i.e. cross-compilation) in opam. It's far from complete, glosses over many details and maybe too simplistic ? but I have the feeling that it's better to try to keep things simple in that setting.
+> 
+> I will certainly not be the person who can fill in all the details ? especially on how to solve and resolve dependencies, I'm sure the solver experts have a better idea of what is needed here than what I'm proposing. People who are familiar with `apt` multi-architecture support may also be in a better position to design this.
+> 
+> So I just dumped my broken set of ideas on the opam wiki so that people can help to improve it and bring it to a full proposal:  
+> 
+> https://github.com/ocaml/opam/wiki/opam-multiarch
+> 
+> Feedback and discussion about the general approach is better done on this list I think. And this should start with whether the support should be handled as an inter or intra switch feature; this proposal being the latter (for these reasons [1]). I know there were attempts at the former so it would be nice if we could reach consensus on this first.
+> 
+> Best,  
+> 
+> Daniel
+> 
+> [1] https://github.com/ocaml/opam/wiki/opam-multiarch#alternative-designs
+> 
+> 
+> 
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From dlobraico at janestreet.com  Sun Oct  4 15:52:26 2015
+From: dlobraico at janestreet.com (Dominick LoBraico)
+Date: Sun, 4 Oct 2015 10:52:26 -0400
+Subject: [opam-devel] distfiles for ocaml.janestreet.com need an SSL
+	upgrade
+In-Reply-To: <CAJEVGC_1kBcA7ufeALoyNNwgEkJ2x0MCwb_DKUZnvpH9mXzN9Q@mail.gmail.com>
+References: <23810553-49AF-4FDE-A996-B4A58C930966@recoil.org>
+ <CAJEVGC_1kBcA7ufeALoyNNwgEkJ2x0MCwb_DKUZnvpH9mXzN9Q@mail.gmail.com>
+Message-ID: <CADiX4M66zO-dfhF=mUH04iEqXnxUSD7gep+XZXn0+RY9nj6K-A@mail.gmail.com>
+
+I think this should be resolved (there were a couple of deprecated
+cipher suites still enabled for this subdomain). My best guess is that
+Apple has (reasonably) become more strict in which cipher suites it
+will use in its "Common Crypto" OpenSSL replacement. Can you verify on
+10.11?
+
+Thanks for the report!
+
+On Sun, Oct 4, 2015 at 10:41 AM, Dominick LoBraico <d at lobraico.com> wrote:
+> Hmm, I can reproduce the error your seeing on 10.10.4 as well but it's
+> not clear to me that this is an SSLv3 issue.
+>
+> $ openssl s_client -connect ocaml.janestreet.com:443 -ssl3
+> CONNECTED(00000003)
+> 51476:error:14094410:SSL routines:SSL3_READ_BYTES:sslv3 alert
+> handshake failure:/SourceCache/OpenSSL098/OpenSSL098-52.30.1/src/ssl/s3_pkt.c:1145:SSL
+> alert number 40
+> 51476:error:1409E0E5:SSL routines:SSL3_WRITE_BYTES:ssl handshake
+> failure:/SourceCache/OpenSSL098/OpenSSL098-52.30.1/src/ssl/s3_pkt.c:566:
+>
+> I'm investigating.
+>
+> On Sun, Oct 4, 2015 at 5:26 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> (x-posting to opam-devel as an fyi in case anyone else runs into this)
+>>
+>> Using OSX 10.11 results in an SSLv3 error from the upstream distfile server
+>> on ocaml.janestreet.com.  Could it please be reconfigured to use TLS 1.0 or
+>> higher?  Workaround is to "brew install wget", which is less secure out of the box.
+>>
+>>   $ curl --write-out %{http_code}\n --insecure --retry 3 --retry-delay 2 -OL
+>>     https://ocaml.janestreet.com/ocaml-core/113.00/files/sexplib-113.00.00.tar.gz
+>>   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+>>                                  Dload  Upload   Total   Spent    Left  Speed
+>>   0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+>>   curl: (56) SSLRead() return error -9841
+>>
+>> Louis, this manifests as a hard-to-debug error, since the curl command line
+>> doesn't seem to get output anywhere (even when using OPAMDEBUG=1).  Is there
+>> some other way than modifying the OPAM source code to see all the commands
+>> that are being shelled out?
+>>
+>> -anil
+>>
+>> --
+>> You received this message because you are subscribed to the Google Groups "ocaml-core" group.
+>> To unsubscribe from this group and stop receiving emails from it, send an email to ocaml-core+unsubscribe at googlegroups.com.
+>> For more options, visit https://groups.google.com/d/optout.
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 11:46:00 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 11:46:00 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+Message-ID: <78F9D00D9A4B41DFAA2DA66B5820A77C@erratique.ch>
+
+Le mardi, 13 octobre 2015 ? 11:23, Thomas Gazagnaire a ?crit :
+> One thing what I'd like is the system to stay simple when people don't use cross-compilation.
+
+I would put it differently. We don't want to bother people with cross-compilation if they don't need to be, which is slightly different. As mentioned in my last message the goal is to avoid to have to maintain separate repositories for cross compilation so from the package repository point of view (i.e. package files) there should be no such thing as people who don't use cross-compilation.
+  
+> That might mean maybe renaming `build-os` to `os` so that things stays as they are when build-os = host-os = os.  
+
+This is actually mentioned in the proposal but your thinking is wrong: non prefixed variable must have host semantics ? host is the thing you install, e.g. the variable lib should be equal to host-lib.
+  
+> About the automatic installation of packages when adding a new architecture to the switch: I'm not very found of that. I usually misspell my `git remote add` commands and I'm happy to have `git remote set-url` and `git fetch` as separate commands. So maybe in this case, just lazily install the missing packages for the new arch on `opam upgrade` and `opam install`.  
+
+Well it can simply ask for confirmation. I think we should avoid a discrepancy between what `opam switch arch list` tells you and install reality (see below).
+  
+> So I think that the constraint: "all installed packages should have the same version for all the architectures" is fine, but the constraint "all installed packages should be installed on all architectures" is too strong.  
+
+I disagree. I want to be able to treat the switch as an entity regardless of architecture so that a `PKG:installed` variable is `true` iff it is installed in all architecture. If you don't do this then you need to be able to introduce architecture specifiers in variables (e.g. PKG:$(ARCH):installed) which I think we should avoid.
+
+Best,
+
+Daniel
+
+
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 12:04:51 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 12:04:51 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+Message-ID: <6E1D78EFED5449A2897C66588044DC23@erratique.ch>
+
+Le mardi, 13 octobre 2015 ? 11:23, Thomas Gazagnaire a ?crit :
+> but the constraint "all installed packages should be installed on all architectures" is too strong.  
+
+Note that the simplicity of the proposal strongly relies on this. It means that the notion of package installation in a switch is kept exactly the same as it is now ? and hence is the same whether you use cross or not. This means that we don't need to introduce new concepts and bureaucracy to be able to talk about a notion of partial installation in a switch and a lot of things remains identical to what it is now, e.g the display of opam info, etc.  
+
+
+Le mardi, 13 octobre 2015 ? 11:46, Daniel B?nzli a ?crit :
+> If you don't do this then you need to be able to introduce architecture specifiers in variables (e.g. PKG:$(ARCH):installed) which I think we should avoid.
+However we will still need something along the line of `pkg config var ?arch` since package configuration variables [1] should be arch specific. If you use them in the build instructions of an opam file they would direct you directly to the ones for you arch, but if you use them from "outside" opam, e.g. on the cli, you have to specify which arch you are talking about.
+  
+
+Daniel
+
+[1] https://github.com/ocaml/opam/issues/2247
+
+
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 12:50:56 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 12:50:56 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <6E1D78EFED5449A2897C66588044DC23@erratique.ch>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+ <6E1D78EFED5449A2897C66588044DC23@erratique.ch>
+Message-ID: <955E214BDF5042C7A73645C1A15A1B3D@erratique.ch>
+
+See also the comments about the proposal on this issue 
+
+https://github.com/ocaml/opam/issues/1536#issuecomment-147569568
+
+Daniel
+
+
+
+From thomas at gazagnaire.org  Tue Oct 13 13:26:26 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 13 Oct 2015 13:26:26 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <78F9D00D9A4B41DFAA2DA66B5820A77C@erratique.ch>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+ <78F9D00D9A4B41DFAA2DA66B5820A77C@erratique.ch>
+Message-ID: <C8F1400A-5726-43C5-B731-995E65C5329E@gazagnaire.org>
+
+
+>> That might mean maybe renaming `build-os` to `os` so that things stays as they are when build-os = host-os = os.  
+> 
+> This is actually mentioned in the proposal but your thinking is wrong: non prefixed variable must have host semantics ? host is the thing you install, e.g. the variable lib should be equal to host-lib.
+
+ok
+
+>> About the automatic installation of packages when adding a new architecture to the switch: I'm not very found of that. I usually misspell my `git remote add` commands and I'm happy to have `git remote set-url` and `git fetch` as separate commands. So maybe in this case, just lazily install the missing packages for the new arch on `opam upgrade` and `opam install`.  
+> 
+> Well it can simply ask for confirmation. I think we should avoid a discrepancy between what `opam switch arch list` tells you and install reality (see below).
+> 
+>> So I think that the constraint: "all installed packages should have the same version for all the architectures" is fine, but the constraint "all installed packages should be installed on all architectures" is too strong.  
+> 
+> I disagree. I want to be able to treat the switch as an entity regardless of architecture so that a `PKG:installed` variable is `true` iff it is installed in all architecture. If you don't do this then you need to be able to introduce architecture specifiers in variables (e.g. PKG:$(ARCH):installed) which I think we should avoid.
+
+I value simplicity as well so if it works well like that I'm fine (especially if opam give meaningful error messages when the invariants are broken). The `arch-specific` trick seems indeed just powerful enough to deal with partial installations.
+
+Thomas
+
+From daniel.buenzli at erratique.ch  Tue Oct 13 20:26:09 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 13 Oct 2015 20:26:09 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <C8F1400A-5726-43C5-B731-995E65C5329E@gazagnaire.org>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+ <41AFE0C7-D41D-4A40-9E9A-4C16402397CC@gazagnaire.org>
+ <78F9D00D9A4B41DFAA2DA66B5820A77C@erratique.ch>
+ <C8F1400A-5726-43C5-B731-995E65C5329E@gazagnaire.org>
+Message-ID: <BD7564EE364E4E2ABB3D23753DF240AE@erratique.ch>
+
+Le mardi, 13 octobre 2015 ? 13:26, Thomas Gazagnaire a ?crit :
+> I value simplicity as well so if it works well like that I'm fine (especially if opam give meaningful error messages when the invariants are broken). The `arch-specific` trick seems indeed just powerful enough to deal with partial installations.
+
+Well in fact Peter Zotov convinced me that this is a little bit too simplistic and not very user friendly as it makes unit of build failure a little bit to large. So it may be better to support the idea that a switch maintains the invariant "all installed packages should have the same version for all the architectures".
+
+Daniel
+
+
+
+From Sebastien.Hinderer at inria.fr  Wed Oct 21 07:54:46 2015
+From: Sebastien.Hinderer at inria.fr (=?utf-8?Q?S=C3=A9bastien?= Hinderer)
+Date: Wed, 21 Oct 2015 08:54:46 +0200
+Subject: [opam-devel] opam does not uninstall menhir properly
+Message-ID: <20151021065446.GA4244@pema>
+
+Hi,
+
+Here is what happens when uninstalling menhir:
+
+$ opam uninstall menhir
+The following actions will be performed:
+  ?  remove menhir 20151012
+
+=-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+[menhir: ocamlfind remove] Command started
+[WARNING] Directory /home/seb/.opam/4.02.1/lib/menhir is not empty, not
+          removing
+[WARNING] Directory /home/seb/.opam/4.02.1/doc/menhir is not empty, not
+          removing
+?  removed   menhir.20151012
+Done.
+
+The remaining files are standard.mly in
+/home/seb/.opam/4.02.1/lib/menhir
+and the demos directory and manual.pdf in
+/home/seb/.opam/4.02.1/doc/menhir.
+
+Given that these files have definitely been installed by Menhir, would
+it be possible to fix the uninstall to also remove them? Or should this
+perhaps be reported upstream?
+
+Thanks,
+
+S?bastien.
+
+From anil at recoil.org  Wed Oct 21 21:13:02 2015
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 21 Oct 2015 13:13:02 -0700
+Subject: [opam-devel] opam does not uninstall menhir properly
+In-Reply-To: <20151021065446.GA4244@pema>
+References: <20151021065446.GA4244@pema>
+Message-ID: <A4636A4C-307F-4EC2-B970-4B39E5DBBEDA@recoil.org>
+
+Thanks -- the uninstall can be fixed in the already-released versions (by adding the `rm` lines into the `remove` field in the `opam` file), and ideally the upstream would fix the actual Makefile problem.  I'm CCing the author, Francois Pottier to this mail.
+
+Anil
+
+> On 20 Oct 2015, at 23:54, S?bastien Hinderer <Sebastien.Hinderer at inria.fr> wrote:
+> 
+> Hi,
+> 
+> Here is what happens when uninstalling menhir:
+> 
+> $ opam uninstall menhir
+> The following actions will be performed:
+>  ?  remove menhir 20151012
+> 
+> =-=- Processing actions -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+> [menhir: ocamlfind remove] Command started
+> [WARNING] Directory /home/seb/.opam/4.02.1/lib/menhir is not empty, not
+>          removing
+> [WARNING] Directory /home/seb/.opam/4.02.1/doc/menhir is not empty, not
+>          removing
+> ?  removed   menhir.20151012
+> Done.
+> 
+> The remaining files are standard.mly in
+> /home/seb/.opam/4.02.1/lib/menhir
+> and the demos directory and manual.pdf in
+> /home/seb/.opam/4.02.1/doc/menhir.
+> 
+> Given that these files have definitely been installed by Menhir, would
+> it be possible to fix the uninstall to also remove them? Or should this
+> perhaps be reported upstream?
+> 
+> Thanks,
+> 
+> S?bastien.
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From Sebastien.Hinderer at inria.fr  Thu Oct 22 09:05:31 2015
+From: Sebastien.Hinderer at inria.fr (=?utf-8?Q?S=C3=A9bastien?= Hinderer)
+Date: Thu, 22 Oct 2015 10:05:31 +0200
+Subject: [opam-devel] opam does not uninstall menhir properly
+In-Reply-To: <20151022065354.GA15572@yquem.inria.fr>
+References: <20151021065446.GA4244@pema>
+ <A4636A4C-307F-4EC2-B970-4B39E5DBBEDA@recoil.org>
+ <20151022065354.GA15572@yquem.inria.fr>
+Message-ID: <20151022080531.GA1609@pl-59055.rocqadm.inria.fr>
+
+Dear Anil, dear Fran?ois,
+
+Many thanks for your help.
+
+Best wishes,
+
+S?bastien.
+
+From Pietro.Abate at pps.univ-paris-diderot.fr  Fri Oct 30 15:36:02 2015
+From: Pietro.Abate at pps.univ-paris-diderot.fr (Pietro Abate)
+Date: Fri, 30 Oct 2015 16:36:02 +0100
+Subject: [opam-devel] Start of an opam multi-architecture proposal
+In-Reply-To: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+References: <544B5386DE35428686EFD1D0EEDE575D@erratique.ch>
+Message-ID: <20151030153602.GA7840@pps.univ-paris-diderot.fr>
+
+Hi All,
+
+On 13/10/15 01:31, Daniel B?nzli wrote:
+> Feedback and discussion about the general approach is better done on
+> this list I think. And this should start with whether the support
+> should be handled as an inter or intra switch feature; this proposal
+> being the latter (for these reasons [1]). I know there were attempts
+> at the former so it would be nice if we could reach consensus on
+> this first.
+
+A few months ago I started working with Fabrice and Roberto on the
+extension multi-arch of opam. I started from solver side to tackle
+this problem, and for the moment I've completely ignored many other
+details related to the user interface (and specified in your
+document). 
+
+I've just committed a working prototype of opam that uses dose to
+handle multi-arch (or we should say multi-switch) universes and you
+can find my work here : https://github.com/abate/opam
+
+To compile this version of opam you need first to compile and install
+dose from git [1] .
+
+The internal protocol used between opam and dose is described here : 
+https://raw.githubusercontent.com/abate/opam/master/doc/design/multi-switch.txt
+(clearly the interface between opam and dose does not use the textual
+form)
+
+For the moment the implementation does not do anything more then opam
+1.3 : all the changes are transparent to the final user (and I've not
+widely tested). The idea is to start from here and push upward these
+modifications and to integrate them to the machinery needed to handle
+a multi-switch environment. I think the first simple feature I'm going
+to add is an --upgrade-all option to upgrade all packages of all
+switches at once (invoking the solver only once).
+
+pietro
+
+[1]: git clone https://scm.gforge.inria.fr/anonscm/git/dose/dose.git 
+
+From Francois.Pottier at inria.fr  Thu Oct 22 07:40:49 2015
+From: Francois.Pottier at inria.fr (Francois Pottier)
+Date: Thu, 22 Oct 2015 06:40:49 -0000
+Subject: [opam-devel] opam does not uninstall menhir properly
+In-Reply-To: <A4636A4C-307F-4EC2-B970-4B39E5DBBEDA@recoil.org>
+References: <20151021065446.GA4244@pema>
+ <A4636A4C-307F-4EC2-B970-4B39E5DBBEDA@recoil.org>
+Message-ID: <20151022065354.GA15572@yquem.inria.fr>
+
+
+Hi Anil & S?bastien,
+
+On Wed, Oct 21, 2015 at 01:13:02PM -0700, Anil Madhavapeddy wrote:
+> Thanks -- the uninstall can be fixed in the already-released versions (by adding the `rm` lines into the `remove` field in the `opam` file), and ideally the upstream would fix the actual Makefile problem.  I'm CCing the author, Francois Pottier to this mail.
+
+Yes, I have just noticed this problem and (hopefully) fixed it this week.
+It should be fixed in the next release.
+
+-- 
+Fran?ois Pottier
+Francois.Pottier at inria.fr
+http://gallium.inria.fr/~fpottier/
+

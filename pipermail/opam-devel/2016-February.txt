@@ -1,0 +1,3429 @@
+From anil at recoil.org  Mon Feb  1 12:01:43 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 1 Feb 2016 12:01:43 +0000
+Subject: [opam-devel] odd error with aspcud on alpine linux
+Message-ID: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+
+I've been porting OPAM to Alpine Linux, and have some very odd errors with Aspcud that I was hoping someone could help with.  The solver pieces are all compiled and should have the right versions, but fail with an inconsistency error.
+
+To reproduce it, you need Docker and:
+
+$ docker run -ti ocaml/opam:alpine sh
+$ opam install cohttp lwt
+[WARNING] External solver failed with inconsistent return value. Request saved to
+          "/home/opam/.opam/log/solver-error-13-1.cudf"
+[ERROR] External solver failure, please fix your installation and check /home/opam/.opam/config and variable
+        $OPAMEXTERNALSOLVER.
+        You may also retry with option --use-internal-solver
+
+$ apk info aspcud
+aspcud-1.9.1-r0 description:
+Package dependency solver
+
+aspcud-1.9.1-r0 webpage:
+http://potassco.sourceforge.net/
+
+aspcud-1.9.1-r0 installed size:
+405504
+
+$ apk info gringo
+gringo-4.5.3-r0 description:
+Grounder to translate user-provided logic programs
+
+gringo-4.5.3-r0 webpage:
+http://potassco.sourceforge.net/
+
+gringo-4.5.3-r0 installed size:
+4239360
+
+$ apk info clasp
+clasp-3.1.3-r0 description:
+Answer set solver for (extended) normal logic programs
+
+clasp-3.1.3-r0 webpage:
+http://potassco.sourceforge.net/
+
+clasp-3.1.3-r0 installed size:
+1101824
+
+Is there something about this combination of versions that is broken?  It would be nice to have an opam selftest that makes it easier to find the stdout/stderrs of these solver pieces to figure it out, as OPAMDEBUG doesn't quite provide the command line and input/outputs to the shell commands.
+
+-a
+
+
+
+
+
+From Gregoire.Henry at ocamlpro.com  Mon Feb  1 12:26:34 2016
+From: Gregoire.Henry at ocamlpro.com (=?iso-8859-1?Q?Gr=E9goire?= Henry)
+Date: Mon, 1 Feb 2016 13:26:34 +0100
+Subject: [opam-devel] odd error with aspcud on alpine linux
+In-Reply-To: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+References: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+Message-ID: <20160201122634.GA19445@venema.ocamlpro.com>
+
+Did you previously define a custom OPAMEXTERNALSOLVER ?
+
+G.
+
+From hannes at mehnert.org  Mon Feb  1 13:39:01 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Mon, 1 Feb 2016 13:39:01 +0000
+Subject: [opam-devel] odd error with aspcud on alpine linux
+In-Reply-To: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+References: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+Message-ID: <56AF5FF5.8030202@mehnert.org>
+
+There was a similar strange issue on Arch Linux..
+https://github.com/ocaml/opam/issues/2203 maybe related?
+
+hannes
+
+On 02/ 1/16 12:01 PM, Anil Madhavapeddy wrote:
+> I've been porting OPAM to Alpine Linux, and have some very odd errors with Aspcud that I was hoping someone could help with.  The solver pieces are all compiled and should have the right versions, but fail with an inconsistency error.
+> 
+> To reproduce it, you need Docker and:
+> 
+> $ docker run -ti ocaml/opam:alpine sh
+> $ opam install cohttp lwt
+> [WARNING] External solver failed with inconsistent return value. Request saved to
+>           "/home/opam/.opam/log/solver-error-13-1.cudf"
+> [ERROR] External solver failure, please fix your installation and check /home/opam/.opam/config and variable
+>         $OPAMEXTERNALSOLVER.
+>         You may also retry with option --use-internal-solver
+> 
+> $ apk info aspcud
+> aspcud-1.9.1-r0 description:
+> Package dependency solver
+> 
+> aspcud-1.9.1-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> aspcud-1.9.1-r0 installed size:
+> 405504
+> 
+> $ apk info gringo
+> gringo-4.5.3-r0 description:
+> Grounder to translate user-provided logic programs
+> 
+> gringo-4.5.3-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> gringo-4.5.3-r0 installed size:
+> 4239360
+> 
+> $ apk info clasp
+> clasp-3.1.3-r0 description:
+> Answer set solver for (extended) normal logic programs
+> 
+> clasp-3.1.3-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> clasp-3.1.3-r0 installed size:
+> 1101824
+> 
+> Is there something about this combination of versions that is broken?  It would be nice to have an opam selftest that makes it easier to find the stdout/stderrs of these solver pieces to figure it out, as OPAMDEBUG doesn't quite provide the command line and input/outputs to the shell commands.
+> 
+> -a
+> 
+> 
+> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From anil at recoil.org  Mon Feb  1 19:00:06 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 1 Feb 2016 19:00:06 +0000
+Subject: [opam-devel] odd error with aspcud on alpine linux
+In-Reply-To: <56AF5FF5.8030202@mehnert.org>
+References: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+ <56AF5FF5.8030202@mehnert.org>
+Message-ID: <20940F9E-E873-4DCA-A569-AEB16EC9DAA8@recoil.org>
+
+Thanks! It's almost certainly the incorrect Gringo version.  Porting the solver suite is an incredibly fragile process... :-/
+
+-anil
+
+> On 1 Feb 2016, at 13:39, Hannes Mehnert <hannes at mehnert.org> wrote:
+> 
+> There was a similar strange issue on Arch Linux..
+> https://github.com/ocaml/opam/issues/2203 maybe related?
+> 
+> hannes
+> 
+> On 02/ 1/16 12:01 PM, Anil Madhavapeddy wrote:
+>> I've been porting OPAM to Alpine Linux, and have some very odd errors with Aspcud that I was hoping someone could help with.  The solver pieces are all compiled and should have the right versions, but fail with an inconsistency error.
+>> 
+>> To reproduce it, you need Docker and:
+>> 
+>> $ docker run -ti ocaml/opam:alpine sh
+>> $ opam install cohttp lwt
+>> [WARNING] External solver failed with inconsistent return value. Request saved to
+>>          "/home/opam/.opam/log/solver-error-13-1.cudf"
+>> [ERROR] External solver failure, please fix your installation and check /home/opam/.opam/config and variable
+>>        $OPAMEXTERNALSOLVER.
+>>        You may also retry with option --use-internal-solver
+>> 
+>> $ apk info aspcud
+>> aspcud-1.9.1-r0 description:
+>> Package dependency solver
+>> 
+>> aspcud-1.9.1-r0 webpage:
+>> http://potassco.sourceforge.net/
+>> 
+>> aspcud-1.9.1-r0 installed size:
+>> 405504
+>> 
+>> $ apk info gringo
+>> gringo-4.5.3-r0 description:
+>> Grounder to translate user-provided logic programs
+>> 
+>> gringo-4.5.3-r0 webpage:
+>> http://potassco.sourceforge.net/
+>> 
+>> gringo-4.5.3-r0 installed size:
+>> 4239360
+>> 
+>> $ apk info clasp
+>> clasp-3.1.3-r0 description:
+>> Answer set solver for (extended) normal logic programs
+>> 
+>> clasp-3.1.3-r0 webpage:
+>> http://potassco.sourceforge.net/
+>> 
+>> clasp-3.1.3-r0 installed size:
+>> 1101824
+>> 
+>> Is there something about this combination of versions that is broken?  It would be nice to have an opam selftest that makes it easier to find the stdout/stderrs of these solver pieces to figure it out, as OPAMDEBUG doesn't quite provide the command line and input/outputs to the shell commands.
+>> 
+>> -a
+>> 
+>> 
+>> 
+>> 
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+>> 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+> 
+
+
+From louis.gesbert at ocamlpro.com  Tue Feb  2 01:27:51 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 02 Feb 2016 10:27:51 +0900
+Subject: [opam-devel] odd error with aspcud on alpine linux
+In-Reply-To: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+References: <DAD9BC13-6EDC-4E82-B07E-77A2D74B59AE@recoil.org>
+Message-ID: <1928874.PrAgdddzOS@maitake>
+
+Le lundi 1 f?vrier 2016, 12:01:43 Anil Madhavapeddy a ?crit :
+> I've been porting OPAM to Alpine Linux, and have some very odd errors with
+> Aspcud that I was hoping someone could help with.  The solver pieces are
+> all compiled and should have the right versions, but fail with an
+> inconsistency error.
+> 
+> To reproduce it, you need Docker and:
+> 
+> $ docker run -ti ocaml/opam:alpine sh
+> $ opam install cohttp lwt
+> [WARNING] External solver failed with inconsistent return value. Request
+> saved to "/home/opam/.opam/log/solver-error-13-1.cudf"
+> [ERROR] External solver failure, please fix your installation and check
+> /home/opam/.opam/config and variable $OPAMEXTERNALSOLVER.
+>         You may also retry with option --use-internal-solver
+> 
+> $ apk info aspcud
+> aspcud-1.9.1-r0 description:
+> Package dependency solver
+> 
+> aspcud-1.9.1-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> aspcud-1.9.1-r0 installed size:
+> 405504
+> 
+> $ apk info gringo
+> gringo-4.5.3-r0 description:
+> Grounder to translate user-provided logic programs
+> 
+> gringo-4.5.3-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> gringo-4.5.3-r0 installed size:
+> 4239360
+> 
+> $ apk info clasp
+> clasp-3.1.3-r0 description:
+> Answer set solver for (extended) normal logic programs
+> 
+> clasp-3.1.3-r0 webpage:
+> http://potassco.sourceforge.net/
+> 
+> clasp-3.1.3-r0 installed size:
+> 1101824
+> 
+> Is there something about this combination of versions that is broken?  It
+> would be nice to have an opam selftest that makes it easier to find the
+> stdout/stderrs of these solver pieces to figure it out, as OPAMDEBUG
+> doesn't quite provide the command line and input/outputs to the shell
+> commands.
+
+A high value for OPAMVERBOSE shows just that :)
+
+Also, let me remind you of the different alternatives to aspcud, just in 
+case:
+http://opam.ocaml.org/doc/Install.html#ExternalSolvers
+
+Although it would obviously be best if we got aspcud working. Thanks for the 
+effort!
+
+Louis
+
+From daniel.buenzli at erratique.ch  Mon Feb  8 22:07:50 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 8 Feb 2016 23:07:50 +0100
+Subject: [opam-devel] [opam-dockerfiles] Bytecode only switches
+Message-ID: <B7BFF72899934289AA20788B93B16E27@erratique.ch>
+
+Having seen a worrying trend of people submitting package with ad-hoc installers made out of Makefile targets that will fail in various fashions on more constrained switches, I think it would be good to have at least one distribution with a bytecode only switch. This would ensure that packages are able to build in such constrained environment. 
+
+Bytecode only switches are useful for ocaml language/runtime/compiler researchers and to use OCaml on more esoteric platforms that lack native-code support.
+
+Best,
+
+Daniel
+
+
+
+From anil at recoil.org  Tue Feb  9 10:09:01 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 9 Feb 2016 10:09:01 +0000
+Subject: [opam-devel] [opam-dockerfiles] Bytecode only switches
+In-Reply-To: <B7BFF72899934289AA20788B93B16E27@erratique.ch>
+References: <B7BFF72899934289AA20788B93B16E27@erratique.ch>
+Message-ID: <CE6FE42F-D0CF-4ADF-B6B4-2B3AB73B1DC4@recoil.org>
+
+On 8 Feb 2016, at 22:07, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> Having seen a worrying trend of people submitting package with ad-hoc installers made out of Makefile targets that will fail in various fashions on more constrained switches, I think it would be good to have at least one distribution with a bytecode only switch. This would ensure that packages are able to build in such constrained environment. 
+> 
+> Bytecode only switches are useful for ocaml language/runtime/compiler researchers and to use OCaml on more esoteric platforms that lack native-code support.
+
+Agreed -- I run into this frequently when porting to OpenBSD PowerPC, and it's much easier to fix it as we go along.
+
+Would anyone have time to put together an OPAM bytecode-compiler-only switch for 4.02.3?  I can create the base packages easily then.
+
+-anil
+
+From yallop at gmail.com  Tue Feb  9 10:18:08 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 9 Feb 2016 10:18:08 +0000
+Subject: [opam-devel] [opam-dockerfiles] Bytecode only switches
+In-Reply-To: <CE6FE42F-D0CF-4ADF-B6B4-2B3AB73B1DC4@recoil.org>
+References: <B7BFF72899934289AA20788B93B16E27@erratique.ch>
+ <CE6FE42F-D0CF-4ADF-B6B4-2B3AB73B1DC4@recoil.org>
+Message-ID: <CAAxsn=F8vPxyb17Vkxtic2kC+wy4aYbFY_7YgbCzUH_-Bu4YoA@mail.gmail.com>
+
+On 9 February 2016 at 10:09, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 8 Feb 2016, at 22:07, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+>>
+>> Having seen a worrying trend of people submitting package with ad-hoc installers made out of Makefile targets that will fail in various fashions on more constrained switches, I think it would be good to have at least one distribution with a bytecode only switch. This would ensure that packages are able to build in such constrained environment.
+>>
+>> Bytecode only switches are useful for ocaml language/runtime/compiler researchers and to use OCaml on more esoteric platforms that lack native-code support.
+>
+> Agreed -- I run into this frequently when porting to OpenBSD PowerPC, and it's much easier to fix it as we go along.
+>
+> Would anyone have time to put together an OPAM bytecode-compiler-only switch for 4.02.3?  I can create the base packages easily then.
+
+Here's a switch which supports ocamlc, but not ocamlopt or ocamlc.opt:
+https://github.com/ocaml/opam-repository/pull/5571
+
+From daniel.buenzli at erratique.ch  Tue Feb  9 11:32:57 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 9 Feb 2016 12:32:57 +0100
+Subject: [opam-devel] Refering to a package's own directory variables in
+	opam files
+Message-ID: <B4272306E7CF4E999A41D0D99965B0B9@erratique.ch>
+
+I'm trying to refer to %{mypkg:etc}% in mypkg's opam file, it works perfectly but opam lint complains:  
+
+warning 41: Some packages are mentionned in package scripts of features, but there is no dependency or depopt toward them
+
+What should I use instead ?
+
+Daniel 
+
+
+
+
+From daniel.buenzli at erratique.ch  Tue Feb  9 17:27:44 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 9 Feb 2016 18:27:44 +0100
+Subject: [opam-devel] [opam-dockerfiles] Bytecode only switches
+In-Reply-To: <CAAxsn=F8vPxyb17Vkxtic2kC+wy4aYbFY_7YgbCzUH_-Bu4YoA@mail.gmail.com>
+References: <B7BFF72899934289AA20788B93B16E27@erratique.ch>
+ <CE6FE42F-D0CF-4ADF-B6B4-2B3AB73B1DC4@recoil.org>
+ <CAAxsn=F8vPxyb17Vkxtic2kC+wy4aYbFY_7YgbCzUH_-Bu4YoA@mail.gmail.com>
+Message-ID: <DBF1C3AC11674371B6A432E115340C00@erratique.ch>
+
+Thanks Anil & Jeremy. D
+
+
+From gabriel.scherer at gmail.com  Sat Feb 13 19:28:06 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Sat, 13 Feb 2016 14:28:06 -0500
+Subject: [opam-devel] opam and "So you want to write a package manager"
+Message-ID: <CAPFanBFdrpHd78etDxOYxwM1KG_6wCCksOZvvLcPs=8uLCECvg@mail.gmail.com>
+
+Hi all,
+
+Sam Boyer has a very interesting piece on the requirements for package
+managers at
+  https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d9527
+
+It's a bit long (but I think it's worth the read if you are into
+package managers), but I think that the central point that is of opam
+relevance is the following distinction:
+
+> OS/system package manager (SPM): this is not why we are here today
+> Language package manager (LPM): an interactive tool (e.g., `go get`) that can retrieve and build specified packages of source code for a particular language. Bad ones dump the fetched source code into a global, unversioned pool (GOPATH), then cackle maniacally at your fervent hope that the cumulative state of that pool makes coherent sense.
+> Project/application dependency manager (PDM): an interactive system for managing the source code dependencies of a single project in a particular language. That means specifying, retrieving, updating, arranging on disk, and removing sets of dependent source code, in such a way that collective coherency is maintained beyond the termination of any single command. Its output???which is precisely reproducible???is a self-contained source tree that acts as the input to a compiler or interpreter. You might think of it as ?compiler, phase zero.?
+
+It seems clear to me that the model of "one packaging environment per
+project", rather than "one packaging environment per user-scoped
+state/switch", is winning in most programming languages (Rust and Go
+are mentioned in the post, but I'm observed from a distance the same
+moves in the Python, Ruby and Javascript communities). And for a good
+reason: it is simply a better model for developers, as it allows to
+have development environments scoped at the conceptually adequate
+level, which is the project level -- there is no reason especially in
+languages that do not allow a given development to include two
+different versions of the same package (OCaml is guilty of this as
+well).
+
+ It is in theory possible to do this with OPAM by using project-local
+root directories, and in fact this is the approach that Guillaume
+Claret, part of the Coq community and influenced by the Ruby packaging
+practices, has long advertised:
+  http://coq-blog.clarus.me/use-opam-for-coq.html
+
+I have already mentioned this thorny question on opam-devel,
+  Subject: One (or more) opam root per projet?
+  Date: Mon Jan 26 20:58:29 GMT 2015
+  http://lists.ocaml.org/pipermail/opam-devel/2015-January/000918.html
+
+But I think it would be worth a re-discussion. I think that the
+writing is on the wall, and that language-specific package managers
+should strive to support project-local configuration. As said in the
+previous discussion, having a user-scoped cache is still useful; but I
+think it should be possible to use OPAM in a mode where this
+resource-usage-motivated sharing is transparent to the developer,
+which really has access to per-project packaging environments.
+
+If nothing else, I think we should consider user interface ways to
+make the already-possible workflow of having a project-local opam root
+easier to manage. For example, we could decide that, by default, opam
+walks the filesystem hierarchy towards the root and picks the first
+directory named .opam as opam root. This would gracefully extend the
+policy of picking ~/.opam by default.
+
+Another topic touched in this blog post is determinism of packaging
+version choices. I think that OPAM's version handling is of very high
+quality compared to some other packaging systems, but this blog post
+argue that having good version bounds in a package description does
+not negate the use for a more precise "lock file" that specifies exact
+versions for all transitive dependencies of a project, that can be
+shared between developers (and even versioned in the version control
+system) to improve reproducibility. This topic has been central to the
+development of Haskell's new tool "stack", which haskellers are raving
+about.
+
+If I want to use this workflow with opam today, what are my options
+interface-wise? Use `opam switch export` and share/version the
+resulting state? In the current world of user-global package state,
+this export is likely to contain packages that are completely
+unrelated to the current project. Would it be possible to export only
+the recursive dependencies of a given opam file, and more generally
+have easier way to manipulate version state information?
+
+I know that Louis already has his plate full for 1.3, but I hope that
+some of those questions could influence the plans for 1.4.
+
+From louis.gesbert at ocamlpro.com  Mon Feb 15 07:35:22 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Mon, 15 Feb 2016 16:35:22 +0900
+Subject: [opam-devel] opam and "So you want to write a package manager"
+In-Reply-To: <CAPFanBFdrpHd78etDxOYxwM1KG_6wCCksOZvvLcPs=8uLCECvg@mail.gmail.com>
+References: <CAPFanBFdrpHd78etDxOYxwM1KG_6wCCksOZvvLcPs=8uLCECvg@mail.gmail.com>
+Message-ID: <1735245.TpKdQKlvgM@maitake>
+
+Indeed, a very worthwile read, thanks for linking! I pointed the author to 
+Mancoosi, too, which he was glad to hear about.
+
+Per-project dependency handling has been asked for quite a few times, and this 
+is indeed something we should support. It complements and doesn't replace the 
+global ~/.opam though.
+
+Looking upwards to a `.opam` directory and use it as opam root would be 
+straightforward to implement (well, I'd just have to copy-paste some code from 
+ocp-indent). But I don't think it is a good idea:
+1. it duplicates lots of stuff, including synchronising repositories, caches, 
+and compiling OCaml
+2. does it replace ~/.opam or add to it ?
+3. how about `opam config env` ? Should you ensure to run it after you cd to 
+your project ? Sounds dangerous, but it might be handled by the build system.
+4. and what about tools such as merlin ? You surely won't install them within 
+every project...
+
+Our opam-manager? provides an experimental solution to 2. and 3. (and, 
+partially, 1.). The idea is to wrap around installed commands (ocamlc, etc.) 
+and redirect them to the correct switch, as determined by e.g. a project-local 
+configuration file -- alleviating the need for `eval $(opam config env)`.
+
+This wouldn't solve 3., but I would be more in favor of allowing project-local 
+_switch trees_ while keeping the global opam root and automatically choosing 
+the current switch depending on CWD. This at least allows opam to know about 
+the other switches around, and may allow opam-user-setup to handle 4. through 
+minor improvements (it should already work for compiler-version-insensitive 
+tools). It also factorises caching and updates.
+
+Since opam 2.0? is planned to allow selecting the repositories per-switch, 
+this shouldn't be a problem. We may also be able to share compiled artifacts 
+between switches at some point, which is a different issue.
+
+> If I want to use this workflow with opam today, what are my options
+> interface-wise? Use `opam switch export` and share/version the
+> resulting state? In the current world of user-global package state,
+> this export is likely to contain packages that are completely
+> unrelated to the current project. Would it be possible to export only
+> the recursive dependencies of a given opam file, and more generally
+> have easier way to manipulate version state information?
+
+For what Sam calls "lock files", indeed, there is nothing built-in, but you 
+could:
+- use `switch export`, but in this case you get also unrelated installed 
+packages
+- save the output of `opam list --installed --rec --required-by <pkg>`, and 
+pass that to `opam install` (unfortunately, the --short format currently 
+excludes versions). This won't, of course, handle pinned packages.
+
+A partial export function limited to what is required by a given package would 
+be very nice for this, I guess. We could imagine an opam command that picks up 
+the project-local opam file, possibly a local export, and builds a local switch 
+based on that. The closest we currently have is `opam pin add .` -- possibly 
+with an `opam switch my-project-switch --alias-of ...`.
+
+Note that we are somehow providing a way to do per-switch dep trees, although 
+completely manually, through the way we handle multiple switches.
+
+Another big question is that we otherwise need build systems to be opam-aware. 
+Without interfering when they are run from within opam, of course. Guess I'll 
+get back to working on opam-as-build-system ;)
+
+Best,
+Louis
+
+
+? https://github.com/OCamlPro/opam-manager
+? yes, it's no longer planned as 1.3, since the repository format and 
+structure of ~/.opam are being changed quite a bit -- no more .comp files.
+
+
+Le samedi 13 f?vrier 2016, 14:28:06 Gabriel Scherer a ?crit :
+> Hi all,
+> 
+> Sam Boyer has a very interesting piece on the requirements for package
+> managers at
+>  
+> https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d
+> 9527
+> 
+> It's a bit long (but I think it's worth the read if you are into
+> package managers), but I think that the central point that is of opam
+> 
+> relevance is the following distinction:
+> > OS/system package manager (SPM): this is not why we are here today
+> > Language package manager (LPM): an interactive tool (e.g., `go get`) that
+> > can retrieve and build specified packages of source code for a particular
+> > language. Bad ones dump the fetched source code into a global,
+> > unversioned pool (GOPATH), then cackle maniacally at your fervent hope
+> > that the cumulative state of that pool makes coherent sense.
+> > Project/application dependency manager (PDM): an interactive system for
+> > managing the source code dependencies of a single project in a particular
+> > language. That means specifying, retrieving, updating, arranging on disk,
+> > and removing sets of dependent source code, in such a way that collective
+> > coherency is maintained beyond the termination of any single command. Its
+> > output???which is precisely reproducible???is a self-contained source
+> > tree that acts as the input to a compiler or interpreter. You might think
+> > of it as ?compiler, phase zero.?
+> It seems clear to me that the model of "one packaging environment per
+> project", rather than "one packaging environment per user-scoped
+> state/switch", is winning in most programming languages (Rust and Go
+> are mentioned in the post, but I'm observed from a distance the same
+> moves in the Python, Ruby and Javascript communities). And for a good
+> reason: it is simply a better model for developers, as it allows to
+> have development environments scoped at the conceptually adequate
+> level, which is the project level -- there is no reason especially in
+> languages that do not allow a given development to include two
+> different versions of the same package (OCaml is guilty of this as
+> well).
+> 
+>  It is in theory possible to do this with OPAM by using project-local
+> root directories, and in fact this is the approach that Guillaume
+> Claret, part of the Coq community and influenced by the Ruby packaging
+> practices, has long advertised:
+>   http://coq-blog.clarus.me/use-opam-for-coq.html
+> 
+> I have already mentioned this thorny question on opam-devel,
+>   Subject: One (or more) opam root per projet?
+>   Date: Mon Jan 26 20:58:29 GMT 2015
+>   http://lists.ocaml.org/pipermail/opam-devel/2015-January/000918.html
+> 
+> But I think it would be worth a re-discussion. I think that the
+> writing is on the wall, and that language-specific package managers
+> should strive to support project-local configuration. As said in the
+> previous discussion, having a user-scoped cache is still useful; but I
+> think it should be possible to use OPAM in a mode where this
+> resource-usage-motivated sharing is transparent to the developer,
+> which really has access to per-project packaging environments.
+> 
+> If nothing else, I think we should consider user interface ways to
+> make the already-possible workflow of having a project-local opam root
+> easier to manage. For example, we could decide that, by default, opam
+> walks the filesystem hierarchy towards the root and picks the first
+> directory named .opam as opam root. This would gracefully extend the
+> policy of picking ~/.opam by default.
+> 
+> Another topic touched in this blog post is determinism of packaging
+> version choices. I think that OPAM's version handling is of very high
+> quality compared to some other packaging systems, but this blog post
+> argue that having good version bounds in a package description does
+> not negate the use for a more precise "lock file" that specifies exact
+> versions for all transitive dependencies of a project, that can be
+> shared between developers (and even versioned in the version control
+> system) to improve reproducibility. This topic has been central to the
+> development of Haskell's new tool "stack", which haskellers are raving
+> about.
+> 
+> If I want to use this workflow with opam today, what are my options
+> interface-wise? Use `opam switch export` and share/version the
+> resulting state? In the current world of user-global package state,
+> this export is likely to contain packages that are completely
+> unrelated to the current project. Would it be possible to export only
+> the recursive dependencies of a given opam file, and more generally
+> have easier way to manipulate version state information?
+> 
+> I know that Louis already has his plate full for 1.3, but I hope that
+> some of those questions could influence the plans for 1.4.
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From thomas at gazagnaire.org  Mon Feb 15 11:00:35 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Mon, 15 Feb 2016 11:00:35 +0000
+Subject: [opam-devel] opam and "So you want to write a package manager"
+In-Reply-To: <1735245.TpKdQKlvgM@maitake>
+References: <CAPFanBFdrpHd78etDxOYxwM1KG_6wCCksOZvvLcPs=8uLCECvg@mail.gmail.com>
+ <1735245.TpKdQKlvgM@maitake>
+Message-ID: <EC8449AF-352B-436C-993C-EFBCC0DB03FB@gazagnaire.org>
+
+> Looking upwards to a `.opam` directory and use it as opam root would be 
+> straightforward to implement (well, I'd just have to copy-paste some code from 
+> ocp-indent). But I don't think it is a good idea:
+> 1. it duplicates lots of stuff, including synchronising repositories, caches, 
+> and compiling OCaml
+> 2. does it replace ~/.opam or add to it ?
+> 3. how about `opam config env` ? Should you ensure to run it after you cd to 
+> your project ? Sounds dangerous, but it might be handled by the build system.
+> 4. and what about tools such as merlin ? You surely won't install them within 
+> every project...
+
+I think the idea of a local .opam is to fully replace the global one, so all the state is associated to the project directory. I think having a global .opam directory to be used as a cache should be an "implementation detail", as a cache where you can store and symlink stuff if needed. You can do similar tricks with Git and share a global block store, but the user only think about distinct "repositories".
+
+> Another big question is that we otherwise need build systems to be opam-aware. 
+> Without interfering when they are run from within opam, of course. Guess I'll 
+> get back to working on opam-as-build-system ;)
+
+Having a way to optimally configure opam and a build system to work together is certainly a good idea of evolution...
+
+Thomas
+
+From Fabrice.Le_fessant at inria.fr  Wed Feb 17 12:27:33 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Wed, 17 Feb 2016 12:27:33 +0000
+Subject: [opam-devel] more committers needed ?
+Message-ID: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+
+Hi,
+
+   If there is some need to help managing PRs to the opam-repository,
+Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github)
+are volunteers to spend some time doing it.
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/0dd60225/attachment.html>
+
+From thomas at gazagnaire.org  Wed Feb 17 15:12:07 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 17 Feb 2016 15:12:07 +0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+Message-ID: <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+
+Hi,
+
+>    If there is some need to help managing PRs to the opam-repository, Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github) are volunteers to spend some time doing it.
+
+I think that's a great idea! The current policy for managing PRs is described here:
+
+https://github.com/ocaml/opam-repository/wiki/PR-checks <https://github.com/ocaml/opam-repository/wiki/PR-checks>
+
+Please check that this is OK with you, and I'll add you to the list of maintainers.
+
+Thanks,
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/37f8a6a5/attachment.html>
+
+From anil at recoil.org  Wed Feb 17 15:14:34 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 17 Feb 2016 15:14:34 +0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+Message-ID: <C8A502AD-0F77-49FA-8D42-927855398507@recoil.org>
+
+On 17 Feb 2016, at 15:12, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+> Hi,
+> 
+>>    If there is some need to help managing PRs to the opam-repository, Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github) are volunteers to spend some time doing it.
+> 
+> I think that's a great idea! The current policy for managing PRs is described here:
+> 
+> https://github.com/ocaml/opam-repository/wiki/PR-checks <https://github.com/ocaml/opam-repository/wiki/PR-checks>
+> 
+> Please check that this is OK with you, and I'll add you to the list of maintainers.
+
+Likewise, very much appreciate the extra support! I'll use this as an opportunity to write up the work I've been doing on multi-distro support in Travis (we can now test depexts on Travis for every Linux distro for which there is a Docker container, but it's not yet been submitted to the main OPAM repository tests until it is debugged a little more)
+
+thanks
+Anil
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/1dd2e90a/attachment.html>
+
+From Gregoire.Henry at ocamlpro.com  Wed Feb 17 15:19:59 2016
+From: Gregoire.Henry at ocamlpro.com (=?iso-8859-1?Q?Gr=E9goire?= Henry)
+Date: Wed, 17 Feb 2016 16:19:59 +0100
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+Message-ID: <20160217151959.GC28779@venema.ocamlpro.com>
+
+> I think that's a great idea! The current policy for managing PRs is described here:
+> 
+> https://github.com/ocaml/opam-repository/wiki/PR-checks <https://github.com/ocaml/opam-repository/wiki/PR-checks>
+> 
+> Please check that this is OK with you, and I'll add you to the list of maintainers.
+
+Seems OK to me.
+
+Gr?goire
+
+From Fabrice.Le_fessant at inria.fr  Wed Feb 17 15:23:49 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Wed, 17 Feb 2016 15:23:49 +0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <20160217151959.GC28779@venema.ocamlpro.com>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+ <20160217151959.GC28779@venema.ocamlpro.com>
+Message-ID: <CAHvkLrMOLJG4VXyK7n6YcxHYN-caRPnP6ownnsiUEhyDoukNqw@mail.gmail.com>
+
+Ok for me too ! Sounds like some parts are already verified by opam-lint /
+Travis, no ?
+
+--Fabrice
+
+On Wed, Feb 17, 2016 at 4:19 PM Gr?goire Henry <Gregoire.Henry at ocamlpro.com>
+wrote:
+
+> > I think that's a great idea! The current policy for managing PRs is
+> described here:
+> >
+> > https://github.com/ocaml/opam-repository/wiki/PR-checks <
+> https://github.com/ocaml/opam-repository/wiki/PR-checks>
+> >
+> > Please check that this is OK with you, and I'll add you to the list of
+> maintainers.
+>
+> Seems OK to me.
+>
+> Gr?goire
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/94d689e7/attachment.html>
+
+From thomas at gazagnaire.org  Wed Feb 17 16:04:11 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 17 Feb 2016 16:04:11 +0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <CAHvkLrMOLJG4VXyK7n6YcxHYN-caRPnP6ownnsiUEhyDoukNqw@mail.gmail.com>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+ <20160217151959.GC28779@venema.ocamlpro.com>
+ <CAHvkLrMOLJG4VXyK7n6YcxHYN-caRPnP6ownnsiUEhyDoukNqw@mail.gmail.com>
+Message-ID: <2B94E8B2-B457-4546-9E57-4E55D179381D@gazagnaire.org>
+
+You should be both in the group now. Welcome!
+
+> Ok for me too ! Sounds like some parts are already verified by opam-lint / Travis, no ?
+> 
+> --Fabrice
+> 
+> On Wed, Feb 17, 2016 at 4:19 PM Gr?goire Henry <Gregoire.Henry at ocamlpro.com <mailto:Gregoire.Henry at ocamlpro.com>> wrote:
+> > I think that's a great idea! The current policy for managing PRs is described here:
+> >
+> > https://github.com/ocaml/opam-repository/wiki/PR-checks <https://github.com/ocaml/opam-repository/wiki/PR-checks> <https://github.com/ocaml/opam-repository/wiki/PR-checks <https://github.com/ocaml/opam-repository/wiki/PR-checks>>
+> >
+> > Please check that this is OK with you, and I'll add you to the list of maintainers.
+> 
+> Seems OK to me.
+> 
+> Gr?goire
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/5f1e6a12/attachment-0001.html>
+
+From Fabrice.Le_fessant at inria.fr  Wed Feb 17 16:37:52 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Wed, 17 Feb 2016 16:37:52 +0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <2B94E8B2-B457-4546-9E57-4E55D179381D@gazagnaire.org>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+ <D33842F0-3D45-4F71-AB72-8388C29EF17E@gazagnaire.org>
+ <20160217151959.GC28779@venema.ocamlpro.com>
+ <CAHvkLrMOLJG4VXyK7n6YcxHYN-caRPnP6ownnsiUEhyDoukNqw@mail.gmail.com>
+ <2B94E8B2-B457-4546-9E57-4E55D179381D@gazagnaire.org>
+Message-ID: <CAHvkLrMnM=aDhTf0209Vk4e_j3utdO-K7E+J4LLTQsp0_fOnvA@mail.gmail.com>
+
+Thank you!
+
+Le mer. 17 f?vr. 2016 ? 17:04, Thomas Gazagnaire <thomas at gazagnaire.org> a
+?crit :
+
+> You should be both in the group now. Welcome!
+>
+> Ok for me too ! Sounds like some parts are already verified by opam-lint /
+> Travis, no ?
+>
+> --Fabrice
+>
+> On Wed, Feb 17, 2016 at 4:19 PM Gr?goire Henry <
+> Gregoire.Henry at ocamlpro.com> wrote:
+>
+>> > I think that's a great idea! The current policy for managing PRs is
+>> described here:
+>> >
+>> > https://github.com/ocaml/opam-repository/wiki/PR-checks <
+>> https://github.com/ocaml/opam-repository/wiki/PR-checks>
+>> >
+>> > Please check that this is OK with you, and I'll add you to the list of
+>> maintainers.
+>>
+>> Seems OK to me.
+>>
+>> Gr?goire
+>>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160217/240f0d70/attachment.html>
+
+From anil at recoil.org  Fri Feb 19 11:40:03 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 19 Feb 2016 11:40:03 +0000
+Subject: [opam-devel] Diplomat: NSDI paper on project community repositories
+Message-ID: <99A252FB-31B1-4727-A069-B687B96415B1@recoil.org>
+
+https://isis.poly.edu/~jcappos/papers/kuppusamy_nsdi_16.pdf
+
+Mentions the work that Hannes and Louis did on the TUF/OPAM design, and also rounds up the lessons from the other language communities as well.
+
+-Anil
+
+From sheets at alum.mit.edu  Sun Feb 21 14:55:45 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Sun, 21 Feb 2016 14:55:45 +0000
+Subject: [opam-devel] opam-repository OS X constraint quality
+Message-ID: <CAAWM5TzqMzUr8p5tavTJBiZ4KYWGEfyimvDnuPcZEmSbN4GnfQ@mail.gmail.com>
+
+Hello,
+
+The maintainers of the ocaml/opam-repository recently
+<https://github.com/ocaml/opam-repository/pull/5452> made graceful
+functioning on OS X a requirement for metadata publication in the
+repository. Having accurate metadata for OS X helps the opam
+repository to deliver a smooth and satisfying experience to users and
+developers.
+
+I'd like to remind all the repository maintainers that packages for
+publication should either:
+
+1. be marked so as to explicitly exclude functioning on OS X with
+`available: [ os != "darwin" ]`
+2. be marked so as to implicitly exclude functioning on OS X with
+something like `available: [ os = "linux" | os = "freebsd" ]`
+3. be ported to work on OS X or have OS X homebrew depexts added such
+that the package at least compiles on OS X (e.g.
+<https://github.com/ocaml/opam-repository/pull/5654>).
+
+Thanks,
+
+David Sheets
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 10:09:12 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 10:09:12 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+Message-ID: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+
+Hi,
+
+As discussed on here:
+https://github.com/ocaml/opam-repository/pull/5338
+the current opam-repository policy is loose, in the sense that anybody can
+modify anybody else's package description. I think the reason for that, in
+the past, has been that it allowed the repository maintainers to improve
+the global quality of the repository.
+
+I think it's time to discuss if we should keep this policy, or if we should
+be a little more strict about that. Here are a few reasons to make the
+policy stricter:
+
+* the future authentification system for opam-repository will prevent
+anybody, except maybe admins, from modifying somebody else's package. Thus,
+the current policy will not be possible in that future;
+
+* when a packge description is updated without the owner knowing it, it can
+lead to inconsistences (the owner might update the package later without
+applying the patch, or propose a new version without the patch, thus
+leading to a regression) and the owner might not learn about the problem
+(it happened to me this week-end, as I would have not known about a
+regression in ocp-build if I had not noticed a PR on ocp-index that uses
+it).
+
+* a maintainer's fix might be of less quality than an owner's fix, because
+he might not know why something is done or not done. Discussing with the
+upstream developer usually is thus a better approach.
+
+* the strict policy has been used for years by Debian, with good success.
+
+For all  these reasons, I propose to switch to the strict mode. Of course,
+some fixes are still possible directly by maintainers, such as fixing
+broken urls (without changing the checksum). These exceptions should be
+specified too.
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/10019109/attachment.html>
+
+From thomas at gazagnaire.org  Mon Feb 22 10:29:58 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Mon, 22 Feb 2016 10:29:58 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+Message-ID: <DD8D8A5D-35FB-49DF-A3E3-F1DD42729339@gazagnaire.org>
+
+> * the future authentification system for opam-repository will prevent anybody, except maybe admins, from modifying somebody else's package. Thus, the current policy will not be possible in that future;
+
+That was not my understanding of the proposal: any PR modifying anything can still be merged as long as there is a quora amonst the repo maintainer. I think that was part of the design constraints that Louis and Hannes tried to resolve.
+
+> * when a packge description is updated without the owner knowing it, it can lead to inconsistences (the owner might update the package later without applying the patch, or propose a new version without the patch, thus leading to a regression) and the owner might not learn about the problem (it happened to me this week-end, as I would have not known about a regression in ocp-build if I had not noticed a PR on ocp-index that uses it).
+
+It is indeed important that upstream are aware of issue and we currently do a poor job with that. Would be nice to automatise that by sending emails to maintainers. Anil, can we use @ocaml.org <http://ocaml.org/>'s SMTP for that?
+
+> * a maintainer's fix might be of less quality than an owner's fix, because he might not know why something is done or not done. Discussing with the upstream developer usually is thus a better approach.
+
+After having spend years (literally) fixing issues in opam-repository, I disagree with that statement. Repo maintainers are experienced OCaml coder, which see compilation error pattern every day. Repo maintainers are also quite active (usually more than package maintainers) and fix issues when they see them.
+
+> For all  these reasons, I propose to switch to the strict mode. Of course, some fixes are still possible directly by maintainers, such as fixing broken urls (without changing the checksum). These exceptions should be specified too.
+
+I think the current model has some flows but it's still very valid given the current constraints. As I said in an other thread, this is a local optimum. Of course, I'm fine to move to another local optimum if it's better :-)
+
+Thomas
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/a26d1eff/attachment.html>
+
+From yallop at gmail.com  Mon Feb 22 10:39:17 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 22 Feb 2016 10:39:17 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+Message-ID: <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+
+Dear Fabrice,
+
+On 22 February 2016 at 10:09, Fabrice Le Fessant
+<fabrice.le_fessant at ocamlpro.com> wrote:
+> As discussed on here:
+> https://github.com/ocaml/opam-repository/pull/5338
+> the current opam-repository policy is loose, in the sense that anybody can
+> modify anybody else's package description. I think the reason for that, in
+> the past, has been that it allowed the repository maintainers to improve the
+> global quality of the repository.
+>
+> I think it's time to discuss if we should keep this policy, or if we should
+> be a little more strict about that.
+
+Is it fair to say that your concerns are primarily about notification
+rather than permission?  The problem isn't that people are modifying
+other people's packages, but that the original maintainers aren't
+always notified.
+
+One thing I try to do when submitting pull requests that modify
+others' packages is to mention the GitHub username of the maintainer
+in the PR description so that they receive a notification.  If the
+change is likely to be at all controversial then I wait for the
+maintainer to comment before merging.
+
+This approach could be mostly automated, with a bot that retrieves the
+username of the original committer of each file from the GitHub API.
+However, I wonder if it'd be sufficient to add a note to the PR check
+procedure (https://github.com/ocaml/opam-repository/wiki/PR-checks)
+suggesting that opam-repository maintainers notify package maintainers
+when submitting changes.
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 12:23:19 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 12:23:19 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <DD8D8A5D-35FB-49DF-A3E3-F1DD42729339@gazagnaire.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <DD8D8A5D-35FB-49DF-A3E3-F1DD42729339@gazagnaire.org>
+Message-ID: <CAHvkLrP4xkwTsR-iX6vMzbY2U=OgmAnO-YBr+oZewBR4WRoF0w@mail.gmail.com>
+
+On Mon, Feb 22, 2016 at 11:30 AM Thomas Gazagnaire <thomas at gazagnaire.org>
+wrote:
+
+> That was not my understanding of the proposal: any PR modifying anything
+> can still be merged as long as there is a quora amonst the repo maintainer.
+> I think that was part of the design constraints that Louis and Hannes tried
+> to resolve.
+>
+
+Even the notion of repo maintainer is weird: we should target a completely
+distributed repo, where each package is taken care of by a small set of
+maintainers (as it is done in Debian, which is not perfect, but working).
+
+Imagine if Github decided that, as they are at least as smart as the devs
+who use their platform, that they should have the right to patch whatever
+code is hosted on Github. Would you keep using such a platform ? I think
+it's the same here: I don't want anybody to mess with my packages, but I do
+want to be warned if there is a problem that I should fix.
+
+I think the opam repo maintainers have one opportunity to fix packages
+(when a new version is submitted the first time), but then, they should not
+be permitted to modify them anymore, without the permission of the
+submitter.
+
+It is indeed important that upstream are aware of issue and we currently do
+> a poor job with that. Would be nice to automatise that by sending emails to
+> maintainers. Anil, can we use @ocaml.org's SMTP for that?
+>
+
+What are you proposing ? Indeed, we should have a daemon watching the
+repository and sending automated emails for some kind of simple problems.
+
+
+> * a maintainer's fix might be of less quality than an owner's fix, because
+> he might not know why something is done or not done. Discussing with the
+> upstream developer usually is thus a better approach.
+>
+> After having spend years (literally) fixing issues in opam-repository, I
+> disagree with that statement. Repo maintainers are experienced OCaml coder,
+> which see compilation error pattern every day. Repo maintainers are also
+> quite active (usually more than package maintainers) and fix issues when
+> they see them.
+>
+
+Well, if your goal is to spend more and more time fixing problems in the
+repo, that's probably the best approach. But if you want to move the work
+from the repo maintainers to the package maintainers, then you need to
+spend a little more time communicating with them about such issues. I think
+the strict approach is better to spread knowledge, and thus on the long
+term. And automatisation can help a lot !
+
+
+> I think the current model has some flows but it's still very valid given
+> the current constraints. As I said in an other thread, this is a local
+> optimum. Of course, I'm fine to move to another local optimum if it's
+> better :-)
+>
+
+Yes, let's find a better local optimum :-)
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/23d3844f/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 13:15:19 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 13:15:19 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+Message-ID: <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+
+Dear Jeremy,
+
+On Mon, Feb 22, 2016 at 11:39 AM Jeremy Yallop <yallop at gmail.com> wrote:
+
+> Is it fair to say that your concerns are primarily about notification
+> rather than permission?
+
+
+No, it is about permission. When I publish something on the OPAM
+repository, I take some responsability for it. I don't want anybody else to
+mess with my packages, and then discover problems that either I could have
+discovered much earlier if I had been contacted immediately, or either
+caused by a maintainer that didn't know how to fix a problem I had caused.
+Am I the only one to care about that ?
+
+
+>   The problem isn't that people are modifying
+> other people's packages, but that the original maintainers aren't
+> always notified.
+>
+
+As I replied to Thomas, would you like Github to modify the source code of
+your application they are hosting, and just add an issue in your BTS to
+tell you afterwards ?
+
+
+> One thing I try to do when submitting pull requests that modify
+> others' packages is to mention the GitHub username of the maintainer
+> in the PR description so that they receive a notification.
+
+
+Well, as I am watching tens of repos on Github, my mailbox is full of such
+emails. I would not notice such a mention, unless I decide to read the
+thread because the title is interesting. Direct mails would be much better.
+
+
+> If the change is likely to be at all controversial then I wait for the
+> maintainer to comment before merging.
+>
+
+That's should be the only way to modify a package. Or if the package
+maintainer does not reply to direct emails after a week or two (in which
+case either the package should be removed, or the maintainer could be
+changed).
+
+
+> This approach could be mostly automated, with a bot that retrieves the
+> username of the original committer of each file from the GitHub API.
+> However, I wonder if it'd be sufficient to add a note to the PR check
+> procedure (https://github.com/ocaml/opam-repository/wiki/PR-checks)
+> suggesting that opam-repository maintainers notify package maintainers
+> when submitting changes.
+>
+
+Again, I think it is not about suggesting, as it is already the case today.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/fe5ce517/attachment.html>
+
+From gabriel.scherer at gmail.com  Mon Feb 22 14:27:49 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 22 Feb 2016 09:27:49 -0500
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+ <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+Message-ID: <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+
+I am not convinced by the argument that "it works for Debian"; Debian
+has had a fair bit of heated maintainership conflicts in the past, and
+this is one of the reason why they now insist on having multiple
+co-maintainers. Debian is successful as a distribution, but the
+localized conflicts have alienated some communities (see for example
+https://lwn.net/Articles/496335/ ), and nobody knows whether a more
+flexible package ownership policy would have worked better or worse.
+
+There are several different kinds of changes to a package, and it
+makes sense to let different people handle them. Of course nobody is
+suggesting that opam-repo maintainers should add arbitrary patches on
+top of some software to implement new features. Here are two kind of
+changes where external involvement may help:
+
+(1) Changes in global packaging policies that are orthogonal to any
+particular packages. When I changed around 3000 packages to add an
+"ocamlbuild" dependency, I couldn't possibly have contacted each
+specific maintainer and waited for each of them to do the change.
+(Under the future security infrastructure I suppose the change would
+have required the signature of one of the trusted repo maintainers; it
+was reviewed and approved by them so the process wouldn't have been
+very different.) Not only would have it required considerable work on
+my side, it would also have guaranteed an inconsistent ecosystem with
+some packages depending on ocamlbuild and some others not depending on
+it. (In the case of this transition this is ok, but in some other
+transient states may be unacceptable.)
+
+(2) Changes in external configurations that affect some systems that
+the maintainer is not particularly familiar with. In software
+distributions, Debian maintainers do Debian-specific patches to make
+changes to respect their local policity, and OpenBSD people fix
+configure scripts that assume too many GNUisms. Following your
+reasoning, this would be unacceptable and that they should always wait
+for upstream to merge their patches. I think the current system of
+"local change + notification for eventual upstreaming" works better.
+(Sometimes it goes wrong, eg. Debian maintainer breaking random number
+generation for a stylistic reason. There is no objective definition of
+which changes are acceptable locally and which must require upstream's
+approval, and people have to use their best judgment.)
+
+The opam-repository thread that spawned the present discussion is
+  https://github.com/ocaml/opam-repository/pull/5338
+I think that empowering Nix users to make the necessary
+opam-repository change to have good support for OCaml inside Nix(OS)
+is the right thing to do, instead of requiring the contributor to send
+dozens of emails to people they don't know, which can be enough of a
+requirement to discourage them from any further contribution.
+
+
+
+
+On Mon, Feb 22, 2016 at 8:15 AM, Fabrice Le Fessant
+<fabrice.le_fessant at ocamlpro.com> wrote:
+> Dear Jeremy,
+>
+> On Mon, Feb 22, 2016 at 11:39 AM Jeremy Yallop <yallop at gmail.com> wrote:
+>>
+>> Is it fair to say that your concerns are primarily about notification
+>> rather than permission?
+>
+>
+> No, it is about permission. When I publish something on the OPAM repository,
+> I take some responsability for it. I don't want anybody else to mess with my
+> packages, and then discover problems that either I could have discovered
+> much earlier if I had been contacted immediately, or either caused by a
+> maintainer that didn't know how to fix a problem I had caused. Am I the only
+> one to care about that ?
+>
+>>
+>>   The problem isn't that people are modifying
+>> other people's packages, but that the original maintainers aren't
+>> always notified.
+>
+>
+> As I replied to Thomas, would you like Github to modify the source code of
+> your application they are hosting, and just add an issue in your BTS to tell
+> you afterwards ?
+>
+>>
+>> One thing I try to do when submitting pull requests that modify
+>> others' packages is to mention the GitHub username of the maintainer
+>> in the PR description so that they receive a notification.
+>
+>
+> Well, as I am watching tens of repos on Github, my mailbox is full of such
+> emails. I would not notice such a mention, unless I decide to read the
+> thread because the title is interesting. Direct mails would be much better.
+>
+>>
+>> If the change is likely to be at all controversial then I wait for the
+>> maintainer to comment before merging.
+>
+>
+> That's should be the only way to modify a package. Or if the package
+> maintainer does not reply to direct emails after a week or two (in which
+> case either the package should be removed, or the maintainer could be
+> changed).
+>
+>>
+>> This approach could be mostly automated, with a bot that retrieves the
+>> username of the original committer of each file from the GitHub API.
+>> However, I wonder if it'd be sufficient to add a note to the PR check
+>> procedure (https://github.com/ocaml/opam-repository/wiki/PR-checks)
+>> suggesting that opam-repository maintainers notify package maintainers
+>> when submitting changes.
+>
+>
+> Again, I think it is not about suggesting, as it is already the case today.
+>
+> --Fabrice
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 14:48:42 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 14:48:42 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+ <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+ <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+Message-ID: <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+
+On Mon, Feb 22, 2016 at 3:28 PM Gabriel Scherer <gabriel.scherer at gmail.com>
+wrote:
+
+> There are several different kinds of changes to a package, and it
+> makes sense to let different people handle them.
+
+
+Indeed, I think repo maintainers can have to make some changes, but these
+should be the exception, not the rule. Anyway, it's good to explicit them.
+
+
+> (1) Changes in global packaging policies that are orthogonal to any
+> particular packages. When I changed around 3000 packages to add an
+> "ocamlbuild" dependency,
+
+
+Of course, such automatic changes can only be done that way. Maybe,
+however, it would have been possible to avoid it. For example, OCaml
+without ocamlbuild could be proposed as a package only available above some
+OPAM version (1.2.2 ?), and that version would automatically add an
+ocamlbuild dependency to every package, except if it has an "ocamlbuild:
+false" header (or something like that). I am not saying it is the best
+solution, but changing 4000 packages seem even worse for me. I presume
+that, most of the time, it is possible to fix such problems in opam rather
+than in opam-repository.
+
+
+> (2) Changes in external configurations that affect some systems that
+> the maintainer is not particularly familiar with.
+
+
+Here, I have to disagree. First, it is always good to discuss such changes,
+just for developers to learn about platforms' specificities that they were
+not aware of. If you don't do that, you will fix a version, and the next
+version will be broken again. Second, you are mixing "repo maintainers" and
+"package maintainers". Maybe developers don't have to know about specific
+platforms (although they are probably using some platform specific thing
+otherwise no change would be needed), about here, we are discussing about
+what package maintainers are supposed to know, or to learn. Package
+maintainers, as in Debian, are not the authors, they are the people who
+decide to take responsibility for making a package public on OPAM. On the
+contrary, repo maintainers are only in charge of maintaining the global
+consistency of the repository, deciding when there is a conflict between
+package maintainers, and so on. The whole point of this discussion is to
+prevent repo maintainers from acting as package maintainers, so this
+distinction is important !
+
+
+> I think that empowering Nix users to make the necessary
+> opam-repository change to have good support for OCaml inside Nix(OS)
+> is the right thing to do, instead of requiring the contributor to send
+> dozens of emails to people they don't know, which can be enough of a
+> requirement to discourage them from any further contribution.
+>
+
+Except that their contributions will be gone at the next version of the
+package, and they will continue to have broken support...
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/362cacd9/attachment-0001.html>
+
+From daniel.buenzli at erratique.ch  Mon Feb 22 15:19:27 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 22 Feb 2016 16:19:27 +0100
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+ <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+ <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+ <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+Message-ID: <80E74F1188864C36AEEEE4374463C117@erratique.ch>
+
+Le lundi, 22 f?vrier 2016 ? 15:48, Fabrice Le Fessant a ?crit :
+> and that version would automatically add an ocamlbuild dependency to every package, except if it has an "ocamlbuild: false" header (or something like that). I am not saying it is the best solution, but changing 4000 packages seem even worse for me. I presume that, most of the time, it is possible to fix such problems in opam rather than in opam-repository.
+
+Adding magic in opam is certainly the worst solution to these kind of problems: let's add ad-hoc layers of obscurity and special cases to the system.
+
+> Package maintainers, as in Debian, are not the authors, they are the people who decide to take responsibility for making a package public on OPAM.
+
+The opam-repository is not debian, it's a package repository for and by developers. What you describe here doesn't reflect the reality which is, in the current state, that most packagers are the package developer themselves.
+  
+> On the contrary, repo maintainers are only in charge of maintaining the global consistency of the repository, deciding when there is a conflict between package maintainers, and so on. The whole point of this discussion is to prevent repo maintainers from acting as package maintainers, so this distinction is important !
+This is a little bit contradictory. If maintainers have to maintain the global consistency of the repository they do have from time to time to act on the package themselves, if only to be able to do so in a timely manner when everything breaks in the repo (which fortunately rarely happened so far).   
+
+Frankly, I think you are blowing things a little bit out of proportions here. It seems that as it stand the repository has been working quite well with minimal friction under the current operating structure. I don't say it should never change in the future but you seem to be only one to be complaining with arguments that seem a little bit out of touch with the reality of the opam-repository.
+
+Best,  
+
+Daniel
+
+ 
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:23:06 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:23:06 +0000
+Subject: [opam-devel] Need to fix checksum for ascii85.0.2
+Message-ID: <CAHvkLrP-jFS=1=LWFJz_chB84ZXFOEB__7D5LRP5xhE9vKX9Hg@mail.gmail.com>
+
+Hi Christian,
+
+  It looks like one of your packages, ascii85 0.2, cannot be installed
+anymore because of a wrong checksum. I submitted a pull-request to fix the
+problem, could you confirm on the PR if you agree with the change ?
+
+https://github.com/ocaml/opam-repository/pull/5694
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/6cbade60/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:28:40 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:28:40 +0000
+Subject: [opam-devel] Need to fix checksum for ascii85.0.3
+Message-ID: <CAHvkLrNr_T78fhi4y-LZZSJVM36zR--9khH0KxcUZ9Q4vsqf6w@mail.gmail.com>
+
+Hi Christian,
+
+  It looks like one of your packages, ascii85 0.3, cannot be installed
+anymore because of a wrong checksum. I submitted a pull-request to fix the
+problem, could you confirm on the PR if you agree with the change ?
+
+https://github.com/ocaml/opam-repository/pull/5693
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/d92a9700/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:28:43 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:28:43 +0000
+Subject: [opam-devel] Need to fix checksum for camlimages 4.0.2, 4.1.0, 4.1.1
+Message-ID: <CAHvkLrPhuR4Lg2q7n4G6xuxs5ROdk163Wmpv70xhkgrDOJjFRg@mail.gmail.com>
+
+Hi Jun,
+
+  It looks like one of your packages, camlimages 4.0.2/4.1.0/4.1.1, cannot
+be installed anymore because of a wrong checksum. I submitted pull-requests
+to fix the problems, could you confirm on these PR if you agree with the
+change ?
+
+https://github.com/ocaml/opam-repository/pull/5689
+https://github.com/ocaml/opam-repository/pull/5692
+https://github.com/ocaml/opam-repository/pull/5691
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/d35c6a50/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:30:01 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:30:01 +0000
+Subject: [opam-devel] Need to fix checksum for lipsum 0.2
+Message-ID: <CAHvkLrMtepVE8iNdNPNpsRfzL=GCuV23QH2j-SC2+0j+sHDS1g@mail.gmail.com>
+
+Hi Christian,
+
+  It looks like one of your packages, lipsum 0.2, cannot be installed
+anymore because of a wrong checksum. I submitted a pull-request to fix the
+problem, could you confirm on the PR if you agree with the change ?
+
+https://github.com/ocaml/opam-repository/pull/5690
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/36de48df/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:30:02 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:30:02 +0000
+Subject: [opam-devel] Need to fix checksum for combine 0.55
+Message-ID: <CAHvkLrM-K7Cqe9vs8zdDvaxeGCXS+M-KceYikeX7CKuJTn3D+A@mail.gmail.com>
+
+Hi Jean-Christophe,
+
+  It looks like one of your packages, combine 0.55, cannot be installed
+anymore because of a wrong checksum. I submitted a pull-request to fix the
+problem, could you confirm on the PR if you agree with the change ?
+
+https://github.com/ocaml/opam-repository/pull/5688
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/aecd8a42/attachment.html>
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 15:33:08 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 15:33:08 +0000
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+Message-ID: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+
+Hi,
+
+  Is there a mailing-list for opam-repo maintainers only ? For me, this
+list is about the development of OPAM itself, I am a bit concerned about
+the trafic if we start to send emails on this list for synchronisation
+between repo maintainers. Would it be worth creating opam-repo at ocaml.org ?
+
+Regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/99a58896/attachment.html>
+
+From markus.mottl at gmail.com  Mon Feb 22 15:35:29 2016
+From: markus.mottl at gmail.com (Markus Mottl)
+Date: Mon, 22 Feb 2016 10:35:29 -0500
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+Message-ID: <CAP_800oz44gZdbwyugGJFpd6FqzRWZThR-v-dOjj0wWsX2Sqzw@mail.gmail.com>
+
+Such a list would seem to be a good idea.
+
+Regards,
+Markus
+
+On Mon, Feb 22, 2016 at 10:33 AM, Fabrice Le Fessant
+<fabrice.le_fessant at ocamlpro.com> wrote:
+> Hi,
+>
+>   Is there a mailing-list for opam-repo maintainers only ? For me, this list
+> is about the development of OPAM itself, I am a bit concerned about the
+> trafic if we start to send emails on this list for synchronisation between
+> repo maintainers. Would it be worth creating opam-repo at ocaml.org ?
+>
+> Regards,
+> --Fabrice
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+
+
+
+-- 
+Markus Mottl        http://www.ocaml.info        markus.mottl at gmail.com
+
+From dra-news at metastack.com  Mon Feb 22 15:41:12 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Mon, 22 Feb 2016 15:41:12 +0000
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+
+The traffic is already a nuisance! Commenting on your previous rebuttal:
+
+> Well, as I am watching tens of repos on Github, my mailbox is full of such emails.
+
+That?s a problem with your mail client configuration, not the process!
+
+> I would not notice such a mention, unless I decide to read the thread because the title is interesting.
+
+GitHub sets lots of headers ? standard list ones in a predictable manner for each repo ? and also some useful extra ones (I use them to filter out some other very high activity repos). In particular, watching for X-GitHub-Reason: mention allows you to mark as high priority (or whatever you want to do in your MUA) a comment in which you?ve been tagged.
+
+> Direct mails would be much better.
+
+No they would not ? getting people on the conversation thread of a PR is vastly superior; it groups the information and discussion in the place where it?s merged and archives it there. I have certainly had to bisect opam-repository before, so being able to go from a SHA1->Merge->PR->Conversation is very useful.
+
+On this string of PRs, I?m wondering if you?re treating the symptom, and not the cause. Each PR so far is to do with an altered checksum from a code service?s binary release system which suggests that they?re not canonical (i.e. that they?ve changed the zip in what should be a trivial manner ? e.g. putting the files in a different order). Rather than fixing the checksums, and causing this to happen again at the whim of a zip library, would it not be better to put in place a policy that zip links should not be to GitHub/BitBucket/Whatever auto-generating URLs but to actual static files (e.g. on github.io)?
+
+
+David
+
+
+From: opam-devel [mailto:opam-devel-bounces at lists.ocaml.org] On Behalf Of Fabrice Le Fessant
+Sent: 22 February 2016 15:33
+To: opam-devel
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+
+Hi,
+
+  Is there a mailing-list for opam-repo maintainers only ? For me, this list is about the development of OPAM itself, I am a bit concerned about the trafic if we start to send emails on this list for synchronisation between repo maintainers. Would it be worth creating opam-repo at ocaml.org<mailto:opam-repo at ocaml.org> ?
+
+Regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/fb5b425b/attachment.html>
+
+From gabriel.scherer at gmail.com  Mon Feb 22 15:42:39 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 22 Feb 2016 10:42:39 -0500
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+ <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+ <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+ <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+Message-ID: <CAPFanBEydH1MMieLZNY0M8th0MmR453G-7fvP3mfwF+9ChrbPA@mail.gmail.com>
+
+Fabrice,
+
+You agree that sometimes repo maintainers have to make some changes.
+In this situation, I think that the problem you raise of upstream devs
+not seeing some of the changes and submitting a before-change
+description for the new package version is inevitable. As we agree
+that this may happen, we are looking for ways to avoid it -- that make
+life easier for everyone.
+
+For ocamlbuild, I have written in the release How-to (the description
+of things that have to be done when creating a new release) that the
+upstream opam file of the last existing release should be checked for
+packaging-policy changes:
+  https://github.com/ocaml/ocamlbuild/blob/master/howto/release.adoc#synchronizing-the-local-and-remote-opam-files
+
+I would encourage other maintainers to adopt such a policy. Checking
+once at release time is an acceptable amount of work for software that
+gets released every few months, and it ensures that this problem does
+not arise. Of course, this is not a silver bullet, other developers
+have different packaging habits that make release for frequent or
+numerous (Daniel tries to script it as much as possible because he has
+many small packages) and they may prefer another way of working with
+packaging changes.
+
+P.S.: I agree that changing checksums are a good reason to ask
+developers to validate changes before pushing them in the repo, rather
+than notify them after the fact. First, only they can really tell what
+the archive is supposed to be (note however that md5 hashes provide no
+security against tampering). Second, we want to discourage them from
+doing this, so having a heavier process in that case helps steer
+everyone towards good practices.
+
+On Mon, Feb 22, 2016 at 9:48 AM, Fabrice Le Fessant
+<fabrice.le_fessant at ocamlpro.com> wrote:
+> On Mon, Feb 22, 2016 at 3:28 PM Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+>>
+>> There are several different kinds of changes to a package, and it
+>> makes sense to let different people handle them.
+>
+>
+> Indeed, I think repo maintainers can have to make some changes, but these
+> should be the exception, not the rule. Anyway, it's good to explicit them.
+>
+>>
+>> (1) Changes in global packaging policies that are orthogonal to any
+>> particular packages. When I changed around 3000 packages to add an
+>> "ocamlbuild" dependency,
+>
+>
+> Of course, such automatic changes can only be done that way. Maybe, however,
+> it would have been possible to avoid it. For example, OCaml without
+> ocamlbuild could be proposed as a package only available above some OPAM
+> version (1.2.2 ?), and that version would automatically add an ocamlbuild
+> dependency to every package, except if it has an "ocamlbuild: false" header
+> (or something like that). I am not saying it is the best solution, but
+> changing 4000 packages seem even worse for me. I presume that, most of the
+> time, it is possible to fix such problems in opam rather than in
+> opam-repository.
+>
+>>
+>> (2) Changes in external configurations that affect some systems that
+>> the maintainer is not particularly familiar with.
+>
+>
+> Here, I have to disagree. First, it is always good to discuss such changes,
+> just for developers to learn about platforms' specificities that they were
+> not aware of. If you don't do that, you will fix a version, and the next
+> version will be broken again. Second, you are mixing "repo maintainers" and
+> "package maintainers". Maybe developers don't have to know about specific
+> platforms (although they are probably using some platform specific thing
+> otherwise no change would be needed), about here, we are discussing about
+> what package maintainers are supposed to know, or to learn. Package
+> maintainers, as in Debian, are not the authors, they are the people who
+> decide to take responsibility for making a package public on OPAM. On the
+> contrary, repo maintainers are only in charge of maintaining the global
+> consistency of the repository, deciding when there is a conflict between
+> package maintainers, and so on. The whole point of this discussion is to
+> prevent repo maintainers from acting as package maintainers, so this
+> distinction is important !
+>
+>>
+>> I think that empowering Nix users to make the necessary
+>> opam-repository change to have good support for OCaml inside Nix(OS)
+>> is the right thing to do, instead of requiring the contributor to send
+>> dozens of emails to people they don't know, which can be enough of a
+>> requirement to discourage them from any further contribution.
+>
+>
+> Except that their contributions will be gone at the next version of the
+> package, and they will continue to have broken support...
+>
+> --Fabrice
+
+From anil at recoil.org  Mon Feb 22 15:59:22 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 22 Feb 2016 15:59:22 +0000
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+Message-ID: <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+
+On 22 Feb 2016, at 15:41, David Allsopp <dra-news at metastack.com> wrote:
+> 
+> No they would not ? getting people on the conversation thread of a PR is vastly superior; it groups the information and discussion in the place where it?s merged and archives it there. I have certainly had to bisect opam-repository before, so being able to go from a SHA1->Merge->PR->Conversation is very useful.  
+
+I'm in complete agreement with David here.  We already have an established process for submitting a PR, and I'd strongly prefer that we do not create another out-of-band mechanism (email) to contact people.  Why not just create an issue in opam-repository and assign to the submitter, for instance? 
+
+Fabrice: I think in the short term, not CCing opam-devel for such e-mails would be appreciated.  I tend to just e-mail people directly if they really don't respond.
+
+> On this string of PRs, I?m wondering if you?re treating the symptom, and not the cause. Each PR so far is to do with an altered checksum from a code service?s binary release system which suggests that they?re not canonical (i.e. that they?ve changed the zip in what should be a trivial manner ? e.g. putting the files in a different order). Rather than fixing the checksums, and causing this to happen again at the whim of a zip library, would it not be better to put in place a policy that zip links should not be to GitHub/BitBucket/Whatever auto-generating URLs but to actual static files (e.g. on github.io)?
+
+Indeed -- GitHub does seem to repack archives with different distribution checksums, quite probably when they change their.
+
+On the broader question that Fabrice raises about access rights to individual packages, it's probably worth bisecting the contributors and why packages need to be affected:
+
+- individual package maintainers: submit a single package, and tend not to get regular updates about its health, for instance when a related package is upgraded.  We do need a mechanism to update a maintainer about when a package is broken by an unrelated change.  Right now, if this happens we add an upper bound constraint, but this doesn't remind the package maintainer to release a version compatible with the new related package.
+
+- distribution porters: adding depexts to a lot of packages (I've just rolled through and added Alpine and Fedora for instance), or minor patches hidden behind an `os` constraint.  For this work, blocking on 10-20 package maintainers would be very onerous and hold back the health of the repository for that work.
+
+- architecture porters: often have a number of short-term fixes for (e.g.) ARM, and these are placed behind patch constraints so that for an x86 user, the OPAM experience is unmodified.  These then need to be rolled upstream.
+
+I'm struggling a little to see what the specific problem that Fabrice is raising is, which appears to be the desire to "lock" a package against commits until he approves it.  This is a reasonable request and should be as simple as the current active repository maintainers not merging requests that touch OCamlPro packages until approved by Fabrice (and/or other OCamlPro staff?).  If this results in a hanging PR (as has happened in the past with ocp-build errors due to a lack of resources upstream to maintain it), then we need to just take an executive decision and either commit it or close the PR.
+
+I don't see anyone else who wants this: I am quite happy for people doing bulk builds to generate and improve constraints against my packages.  More generally, lightweight tooling to make it easier to enforce such constraints locally would be very useful -- for instance, something to probe for disparities in source archives and the `opam` metadata in the repository and alert for inconsistencies.
+
+regards,
+Anil
+
+From anil at recoil.org  Mon Feb 22 16:14:09 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 22 Feb 2016 16:14:09 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <CAPFanBEydH1MMieLZNY0M8th0MmR453G-7fvP3mfwF+9ChrbPA@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <CAAxsn=F-3+eyJU0AYTDkMwxtKqk-wz57UeZk2B9VxOpLmQsyOQ@mail.gmail.com>
+ <CAHvkLrN81HgU19ZGq_cfKOk60zObgX0-4i=dwWT3pavCabmNrA@mail.gmail.com>
+ <CAPFanBFFh0XXK-O3yknpAKCVgqJS=ZzS3A3K6PnOKZnDVXWSbQ@mail.gmail.com>
+ <CAHvkLrNd=N89W3SmH57cpEgA=_DGhcJxe-LBteL=i57Bt-HvKQ@mail.gmail.com>
+ <CAPFanBEydH1MMieLZNY0M8th0MmR453G-7fvP3mfwF+9ChrbPA@mail.gmail.com>
+Message-ID: <9E106615-5C34-40AF-9DFE-8FF0541AD75C@recoil.org>
+
+On 22 Feb 2016, at 15:42, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> 
+> For ocamlbuild, I have written in the release How-to (the description
+> of things that have to be done when creating a new release) that the
+> upstream opam file of the last existing release should be checked for
+> packaging-policy changes:
+>  https://github.com/ocaml/ocamlbuild/blob/master/howto/release.adoc#synchronizing-the-local-and-remote-opam-files
+> 
+> I would encourage other maintainers to adopt such a policy. Checking
+> once at release time is an acceptable amount of work for software that
+> gets released every few months, and it ensures that this problem does
+> not arise. Of course, this is not a silver bullet, other developers
+> have different packaging habits that make release for frequent or
+> numerous (Daniel tries to script it as much as possible because he has
+> many small packages) and they may prefer another way of working with
+> packaging changes.
+
+Very sensible!  There is also the issue of sweeping changes in the
+repository affecting upstream `opam` files.  This most notably is
+happening right now with the sexplib-camlp4->ppx_sexp_conv changes,
+and so I asked Jeremie Diminio to create a CHANGES file in the
+opam-repository:
+
+https://github.com/ocaml/opam-repository/blob/master/CHANGES.md
+
+It's not ideal, but at least there's a recorded place to look at
+for how to deal with an old `opam` file in your distribution and
+updating it to the latest and greatest packages.
+
+Anil
+
+From michipili at gmail.com  Mon Feb 22 16:14:45 2016
+From: michipili at gmail.com (=?utf-8?Q?Michael_Gr=C3=BCnewald?=)
+Date: Mon, 22 Feb 2016 17:14:45 +0100
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+Message-ID: <DA1EBED9-8C15-4EE8-AC9C-94B916DE9E25@gmail.com>
+
+Two mostly off-topic comments prompted by this paragraph:
+
+> On 22 Feb 2016, at 16:41, David Allsopp <dra-news at metastack.com> wrote:
+> 
+> On this string of PRs, I?m wondering if you?re treating the symptom, and not the cause. Each PR so far is to do with an altered checksum from a code service?s binary release system which suggests that they?re not canonical (i.e. that they?ve changed the zip in what should be a trivial manner ? e.g. putting the files in a different order). Rather than fixing the checksums, and causing this to happen again at the whim of a zip library, would it not be better to put in place a policy that zip links should not be to GitHub/BitBucket/Whatever auto-generating URLs but to actual static files (e.g. on github.io)?
+
+1. It is surprisingly difficult to deterministically produce archives using
+   common archiving tools. One of the ?simplest? way to achieve this is
+
+    find ?${DIRECTORY}" -name '.git' -prune -o -type f -print\
+        | sort\
+        | cpio -o -a --format=ustar\
+        > ?${ARCHIVE}?
+
+   Using widely available compression algorithms will break determinism
+   (gz, bz2, xz) maybe because of multi-threading or a randomization
+   strategy used to avoid worst-case distribution scenarios.  This is
+   mostly specualtive, as I did not any effort to check this. :)
+
+
+2. The build system bsdowl I write and use for my OCaml packages supports
+   production of GPG-signed archives with `make dist` see
+   for instance https://github.com/michipili/lemonade for a short
+   example.
+
+Best regards,
+Michael
+
+
+From hannes at mehnert.org  Mon Feb 22 16:23:43 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Mon, 22 Feb 2016 17:23:43 +0100
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+Message-ID: <56CB360F.5090601@mehnert.org>
+
+Hello,
+
+On 02/22/16 11:09 AM, Fabrice Le Fessant wrote:
+> * the future authentification system for opam-repository will prevent
+> anybody, except maybe admins, from modifying somebody else's package. Thus,
+> the current policy will not be possible in that future;
+
+I'm really glad that the opam-repository mostly consists of package
+authors who submit their packages, and nearly no intermediaries who
+write custom patches (as in the debian world).
+
+The current workflow is that an author publishes their release, with
+lower bounds on dependencies.  Will be the same in the future.
+
+When a new release of any dependency is issued, this might be
+incompatible with earlier versions (unfortunately we don't enforce
+semantic versioning, afaik elm does this and opam should adapt).  This
+is the main reason for the existence of repository maintainers - they
+fix upper bounds of dependent packages to have the opam-repository in a
+working state (otherwise users, who download it and want to install
+things end up with a broken repository; or the release process of any
+package needs to involve the coordination of all reverse dependencies -
+I don't believe this is realistic).
+
+The signing proposal retains the role of repository maintainers for
+exactly this purpose - but it will need a quorum (of 3? - the concrete
+number needs some discussion) of repository maintainers to coordinate
+(otherwise, a single compromised repository maintainer can arbitrarily
+modify the entire repository, which means there's no need for signing by
+authors in the first place).
+
+Any modification to the opam file needs to be signed by either the
+author(s) [there may be multiple people who own a single package] or a
+quorum of repository maintainers.  There's no categorisation of
+modifications into 'allowed for repository maintainer/allowed only by
+author'.
+
+I expect that quickfixes, such as patches for platform X, or upper bound
+of dependency Y, will get upstreamed to the authors.  I think a
+notification system which automatically informs the author would be
+great to have (independent of the signing)!
+
+
+hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/fa90690a/attachment.sig>
+
+From anil at recoil.org  Mon Feb 22 16:31:46 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 22 Feb 2016 16:31:46 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <56CB360F.5090601@mehnert.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+Message-ID: <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+
+On 22 Feb 2016, at 16:23, Hannes Mehnert <hannes at mehnert.org> wrote:
+> 
+> When a new release of any dependency is issued, this might be
+> incompatible with earlier versions (unfortunately we don't enforce
+> semantic versioning, afaik elm does this and opam should adapt).
+
+Interesting idea -- so this would mean that OPAM has to remap
+upstream versions into something that is a semantic version.
+
+Does Elm eliminate this by mandating that libraries should
+"natively" all be semantically versioned?  We can't do this in
+OCaml today since there are too many upstream packages with
+their own versioning notions.
+
+Anil
+
+From hannes at mehnert.org  Mon Feb 22 16:39:23 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Mon, 22 Feb 2016 17:39:23 +0100
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+Message-ID: <56CB39BB.1040508@mehnert.org>
+
+On 02/22/16 05:31 PM, Anil Madhavapeddy wrote:
+> Interesting idea -- so this would mean that OPAM has to remap
+> upstream versions into something that is a semantic version.
+> 
+> Does Elm eliminate this by mandating that libraries should
+> "natively" all be semantically versioned?  We can't do this in
+> OCaml today since there are too many upstream packages with
+> their own versioning notions.
+
+Elm seems to check whether the API is compatible, and if not, only
+accepts a release if major is bumped:
+https://github.com/elm-lang/elm-package#version-rules
+
+What does "own versioning notions" mean?  I'd appreciate if the
+community would enforce (by peer pressure and adequate tooling) semantic
+versioning for the main opam-repository.
+
+
+hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/48dc3e53/attachment.sig>
+
+From amc79 at cam.ac.uk  Mon Feb 22 16:43:20 2016
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Mon, 22 Feb 2016 16:43:20 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+Message-ID: <798F4DBF-0BD3-48A0-8C8B-1343A5098024@cam.ac.uk>
+
+
+> On 22 Feb 2016, at 16:31, Anil Madhavapeddy <anil at recoil.org> wrote:
+> 
+> On 22 Feb 2016, at 16:23, Hannes Mehnert <hannes at mehnert.org> wrote:
+>> 
+>> When a new release of any dependency is issued, this might be
+>> incompatible with earlier versions (unfortunately we don't enforce
+>> semantic versioning, afaik elm does this and opam should adapt).
+> 
+> Interesting idea -- so this would mean that OPAM has to remap
+> upstream versions into something that is a semantic version.
+> 
+> Does Elm eliminate this by mandating that libraries should
+> "natively" all be semantically versioned?  We can't do this in
+> OCaml today since there are too many upstream packages with
+> their own versioning notions.
+
+Yup, Elm mandates that packages use semantic versioning.  From their website:
+"Semantic versioning is automatically enforced for all community libraries. Elm's package manager detects any API changes, so breaking API changes never sneak into patches. You can upgrade with confidence."
+
+It?s interesting to note that all packages are meant to start at 1.0.0 (i.e. from a stable point) [1].  This isn?t true opam-repository (nor do I think it should be).
+
+Hannes, I don?t quite understand what you mean by ?opam should adapt?.  People generally seem to use SemVer these days anyway.
+
+
+[1] https://github.com/elm-lang/elm-package/blob/master/README.md#version-rules
+
+Amir
+
+From anil at recoil.org  Mon Feb 22 16:43:30 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 22 Feb 2016 16:43:30 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <56CB39BB.1040508@mehnert.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+ <56CB39BB.1040508@mehnert.org>
+Message-ID: <CCD3D8DF-D899-4BA3-804B-E6E02796296C@recoil.org>
+
+On 22 Feb 2016, at 16:39, Hannes Mehnert <hannes at mehnert.org> wrote:
+> 
+> On 02/22/16 05:31 PM, Anil Madhavapeddy wrote:
+>> Interesting idea -- so this would mean that OPAM has to remap
+>> upstream versions into something that is a semantic version.
+>> 
+>> Does Elm eliminate this by mandating that libraries should
+>> "natively" all be semantically versioned?  We can't do this in
+>> OCaml today since there are too many upstream packages with
+>> their own versioning notions.
+> 
+> Elm seems to check whether the API is compatible, and if not, only
+> accepts a release if major is bumped:
+> https://github.com/elm-lang/elm-package#version-rules
+> 
+> What does "own versioning notions" mean?  I'd appreciate if the
+> community would enforce (by peer pressure and adequate tooling) semantic
+> versioning for the main opam-repository.
+
+I mean that there are hundreds of OCaml packages that existed
+before OPAM that have their own versioning conventions (most of
+which are not semantically versioned), and these are directly
+mapped into OPAM package versions.
+
+It would be incredibly useful to have an enforcement of semantic
+versioning, but at this stage in the current repository would
+require a mass remapping of upstream versions into the scheme.
+
+Anil
+
+From amc79 at cam.ac.uk  Mon Feb 22 16:45:10 2016
+From: amc79 at cam.ac.uk (Amir Chaudhry)
+Date: Mon, 22 Feb 2016 16:45:10 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+	package description
+In-Reply-To: <56CB39BB.1040508@mehnert.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+ <56CB39BB.1040508@mehnert.org>
+Message-ID: <2A627AC0-62EA-401F-8401-28A28EB7A34C@cam.ac.uk>
+
+
+> On 22 Feb 2016, at 16:39, Hannes Mehnert <hannes at mehnert.org> wrote:
+> 
+> On 02/22/16 05:31 PM, Anil Madhavapeddy wrote:
+>> Interesting idea -- so this would mean that OPAM has to remap
+>> upstream versions into something that is a semantic version.
+>> 
+>> Does Elm eliminate this by mandating that libraries should
+>> "natively" all be semantically versioned?  We can't do this in
+>> OCaml today since there are too many upstream packages with
+>> their own versioning notions.
+> 
+> Elm seems to check whether the API is compatible, and if not, only
+> accepts a release if major is bumped:
+> https://github.com/elm-lang/elm-package#version-rules
+> 
+> What does "own versioning notions" mean?  I'd appreciate if the
+> community would enforce (by peer pressure and adequate tooling) semantic
+> versioning for the main opam-repository.
+
+Thanks, this mostly answers my question. :)
+
+Amir
+
+
+From hannes at mehnert.org  Mon Feb 22 16:52:45 2016
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Mon, 22 Feb 2016 17:52:45 +0100
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CCD3D8DF-D899-4BA3-804B-E6E02796296C@recoil.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+ <56CB39BB.1040508@mehnert.org>
+ <CCD3D8DF-D899-4BA3-804B-E6E02796296C@recoil.org>
+Message-ID: <56CB3CDD.5000308@mehnert.org>
+
+On 02/22/16 05:43 PM, Anil Madhavapeddy wrote:
+> I mean that there are hundreds of OCaml packages that existed
+> before OPAM that have their own versioning conventions (most of
+> which are not semantically versioned), and these are directly
+> mapped into OPAM package versions.
+> 
+> It would be incredibly useful to have an enforcement of semantic
+> versioning, but at this stage in the current repository would
+> require a mass remapping of upstream versions into the scheme.
+
+My idea would be to leave the versions which are there in place (since
+the constraints are already setup), but for new releases require that if
+the API changes the major version be (at least) last-release.major + 1.
+
+No remapping needed; in case such pre-opam packages want to do new
+releases, they should conform to semantic versioning.
+
+
+hannes
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/19bdddf0/attachment.sig>
+
+From sheets at alum.mit.edu  Mon Feb 22 16:54:03 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Mon, 22 Feb 2016 16:54:03 +0000
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <56CB39BB.1040508@mehnert.org>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <56CB360F.5090601@mehnert.org>
+ <67576060-F174-4034-BDDD-1C5FC8ADE791@recoil.org>
+ <56CB39BB.1040508@mehnert.org>
+Message-ID: <CAAWM5TzS9j8YovEZ5MBfEGKPHeQVzDM=vN3sov_snnra5FX1Cg@mail.gmail.com>
+
+On Mon, Feb 22, 2016 at 4:39 PM, Hannes Mehnert <hannes at mehnert.org> wrote:
+> On 02/22/16 05:31 PM, Anil Madhavapeddy wrote:
+>> Interesting idea -- so this would mean that OPAM has to remap
+>> upstream versions into something that is a semantic version.
+>>
+>> Does Elm eliminate this by mandating that libraries should
+>> "natively" all be semantically versioned?  We can't do this in
+>> OCaml today since there are too many upstream packages with
+>> their own versioning notions.
+>
+> Elm seems to check whether the API is compatible, and if not, only
+> accepts a release if major is bumped:
+> https://github.com/elm-lang/elm-package#version-rules
+>
+> What does "own versioning notions" mean?  I'd appreciate if the
+> community would enforce (by peer pressure and adequate tooling) semantic
+> versioning for the main opam-repository.
+
+I agree that semantic versioning would be nice; however, semantic
+versioning can never be solely relied upon.
+For example, people make mistakes when assigning semantic version
+numbers. Sometimes, changes that do break
+compatibility are not surfaced at the signature level. A fallback
+constraint method is required.
+
+Additionally, I don't think any of the recent suggestions of
+*enforcement* of behavior is wise. I'm of the opinion that, as
+long as the package builds, has a bare minimum of metadata, a
+reasonable name, and isn't harmful to users,
+developers should be free to see their work published in
+ocaml/opam-repository. We should absolutely adopt tooling
+and social conventions to encourage positive behavior. I don't see any
+benefit to exclusion due to versioning schemes,
+lack of home pages, lack of examples, lack of documentation, and other
+violated best practices.
+
+Thanks,
+
+David
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 17:07:22 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 17:07:22 +0000
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+ <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+Message-ID: <CAHvkLrMpQyWrSDdr_MRA0r+azBNG2Y3zs0Yug3VWPjZ+N3ZAnA@mail.gmail.com>
+
+On Mon, Feb 22, 2016 at 4:59 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> I'm struggling a little to see what the specific problem that Fabrice is
+> raising is, which appears to be the desire to "lock" a package against
+> commits until he approves it.  This is a reasonable request and should be
+> as simple as the current active repository maintainers not merging requests
+> that touch OCamlPro packages until approved by Fabrice (and/or other
+> OCamlPro staff?). If this results in a hanging PR (as has happened in the
+> past with ocp-build errors due to a lack of resources upstream to maintain
+> it), then we need to just take an executive decision and either commit it
+> or close the PR.
+
+
+It was not my point (the PR related to ocp-build yesterday just confirmed
+the discussion we had started on Friday), but if it is the only result, I
+would already be happy with it.
+
+And ok, I will not use this list nor mail anymore as a synchronisation way
+for opam-repo maintainers. Anyway, most of my PRs fixing checksums have
+already been merged without waiting for package maintainers to confirm them.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/00b657a5/attachment.html>
+
+From sheets at alum.mit.edu  Mon Feb 22 17:25:15 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Mon, 22 Feb 2016 17:25:15 +0000
+Subject: [opam-devel] Please don't DoS the opam-repository
+Message-ID: <CAAWM5TynJ3vSwtbURH=GFJB=7bG2M-CriOehpBOML28fcaDOiA@mail.gmail.com>
+
+Dear Fabrice,
+
+Please slow your submission of pull requests to ocaml/opam-repository.
+
+Your PRs solve long-standing and unreported issues (good!) but do so
+in a way that is anti-social to the other members of the community.
+
+Specifically, you have now queued an enormous number of jobs on Travis
+CI which will slow package publication and testing for emergent
+issues.
+
+Respectfully,
+
+David Sheets
+
+From fabrice.le_fessant at ocamlpro.com  Mon Feb 22 18:05:11 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Mon, 22 Feb 2016 18:05:11 +0000
+Subject: [opam-devel] Please don't DoS the opam-repository
+In-Reply-To: <CAAWM5TynJ3vSwtbURH=GFJB=7bG2M-CriOehpBOML28fcaDOiA@mail.gmail.com>
+References: <CAAWM5TynJ3vSwtbURH=GFJB=7bG2M-CriOehpBOML28fcaDOiA@mail.gmail.com>
+Message-ID: <CAHvkLrMOwuR6EtGJuwEe4hej_H4Kh=dx-ot36FFuXtSZw2tk0g@mail.gmail.com>
+
+Do we have a limited number of jobs on Travis ? jobs per jour, jobs per
+day, jobs per month ?
+--Fabrice
+
+On Mon, Feb 22, 2016 at 6:25 PM David Sheets <sheets at alum.mit.edu> wrote:
+
+> Dear Fabrice,
+>
+> Please slow your submission of pull requests to ocaml/opam-repository.
+>
+> Your PRs solve long-standing and unreported issues (good!) but do so
+> in a way that is anti-social to the other members of the community.
+>
+> Specifically, you have now queued an enormous number of jobs on Travis
+> CI which will slow package publication and testing for emergent
+> issues.
+>
+> Respectfully,
+>
+> David Sheets
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/b2534d69/attachment.html>
+
+From gabriel.scherer at gmail.com  Mon Feb 22 18:34:46 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Mon, 22 Feb 2016 13:34:46 -0500
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+ <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+Message-ID: <CAPFanBGj1XXBC8qRQ5Eswe3A=y6dVLtNhNiQV1QCpST2xr8diA@mail.gmail.com>
+
+On Mon, Feb 22, 2016 at 10:59 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> Indeed -- GitHub does seem to repack archives with different distribution checksums, quite probably when they change their.
+
+I was not aware of this -- I assumed archives were built deterministically.
+
+Do you know how often that happens? Is it ok for maintainers to rely
+on those release archives, if they are ready to update the checksum
+whenever it changes? Or is that inherently unstable and should we add
+an "opam lint" rule to warn about these URLs?
+
+I use this for the ocamlbuild package, because it is extremely
+convenient. I don't have another static hosting page than the github
+repo right now (not even a .github.io page), and I would rather avoid
+it if reasonable.
+
+On Mon, Feb 22, 2016 at 10:59 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 22 Feb 2016, at 15:41, David Allsopp <dra-news at metastack.com> wrote:
+>>
+>> No they would not ? getting people on the conversation thread of a PR is vastly superior; it groups the information and discussion in the place where it?s merged and archives it there. I have certainly had to bisect opam-repository before, so being able to go from a SHA1->Merge->PR->Conversation is very useful.
+>
+> I'm in complete agreement with David here.  We already have an established process for submitting a PR, and I'd strongly prefer that we do not create another out-of-band mechanism (email) to contact people.  Why not just create an issue in opam-repository and assign to the submitter, for instance?
+>
+> Fabrice: I think in the short term, not CCing opam-devel for such e-mails would be appreciated.  I tend to just e-mail people directly if they really don't respond.
+>
+>> On this string of PRs, I?m wondering if you?re treating the symptom, and not the cause. Each PR so far is to do with an altered checksum from a code service?s binary release system which suggests that they?re not canonical (i.e. that they?ve changed the zip in what should be a trivial manner ? e.g. putting the files in a different order). Rather than fixing the checksums, and causing this to happen again at the whim of a zip library, would it not be better to put in place a policy that zip links should not be to GitHub/BitBucket/Whatever auto-generating URLs but to actual static files (e.g. on github.io)?
+>
+> Indeed -- GitHub does seem to repack archives with different distribution checksums, quite probably when they change their.
+>
+> On the broader question that Fabrice raises about access rights to individual packages, it's probably worth bisecting the contributors and why packages need to be affected:
+>
+> - individual package maintainers: submit a single package, and tend not to get regular updates about its health, for instance when a related package is upgraded.  We do need a mechanism to update a maintainer about when a package is broken by an unrelated change.  Right now, if this happens we add an upper bound constraint, but this doesn't remind the package maintainer to release a version compatible with the new related package.
+>
+> - distribution porters: adding depexts to a lot of packages (I've just rolled through and added Alpine and Fedora for instance), or minor patches hidden behind an `os` constraint.  For this work, blocking on 10-20 package maintainers would be very onerous and hold back the health of the repository for that work.
+>
+> - architecture porters: often have a number of short-term fixes for (e.g.) ARM, and these are placed behind patch constraints so that for an x86 user, the OPAM experience is unmodified.  These then need to be rolled upstream.
+>
+> I'm struggling a little to see what the specific problem that Fabrice is raising is, which appears to be the desire to "lock" a package against commits until he approves it.  This is a reasonable request and should be as simple as the current active repository maintainers not merging requests that touch OCamlPro packages until approved by Fabrice (and/or other OCamlPro staff?).  If this results in a hanging PR (as has happened in the past with ocp-build errors due to a lack of resources upstream to maintain it), then we need to just take an executive decision and either commit it or close the PR.
+>
+> I don't see anyone else who wants this: I am quite happy for people doing bulk builds to generate and improve constraints against my packages.  More generally, lightweight tooling to make it easier to enforce such constraints locally would be very useful -- for instance, something to probe for disparities in source archives and the `opam` metadata in the repository and alert for inconsistencies.
+>
+> regards,
+> Anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From daniel.buenzli at erratique.ch  Mon Feb 22 18:50:39 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Mon, 22 Feb 2016 19:50:39 +0100
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <CAPFanBGj1XXBC8qRQ5Eswe3A=y6dVLtNhNiQV1QCpST2xr8diA@mail.gmail.com>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+ <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+ <CAPFanBGj1XXBC8qRQ5Eswe3A=y6dVLtNhNiQV1QCpST2xr8diA@mail.gmail.com>
+Message-ID: <75CD1588500142318CC18D2455D42CDE@erratique.ch>
+
+Le lundi, 22 f?vrier 2016 ? 19:34, Gabriel Scherer a ?crit :
+> I use this for the ocamlbuild package, because it is extremely
+> convenient. I don't have another static hosting page than the github
+> repo right now (not even a .github.io (http://github.io) page), and I would rather avoid
+> it if reasonable.
+
+I wouldn't rely on this, it has already been broken more than once. In general you anyways want to apply a function on a checkout in order to generate a release tarball (that is unless you still live in an age were you manipulate version numbers manually). What you can do is simply upload a tarball to what github considers a release (i.e. a tag). See for example the release for uchar:
+
+https://github.com/ocaml/uchar/releases
+
+The package downloads the associated tarball not github's notion of "source code" on that page.
+
+Best,
+
+Daniel
+
+
+
+From louis.gesbert at ocamlpro.com  Tue Feb 23 01:34:58 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 23 Feb 2016 10:34:58 +0900
+Subject: [opam-devel] current opam-repository policy : who can modify a
+ package description
+In-Reply-To: <CAHvkLrP4xkwTsR-iX6vMzbY2U=OgmAnO-YBr+oZewBR4WRoF0w@mail.gmail.com>
+References: <CAHvkLrM3BA31u-9HgjTxYueRt7R1v9VBRygWzVrjwf4JVJx1KA@mail.gmail.com>
+ <DD8D8A5D-35FB-49DF-A3E3-F1DD42729339@gazagnaire.org>
+ <CAHvkLrP4xkwTsR-iX6vMzbY2U=OgmAnO-YBr+oZewBR4WRoF0w@mail.gmail.com>
+Message-ID: <1621862.TFPQ40iz4H@maitake>
+
+Just bringing in some clarifications:
+
+- Hannes summarised the signing plans well. I'd like to mention that anyone 
+can still file a PR across packages they don't own -- in that case, a quorum of 
+repository maintainers will need to sign it (which, with proper tooling, 
+should'nt be much more than command-line). If they only modify packages they 
+own, they can sign for it, and obviously still need the PR accepted, but 
+that's it.
+
+- Notifications: Camelus already detects modified package definitions and has 
+access to the maintainer field -- just adding notifications through some SMTP 
+binding would be easy. Something in the vein of ? A pull-request modifying 
+package Xxx has been submitted by Yyy ?, with the diff and a link to the PR. 
+Then leave some time window for the owner to chime in. That's assuming mails 
+aren't obfuscated in the metadata, we should probably put some obfuscation in 
+opam.ocaml.org/packages to help with that. contact at ocamlpro.com is going to 
+get (o)pammed :p.
+
+- Another, more subtle notification, is that `opam update`/`opam upgrade` can 
+tell you about modified upstream metadata. It could even warn or advise if the 
+in-source opam is not in sync (it's already done in some cases).
+
+- It's not the only one, but adding upper bounds on releases of a new version 
+of a dependency is indeed the main case for cross-package patches. Solutions 
+are welcome, e.g. forcing an upper bound on dependencies to begin with, but 
+should be considered carefully within our existing setup, which is very agile 
+and has its merits.
+
+- There is an awfully complex net of dependencies: I think managing it in a 
+completely distributed fashion would be much more difficult than it is now. And 
+editing packages with full control and responsibility is available through 
+`opam repo add`. Systems like npm can discover packages and don't require a 
+central repository, but we have stricter interface constraints, and having a 
+board of editors trying to keep the consistency of the whole is I think a good 
+thing. Now, of course, this all needs the right balance.
+
+Best,
+Louis Gesbert - OCamlPro
+
+Le lundi 22 f?vrier 2016, 12:23:19 Fabrice Le Fessant a ?crit :
+> On Mon, Feb 22, 2016 at 11:30 AM Thomas Gazagnaire <thomas at gazagnaire.org>
+> 
+> wrote:
+> > That was not my understanding of the proposal: any PR modifying anything
+> > can still be merged as long as there is a quora amonst the repo
+> > maintainer.
+> > I think that was part of the design constraints that Louis and Hannes
+> > tried
+> > to resolve.
+> 
+> Even the notion of repo maintainer is weird: we should target a completely
+> distributed repo, where each package is taken care of by a small set of
+> maintainers (as it is done in Debian, which is not perfect, but working).
+> 
+> Imagine if Github decided that, as they are at least as smart as the devs
+> who use their platform, that they should have the right to patch whatever
+> code is hosted on Github. Would you keep using such a platform ? I think
+> it's the same here: I don't want anybody to mess with my packages, but I do
+> want to be warned if there is a problem that I should fix.
+> 
+> I think the opam repo maintainers have one opportunity to fix packages
+> (when a new version is submitted the first time), but then, they should not
+> be permitted to modify them anymore, without the permission of the
+> submitter.
+> 
+> It is indeed important that upstream are aware of issue and we currently do
+> 
+> > a poor job with that. Would be nice to automatise that by sending emails
+> > to
+> > maintainers. Anil, can we use @ocaml.org's SMTP for that?
+> 
+> What are you proposing ? Indeed, we should have a daemon watching the
+> repository and sending automated emails for some kind of simple problems.
+> 
+> > * a maintainer's fix might be of less quality than an owner's fix, because
+> > he might not know why something is done or not done. Discussing with the
+> > upstream developer usually is thus a better approach.
+> > 
+> > After having spend years (literally) fixing issues in opam-repository, I
+> > disagree with that statement. Repo maintainers are experienced OCaml
+> > coder,
+> > which see compilation error pattern every day. Repo maintainers are also
+> > quite active (usually more than package maintainers) and fix issues when
+> > they see them.
+> 
+> Well, if your goal is to spend more and more time fixing problems in the
+> repo, that's probably the best approach. But if you want to move the work
+> from the repo maintainers to the package maintainers, then you need to
+> spend a little more time communicating with them about such issues. I think
+> the strict approach is better to spread knowledge, and thus on the long
+> term. And automatisation can help a lot !
+> 
+> > I think the current model has some flows but it's still very valid given
+> > the current constraints. As I said in an other thread, this is a local
+> > optimum. Of course, I'm fine to move to another local optimum if it's
+> > better :-)
+> 
+> Yes, let's find a better local optimum :-)
+> --Fabrice
+
+From fabrice.le_fessant at ocamlpro.com  Tue Feb 23 08:09:20 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Tue, 23 Feb 2016 08:09:20 +0000
+Subject: [opam-devel] Need to fix checksum for combine 0.55
+In-Reply-To: <56CC0496.4080405@lri.fr>
+References: <CAHvkLrM-K7Cqe9vs8zdDvaxeGCXS+M-KceYikeX7CKuJTn3D+A@mail.gmail.com>
+ <56CC0496.4080405@lri.fr>
+Message-ID: <CAHvkLrOf0NsXKKOJpHSCMKQzHYUormPbPY_YdOdztZESSi2NkA@mail.gmail.com>
+
+Merci d'avoir v?rifi? !
+Fabrice
+Le mar. 23 f?vr. 2016 ? 08:04, Jean-Christophe Filliatre <
+Jean-Christophe.Filliatre at lri.fr> a ?crit :
+
+> Salut Fabrice,
+>
+> Le checksum ?tait en effet incorrect et ton fix contient le bon checksum
+> maintenant. J'ajoute R?my en copie car c'est apparemment lui qui a fait
+> le paquet opam de combine 0.55.
+>
+> Amicalement,
+> --
+> Jean-Christophe
+>
+>
+> On 22/02/2016 16:30, Fabrice Le Fessant wrote:
+> > Hi Jean-Christophe,
+> >
+> >   It looks like one of your packages, combine 0.55, cannot be installed
+> > anymore because of a wrong checksum. I submitted a pull-request to fix
+> > the problem, could you confirm on the PR if you agree with the change ?
+> >
+> > https://github.com/ocaml/opam-repository/pull/5688
+> >
+> > Best regards,
+> > --Fabrice
+> >
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160223/9ee759f4/attachment.html>
+
+From thomas at gazagnaire.org  Tue Feb 23 09:02:40 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 23 Feb 2016 09:02:40 +0000
+Subject: [opam-devel] mailing liste for opam-repo maintainers
+In-Reply-To: <CAPFanBGj1XXBC8qRQ5Eswe3A=y6dVLtNhNiQV1QCpST2xr8diA@mail.gmail.com>
+References: <CAHvkLrMr-CY2evtuwc3RNO1Y+uLXNR128RwCxjXWtcu4y6u5fA@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D9EA2A8060@Remus.metastack.local>
+ <81E9CE1B-81A0-4082-8DE4-AA52B62971FB@recoil.org>
+ <CAPFanBGj1XXBC8qRQ5Eswe3A=y6dVLtNhNiQV1QCpST2xr8diA@mail.gmail.com>
+Message-ID: <9992BD70-07AB-4A73-B164-442990E3E437@gazagnaire.org>
+
+>> Indeed -- GitHub does seem to repack archives with different distribution checksums, quite probably when they change their.
+> 
+> I was not aware of this -- I assumed archives were built deterministically.
+> 
+> Do you know how often that happens? Is it ok for maintainers to rely
+> on those release archives, if they are ready to update the checksum
+> whenever it changes? Or is that inherently unstable and should we add
+> an "opam lint" rule to warn about these URLs?
+> 
+> I use this for the ocamlbuild package, because it is extremely
+> convenient. I don't have another static hosting page than the github
+> repo right now (not even a .github.io page), and I would rather avoid
+> it if reasonable.
+
+GH archives are in practice stable. Bitbucket ones seem to be re-generated regularly.
+
+Thomas
+
+> 
+> On Mon, Feb 22, 2016 at 10:59 AM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> On 22 Feb 2016, at 15:41, David Allsopp <dra-news at metastack.com> wrote:
+>>> 
+>>> No they would not ? getting people on the conversation thread of a PR is vastly superior; it groups the information and discussion in the place where it?s merged and archives it there. I have certainly had to bisect opam-repository before, so being able to go from a SHA1->Merge->PR->Conversation is very useful.
+>> 
+>> I'm in complete agreement with David here.  We already have an established process for submitting a PR, and I'd strongly prefer that we do not create another out-of-band mechanism (email) to contact people.  Why not just create an issue in opam-repository and assign to the submitter, for instance?
+>> 
+>> Fabrice: I think in the short term, not CCing opam-devel for such e-mails would be appreciated.  I tend to just e-mail people directly if they really don't respond.
+>> 
+>>> On this string of PRs, I?m wondering if you?re treating the symptom, and not the cause. Each PR so far is to do with an altered checksum from a code service?s binary release system which suggests that they?re not canonical (i.e. that they?ve changed the zip in what should be a trivial manner ? e.g. putting the files in a different order). Rather than fixing the checksums, and causing this to happen again at the whim of a zip library, would it not be better to put in place a policy that zip links should not be to GitHub/BitBucket/Whatever auto-generating URLs but to actual static files (e.g. on github.io)?
+>> 
+>> Indeed -- GitHub does seem to repack archives with different distribution checksums, quite probably when they change their.
+>> 
+>> On the broader question that Fabrice raises about access rights to individual packages, it's probably worth bisecting the contributors and why packages need to be affected:
+>> 
+>> - individual package maintainers: submit a single package, and tend not to get regular updates about its health, for instance when a related package is upgraded.  We do need a mechanism to update a maintainer about when a package is broken by an unrelated change.  Right now, if this happens we add an upper bound constraint, but this doesn't remind the package maintainer to release a version compatible with the new related package.
+>> 
+>> - distribution porters: adding depexts to a lot of packages (I've just rolled through and added Alpine and Fedora for instance), or minor patches hidden behind an `os` constraint.  For this work, blocking on 10-20 package maintainers would be very onerous and hold back the health of the repository for that work.
+>> 
+>> - architecture porters: often have a number of short-term fixes for (e.g.) ARM, and these are placed behind patch constraints so that for an x86 user, the OPAM experience is unmodified.  These then need to be rolled upstream.
+>> 
+>> I'm struggling a little to see what the specific problem that Fabrice is raising is, which appears to be the desire to "lock" a package against commits until he approves it.  This is a reasonable request and should be as simple as the current active repository maintainers not merging requests that touch OCamlPro packages until approved by Fabrice (and/or other OCamlPro staff?).  If this results in a hanging PR (as has happened in the past with ocp-build errors due to a lack of resources upstream to maintain it), then we need to just take an executive decision and either commit it or close the PR.
+>> 
+>> I don't see anyone else who wants this: I am quite happy for people doing bulk builds to generate and improve constraints against my packages.  More generally, lightweight tooling to make it easier to enforce such constraints locally would be very useful -- for instance, something to probe for disparities in source archives and the `opam` metadata in the repository and alert for inconsistencies.
+>> 
+>> regards,
+>> Anil
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From anil at recoil.org  Tue Feb 23 10:50:00 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 23 Feb 2016 10:50:00 +0000
+Subject: [opam-devel] Please don't DoS the opam-repository
+In-Reply-To: <CAHvkLrMOwuR6EtGJuwEe4hej_H4Kh=dx-ot36FFuXtSZw2tk0g@mail.gmail.com>
+References: <CAAWM5TynJ3vSwtbURH=GFJB=7bG2M-CriOehpBOML28fcaDOiA@mail.gmail.com>
+ <CAHvkLrMOwuR6EtGJuwEe4hej_H4Kh=dx-ot36FFuXtSZw2tk0g@mail.gmail.com>
+Message-ID: <E45A33D2-9FBE-4739-9416-7B4485B523A0@recoil.org>
+
+It's the free service, and so it's rate throttled by "reasonable use".  In general we should avoid spamming the repository with a ton of requests to avoid causing Travis a surge.
+
+However, the model that you used is the right one, since it triggers an individual installation of each package rather than failing on the first error (as a big unified PR would).  I don't have an easy answer to how to rate limit pull requests -- hopefully this will just become easier as we run these sort of distfile checks on an ongoing basis and so do not let a big backlog build up.
+
+Thanks for taking all the trouble to file the PRs!
+
+Anil
+
+> On 22 Feb 2016, at 18:05, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+> 
+> Do we have a limited number of jobs on Travis ? jobs per jour, jobs per day, jobs per month ?
+> --Fabrice
+> 
+> On Mon, Feb 22, 2016 at 6:25 PM David Sheets <sheets at alum.mit.edu <mailto:sheets at alum.mit.edu>> wrote:
+> Dear Fabrice,
+> 
+> Please slow your submission of pull requests to ocaml/opam-repository.
+> 
+> Your PRs solve long-standing and unreported issues (good!) but do so
+> in a way that is anti-social to the other members of the community.
+> 
+> Specifically, you have now queued an enormous number of jobs on Travis
+> CI which will slow package publication and testing for emergent
+> issues.
+> 
+> Respectfully,
+> 
+> David Sheets
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160223/c06939f7/attachment-0001.html>
+
+From sheets at alum.mit.edu  Tue Feb 23 12:28:39 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Tue, 23 Feb 2016 12:28:39 +0000
+Subject: [opam-devel] OPAM Dockerfiles set OPAMSWITCH
+Message-ID: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+
+The Docker containers described by
+https://github.com/ocaml/opam-dockerfiles somehow set the OPAMSWITCH
+environment variable. I haven't been able to find where or why this
+variable has been set and it causes many opam commands to be more
+heavyweight than necessary which makes interactive use annoying. For
+instance, after switching compilers, you must run something like
+
+```
+eval `opam config env --switch=system`
+```
+
+if OPAMSWITCH is set. When is OPAMSWITCH necessary? Why? What sets it?
+
+I'm really enjoying using the opam Docker containers because it means
+that a fresh, minimal, throwaway OPAM install is just a `docker run
+-it --rm -v ~/Code:/Code:rw ocaml/opam:alpine-3.3_ocaml-4.02.3 ash`
+away. Thanks, avsm!
+
+From anil at recoil.org  Tue Feb 23 12:33:44 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 23 Feb 2016 12:33:44 +0000
+Subject: [opam-devel] OPAM Dockerfiles set OPAMSWITCH
+In-Reply-To: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+References: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+Message-ID: <E29B3E3E-79AE-4F54-9F6F-5298F4F9C53D@recoil.org>
+
+On 23 Feb 2016, at 12:28, David Sheets <sheets at alum.mit.edu> wrote:
+> 
+> The Docker containers described by
+> https://github.com/ocaml/opam-dockerfiles somehow set the OPAMSWITCH
+> environment variable. I haven't been able to find where or why this
+> variable has been set and it causes many opam commands to be more
+> heavyweight than necessary which makes interactive use annoying. For
+> instance, after switching compilers, you must run something like
+> 
+> ```
+> eval `opam config env --switch=system`
+> ```
+> 
+> if OPAMSWITCH is set. When is OPAMSWITCH necessary? Why? What sets it?
+
+One possibility is that the entrypoint to the container passes the
+command through "opam config exec --", which ensures that the local
+OPAM context is available when you run the command.
+
+This isn't really designed to support compiler switching, now that
+I think about it :-)  Perhaps we should rejig the container layout
+to have precisely one switch per container?  Do you just want to use
+the system switch in your usecase?
+
+> 
+> I'm really enjoying using the opam Docker containers because it means
+> that a fresh, minimal, throwaway OPAM install is just a `docker run
+> -it --rm -v ~/Code:/Code:rw ocaml/opam:alpine-3.3_ocaml-4.02.3 ash`
+> away. Thanks, avsm!
+
+Glad they're coming in handy!  I haven't fully documented them and
+the layout is fluid until Travis in particular is happy, and I use
+them a bit more for interactive use.  Feedback is very welcome though;
+I aim to document them this week and will update the list on how the
+multi-distro Travis support is coming.
+
+Anil
+
+From sheets at alum.mit.edu  Tue Feb 23 15:00:32 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Tue, 23 Feb 2016 15:00:32 +0000
+Subject: [opam-devel] OPAM Dockerfiles set OPAMSWITCH
+In-Reply-To: <E29B3E3E-79AE-4F54-9F6F-5298F4F9C53D@recoil.org>
+References: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+ <E29B3E3E-79AE-4F54-9F6F-5298F4F9C53D@recoil.org>
+Message-ID: <CAAWM5TzkN9H+KQ5P7keYHG4X3HZ9aDDvWkG6trJw_=s+m8sTpw@mail.gmail.com>
+
+On Tue, Feb 23, 2016 at 12:33 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 23 Feb 2016, at 12:28, David Sheets <sheets at alum.mit.edu> wrote:
+>>
+>> The Docker containers described by
+>> https://github.com/ocaml/opam-dockerfiles somehow set the OPAMSWITCH
+>> environment variable. I haven't been able to find where or why this
+>> variable has been set and it causes many opam commands to be more
+>> heavyweight than necessary which makes interactive use annoying. For
+>> instance, after switching compilers, you must run something like
+>>
+>> ```
+>> eval `opam config env --switch=system`
+>> ```
+>>
+>> if OPAMSWITCH is set. When is OPAMSWITCH necessary? Why? What sets it?
+>
+> One possibility is that the entrypoint to the container passes the
+> command through "opam config exec --", which ensures that the local
+> OPAM context is available when you run the command.
+
+Ah, yes, that does look like the culprit. I've submitted
+<https://github.com/ocaml/opam/pull/2444> to change this behavior.
+
+> This isn't really designed to support compiler switching, now that
+> I think about it :-)  Perhaps we should rejig the container layout
+> to have precisely one switch per container?  Do you just want to use
+> the system switch in your usecase?
+
+No, I would really like to be able to switch to, e.g.,
+4.02.3+bytecode-only which
+Jeremy added recently at Daniel's request. I don't think it makes sense to have
+tags for all compiler switches in the universe but I agree that in
+automation use
+cases there should generally be a single switch in each container.
+
+David
+
+From anil at recoil.org  Tue Feb 23 15:15:14 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 23 Feb 2016 15:15:14 +0000
+Subject: [opam-devel] OPAM Dockerfiles set OPAMSWITCH
+In-Reply-To: <CAAWM5TzkN9H+KQ5P7keYHG4X3HZ9aDDvWkG6trJw_=s+m8sTpw@mail.gmail.com>
+References: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+ <E29B3E3E-79AE-4F54-9F6F-5298F4F9C53D@recoil.org>
+ <CAAWM5TzkN9H+KQ5P7keYHG4X3HZ9aDDvWkG6trJw_=s+m8sTpw@mail.gmail.com>
+Message-ID: <7F235AA6-9147-4BD1-9CB6-5B6FC198F95D@recoil.org>
+
+On 23 Feb 2016, at 15:00, David Sheets <sheets at alum.mit.edu> wrote:
+> 
+> On Tue, Feb 23, 2016 at 12:33 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> On 23 Feb 2016, at 12:28, David Sheets <sheets at alum.mit.edu> wrote:
+>>> 
+>>> The Docker containers described by
+>>> https://github.com/ocaml/opam-dockerfiles somehow set the OPAMSWITCH
+>>> environment variable. I haven't been able to find where or why this
+>>> variable has been set and it causes many opam commands to be more
+>>> heavyweight than necessary which makes interactive use annoying. For
+>>> instance, after switching compilers, you must run something like
+>>> 
+>>> ```
+>>> eval `opam config env --switch=system`
+>>> ```
+>>> 
+>>> if OPAMSWITCH is set. When is OPAMSWITCH necessary? Why? What sets it?
+>> 
+>> One possibility is that the entrypoint to the container passes the
+>> command through "opam config exec --", which ensures that the local
+>> OPAM context is available when you run the command.
+> 
+> Ah, yes, that does look like the culprit. I've submitted
+> <https://github.com/ocaml/opam/pull/2444> to change this behavior.
+
+If you can submit the patch against the ocaml/opam:1.2 branch and
+Louis merges it, it will show up magically in the next container
+rebuild.  OPAM is built from source against 1.2-dev there.
+
+> 
+>> This isn't really designed to support compiler switching, now that
+>> I think about it :-)  Perhaps we should rejig the container layout
+>> to have precisely one switch per container?  Do you just want to use
+>> the system switch in your usecase?
+> 
+> No, I would really like to be able to switch to, e.g.,
+> 4.02.3+bytecode-only which
+> Jeremy added recently at Daniel's request. I don't think it makes sense to have
+> tags for all compiler switches in the universe but I agree that in
+> automation use
+> cases there should generally be a single switch in each container.
+
+Sounds good.  I've got adding a bytecode-only switch TODO item to
+the matrix, so that OPAM repository can be tested in this way.
+
+Anil
+
+From sheets at alum.mit.edu  Tue Feb 23 15:51:34 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Tue, 23 Feb 2016 15:51:34 +0000
+Subject: [opam-devel] OPAM Dockerfiles set OPAMSWITCH
+In-Reply-To: <7F235AA6-9147-4BD1-9CB6-5B6FC198F95D@recoil.org>
+References: <CAAWM5TyKFP11iV4JTtFjAh8zO31xy=U0cZ1dkwnb7M0LS8U-4w@mail.gmail.com>
+ <E29B3E3E-79AE-4F54-9F6F-5298F4F9C53D@recoil.org>
+ <CAAWM5TzkN9H+KQ5P7keYHG4X3HZ9aDDvWkG6trJw_=s+m8sTpw@mail.gmail.com>
+ <7F235AA6-9147-4BD1-9CB6-5B6FC198F95D@recoil.org>
+Message-ID: <CAAWM5TxJbbUkfb8kEBBd9-_xKpM52Ygw5n+CjE=UFGo3K86JNw@mail.gmail.com>
+
+On Tue, Feb 23, 2016 at 3:15 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 23 Feb 2016, at 15:00, David Sheets <sheets at alum.mit.edu> wrote:
+>>
+>> On Tue, Feb 23, 2016 at 12:33 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>>> On 23 Feb 2016, at 12:28, David Sheets <sheets at alum.mit.edu> wrote:
+>>>>
+>>>> The Docker containers described by
+>>>> https://github.com/ocaml/opam-dockerfiles somehow set the OPAMSWITCH
+>>>> environment variable. I haven't been able to find where or why this
+>>>> variable has been set and it causes many opam commands to be more
+>>>> heavyweight than necessary which makes interactive use annoying. For
+>>>> instance, after switching compilers, you must run something like
+>>>>
+>>>> ```
+>>>> eval `opam config env --switch=system`
+>>>> ```
+>>>>
+>>>> if OPAMSWITCH is set. When is OPAMSWITCH necessary? Why? What sets it?
+>>>
+>>> One possibility is that the entrypoint to the container passes the
+>>> command through "opam config exec --", which ensures that the local
+>>> OPAM context is available when you run the command.
+>>
+>> Ah, yes, that does look like the culprit. I've submitted
+>> <https://github.com/ocaml/opam/pull/2444> to change this behavior.
+>
+> If you can submit the patch against the ocaml/opam:1.2 branch and
+> Louis merges it, it will show up magically in the next container
+> rebuild.  OPAM is built from source against 1.2-dev there.
+
+https://github.com/ocaml/opam/pull/2445 is the backport.
+
+David
+
+From anil at recoil.org  Wed Feb 24 15:15:15 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 24 Feb 2016 15:15:15 +0000
+Subject: [opam-devel] IRILL cloud solver down?
+Message-ID: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+
+Good afternoon,
+
+Who maintains the IRILL cloud solver service?  It appears to be giving a 404 now, which is disabling a lot of OPAM installs on distributions without a native port (OpenBSD, RedHat, CentOS, Alpine and Fedora among others).
+
+~ $ curl -vv http://cudf-solvers.irill.org/cudf.bz2?criteria=x
+*   Trying 128.93.132.68...
+* Connected to cudf-solvers.irill.org (128.93.132.68) port 80 (#0)
+> GET /cudf.bz2?criteria=x HTTP/1.1
+> Host: cudf-solvers.irill.org
+> User-Agent: curl/7.47.0
+> Accept: */*
+> 
+< HTTP/1.1 404 Not Found
+< Server: nginx/1.6.2
+< Date: Wed, 24 Feb 2016 15:11:22 GMT
+< Content-Length: 60
+< Connection: keep-alive
+< 
+* Connection #0 to host cudf-solvers.irill.org left intact
+
+thanks!
+Anil
+
+From Fabrice.Le_fessant at inria.fr  Wed Feb 24 15:19:40 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Wed, 24 Feb 2016 15:19:40 +0000
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+Message-ID: <CAHvkLrPghS63jNd40+0Diy98uv_EpX-9dA7bvu3yXbarzQsJ0A@mail.gmail.com>
+
+There is a BTS here: https://github.com/IRILL/cudf_remote_proxy/issues
+--Fabrice
+
+On Wed, Feb 24, 2016 at 4:15 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> Good afternoon,
+>
+> Who maintains the IRILL cloud solver service?  It appears to be giving a
+> 404 now, which is disabling a lot of OPAM installs on distributions without
+> a native port (OpenBSD, RedHat, CentOS, Alpine and Fedora among others).
+>
+> ~ $ curl -vv http://cudf-solvers.irill.org/cudf.bz2?criteria=x
+> *   Trying 128.93.132.68...
+> * Connected to cudf-solvers.irill.org (128.93.132.68) port 80 (#0)
+> > GET /cudf.bz2?criteria=x HTTP/1.1
+> > Host: cudf-solvers.irill.org
+> > User-Agent: curl/7.47.0
+> > Accept: */*
+> >
+> < HTTP/1.1 404 Not Found
+> < Server: nginx/1.6.2
+> < Date: Wed, 24 Feb 2016 15:11:22 GMT
+> < Content-Length: 60
+> < Connection: keep-alive
+> <
+> * Connection #0 to host cudf-solvers.irill.org left intact
+>
+> thanks!
+> Anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160224/9d93623e/attachment.html>
+
+From gregoire.henry at ocamlpro.com  Wed Feb 24 15:44:19 2016
+From: gregoire.henry at ocamlpro.com (=?iso-8859-1?Q?Gr=E9goire?= Henry)
+Date: Wed, 24 Feb 2016 16:44:19 +0100
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+Message-ID: <20160224154419.GA18423@venema.ocamlpro.com>
+
+Hi Anil,
+
+  The service only answers to POST request, hence the 404 you hit.
+
+  Otherwise, the server seems up and running.
+
+  Our logs report some network instability though.
+
+Gr?goire
+
+From sheets at alum.mit.edu  Wed Feb 24 15:46:44 2016
+From: sheets at alum.mit.edu (David Sheets)
+Date: Wed, 24 Feb 2016 15:46:44 +0000
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <20160224154419.GA18423@venema.ocamlpro.com>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+Message-ID: <CAAWM5Tzat4c0C6BM7ijOm1ZJf8poDpfyBCD7s8QX9iZXr0Okxw@mail.gmail.com>
+
+On Wed, Feb 24, 2016 at 3:44 PM, Gr?goire Henry
+<gregoire.henry at ocamlpro.com> wrote:
+> Hi Anil,
+>
+>   The service only answers to POST request, hence the 404 you hit.
+
+Where is the source code for the service? I believe it should return
+405 in this case with an Allow header listing POST.
+
+David
+
+>
+>   Otherwise, the server seems up and running.
+>
+>   Our logs report some network instability though.
+>
+> Gr?goire
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From anil at recoil.org  Wed Feb 24 15:48:08 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 24 Feb 2016 15:48:08 +0000
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <20160224154419.GA18423@venema.ocamlpro.com>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+Message-ID: <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+
+On 24 Feb 2016, at 15:44, Gr?goire Henry <gregoire.henry at ocamlpro.com> wrote:
+> 
+> Hi Anil,
+> 
+>  The service only answers to POST request, hence the 404 you hit.
+
+Good point!
+
+>  Otherwise, the server seems up and running.
+> 
+>  Our logs report some network instability though.
+
+Thanks, it seems to be back up again, so I'm restarting the CI jobs.  Is the configuration of the server available so I can set it up as a local Docker container alongside the CI runs?  We can spin up around 3000 containers simultaneously in a bulk run, so this can hit the cloud service pretty hard if they all make HTTP requests for a solution at the same time (and pollutes your logs with CI noise).
+
+Anil
+
+From Gregoire.Henry at ocamlpro.com  Wed Feb 24 16:06:30 2016
+From: Gregoire.Henry at ocamlpro.com (=?iso-8859-1?Q?Gr=E9goire?= Henry)
+Date: Wed, 24 Feb 2016 17:06:30 +0100
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+Message-ID: <20160224160630.GB18423@venema.ocamlpro.com>
+
+> Thanks, it seems to be back up again, so I'm restarting the CI jobs.
+> Is the configuration of the server available so I can set it up as a
+> local Docker container alongside the CI runs?  We can spin up around
+> 3000 containers simultaneously in a bulk run, so this can hit the
+> cloud service pretty hard if they all make HTTP requests for a
+> solution at the same time (and pollutes your logs with CI noise).
+
+Indeed, there is actually a global rate limiter that your bulk runs
+may trigger. We did not took the time to release the tool, yet. We
+will discuss this. I will let you now.
+
+Gr?goire
+
+From anil at recoil.org  Wed Feb 24 16:17:41 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 24 Feb 2016 16:17:41 +0000
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <20160224160630.GB18423@venema.ocamlpro.com>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+ <20160224160630.GB18423@venema.ocamlpro.com>
+Message-ID: <1C324DAD-0FA1-4737-9BD7-E932ECCB4C85@recoil.org>
+
+On 24 Feb 2016, at 16:06, Gr?goire Henry <Gregoire.Henry at ocamlpro.com> wrote:
+> 
+>> Thanks, it seems to be back up again, so I'm restarting the CI jobs.
+>> Is the configuration of the server available so I can set it up as a
+>> local Docker container alongside the CI runs?  We can spin up around
+>> 3000 containers simultaneously in a bulk run, so this can hit the
+>> cloud service pretty hard if they all make HTTP requests for a
+>> solution at the same time (and pollutes your logs with CI noise).
+> 
+> Indeed, there is actually a global rate limiter that your bulk runs
+> may trigger. We did not took the time to release the tool, yet. We
+> will discuss this. I will let you now.
+> 
+
+No problem at all -- I'll wire up a quick aspcud<->socat container
+to work around the issue for now (the bulk builds would also benefit
+from having a deterministic solver binary tied to the run, so we can
+chase down aspcud/gringo/clasp compatibility issues as well).
+
+Thanks for the very speedy response!
+
+-anil
+
+From roberto at dicosmo.org  Wed Feb 24 16:24:56 2016
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Wed, 24 Feb 2016 17:24:56 +0100
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <1C324DAD-0FA1-4737-9BD7-E932ECCB4C85@recoil.org>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+ <20160224160630.GB18423@venema.ocamlpro.com>
+ <1C324DAD-0FA1-4737-9BD7-E932ECCB4C85@recoil.org>
+Message-ID: <20160224162456.GA19475@traveler>
+
+A dockerized aspcud is here
+
+https://github.com/rdicosmo/docked-aspcud
+
+On Wed, Feb 24, 2016 at 04:17:41PM +0000, Anil Madhavapeddy wrote:
+> On 24 Feb 2016, at 16:06, Gr?goire Henry <Gregoire.Henry at ocamlpro.com> wrote:
+> > 
+> >> Thanks, it seems to be back up again, so I'm restarting the CI jobs.
+> >> Is the configuration of the server available so I can set it up as a
+> >> local Docker container alongside the CI runs?  We can spin up around
+> >> 3000 containers simultaneously in a bulk run, so this can hit the
+> >> cloud service pretty hard if they all make HTTP requests for a
+> >> solution at the same time (and pollutes your logs with CI noise).
+> > 
+> > Indeed, there is actually a global rate limiter that your bulk runs
+> > may trigger. We did not took the time to release the tool, yet. We
+> > will discuss this. I will let you now.
+> > 
+> 
+> No problem at all -- I'll wire up a quick aspcud<->socat container
+> to work around the issue for now (the bulk builds would also benefit
+> from having a deterministic solver binary tied to the run, so we can
+> chase down aspcud/gringo/clasp compatibility issues as well).
+> 
+> Thanks for the very speedy response!
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En detachement a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+8 place Aur?lie Nemours
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From roberto at dicosmo.org  Wed Feb 24 17:29:00 2016
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Wed, 24 Feb 2016 18:29:00 +0100
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <20160224162456.GA19475@traveler>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+ <20160224160630.GB18423@venema.ocamlpro.com>
+ <1C324DAD-0FA1-4737-9BD7-E932ECCB4C85@recoil.org>
+ <20160224162456.GA19475@traveler>
+Message-ID: <CAJBwKuWSWUQcECivttRF1_+vFOWAaM+Xrm_Ap1P0Q1ZGRy_qCw@mail.gmail.com>
+
+And here is the issue you opened an year ago about the socat wrapper
+https://github.com/rdicosmo/docked-aspcud/issues/1
+Feel free to submit a PR when you have it worked out
+
+2016-02-24 17:24 GMT+01:00 Roberto Di Cosmo <roberto at dicosmo.org>:
+
+> A dockerized aspcud is here
+>
+> https://github.com/rdicosmo/docked-aspcud
+>
+> On Wed, Feb 24, 2016 at 04:17:41PM +0000, Anil Madhavapeddy wrote:
+> > On 24 Feb 2016, at 16:06, Gr?goire Henry <Gregoire.Henry at ocamlpro.com>
+> wrote:
+> > >
+> > >> Thanks, it seems to be back up again, so I'm restarting the CI jobs.
+> > >> Is the configuration of the server available so I can set it up as a
+> > >> local Docker container alongside the CI runs?  We can spin up around
+> > >> 3000 containers simultaneously in a bulk run, so this can hit the
+> > >> cloud service pretty hard if they all make HTTP requests for a
+> > >> solution at the same time (and pollutes your logs with CI noise).
+> > >
+> > > Indeed, there is actually a global rate limiter that your bulk runs
+> > > may trigger. We did not took the time to release the tool, yet. We
+> > > will discuss this. I will let you now.
+> > >
+> >
+> > No problem at all -- I'll wire up a quick aspcud<->socat container
+> > to work around the issue for now (the bulk builds would also benefit
+> > from having a deterministic solver binary tied to the run, so we can
+> > chase down aspcud/gringo/clasp compatibility issues as well).
+> >
+> > Thanks for the very speedy response!
+> >
+> > -anil
+> > _______________________________________________
+> > opam-devel mailing list
+> > opam-devel at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-devel
+>
+> --
+> Roberto Di Cosmo
+>
+> ------------------------------------------------------------------
+> Professeur               En detachement a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>       http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+>
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> 8 place Aur?lie Nemours
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3
+>
+
+
+
+-- 
+Roberto Di Cosmo
+
+------------------------------------------------------------------
+Professeur               En detachement a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+
+Bureau 320 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160224/2c712965/attachment.html>
+
+From p.donadeo at gmail.com  Wed Feb 24 22:28:26 2016
+From: p.donadeo at gmail.com (Paolo Donadeo)
+Date: Wed, 24 Feb 2016 23:28:26 +0100
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <20160224162456.GA19475@traveler>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <F8446E7C-82F6-44D8-909B-7105AD98D84B@recoil.org>
+ <20160224160630.GB18423@venema.ocamlpro.com>
+ <1C324DAD-0FA1-4737-9BD7-E932ECCB4C85@recoil.org>
+ <20160224162456.GA19475@traveler>
+Message-ID: <CAPzAKVB2poXx0JDi=RzCdJCevVijFCTFXezatU_SkGh_aOeqYg@mail.gmail.com>
+
+On Wed, Feb 24, 2016 at 5:24 PM, Roberto Di Cosmo <roberto at dicosmo.org>
+wrote:
+
+> A dockerized aspcud is here
+
+
+Nice, thanks!
+
+
+-- 
+*Paolo*
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160224/85917ced/attachment.html>
+
+From seliopou at gmail.com  Thu Feb 25 00:47:56 2016
+From: seliopou at gmail.com (Spiros Eliopoulos)
+Date: Wed, 24 Feb 2016 19:47:56 -0500
+Subject: [opam-devel] IRILL cloud solver down?
+In-Reply-To: <CAAWM5Tzat4c0C6BM7ijOm1ZJf8poDpfyBCD7s8QX9iZXr0Okxw@mail.gmail.com>
+References: <7C202DE3-618D-4AF8-9902-DC33CEE67133@recoil.org>
+ <20160224154419.GA18423@venema.ocamlpro.com>
+ <CAAWM5Tzat4c0C6BM7ijOm1ZJf8poDpfyBCD7s8QX9iZXr0Okxw@mail.gmail.com>
+Message-ID: <CAEkQQgKbqrr6WserN+ikobBh94fyxRe3wLhPfShsfnEUhGF-6A@mail.gmail.com>
+
+On Wed, Feb 24, 2016 at 10:46 AM, David Sheets <sheets at alum.mit.edu> wrote:
+
+> On Wed, Feb 24, 2016 at 3:44 PM, Gr?goire Henry
+> <gregoire.henry at ocamlpro.com> wrote:
+> > Hi Anil,
+> >
+> >   The service only answers to POST request, hence the 404 you hit.
+>
+> Where is the source code for the service? I believe it should return
+> 405 in this case with an Allow header listing POST.
+
+
+This indeed should be the behavior. See the following HTTP response diagram
+and ocaml-webmachine implementation:
+
+
+https://raw.githubusercontent.com/wiki/webmachine/webmachine/images/http-headers-status-v3.png
+
+https://github.com/inhabitedtype/ocaml-webmachine/blob/9d63166/lib/webmachine.ml#L453-L464
+
+-Spiros E.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160224/79a9d8fe/attachment.html>
+
+From Jean-Christophe.Filliatre at lri.fr  Tue Feb 23 06:44:52 2016
+From: Jean-Christophe.Filliatre at lri.fr (Jean-Christophe Filliatre)
+Date: Tue, 23 Feb 2016 06:44:52 -0000
+Subject: [opam-devel] Need to fix checksum for combine 0.55
+In-Reply-To: <CAHvkLrM-K7Cqe9vs8zdDvaxeGCXS+M-KceYikeX7CKuJTn3D+A@mail.gmail.com>
+References: <CAHvkLrM-K7Cqe9vs8zdDvaxeGCXS+M-KceYikeX7CKuJTn3D+A@mail.gmail.com>
+Message-ID: <56CC0496.4080405@lri.fr>
+
+Salut Fabrice,
+
+Le checksum ?tait en effet incorrect et ton fix contient le bon checksum
+maintenant. J'ajoute R?my en copie car c'est apparemment lui qui a fait
+le paquet opam de combine 0.55.
+
+Amicalement,
+--
+Jean-Christophe
+
+
+On 22/02/2016 16:30, Fabrice Le Fessant wrote:
+> Hi Jean-Christophe,
+> 
+>   It looks like one of your packages, combine 0.55, cannot be installed
+> anymore because of a wrong checksum. I submitted a pull-request to fix
+> the problem, could you confirm on the PR if you agree with the change ?
+> 
+> https://github.com/ocaml/opam-repository/pull/5688
+> 
+> Best regards,
+> --Fabrice
+> 
+
+From remy.el-sibaie at lip6.fr  Tue Feb 23 08:30:48 2016
+From: remy.el-sibaie at lip6.fr (=?UTF-8?Q?R=C3=A9my_El_Siba=C3=AFe_Besognet?=)
+Date: Tue, 23 Feb 2016 08:30:48 -0000
+Subject: [opam-devel] Need to fix checksum for combine 0.55
+In-Reply-To: <CAHvkLrOf0NsXKKOJpHSCMKQzHYUormPbPY_YdOdztZESSi2NkA@mail.gmail.com>
+References: <CAHvkLrM-K7Cqe9vs8zdDvaxeGCXS+M-KceYikeX7CKuJTn3D+A@mail.gmail.com>
+ <56CC0496.4080405@lri.fr>
+ <CAHvkLrOf0NsXKKOJpHSCMKQzHYUormPbPY_YdOdztZESSi2NkA@mail.gmail.com>
+Message-ID: <CAKAHPK04Qoa08VUQFzVHksaTQC2gu+YoOAdbjPygnqa0yzjDvA@mail.gmail.com>
+
+Effectivement, merci et d?sol?.
+
+On Tue, Feb 23, 2016, 09:09 Fabrice Le Fessant <
+fabrice.le_fessant at ocamlpro.com> wrote:
+
+> Merci d'avoir v?rifi? !
+> Fabrice
+> Le mar. 23 f?vr. 2016 ? 08:04, Jean-Christophe Filliatre <
+> Jean-Christophe.Filliatre at lri.fr> a ?crit :
+>
+>> Salut Fabrice,
+>>
+>> Le checksum ?tait en effet incorrect et ton fix contient le bon checksum
+>> maintenant. J'ajoute R?my en copie car c'est apparemment lui qui a fait
+>> le paquet opam de combine 0.55.
+>>
+>> Amicalement,
+>> --
+>> Jean-Christophe
+>>
+>>
+>> On 22/02/2016 16:30, Fabrice Le Fessant wrote:
+>> > Hi Jean-Christophe,
+>> >
+>> >   It looks like one of your packages, combine 0.55, cannot be installed
+>> > anymore because of a wrong checksum. I submitted a pull-request to fix
+>> > the problem, could you confirm on the PR if you agree with the change ?
+>> >
+>> > https://github.com/ocaml/opam-repository/pull/5688
+>> >
+>> > Best regards,
+>> > --Fabrice
+>> >
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160223/90aa00a9/attachment-0001.html>
+
+From jun.furuse at gmail.com  Wed Feb 24 02:02:54 2016
+From: jun.furuse at gmail.com (Jun Furuse)
+Date: Wed, 24 Feb 2016 02:02:54 -0000
+Subject: [opam-devel] Need to fix checksum for camlimages 4.0.2, 4.1.0,
+	4.1.1
+In-Reply-To: <CAHvkLrPhuR4Lg2q7n4G6xuxs5ROdk163Wmpv70xhkgrDOJjFRg@mail.gmail.com>
+References: <CAHvkLrPhuR4Lg2q7n4G6xuxs5ROdk163Wmpv70xhkgrDOJjFRg@mail.gmail.com>
+Message-ID: <CAAoLEWv=N0Uq0=swxPaM=OoZ0pO-LhV9+CN0P+beFF17jeZg=A@mail.gmail.com>
+
+Hi,
+
+It seems Bitbucket has changed its archiver and the checksums are now
+different.  I see lots of my packages have
+now problems... sigh.
+
+Please feel free to fix these.
+
+Thanks
+Jun
+
+Hi Jun,
+
+  It looks like one of your packages, camlimages 4.0.2/4.1.0/4.1.1, cannot
+be installed anymore because of a wrong checksum. I submitted pull-requests
+to fix the problems, could you confirm on these PR if you agree with the
+change ?
+
+https://github.com/ocaml/opam-repository/pull/5689
+https://github.com/ocaml/opam-repository/pull/5692
+https://github.com/ocaml/opam-repository/pull/5691
+
+Best regards,
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160224/abb87821/attachment-0001.html>
+
+From chenglou92 at gmail.com  Mon Feb 22 21:54:11 2016
+From: chenglou92 at gmail.com (Cheng Lou)
+Date: Mon, 22 Feb 2016 21:54:11 -0000
+Subject: [opam-devel] more committers needed ?
+In-Reply-To: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+References: <CAHvkLrNwMyomYbFN-Bi1J18jd3Y89aEYqBSGcqQV7ycAThNcjw@mail.gmail.com>
+Message-ID: <94cf0c42-0c41-496d-a051-5d2617ccd7fc@googlegroups.com>
+
+Sorry for hijacking the discussion. I'm new to OPAM, but is there a reason 
+why PRs for package upgrades can't be managed automatically? E.g. asking 
+for a git URL and either periodically check for new release tags, or check 
+on the fly when installing a library.
+
+On Wednesday, February 17, 2016 at 7:27:49 AM UTC-5, Fabrice Le Fessant 
+wrote:
+>
+> Hi,
+>
+>    If there is some need to help managing PRs to the opam-repository, 
+> Gr?goire Henry (OCamlPro-Henry on Github) and myself (lefessan on Github) 
+> are volunteers to spend some time doing it.
+>
+> Best regards,
+> --Fabrice
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20160222/864aa21f/attachment.html>
+

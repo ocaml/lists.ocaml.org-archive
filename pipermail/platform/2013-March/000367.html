@@ -1,0 +1,142 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] An alternative proposal for namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C87ppyuhuj9.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000366.html">
+   <LINK REL="Next"  HREF="000368.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] An alternative proposal for namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20An%20alternative%20proposal%20for%20namespaces&In-Reply-To=%3C87ppyuhuj9.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] An alternative proposal for namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 20 17:04:42 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000366.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+        <LI>Next message: <A HREF="000368.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#367">[ date ]</a>
+              <a href="thread.html#367">[ thread ]</a>
+              <a href="subject.html#367">[ subject ]</a>
+              <a href="author.html#367">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> Moreover, even if you don't use simple namespaces, you will use tools which need to support them.  Concretely,
+</I>&gt;<i> ocamlbuild and the omake default rules for OCaml will have to be adapted to support them.  With your semantics, omake
+</I>&gt;<i> for instance will have to do a non-trivial job to implement the
+</I>&gt;<i> resolution strategy.
+</I>
+The resolution of simple namespaces is much easier than the resolution
+of search path files. It is fundamentally the same resolution as OCaml
+uses now.
+
+If omake continues to use &quot;ocamldep -modules&quot; then it will have to
+implement the resolution strategy. To support *search path files* this
+will involve either parsing them itself or using the proposed &quot;ocamlns
+... -resolve Foo#Bar&quot;. If it switches to using regular &quot;ocamldep&quot; with
+generated search path files then it won't need to implement the
+resolution strategy anyway.
+
+&gt;<i>   Also, the compilers will have to
+</I>&gt;<i> scan the directories, preventing other kinds of build systems based on capturing accesses to the file system to infer
+</I>&gt;<i> dependencies.   
+</I>
+I'm not particularly worried about hypothetical build systems. If you
+want to implement such a build system then you should really add hooks
+into the OCaml compiler. This argument also assumes that catching
+&quot;Sys.file_exists&quot; is fine but catching &quot;Sys.readdir&quot; is impossible.
+
+&gt;<i> I have the feeling to repeat myself...  I can understand that you consider these drawbacks as minor, but
+</I>&gt;<i> do you agree they will apply even to users not using simple
+</I>&gt;<i> namespaces?
+</I>
+No, the only &quot;problem&quot; caused by simple namespaces is the lack of
+support for a hypothetical build system based on capturing file system
+accesses, and even this would work fine if you always used search path
+files.
+
+&gt;&gt;&gt;<i> Concrete example: the library developers decides to change the name of one of his namespaces
+</I>&gt;&gt;&gt;<i> from Foo to Bar, but there are old foo-*.cmi files around, so the compiler does not complain upon a remaining &quot;open
+</I>&gt;&gt;&gt;<i> namespace Foo&quot; in one of the files.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The same thing happens if I accidently leave an old mapping in my search
+</I>&gt;&gt;<i> path file, except that then the problem won't be fixed the next time I
+</I>&gt;&gt;<i> run &quot;make clean&quot; or equivalent.
+</I>&gt;<i>
+</I>&gt;<i> Indeed, so at least you have a reproducible behavior, and the error will be easy enough to understand and fix.  Aren't
+</I>&gt;<i> you shocked by the idea that while dependencies are correct, you'd get a different behavior from the compiler after a
+</I>&gt;<i> &quot;make clean&quot; or a fresh checkout?
+</I>
+Not particularly, we are only talking about the lack of a warning
+telling you to change the name of a namespace that the file doesn't
+actually use.
+
+The warning only exists to point you to the likely cause of a later
+error, but since we are talking about precisely the case when there is
+no later error then it is not particularly concerning.
+
+We could always combine this warning with the &quot;this namespace is unused&quot;
+warning so that the warning is raised more consistently. That might
+actually make more sense anyway.
+
+&gt;&gt;<i> When you use ocamldoc you are supposed to pass it the same arguments
+</I>&gt;&gt;<i> that you used to compile the program. This is not particularly
+</I>&gt;&gt;<i> difficult, and is the only way to handle syntax extensions anyway.
+</I>&gt;<i>
+</I>&gt;<i> With &quot;-name&quot;, you can choose a different naming strategy for each file in your project.  Ocamldoc is called once to
+</I>&gt;<i> generate the documentation for many files.  How do you pass the required information?  With one &quot;-name&quot; option for each
+</I>&gt;<i> module?
+</I>&gt;<i>
+</I>
+I happen to be writing a new version of (the front-end of) ocamldoc for
+the platform, which will completely avoid this problem. In the
+meantime a &quot;-name&quot; option for each module will work fine.
+
+&gt;&gt;<i> But the information is still hidden: Which .mlpath files were used and
+</I>&gt;&gt;<i> in what order? What &quot;-namespace&quot; argument was passed to the compiler?
+</I>
+&gt;<i> As you say, we will need to pass the .mlpath arguments to the tools. This is easier than passing a &quot;-name&quot; argument for
+</I>&gt;<i> each module.  And I suggested to keep the &quot;-namespace&quot; argument in the generated units precisely to avoid having to pass
+</I>&gt;<i> it again to tools.
+</I>
+If you are going to look in the generated files anyway then why do you
+need an &quot;.mlpath&quot; file? Obviously the source file name would be included
+in the files compiled using &quot;-name&quot;.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000366.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+	<LI>Next message: <A HREF="000368.html">[ocaml-platform] An alternative proposal for namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#367">[ date ]</a>
+              <a href="thread.html#367">[ thread ]</a>
+              <a href="subject.html#367">[ subject ]</a>
+              <a href="author.html#367">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

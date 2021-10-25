@@ -1,0 +1,1077 @@
+5 patches for repository https://forge.ocamlcore.org/anonscm/darcs/oasis/oasis:
+
+Tue Oct 26 11:08:41 PDT 2010  till@pps.jussieu.fr
+  * Support for packed libraries (but not in _tags... )
+
+Fri Feb 11 09:23:00 PST 2011  till@pps.jussieu.fr
+  * Packed modules: autgenerate the _tags for-pack list
+
+Fri Feb 18 11:20:00 PST 2011  till@pps.jussieu.fr
+  * updated myocamlbuildbase to not pass in the cma stub when linking packed libraries...
+
+Mon Dec 26 07:43:00 PST 2011  anil@recoil.org
+  * resolve-pack-conflict
+
+Mon Dec 26 08:12:53 PST 2011  anil@recoil.org
+  * Do not install the .cmx submodules if the target is packed
+
+New patches:
+
+[Support for packed libraries (but not in _tags... )
+till@pps.jussieu.fr**20101026180841] {
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 57
+-             (List.map (OASISUnixPath.concat bs.bs_path)
+-                [modul^".cmi";
+-                 OASISUnixPath.uncapitalize_file modul ^ ".cmi";
+-                 OASISUnixPath.capitalize_file modul ^ ".cmi"])
+-             :: hdrs)
+-      []
++           possible_base_fn
++        end
++  in
++
++  let find_modules lst ext = 
++    List.map 
++      (fun nm -> 
++         List.map 
++           (fun base_fn -> base_fn ^"."^ext)
++           (find_module nm))
++      lst
++  in
++
++  (* The headers that should be compiled along *)
++  let headers =
++    find_modules
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 30
+-  (* The headers that should be compiled along *)
+-  let headers =
+-    List.fold_left
+-      (fun hdrs modul ->
+-         try
+-           let base_fn =
+-             List.find
+-               (fun fn ->
+-                  source_file_exists (fn^".ml") ||
+-                  source_file_exists (fn^".mli") ||
+-                  source_file_exists (fn^".mll") ||
+-                  source_file_exists (fn^".mly"))
+-               (List.map
+-                  (OASISUnixPath.concat bs.bs_path)
+-                  [modul;
+-                   OASISUnixPath.uncapitalize_file modul;
+-                   OASISUnixPath.capitalize_file modul])
+-           in
+-             [base_fn^".cmi"] :: hdrs
+-         with Not_found ->
++
++  (* Look for a module file, considering capitalization or not. *)
++  let find_module modul = 
++    let possible_base_fn = 
++      List.map
++        (OASISUnixPath.concat bs.bs_path)
++        [modul;
++         OASISUnixPath.uncapitalize_file modul;
++         OASISUnixPath.capitalize_file modul]
++    in
++      try
++        begin
++          [List.find
++             (fun fn ->
++                source_file_exists (fn^".ml") ||
++                source_file_exists (fn^".mli") ||
++                source_file_exists (fn^".mll") ||
++                source_file_exists (fn^".mly"))
++             possible_base_fn]
++        end
++      with Not_found ->
++        begin
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 57
+-                 String.uncapitalize modul ^ ".cmi";
+-                 String.capitalize modul ^ ".cmi"])
++                 OASISUnixPath.uncapitalize_file modul ^ ".cmi";
++                 OASISUnixPath.capitalize_file modul ^ ".cmi"])
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 45
+-                   String.uncapitalize modul;
+-                   String.capitalize modul])
++                   OASISUnixPath.uncapitalize_file modul;
++                   OASISUnixPath.capitalize_file modul])
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 41
+-                  source_file_exists (fn^".mly")) 
++                  source_file_exists (fn^".mly"))
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 37
+-               (fun fn -> 
++               (fun fn ->
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 34
+-         try 
+-           let base_fn = 
++         try
++           let base_fn =
+hunk ./src/oasis/OASISLibrary.ml 32
+-    List.fold_left
+-      (fun hdrs modul ->
+-         try 
+-           let base_fn = 
+-             List.find
+-               (fun fn -> 
+-                  source_file_exists (fn^".ml") ||
+-                  source_file_exists (fn^".mli") ||
+-                  source_file_exists (fn^".mll") ||
+-                  source_file_exists (fn^".mly")) 
+-               (List.map
+-                  (OASISUnixPath.concat bs.bs_path)
+-                  [modul;
+-                   String.uncapitalize modul;
+-                   String.capitalize modul])
+-           in
+-             [base_fn^".cmi"] :: hdrs
+-         with Not_found ->
+-           OASISMessage.warning
+-             ~ctxt
+-             (f_ "Cannot find source file matching \
+-                  module '%s' in library %s")
+-             modul cs.cs_name;
+-             (List.map (OASISUnixPath.concat bs.bs_path)
+-                [modul^".cmi";
+-                 String.uncapitalize modul ^ ".cmi";
+-                 String.capitalize modul ^ ".cmi"])
+-             :: hdrs)
++    if lib.lib_pack then
+)
+)
+)
+)
+)
+)
+)
+merger 0.0 (
+hunk ./src/oasis/OASISLibrary.ml 62
++      "cmi"
++  in
++
++  (* The .cmx that be compiled along *)
++  let cmxs =
++    let should_be_built =
++      match bs.bs_compiled_object with
++        | Native -> true
++        | Best -> is_native ()
++        | Byte -> false
++    in
++      if should_be_built then
++        find_modules
++          (lib.lib_modules @ lib.lib_internal_modules)
++          "cmx"
++      else
++        []
+hunk ./src/oasis/OASISLibrary.ml 61
+-      lib.lib_modules
++    else
++      List.fold_left
++        (fun hdrs modul ->
++           try 
++             let base_fn = 
++               List.find
++                 (fun fn -> 
++                    source_file_exists (fn^".ml") ||
++                    source_file_exists (fn^".mli") ||
++                    source_file_exists (fn^".mll") ||
++                    source_file_exists (fn^".mly")) 
++                 (List.map
++                    (OASISUnixPath.concat bs.bs_path)
++                    [modul;
++                     String.uncapitalize modul;
++                     String.capitalize modul])
++             in
++               [base_fn^".cmi"] :: hdrs
++           with Not_found ->
++             OASISMessage.warning
++               ~ctxt
++               (f_ "Cannot find source file matching \
++                    module '%s' in library %s")
++               modul cs.cs_name;
++               (List.map (OASISUnixPath.concat bs.bs_path)
++                  [modul^".cmi";
++                   String.uncapitalize modul ^ ".cmi";
++                   String.capitalize modul ^ ".cmi"])
++               :: hdrs)
++        []
++        lib.lib_modules
+)
+hunk ./src/oasis/OASISLibrary.ml 70
+ 
+   (* Compute what libraries should be built *)
+   let acc_nopath =
++    (* Add the packed header file if required *)
++    let add_pack_header acc =
++      if lib.lib_pack then
++        [cs.cs_name^".cmi"] :: acc
++      else
++        acc
++    in
+     let byte acc =
+hunk ./src/oasis/OASISLibrary.ml 78
+-      [cs.cs_name^".cma"] :: acc
++      add_pack_header ([cs.cs_name^".cma"] :: acc)
+     in
+     let native acc =
+hunk ./src/oasis/OASISLibrary.ml 81
+-      [cs.cs_name^".cmxa"] :: [cs.cs_name^(ext_lib ())] :: acc
++      add_pack_header ([cs.cs_name^".cmxa"] :: [cs.cs_name^(ext_lib ())] :: acc)
+     in
+       match bs.bs_compiled_object with
+         | Native ->
+hunk ./src/oasis/OASISLibrary_intern.ml 67
+          s_ "List of modules to compile which are not exported.")
+       (fun (_, _, lib) -> lib.lib_internal_modules)
+   in
++  let pack =
++    new_field schm "Pack"
++      ~default:false
++      ~quickstart_level:Expert
++      boolean
++      (fun () ->
++         s_ "Set if we should build a packed library.")
++      (fun (_, _, lib) -> lib.lib_pack)
++  in
+   let findlib_parent =
+     new_field schm "FindlibParent"
+       ~default:None
+hunk ./src/oasis/OASISLibrary_intern.ml 113
+           (build_section_gen nm data),
+           {
+             lib_modules            = external_modules data;
++            lib_pack               = pack data;
+             lib_internal_modules   = internal_modules data;
+             lib_findlib_parent     = findlib_parent data;
+             lib_findlib_name       = findlib_name data;
+hunk ./src/oasis/OASISTypes.ml 142
+ type library =
+     {
+       lib_modules:            string list;
++      lib_pack:               bool;
+       lib_internal_modules:   string list;
+       lib_findlib_parent:     findlib_name option;
+       lib_findlib_name:       findlib_name option;
+hunk ./src/oasis/OASISTypes.mli 197
+     {
+       lib_modules:            string list;
+       (** List of modules exported by the library. *)
++      lib_pack:               bool;
++      (** Are we building a packed library? *)
+       lib_internal_modules:   string list;
+       (** List of modules not-exported by the library, but compiled along. *)
+       lib_findlib_parent:     findlib_name option;
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 150
+-                             String.uncapitalize modul^".mli";
+-                             String.capitalize   modul^".mli";
+-                             String.uncapitalize modul^".ml";
+-                             String.capitalize   modul^".ml"])
++                             OASISUnixPath.uncapitalize_file modul^".mli";
++                             OASISUnixPath.capitalize_file   modul^".mli";
++                             OASISUnixPath.uncapitalize_file modul^".ml";
++                             OASISUnixPath.capitalize_file   modul^".ml"])
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 157
+-                         warning 
++                         warning
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 145
+-                         Sys.file_exists 
++                         Sys.file_exists
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 143
+-                     try 
++                     try
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 138
+-              let path = 
++              let path =
+merger 0.0 (
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 136
+-            let acc = 
++            let acc =
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 136
+-            let acc = 
+-              (* Add uncompiled header from the source tree *)
+-              let path = 
+-                BaseFilePath.of_unix bs.bs_path
+-              in
+-                List.fold_left
+-                  (fun acc modul ->
+-                     try 
+-                       List.find
+-                         Sys.file_exists 
+-                         (List.map
+-                            (Filename.concat path)
+-                            [modul^".mli";
+-                             modul^".ml";
+-                             String.uncapitalize modul^".mli";
+-                             String.capitalize   modul^".mli";
+-                             String.uncapitalize modul^".ml";
+-                             String.capitalize   modul^".ml"])
+-                       :: acc
+-                     with Not_found ->
+-                       begin
+-                         warning 
+-                           (f_ "Cannot find source header for module %s \
+-                                in library %s")
+-                           modul cs.cs_name;
+-                         acc
+-                       end)
+-                  acc
+-                  lib.lib_modules
++            let acc =
++              if lib.lib_pack then
++                acc
++              else
++                (* Add uncompiled header from the source tree (for non-packed libraries) *)
++                let path = 
++                  BaseFilePath.of_unix bs.bs_path
++                in
++                  List.fold_left
++                    (fun acc modul ->
++                       try 
++                         List.find
++                           Sys.file_exists 
++                           (List.map
++                              (Filename.concat path)
++                              [modul^".mli";
++                               modul^".ml";
++                               String.uncapitalize modul^".mli";
++                               String.capitalize   modul^".mli";
++                               String.uncapitalize modul^".ml";
++                               String.capitalize   modul^".ml"])
++                         :: acc
++                       with Not_found ->
++                         begin
++                           warning 
++                             (f_ "Cannot find source header for module %s \
++                                  in library %s")
++                             modul cs.cs_name;
++                           acc
++                         end)
++                    acc
++                    lib.lib_modules
+)
+)
+)
+)
+)
+)
+hunk ./src/plugins/ocamlbuild/OCamlbuildPlugin.ml 604
+                  in
+ 
+                  let ctxt =
+-                   (* Generate .mllib files *)
++                   (* Generate .mllib or .mlpack files *)
++                   let extension =
++                     if lib.lib_pack then
++                       "mlpack"
++                     else
++                       "mllib"
++                   in
+                    let fn_base =
+                      prepend_bs_path bs cs.cs_name
+                    in
+hunk ./src/plugins/ocamlbuild/OCamlbuildPlugin.ml 616
+                      add_file
+                        (template_make
+-                          (FilePath.add_extension fn_base "mllib")
++                          (FilePath.add_extension fn_base extension)
+                           comment_ocamlbuild
+                           []
+                           (lib.lib_modules @ lib.lib_internal_modules)
+}
+[Packed modules: autgenerate the _tags for-pack list
+till@pps.jussieu.fr**20110211172300] {
+adddir ./examples/packedlib
+addfile ./examples/packedlib/LICENSE
+addfile ./examples/packedlib/_oasis
+adddir ./examples/packedlib/src
+addfile ./examples/packedlib/src/bar.ml
+addfile ./examples/packedlib/src/bar.mli
+addfile ./examples/packedlib/src/foo.ml
+addfile ./examples/packedlib/src/foo.mli
+hunk ./examples/packedlib/LICENSE 1
++********************************************************************************
++*  OASIS: architecture for building OCaml libraries and applications           *
++*                                                                              *
++*  Copyright (C) 2008-2010, OCamlCore SARL                                     *
++*                                                                              *
++*  This library is free software; you can redistribute it and/or modify it     *
++*  under the terms of the GNU Lesser General Public License as published by    *
++*  the Free Software Foundation; either version 2.1 of the License, or (at     *
++*  your option) any later version, with the OCaml static compilation           *
++*  exception.                                                                  *
++*                                                                              *
++*  This library is distributed in the hope that it will be useful, but         *
++*  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY  *
++*  or FITNESS FOR A PARTICULAR PURPOSE. See the file COPYING for more          *
++*  details.                                                                    *
++*                                                                              *
++*  You should have received a copy of the GNU Lesser General Public License    *
++*  along with this library; if not, write to the Free Software Foundation,     *
++*  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA               *
++********************************************************************************
++
+hunk ./examples/packedlib/_oasis 1
++Name: packedlib
++Version: 0.1
++OASISFormat: 0.1
++Authors: Till Varoquaux <till@janestreet.com>
++Maintainers: Till Varoquaux <till@janestreet.com>
++Copyrights: (C) 2011 Till Varoquaux
++License: LGPL with OCaml linking exception
++BuildTools: ocamlbuild
++
++Synopsis: Testing packed libraries work fine in oasis
++
++
++Library packedlib
++  Pack: true
++  Path: src
++  Modules: Foo, Bar
+hunk ./examples/packedlib/src/bar.ml 1
++(********************************************************************************)
++(*  OASIS: architecture for building OCaml libraries and applications           *)
++(*                                                                              *)
++(*  Copyright (C) 2008-2010, OCamlCore SARL                                     *)
++(*                                                                              *)
++(*  This library is free software; you can redistribute it and/or modify it     *)
++(*  under the terms of the GNU Lesser General Public License as published by    *)
++(*  the Free Software Foundation; either version 2.1 of the License, or (at     *)
++(*  your option) any later version, with the OCaml static compilation           *)
++(*  exception.                                                                  *)
++(*                                                                              *)
++(*  This library is distributed in the hope that it will be useful, but         *)
++(*  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY  *)
++(*  or FITNESS FOR A PARTICULAR PURPOSE. See the file COPYING for more          *)
++(*  details.                                                                    *)
++(*                                                                              *)
++(*  You should have received a copy of the GNU Lesser General Public License    *)
++(*  along with this library; if not, write to the Free Software Foundation,     *)
++(*  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA               *)
++(********************************************************************************)
++
++type t = string
++
++let create s = s
++let value s = s
+hunk ./examples/packedlib/src/bar.mli 1
++(********************************************************************************)
++(*  OASIS: architecture for building OCaml libraries and applications           *)
++(*                                                                              *)
++(*  Copyright (C) 2008-2010, OCamlCore SARL                                     *)
++(*                                                                              *)
++(*  This library is free software; you can redistribute it and/or modify it     *)
++(*  under the terms of the GNU Lesser General Public License as published by    *)
++(*  the Free Software Foundation; either version 2.1 of the License, or (at     *)
++(*  your option) any later version, with the OCaml static compilation           *)
++(*  exception.                                                                  *)
++(*                                                                              *)
++(*  This library is distributed in the hope that it will be useful, but         *)
++(*  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY  *)
++(*  or FITNESS FOR A PARTICULAR PURPOSE. See the file COPYING for more          *)
++(*  details.                                                                    *)
++(*                                                                              *)
++(*  You should have received a copy of the GNU Lesser General Public License    *)
++(*  along with this library; if not, write to the Free Software Foundation,     *)
++(*  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA               *)
++(********************************************************************************)
++
++type t
++val create : string -> t
++val value : t -> string
+hunk ./examples/packedlib/src/foo.ml 1
++(********************************************************************************)
++(*  OASIS: architecture for building OCaml libraries and applications           *)
++(*                                                                              *)
++(*  Copyright (C) 2008-2010, OCamlCore SARL                                     *)
++(*                                                                              *)
++(*  This library is free software; you can redistribute it and/or modify it     *)
++(*  under the terms of the GNU Lesser General Public License as published by    *)
++(*  the Free Software Foundation; either version 2.1 of the License, or (at     *)
++(*  your option) any later version, with the OCaml static compilation           *)
++(*  exception.                                                                  *)
++(*                                                                              *)
++(*  This library is distributed in the hope that it will be useful, but         *)
++(*  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY  *)
++(*  or FITNESS FOR A PARTICULAR PURPOSE. See the file COPYING for more          *)
++(*  details.                                                                    *)
++(*                                                                              *)
++(*  You should have received a copy of the GNU Lesser General Public License    *)
++(*  along with this library; if not, write to the Free Software Foundation,     *)
++(*  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA               *)
++(********************************************************************************)
++
++type t = int
++
++let create n = n
++let value n = n
+hunk ./examples/packedlib/src/foo.mli 1
++(********************************************************************************)
++(*  OASIS: architecture for building OCaml libraries and applications           *)
++(*                                                                              *)
++(*  Copyright (C) 2008-2010, OCamlCore SARL                                     *)
++(*                                                                              *)
++(*  This library is free software; you can redistribute it and/or modify it     *)
++(*  under the terms of the GNU Lesser General Public License as published by    *)
++(*  the Free Software Foundation; either version 2.1 of the License, or (at     *)
++(*  your option) any later version, with the OCaml static compilation           *)
++(*  exception.                                                                  *)
++(*                                                                              *)
++(*  This library is distributed in the hope that it will be useful, but         *)
++(*  WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY  *)
++(*  or FITNESS FOR A PARTICULAR PURPOSE. See the file COPYING for more          *)
++(*  details.                                                                    *)
++(*                                                                              *)
++(*  You should have received a copy of the GNU Lesser General Public License    *)
++(*  along with this library; if not, write to the Free Software Foundation,     *)
++(*  Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA               *)
++(********************************************************************************)
++
++type t
++val create : int -> t
++val value : t -> int
+hunk ./src/plugins/ocamlbuild/OCamlbuildPlugin.ml 575
+                      ["include"]
+                  in
+ 
++                 let tag_t =
++                   if lib.lib_pack then
++                     let fnames =
++                       List.fold_left
++                         (fun acc s ->
++                           (FilePath.UnixPath.add_extension s "cmx")
++                           :: (FilePath.UnixPath.add_extension
++                                 (String.uncapitalize s)
++                                 "cmx")
++                           :: acc)
++                         []
++                         lib.lib_modules
++                     in
++                     add_tags
++                       tag_t
++                       (List.fold_left
++                          (fun acc dn ->
++                            List.fold_left
++                              (fun acc fn ->
++                                Filename.concat dn fn :: acc)
++                              acc
++                              fnames)
++                          []
++                          (src_dirs @ src_internal_dirs))
++                       ["for-pack(" ^ String.capitalize cs.cs_name ^ ")"]
++                   else
++                     tag_t
++                 in
++
+                  let ctxt, tag_t, myocamlbuild_t =
+                    bs_tags
+                      pkg sct cs bs
+hunk ./test/TestFull.ml 918
+             ],
+             []);
+ 
++         (* Packed library *)
++         "../examples/packedlib", 
++         (fun () -> 
++            long_test,
++            oasis_ocamlbuild_files @ 
++              [ "src/packedlib.mlpack" ],
++            [
++              in_ocaml_library "packedlib" 
++                ["packedlib.cma"; 
++                 "foo.cmi"; "foo.mli"; 
++                 "bar.cmi"; "bar.mli"; 
++                 "META"];
++              conditional
++                !has_ocamlopt
++                (in_ocaml_library "packedlib"
++                   ["packedlib.cmxa"; 
++                    if Sys.os_type = "Win32" then
++                      "packedlib.lib"
++                    else
++                      "packedlib.a"]);
++            ],
++            []);
++
++
+ 
+          (* Complete library with findlib package to check *)
+          "../examples/findlib",
+}
+[updated myocamlbuildbase to not pass in the cma stub when linking packed libraries...
+till@pps.jussieu.fr**20110218192000] hunk ./src/plugins/ocamlbuild/MyOCamlbuildBase.ml 132
+                  (* When ocaml link something that use the C library, then one
+                     need that file to be up to date.
+                   *)
+-                 dep  ["link"; "ocaml"; "use_lib"^lib] 
++                 dep  ["compile"; "ocaml"; "use_lib"^lib] 
+                    [dir/"lib"^lib^"."^(!Options.ext_lib)];
+ 
+                  (* TODO: be more specific about what depends on headers *)
+[resolve-pack-conflict
+anil@recoil.org**20111226154300
+ Ignore-this: d4137415a82d00b048fcf98874d5384d
+] {
+hunk ./src/oasis/OASISLibrary.ml 30
+ 
+ let generated_unix_files ~ctxt (cs, bs, lib)
+       source_file_exists is_native ext_lib ext_dll =
+-  (* The headers that should be compiled along *)
+-  let headers =
+-    List.fold_left
+-      (fun hdrs modul ->
+-         try 
+-           let base_fn = 
+-             List.find
+-               (fun fn -> 
+-                  source_file_exists (fn^".ml") ||
+-                  source_file_exists (fn^".mli") ||
+-                  source_file_exists (fn^".mll") ||
+-                  source_file_exists (fn^".mly")) 
+-               (List.map
+-                  (OASISUnixPath.concat bs.bs_path)
+-                  [modul;
+-                   String.uncapitalize modul;
+-                   String.capitalize modul])
+-           in
+-             [base_fn^".cmi"] :: hdrs
+-         with Not_found ->
++
++  (* Look for a module file, considering capitalization or not. *)
++  let find_module modul = 
++    let possible_base_fn = 
++      List.map
++        (OASISUnixPath.concat bs.bs_path)
++        [modul;
++         OASISUnixPath.uncapitalize_file modul;
++         OASISUnixPath.capitalize_file modul]
++    in
++      try
++        begin
++          [List.find
++             (fun fn ->
++                source_file_exists (fn^".ml") ||
++                source_file_exists (fn^".mli") ||
++                source_file_exists (fn^".mll") ||
++                source_file_exists (fn^".mly"))
++             possible_base_fn]
++        end
++      with Not_found ->
++        begin
+            OASISMessage.warning
+              ~ctxt
+              (f_ "Cannot find source file matching \
+hunk ./src/oasis/OASISLibrary.ml 57
+                   module '%s' in library %s")
+              modul cs.cs_name;
+-             (List.map (OASISUnixPath.concat bs.bs_path)
+-                [modul^".cmi";
+-                 String.uncapitalize modul ^ ".cmi";
+-                 String.capitalize modul ^ ".cmi"])
+-             :: hdrs)
++           possible_base_fn
++        end
++  in
++
++  let find_modules lst ext = 
++    List.map 
++      (fun nm -> 
++         List.map 
++           (fun base_fn -> base_fn ^"."^ext)
++           (find_module nm))
++      lst
++  in
++
++  (* The headers that should be compiled along *)
++  let headers =
++    if lib.lib_pack then
+       []
+hunk ./src/oasis/OASISLibrary.ml 74
+-      lib.lib_modules
++    else
++      find_modules
++        lib.lib_modules
++        "cmi"
++  in
++
++  (* The .cmx that be compiled along *)
++  let cmxs =
++    let should_be_built =
++      match bs.bs_compiled_object with
++        | Native -> true
++        | Best -> is_native ()
++        | Byte -> false
++    in
++      if should_be_built then
++        find_modules
++          (lib.lib_modules @ lib.lib_internal_modules)
++          "cmx"
++      else
++        []
+   in
+ 
+   let acc_nopath =
+hunk ./src/plugins/internal/InternalInstallPlugin.ml 136
+               (* Start with acc + lib_extra *)
+               List.rev_append lib_extra acc
+             in
+-            let acc = 
+-              (* Add uncompiled header from the source tree *)
+-              let path = 
+-                BaseFilePath.of_unix bs.bs_path
+-              in
+-                List.fold_left
+-                  (fun acc modul ->
+-                     try 
+-                       List.find
+-                         Sys.file_exists 
+-                         (List.map
+-                            (Filename.concat path)
+-                            [modul^".mli";
+-                             modul^".ml";
+-                             String.uncapitalize modul^".mli";
+-                             String.capitalize   modul^".mli";
+-                             String.uncapitalize modul^".ml";
+-                             String.capitalize   modul^".ml"])
+-                       :: acc
+-                     with Not_found ->
+-                       begin
+-                         warning 
+-                           (f_ "Cannot find source header for module %s \
+-                                in library %s")
+-                           modul cs.cs_name;
+-                         acc
+-                       end)
+-                  acc
+-                  lib.lib_modules
++            let acc =
++              if lib.lib_pack then
++                acc
++              else
++                (* Add uncompiled header from the source tree (for non-packed libraries) *)
++                let path = 
++                  BaseFilePath.of_unix bs.bs_path
++                in
++                  List.fold_left
++                    (fun acc modul ->
++                       try 
++                         List.find
++                           Sys.file_exists 
++                           (List.map
++                              (Filename.concat path)
++                              [modul^".mli";
++                               modul^".ml";
++                               String.uncapitalize modul^".mli";
++                               String.capitalize   modul^".mli";
++                               String.uncapitalize modul^".ml";
++                               String.capitalize   modul^".ml"])
++                         :: acc
++                       with Not_found ->
++                         begin
++                           warning 
++                             (f_ "Cannot find source header for module %s \
++                                  in library %s")
++                             modul cs.cs_name;
++                           acc
++                         end)
++                    acc
++                    lib.lib_modules
+             in
+ 
+             let acc =
+}
+[Do not install the .cmx submodules if the target is packed
+anil@recoil.org**20111226161253
+ Ignore-this: 9ba5dc518c964d75b159de6b648400da
+] hunk ./src/oasis/OASISLibrary.ml 83
+   (* The .cmx that be compiled along *)
+   let cmxs =
+     let should_be_built =
++      (not lib.lib_pack) && (* Do not install .cmx packed submodules *)
+       match bs.bs_compiled_object with
+         | Native -> true
+         | Best -> is_native ()
+
+Context:
+
+[Fix an incomplete test in TestFileTemplate
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111205075554
+ Ignore-this: f05e85387a1b87cc2104027ecee550bb
+] 
+[Produce only subcommands specific helps when asked (Closes: #783)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111205074202
+ Ignore-this: 20fe2c5f61c81fda2c6ec1b64bf3e013
+] 
+[Use pager for long textual output (Closes: #782)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111205055621
+ Ignore-this: 66a3282479471f1c075c70f69bda69f8
+] 
+[Give the help summary directly when running just "oasis" (Closes: #781)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111202172337
+ Ignore-this: f2dfd1c671d417a3ddf04fa25a5813ed
+] 
+[Remove `pwd` filename prefix to avoid too long command line on Windows (Closes: #1007)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111202170635
+ Ignore-this: 3dd4b54d40cdf1d2507e1291a6ccfffe
+] 
+[Install .cmx (Closes: #686, #885)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111201002254
+ Ignore-this: 15a9079fe9231bd6cb0f6fa8f4b9e5d4
+ 
+ Detect required .cmx by using lib_modules and lib_internal_modules. Apply the
+ patch from ygrek, with some adaptation to pass all tests.
+ 
+] 
+[Check file permissions while testing
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111121075242
+ Ignore-this: f9bed0a9a8441763a976b577cb6f92c
+] 
+[Retain blanks at the beginning of line in freeform (Closes: #811)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111114233006
+ Ignore-this: 722a095676470f2608e335db5b53414c
+] 
+[Allow to define interdependent flags (Closes: #827, #938)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111111190236
+ Ignore-this: f16bebaa13fa2368f8142fd4968eec26
+ 
+ In order to allow interdependent flags, we transform back lazy values into
+ 'unit -> string' functions. This allows to change a flag value on the
+ command line and to update all the dependent values.
+ 
+] 
+[Allow PreConfCommand to create setup.data with any variables inside (Closes: #823)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111111165822
+ Ignore-this: e07220fb553c7ff59ad6d2b8e7cfa77a
+] 
+[Allow to use setup.data in shell script and Makefile (Closes: #982)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111111152627
+ Ignore-this: b61059d69a484615012846186338eb2d
+] 
+[Get rid of the backup target, we now have stable releases
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111108012731
+ Ignore-this: b77ddec9aed6bda0235f60fb1716f38d
+] 
+[Advanced checking of OASIS versions involved in dist
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111108012410
+ Ignore-this: 866fda8577a68844523650e6c4c03eb7
+] 
+[Use oasis-dist to do source distribution
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111108005253
+ Ignore-this: 9e727ffa32e0290b6fecfef7b5661b37
+] 
+[Check version number order in oasis-dist
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111108004833
+ Ignore-this: 1c999d4315f0ea757d1b1810f30e8949
+] 
+[Fix permissions (Closes: #980)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111108000622
+ Ignore-this: 186e4a2f724f1a9ae1d527c25902e5da
+] 
+[Use Printexc.to_string/register_printer to handle exception
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20111106190543
+ Ignore-this: af63c56cc8740ecf1d2f9cbd8fc54273
+] 
+[Fix empty body when no homepage
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110715130217
+ Ignore-this: 10e67e5c58a5053b842d6e9743a80c51
+] 
+[Add git support to oasis-dist
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110715130203
+ Ignore-this: 5dff19ca30d6fffc17db0d5c50a7eb4d
+] 
+[Apply file perm anyway when generating file template
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110607211954
+ Ignore-this: c26672640e4ab86e9fdd5c07d1cf881c
+] 
+[Better patch to restore the original line numbers (only after the body).
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110829213700
+ Ignore-this: 6b9354e01fb618f18ae421effef1f3db
+] 
+[Restore the original file locations (e.g. in setup.ml and myocamlbuild.ml)
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110829210906
+ Ignore-this: 7615b5c33616b50f402d00c0836a255d
+] 
+[Remove trailing white space and respect the 80 columns limit for OASISFileTemplate.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110829195603
+ Ignore-this: 2e6a231f2359892d272b4c42499c2275
+] 
+[Print version when requesting help.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110829124452
+ Ignore-this: 8e3244c1184c52a19575ce0a6e2270a0
+] 
+[Allow to ignore unknown fields
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110530094324
+ Ignore-this: 5c0e4b06344b54e3ee7503251a22018d
+] 
+[TAG 0.2.1~alpha1
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110528000520
+ Ignore-this: 99b598300cc537d602cd0ab18704bf76
+] 
+[correct capitalization of module name when it is in a subdirectory
+chambart@crans.org**20110209135451
+ Ignore-this: 58aafb53e1226ae59c5a165610682a5a
+] 
+[Drop extra version in ocaml version (Closes: #964, #888)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527230545
+ Ignore-this: 20252c3e8cdfdb9ab14d6f0aad05f823
+] 
+[Always output info messages on stderr (Closes: #785)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527145947
+ Ignore-this: 8993e464d10ee28caad9365a4ff7f1fd
+] 
+[Fix interversion in version comparator lexer (Closes: #808)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527144729
+ Ignore-this: d1019f9f32746326123c32f0d04e4809
+] 
+[Document the fact that setup.data is mandatory (Closes: #946)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527144231
+ Ignore-this: d45ed21af84bff3f0fc9eafa0ac90af9
+] 
+[configure translates getopt command line to Arg (Closes: #778, #804)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527143804
+ Ignore-this: eb2ebfbf518189d92abc40b7cdc01274
+] 
+[Generate valid META when there are line breaks in synopsis (Closes: #933)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527123316
+ Ignore-this: 1c6cf645fbb8bd0fbd7fa3cc11551dcb
+] 
+[Keep owner of generated files (Closes: #793)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527120647
+ Ignore-this: 5e550b35599dbdb00bf3692aeb3d9789
+] 
+[Set -I +threads for ocamlfind ocamldoc in ocamlbuild (Closes: #949)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527112145
+ Ignore-this: 1a45d9ade3df98505bfbf8fc5c326e9d
+] 
+[Don't copy executable in ocamlbuild
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527102818
+ Ignore-this: d6e6fae1064cd0e0ff0cc67a52dc9176
+ 
+ This patch allow to avoid copying executable to their real name. It helps to
+ call ocamlbuild a single time for the whole build rather than calling it n time
+ (n = number of executable sections) and copying resulting exec.
+ 
+ This speeds up the build process because ocamlbuild doesn't have to
+ compute/scan dependencies each time.
+ 
+ The drawback is that you have to use $foo when you want to call Executable foo,
+ because $foo will be _build/.../main.byte.
+ 
+] 
+[Exclude VCS directories by default (Closes: #847)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110527091550
+ Ignore-this: 26dd10644c1aac632c3aa3a4625b66f6
+] 
+[Produce .annot files when compiling OASIS.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110510105659
+ Ignore-this: 3f55a589f0b341664365ef24c1db8322
+] 
+[Print the configure summary in the "normal" order.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110510093139
+ Ignore-this: aa76c06bef957496f73eff5f303c5ffe
+] 
+[Expose more internal data for the bundle subcommand
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110526142943
+ Ignore-this: 27f6a30571d1ec2940751398769f2f0f
+] 
+[Add a test case for comparing version with alpha at the end
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110526142258
+ Ignore-this: c5f91220268d92a112e3ec991f85080a
+] 
+[Solve conflicts introduce by whitespace removal
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110526142001
+ Ignore-this: ac8cf00fc0123263bea3d4450868422
+] 
+[Add ?f_exit_code to all functions of the BaseExec module.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110509202521
+ Ignore-this: fe94a0848658ddfd2970af4c7c309a1f
+] 
+[Removed trailing white space.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110509202024
+ Ignore-this: acbe03c76cdb0d400c9f990e68839143
+] 
+[Generic failwithf using a format.
+Christophe Troestler <Christophe.Troestler@umons.ac.be>**20110509200838
+ Ignore-this: 854a550435d99810d32bb29ea37e81ef
+] 
+[Merge findlib virtual containers with the same name
+Jeremie Dimino <jeremie@dimino.org>**20101109105908
+ Ignore-this: 7ec448ef7e5d742aa88a4b4398b254f1
+] 
+[Externalize ocamlmod in its own project
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110524124232
+ Ignore-this: 7323cab5b11ac0ed44bb6025ccbf0382
+] 
+[New version 0.2.1
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110520100119
+ Ignore-this: b86aa9f25bfc0e422112069aa107f220
+] 
+[Publish OASISSection
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110517141137
+ Ignore-this: bcda2a38f01574b0448530d6b00f61fa
+] 
+[Synchronize plugin data for section
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110516094444
+ Ignore-this: cfa6a36772536b1628548d7cf30f0b76
+ 
+ This patch extends the synchronization scheme between data and plugin_data to
+ sections. This allow to set plugin data for sections (like in META) and have
+ them taken into account when outputing the result (like in Quickstart).
+ 
+] 
+[Include more modules and use OASISGettext to be able to use oasis as a library
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110512121403
+ Ignore-this: 2d76346f42566b7794219b747ef03ac3
+] 
+[Call "oasis setup" in oasis-dist.ml
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110408134901
+ Ignore-this: b3e4fe72a6c43794464188453978ba07
+] 
+[Improve OASISLibrary documentation
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110408134842
+ Ignore-this: c8ced3b260148f684cb52c15fcf33886
+] 
+[Take into account removed targets in DevFiles
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110402095234
+ Ignore-this: ec53870fc6c92df963772fa58ca64dd2
+] 
+[Correct a typo and some grammar in INSTALL.txt.
+Ronan Le Hy <ronan.lehy@gmail.com>**20110204171059
+ Ignore-this: 5bc35a9bdc7cf3fa8202db6e80826127
+] 
+[Fix typo SEMICOLON -> COLON
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20110123143838
+ Ignore-this: dfa1d2ed6bbd9f6a2b876aa85af7c822
+] 
+[Support darcs and no vcs for distribution
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20101123212154
+ Ignore-this: f7b6b66a96353a7f0028cbdbde3cb1b6
+] 
+[Verify validity of input when parsing in quickstart (Closes: #797)
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20101123164629
+ Ignore-this: 80442f22471fff86049198929f074862
+] 
+[Fix typo
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20101117212250
+ Ignore-this: 8e0b573b1462fcde56ae714704a0b8db
+] 
+[Add announce and dist prototype
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20101111144851
+ Ignore-this: 410af95d05f89878555e77b6e1986089
+] 
+[TAG 0.2.0
+Sylvain Le Gall <sylvain.le-gall@ocamlcore.com>**20101021224216
+ Ignore-this: 54ef4b91f0c6f49f151b5f06d77e1ed1
+] 
+Patch bundle hash:
+b8e5a2e9843639b0f568a086acbac7d46252677a

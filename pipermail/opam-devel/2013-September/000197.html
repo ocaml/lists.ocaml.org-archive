@@ -1,0 +1,98 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] mirage, opam and cross-compiling... ?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20mirage%2C%20opam%20and%20cross-compiling...%20%3F&In-Reply-To=%3C8972A91E-F38D-4D98-B100-BAE25D17F987%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000196.html">
+   <LINK REL="Next"  HREF="000198.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] mirage, opam and cross-compiling... ?</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20mirage%2C%20opam%20and%20cross-compiling...%20%3F&In-Reply-To=%3C8972A91E-F38D-4D98-B100-BAE25D17F987%40recoil.org%3E"
+       TITLE="[opam-devel] mirage, opam and cross-compiling... ?">anil at recoil.org
+       </A><BR>
+    <I>Wed Sep 18 16:58:03 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000196.html">[opam-devel] [ocaml-infra] Is there a compilation farm for OCaml open source projects somewhere?
+</A></li>
+        <LI>Next message: <A HREF="000198.html">[opam-devel] mirage, opam and cross-compiling... ?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#197">[ date ]</a>
+              <a href="thread.html#197">[ thread ]</a>
+              <a href="subject.html#197">[ subject ]</a>
+              <a href="author.html#197">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 18 Sep 2013, at 12:44, Christopher Greenhalgh &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">Chris.Greenhalgh at nottingham.ac.uk</A>&gt; wrote:
+
+&gt;<i> Is there something that passes for best practice when it comes to cross-compiling, ocaml and opam? 
+</I>&gt;<i> 
+</I>
+[I'm CCing opam-devel on this question, as it's pertinent to ongoing work in the trunk of OCaml]
+
+&gt;<i> I've spent the morning looking but ocaml cross-compiling seems to be rather ad hoc at the moment. And the approach I've taken so far following Vouillon with separate target-specific opam packages doesn't seem entirely satisfactory...
+</I>&gt;<i> 
+</I>&gt;<i> it would seem &quot;better&quot; to be able to switch to a cross-compiler and build standard (or at least cross-compilation-compatible) packages auto-magically. And it would be super-nice if this didn't require any changes to &quot;simple&quot; packages, which in turn implies that cross-compiling tools are the default and the cross-compiler's ocamlbuild is wise to cross-compiling. Other build tools (esp. oasis) could then also be extended to turn out sensible defaults when cross-compiling (e.g. using BuildTools fields).
+</I>
+Right -- the problem with cross-compiling OCaml historically has been a few points:
+
+- the OCaml toolchain itself didn't support building cross-tools
+- there's no standard for specifying an equivalent to CFLAGS/CC in OCaml build systems -- everyone defines their own.
+
+The former is being solved in 4.2 trunk now (I believe not yet fully cross-arch, but certainly cross-os).  The latter is why an Android-specific OPAM target is what the existing repository does.
+
+However, I think we're in much better to solve this properly now with compiler switches, but it will require doing two things:
+
+- define an OPAM switch that generates the cross-libraries.  This switch will be incapable of executing the binaries it produces, so it's probably best to generate a host toolchain *and* a separate cross toolchain with a different prefix.
+
+- add patches to existing build systems to use the cross tools (such as OASIS, as you mention).  This still requires an overlay patchset in OPAM, but it's far easier to manage and feed upstream that a set of ad-hoc patches.
+
+- the annoying ones are usually syntax extensions, which need to be built as host libraries and not target libraries.  We have a way to sidestep this as of a few weeks ago.  Leo White has built a specialized compiler driver that bypasses the usual compiler parse tree, and instead statically links in some camlp4 extensions.  This is not only faster, but it avoids dynamic linking in the compiler completely!  Most of our syntax extension requirements are actually pretty minimal (the Lwt one, and perhaps Sexplib and Cow), so we could just link those into one mega-compiler-driver that works on all the source code that we care about.
+
+<A HREF="https://github.com/lpw25/ocaml-with-pp">https://github.com/lpw25/ocaml-with-pp</A>
+
+I'm playing with this at the moment in order to build a js_of_ocaml toplevel for the Real World OCaml website, so let me know how you get along with it.
+
+&gt;<i> I added some notes to the end of my mirage-on-android working notes, <A HREF="https://github.com/cgreenhalgh/opensharingtoolkit/blob/master/docs/mirageonandroid.md">https://github.com/cgreenhalgh/opensharingtoolkit/blob/master/docs/mirageonandroid.md</A>
+</I>&gt;<i> 
+</I>&gt;<i> But I'm wondering if this is already in hand somewhere or better tackled otherwise?
+</I>
+Your notes are incredibly useful -- I think it's time to kickstart some of the cross-compilation work now that the OCaml 4.01 release is out of the way.  This also gives us a useful direction in OPAM development in terms of build system requirements (if you can cross-architecture compile it, then it'll probably work anywhere@)
+
+-anil
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000196.html">[opam-devel] [ocaml-infra] Is there a compilation farm for OCaml open source projects somewhere?
+</A></li>
+	<LI>Next message: <A HREF="000198.html">[opam-devel] mirage, opam and cross-compiling... ?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#197">[ date ]</a>
+              <a href="thread.html#197">[ thread ]</a>
+              <a href="subject.html#197">[ subject ]</a>
+              <a href="author.html#197">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

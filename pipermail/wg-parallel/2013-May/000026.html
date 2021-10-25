@@ -1,0 +1,125 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-parallel] About Lwt and Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3CCACLX4jRf3A83ZR5jVX7tVenvoSDHC5NwyFhhWqEUfdV_a6oaLg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000025.html">
+   <LINK REL="Next"  HREF="000024.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-parallel] About Lwt and Async</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:wg-parallel%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-parallel%5D%20About%20Lwt%20and%20Async&In-Reply-To=%3CCACLX4jRf3A83ZR5jVX7tVenvoSDHC5NwyFhhWqEUfdV_a6oaLg%40mail.gmail.com%3E"
+       TITLE="[wg-parallel] About Lwt and Async">yminsky at janestreet.com
+       </A><BR>
+    <I>Wed May  1 16:36:05 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000025.html">[wg-parallel] About Lwt and Async
+</A></li>
+        <LI>Next message: <A HREF="000024.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#26">[ date ]</a>
+              <a href="thread.html#26">[ thread ]</a>
+              <a href="subject.html#26">[ subject ]</a>
+              <a href="author.html#26">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Wed, May 1, 2013 at 9:00 AM, David Scott &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-parallel">dave.scott at eu.citrix.com</A>&gt; wrote:
+&gt;<i>
+</I>&gt;<i> Hi,
+</I>&gt;<i>
+</I>&gt;<i> In the XenServer part of Citrix we're starting to use Core for some projects
+</I>&gt;<i> (and no doubt we'll incorporate Async into those soon) and we're also using
+</I>&gt;<i> Lwt, mainly via mirage. We haven't invested so much in either that it would
+</I>&gt;<i> be impossible to switch, although it will take a while: shipping code will
+</I>&gt;<i> often be maintained for around 5 years.
+</I>&gt;<i>
+</I>&gt;<i> I had a quick look at our development opam repo[1] and, at the package level
+</I>&gt;<i> at least, our stuff breaks down roughly into
+</I>&gt;<i>
+</I>&gt;<i>   * 25% C bindings for bits of Unix; traditional style; potentially blocking
+</I>&gt;<i> operations.
+</I>&gt;<i>   * 25% protocol implementations / format converters. These are a mix of
+</I>&gt;<i> traditional style, with some lwt creeping in (often kept separate using
+</I>&gt;<i> ocamlfind subpackages)
+</I>&gt;<i>   * 50% apps / services / tools. I'm expecting both Async and Lwt to start
+</I>&gt;<i> creeping in here.
+</I>&gt;<i>
+</I>&gt;<i> Our apps usually talk to each other via RPC so we can live with a mixture of
+</I>&gt;<i> Async apps and Lwt apps but it would obviously be simpler if we were able to
+</I>&gt;<i> standardise (eventually) on one API.
+</I>&gt;<i>
+</I>&gt;<i> The simple Lwt shim on top of Async Jeremie described would potentially be
+</I>&gt;<i> useful for us: in some of our less performance-critical apps we could
+</I>&gt;<i> clearly live with a bit of extra boxing. We're also not using very much of
+</I>&gt;<i> the Lwt library so even a very basic integration would still be useful.
+</I>&gt;<i>
+</I>&gt;<i> Our performance critical apps will use mirage and its ecosystem of
+</I>&gt;<i> libraries, all based on Lwt. If it were possible to port the kernel of Async
+</I>&gt;<i> to mirage then we could use the Async engine everywhere, and
+</I>&gt;<i> slowly port everything over to it.
+</I>&gt;<i>
+</I>&gt;<i> Cheers,
+</I>&gt;<i> Dave
+</I>&gt;<i>
+</I>&gt;<i> [1] <A HREF="https://github.com/xen-org/opam-repo-dev">https://github.com/xen-org/opam-repo-dev</A>
+</I>
+I believe Anil is interested in moving Mirage to Async (Anil, can you
+confirm?), and Jeremie and Stephen are going to do the reorganization
+of Core so that there is a Core_kernel that's more portable than the
+full Core, and Async's core (which we're going to rename to
+Async_kernel) is going to depend only on Core_kernel.
+
+As Jeremie said, the Lwt shim seems doable, and we'll look into that
+as an intern project this summer.
+
+I should say: I very much endorse Daniel's suggestion that codecs
+should when possible be written in such a way as to be adaptible
+between multiple engines.
+
+As a side note, it looks like we're not the only community with this
+problem.  There are some interesting discussions in the Scala
+community about the mismatch between Akka futures and Finagle
+futures.  It's all very reminisicent.
+
+<A HREF="https://groups.google.com/forum/#!topic/akka-user/eXiBV5V7ZzE">https://groups.google.com/forum/#!topic/akka-user/eXiBV5V7ZzE</A>
+
+We're also contemplating having an intern look as to whether Libuv
+would be a reasonable way of getting Async to be more portable to
+other places, including Windows.
+
+y
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000025.html">[wg-parallel] About Lwt and Async
+</A></li>
+	<LI>Next message: <A HREF="000024.html">[wg-parallel] About Lwt and Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#26">[ date ]</a>
+              <a href="thread.html#26">[ thread ]</a>
+              <a href="subject.html#26">[ subject ]</a>
+              <a href="author.html#26">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-parallel">More information about the wg-parallel
+mailing list</a><br>
+</body></html>

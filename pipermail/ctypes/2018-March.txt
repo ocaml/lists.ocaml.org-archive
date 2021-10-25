@@ -1,0 +1,108 @@
+From marcello.seri at citrix.com  Mon Mar 26 17:32:28 2018
+From: marcello.seri at citrix.com (Marcello Seri)
+Date: Mon, 26 Mar 2018 16:32:28 +0000
+Subject: [ocaml-ctypes] Ctypes and structs containing strings
+Message-ID: <1522081954821.1826@citrix.com>
+
+Hi,
+
+I am sorry if I am cross-posting from https://discuss.ocaml.org/t/ctypes-and-structs-containing-strings/1752 but the post there got no attention and I was told that it was a better idea to ask on the mailing-list.
+
+In `ocaml-opasswd` (https://github.com/xapi-project/ocaml-opasswd)<https://github.com/xapi-project/ocaml-opasswd> we are using ctypes to bind some functions from `passwd.h` and `shadow.h`. In rare cases, when using the library to update an entry in the shadow file, it seems that the two strings in the passwd struct are read from uninitialised memory instead of being copies of the ocaml strings that we passed to create the new shadow struct.
+
+The code is here: https://github.com/xapi-project/ocaml-opasswd/blob/master/lib/shadow.ml#L20 and my fear is that declaring those as `string`:
+```
+let sp_name     = field shadow_t "sp_name" string
+let sp_passwd = field shadow_t "sp_passwd" string
+```
+and then reading or writing them with
+```
+name     = getf !@sp sp_name;
+passwd = getf !@sp sp_passwd;
+```
+and
+```
+setf sp_t sp_name sp.name;
+setf sp_t sp_passwd sp.passwd;
+```
+could be wrong. Reading the documentation, it seems that strings view are doing the right copies and allocation there but I don't see other major points of failure. This code has been there for ages, and if it is wrong I am not sure how it should be fixed. To add some more context, the part of the code that sometimes seems to behave badly is https://github.com/xapi-project/ocaml-opasswd/blob/master/lib/common.ml#L19-L21
+
+Is the declaration clearly wrong? How should I declare the strings and properly copy them between c and ocaml when using ctypes, should they be char ptr and handled manually?
+
+Thanks in advance for the help.
+
+Best,
+Marcello
+
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20180326/34516eba/attachment.html>
+
+From yallop at gmail.com  Sat Mar 31 22:51:45 2018
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 31 Mar 2018 22:51:45 +0100
+Subject: [ocaml-ctypes] Ctypes and structs containing strings
+In-Reply-To: <1522081954821.1826@citrix.com>
+References: <1522081954821.1826@citrix.com>
+Message-ID: <CAAxsn=FRSz9AhQP_d47Hem3=iQm+-4GYrP+ihC-Hq4tmeUWvTA@mail.gmail.com>
+
+Dear Marcello,
+
+On 26 March 2018 at 17:32, Marcello Seri <marcello.seri at citrix.com> wrote:
+> In `ocaml-opasswd` (https://github.com/xapi-project/ocaml-opasswd) we are
+> using ctypes to bind some functions from `passwd.h` and `shadow.h`. In rare
+> cases, when using the library to update an entry in the shadow file, it
+> seems that the two strings in the passwd struct are read from uninitialised
+> memory instead of being copies of the ocaml strings that we passed to create
+> the new shadow struct.
+>
+> The code is here:
+> https://github.com/xapi-project/ocaml-opasswd/blob/master/lib/shadow.ml#L20
+> and my fear is that declaring those as `string`:
+> ```
+> let sp_name     = field shadow_t "sp_name" string
+> let sp_passwd = field shadow_t "sp_passwd" string
+> ```
+> and then reading or writing them with
+> ```
+> name     = getf !@sp sp_name;
+> passwd = getf !@sp sp_passwd;
+> ```
+> and
+> ```
+> setf sp_t sp_name sp.name;
+> setf sp_t sp_passwd sp.passwd;
+> ```
+> could be wrong.
+
+I think your analysis is correct.
+
+When the memory is owned by C code -- for example, when a C function
+passes a struct to OCaml with fields already initialized -- then using
+the string view works well: reading a string field creates an OCaml
+copy, which persists as long as needed.
+
+However, when things are the other way round -- i.e. when you're
+creating or initializing the struct in OCaml before passing it to C --
+then the string view isn't a good choice, because there's no way to
+manage the lifetime of the C copy of the OCaml string that's written
+to the struct field.  I'm planning to change the interface in a future
+release to make the lifetime of allocated objects clearer, and to make
+these kinds of issues less likely.
+
+> Is the declaration clearly wrong? How should I declare the strings and
+> properly copy them between c and ocaml when using ctypes, should they be
+> char ptr and handled manually?
+
+A reasonable way to do this would be to allocate stable memory for the
+string fields before the C call, and ensure that the memory stays
+around until the call is complete.  Stable memory could mean any of: a
+bigarray, a Ctypes.CArray.t value, memory returned by malloc, memory
+returned by Ctypes.allocate, etc.  In most of these cases ensuring the
+memory stays around is a matter of holding onto the handle (bigarray
+value, Ctypes ptr, etc.) until after the call.
+
+Kind regards,
+
+Jeremy
+

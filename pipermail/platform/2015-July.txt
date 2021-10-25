@@ -1,0 +1,408 @@
+From daniel.buenzli at erratique.ch  Fri Jul 17 11:26:02 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 17 Jul 2015 11:26:02 +0100
+Subject: [ocaml-platform] [wg-windows] Identifying windows ports for
+ build systems & cross compiling distinctions
+In-Reply-To: <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+Message-ID: <3D6425393B9549ED892DE814251B3530@erratique.ch>
+
+Le mardi, 30 juin 2015 ? 18:52, Daniel B?nzli a ?crit :
+> Le mardi, 30 juin 2015 ? 18:13, David Allsopp a ?crit :
+> > $OCAMLLIB/Makefile.config defines TOOLCHAIN variable already which gives mingw or msvc.
+>  
+
+It seems that `ocamlc -config` doesn't output this variable. Could anyone confirm me that `ocamlc -config | grep ccomp_type` gives the information (and how).  
+
+Besides regarding the initial discussion I think the only reasonable option would be:  
+
+b) Distinguish an OS for the mingw ports
+
+However I would like to get feedback from windows users if it makes sense to do this, in the sense that a lot of things have to be done differently build-wise with mingw compared to a plain win32 and that it's useful in build systems to be able to get that information without having to grep `ocamlc -config`. Because if it's only for the file extension business maybe it's not such a good idea to define an os value for it.
+
+Best,
+
+Daniel
+
+
+
+From B.Butterfield at F5.com  Wed Jul 22 23:17:39 2015
+From: B.Butterfield at F5.com (Bruce Butterfield)
+Date: Wed, 22 Jul 2015 22:17:39 +0000
+Subject: [ocaml-platform] opam update problem
+Message-ID: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+
+I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+
+$ opam update --debug
+...
+Processing  1/1: [default: http]
+00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+[ERROR] Could not update repository default
+...
+
+The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+
+
+From thomas at gazagnaire.org  Wed Jul 22 23:19:36 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 22 Jul 2015 23:19:36 +0100
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+Message-ID: <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+
+> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+> 
+> $ opam update --debug
+> ...
+> Processing  1/1: [default: http]
+> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+> [ERROR] Could not update repository default
+> ...
+> 
+> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+
+Can you access that url using curl or wget?
+
+Thomas
+
+From B.Butterfield at F5.com  Wed Jul 22 23:20:59 2015
+From: B.Butterfield at F5.com (Bruce Butterfield)
+Date: Wed, 22 Jul 2015 22:20:59 +0000
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+ <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+Message-ID: <027692F6-35BF-4D3F-AA53-BF60AD575EE2@f5.com>
+
+I can if it doesn't have the '.' at the end of the URI. 
+
+> On Jul 22, 2015, at 3:19 PM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+>> 
+>> $ opam update --debug
+>> ...
+>> Processing  1/1: [default: http]
+>> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+>> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+>> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+>> [ERROR] Could not update repository default
+>> ...
+>> 
+>> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+> 
+> Can you access that url using curl or wget?
+> 
+> Thomas
+
+
+From thomas at gazagnaire.org  Thu Jul 23 08:29:46 2015
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Thu, 23 Jul 2015 08:29:46 +0100
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <027692F6-35BF-4D3F-AA53-BF60AD575EE2@f5.com>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+ <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+ <027692F6-35BF-4D3F-AA53-BF60AD575EE2@f5.com>
+Message-ID: <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+
+> I can if it doesn't have the '.' at the end of the URI. 
+
+This is just pretty-printing.
+
+Try with -vv to see what command opam actually uses. It might be an issue with your version of curl. And maybe move the discussion to the issue tracker on GitHub[1] where it would be tracked more easily.
+
+Best,
+Thomas
+
+[1]: https://github.com/ocaml/opam/issues
+
+> 
+>> On Jul 22, 2015, at 3:19 PM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>> 
+>>> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+>>> 
+>>> $ opam update --debug
+>>> ...
+>>> Processing  1/1: [default: http]
+>>> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+>>> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+>>> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+>>> [ERROR] Could not update repository default
+>>> ...
+>>> 
+>>> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+>> 
+>> Can you access that url using curl or wget?
+>> 
+>> Thomas
+> 
+
+
+From francois.berenger at inria.fr  Thu Jul 23 08:49:32 2015
+From: francois.berenger at inria.fr (Francois Berenger)
+Date: Thu, 23 Jul 2015 09:49:32 +0200
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+ <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+ <027692F6-35BF-4D3F-AA53-BF60AD575EE2@f5.com>
+ <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+Message-ID: <55B09C8C.5000002@inria.fr>
+
+On 07/23/2015 09:29 AM, Thomas Gazagnaire wrote:
+>> I can if it doesn't have the '.' at the end of the URI.
+>
+> This is just pretty-printing.
+>
+> Try with -vv to see what command opam actually uses. It might be an issue with your version of curl. And maybe move the discussion to the issue tracker on GitHub[1] where it would be tracked more easily.
+
+Sometimes uninstalling curl and installing wget is a workaround for such 
+problems.
+
+However, I am not sure if opam supports wget.
+
+> Best,
+> Thomas
+>
+> [1]: https://github.com/ocaml/opam/issues
+>
+>>
+>>> On Jul 22, 2015, at 3:19 PM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>>>
+>>>> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+>>>>
+>>>> $ opam update --debug
+>>>> ...
+>>>> Processing  1/1: [default: http]
+>>>> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+>>>> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+>>>> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+>>>> [ERROR] Could not update repository default
+>>>> ...
+>>>>
+>>>> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+>>>
+>>> Can you access that url using curl or wget?
+>>>
+>>> Thomas
+>>
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+
+-- 
+Regards,
+Francois.
+"When in doubt, use more types"
+
+From louis.gesbert at ocamlpro.com  Thu Jul 23 08:59:02 2015
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Thu, 23 Jul 2015 16:59:02 +0900
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <55B09C8C.5000002@inria.fr>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+ <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+ <55B09C8C.5000002@inria.fr>
+Message-ID: <4538959.IDJZxY820p@agaric>
+
+It does. You may even specify any custom command through the OPAMFETCH variable with the most recent versions. `OPAMFETCH=wget` works without having to uninstall curl.
+
+> - Francois Berenger, 23/07/2015 09:49 -
+> On 07/23/2015 09:29 AM, Thomas Gazagnaire wrote:
+> >> I can if it doesn't have the '.' at the end of the URI.
+> >
+> > This is just pretty-printing.
+> >
+> > Try with -vv to see what command opam actually uses. It might be an issue with your version of curl. And maybe move the discussion to the issue tracker on GitHub[1] where it would be tracked more easily.
+> 
+> Sometimes uninstalling curl and installing wget is a workaround for such 
+> problems.
+> 
+> However, I am not sure if opam supports wget.
+> 
+> > Best,
+> > Thomas
+> >
+> > [1]: https://github.com/ocaml/opam/issues
+> >
+> >>
+> >>> On Jul 22, 2015, at 3:19 PM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> >>>
+> >>>> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+> >>>>
+> >>>> $ opam update --debug
+> >>>> ...
+> >>>> Processing  1/1: [default: http]
+> >>>> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+> >>>> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+> >>>> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+> >>>> [ERROR] Could not update repository default
+> >>>> ...
+> >>>>
+> >>>> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+> >>>
+> >>> Can you access that url using curl or wget?
+> >>>
+> >>> Thomas
+> >>
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> >
+> 
+> 
+
+From B.Butterfield at F5.com  Thu Jul 23 17:04:01 2015
+From: B.Butterfield at F5.com (Bruce Butterfield)
+Date: Thu, 23 Jul 2015 16:04:01 +0000
+Subject: [ocaml-platform] opam update problem
+In-Reply-To: <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+References: <574A38A9-C478-4827-832C-F8C6411D4865@f5.com>
+ <EECA1FEE-4BA7-46FD-AF0F-83A13E7F4987@gazagnaire.org>
+ <027692F6-35BF-4D3F-AA53-BF60AD575EE2@f5.com>
+ <77A47BC1-8076-4A28-8F1D-BACE24D9E72A@gazagnaire.org>
+Message-ID: <B8EB4A2D-6FA3-4281-B7E2-538590994340@f5.com>
+
+OK, that isolated the problem:
+
+butterfield-mba:~ bruce$ opam update -vv
+
+=-=- Updating package repositories =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=  ?
+[default: http] Command started
++ wget "--content-disposition" "--no-check-certificate" "-t" "3" "https://opam.ocaml.org/urls.txt" (CWD=/var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-3244-dd682e)
+- dyld: Library not loaded: /usr/local/opt/openssl/lib/libssl.1.0.0.dylib
+-   Referenced from: /usr/local/bin/wget
+-   Reason: image not found
+[ERROR] Could not update repository default
+^C'opam update -vv' failed.
+butterfield-mba:~ bruce$
+
+Just a problem loading a shared lib. That I can fix. Thanks!
+
+> On Jul 23, 2015, at 12:29 AM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> 
+>> I can if it doesn't have the '.' at the end of the URI. 
+> 
+> This is just pretty-printing.
+> 
+> Try with -vv to see what command opam actually uses. It might be an issue with your version of curl. And maybe move the discussion to the issue tracker on GitHub[1] where it would be tracked more easily.
+> 
+> Best,
+> Thomas
+> 
+> [1]: https://github.com/ocaml/opam/issues
+> 
+>> 
+>>> On Jul 22, 2015, at 3:19 PM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+>>> 
+>>>> I'm unable to run 'opam update' -- I get an error message "Could not update repository default". Running it with debug flag:
+>>>> 
+>>>> $ opam update --debug
+>>>> ...
+>>>> Processing  1/1: [default: http]
+>>>> 00:00.397  PARALLEL                Collected task for job 0 (ret:256)
+>>>> 00:00.397  SYSTEM                  rmdir /var/folders/6p/sf2lk3297kb9sl_tpq6tckcw0000gn/T/opam-90980-dd682e
+>>>> 00:00.403  SYSTEM                  Could not download file at https://opam.ocaml.org/urls.txt.
+>>>> [ERROR] Could not update repository default
+>>>> ...
+>>>> 
+>>>> The period at the end of the URL is suspicious but I have no idea why it is there or if that is the problem. Any ideas?
+>>> 
+>>> Can you access that url using curl or wget?
+>>> 
+>>> Thomas
+>> 
+> 
+
+
+From daniel.buenzli at erratique.ch  Thu Jul 23 21:39:15 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Thu, 23 Jul 2015 21:39:15 +0100
+Subject: [ocaml-platform] [wg-windows] Identifying windows ports for
+ build systems & cross compiling distinctions
+In-Reply-To: <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+ <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+Message-ID: <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+
+Le jeudi, 23 juillet 2015 ? 19:55, David Allsopp a ?crit :
+> utils/config.mlp shows that the output will be the CCOMPTYPE variable OCaml was configured with; config/Makefile.{msvc,msvc64,mingw,mingw64} show that is "msvc" for the first two and "cc" for the second two.
+
+Thanks very much, that's useful information on where to look at things.
+
+> Additionally, while new code out there may be taking advantage of Sys.win32, I expect there's a lot of code still reasonably expecting that Sys.os_type = "Win32" will work forever.
+I'm not suggesting to change that in OCaml I'm suggesting that for the *opam* os variable so that build systems can condition on it an behave accordingly. The opam os variable is already quite different from Sys.os_type which is not precise enough, see [1].
+  
+> Adding Sys.comp_type would be handy, of course... but then having the entire Config module as Sys.Config would be generally quite useful!
+
+As already mentioned that doesn't help much in cross-compiling scenarios.
+  
+> I'm not sure what you're getting at here - what build system differences are you referring to?
+
+Well the build system needs to adapt file extensions for one thing (which is quite annoying). Hence my question is it *only this* that differs in the mingw and msvc ports or are there also other differences at the build level (e.g. build rules) as if this is the case it would make sense to distinguish the ports using the os variable in order to have a good bulk variable to condition on, otherwise, if it's only the file extensions I don't think it's worth it.
+
+Best,
+
+Daniel
+
+[1] https://github.com/ocaml/opam-depext/blob/d94f9f06e1d489dc4f946fb3aa37589eb9e9a2ec/depext.ml#L62-L74
+
+
+
+From daniel.buenzli at erratique.ch  Fri Jul 24 13:59:43 2015
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 24 Jul 2015 13:59:43 +0100
+Subject: [ocaml-platform] [wg-windows] Identifying windows ports for
+ build systems & cross compiling distinctions
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9E9D4915E@Remus.metastack.local>
+References: <88589CEFF4F346BBB9C699A50E198142@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9C9F6C4@Remus.metastack.local>
+ <76478AAD389641DE94728EC386AFFA87@erratique.ch>
+ <3D6425393B9549ED892DE814251B3530@erratique.ch>
+ <000001d0c579$332f0aa0$998d1fe0$@metastack.com>
+ <5B65952A997C4A70B0923F43F26DF2BB@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9E9D4915E@Remus.metastack.local>
+Message-ID: <5FC0BE0F5534411B99B1D89D414AE590@erratique.ch>
+
+Le vendredi, 24 juillet 2015 ? 11:58, David Allsopp a ?crit :
+> Sorry - poor context-switching on my part! However, my comment still stands - mingw and msvc are not operating (sub-)systems ? even the sub-splitting in that function still gives you operating systems. Having something akin to the comp_type seems better to me than (ab)using the notion of os.
+
+Ok.
+   
+> This may play differently in an OPAM which fully supports cross-compilation, but would you expect that os variable to be the same across all switches?
+
+Since that os variable should formally be taken for host-os no.
+  
+> One thing that is certainly interesting (and which I'm doing in my Windows port of OPAM[*]) is being able to use all four native Windows ports in the same OPAM installation.
+
+Yes, there should be no problem with this I think.
+
+> comparch = msvc -> immediately .obj, .lib, .dll, .exe (and Microsoft invocation rules)
+> comparch = cc -> immediately gives you .o and .a and then os <> Win32 gives you .so or .dll+.exe (and CC/GCC invocation rules)
+
+You meant comp_type I guess. Ok thanks, that's clear. It seems effectively less contrived than introducing an os for mingw.  
+
+> [*] which is, of course, a) not finished and b) not necessarily going to be merged!  
+You should try to sync and plot with Louis, I'm sure he's interested.  
+
+Best,
+
+Daniel
+

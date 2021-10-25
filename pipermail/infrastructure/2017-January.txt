@@ -1,0 +1,671 @@
+From dra-news at metastack.com  Wed Jan 25 13:45:20 2017
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 25 Jan 2017 13:45:20 -0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+Message-ID: <000001d27711$462c6670$d2853350$@metastack.com>
+
+I'm hoping to merge OCaml GPR#1014
+(https://github.com/ocaml/ocaml/pull/1014) in advance of the OCaml 4.05 code
+freeze. The principal aim of this GPR is to stop the Changes file being a
+constant source of merge conflicts on open pull requests. This is fixed by
+splitting the Changes file into individual entries which are recombined
+using a script. At each release, the individual files are merged into
+Changes and the new Changes file committed in one go (for convenience, in a
+manner not unrelated to having both configure.ac and configure in a
+repository).
+
+It is desirable to keep the fragment files, but these add considerable
+weight to the main repository (and OCaml sources tarball). I have proposed
+in the solution using a Git submodule to store the archived entries. The
+submodule is at present at https://github.com/dra27/ocaml-changelog and I
+would like to move this repository to the ocaml namespace. It would be
+sensible for the repository not to accept pull requests or issues via the
+GUI and, unless others are keen to be able to perform the OCaml release
+manager's job, only I (at least for the initial commits) and Damien Doligez
+definitely need push access to it.
+
+All best,
+
+
+David
+
+
+From daniel.buenzli at erratique.ch  Wed Jan 25 14:22:57 2017
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 25 Jan 2017 15:22:57 +0100
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <000001d27711$462c6670$d2853350$@metastack.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+Message-ID: <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+
+On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+> It is desirable to keep the fragment files, but these add considerable
+> weight to the main repository (and OCaml sources tarball). I have proposed
+> in the solution using a Git submodule to store the archived entries.
+
+Are you sure about this ? It seems to me that git should be able to handle this without too much problem and it should be easy enough not to include them in the release tarball. I personally had a terrible experience with git submodules (though that was a long time ago) and I wouldn't advise anyone to get into this mess.
+
+D
+
+From anil at recoil.org  Wed Jan 25 14:30:51 2017
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 25 Jan 2017 14:30:51 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+Message-ID: <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+
+On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+> 
+> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+>> It is desirable to keep the fragment files, but these add considerable
+>> weight to the main repository (and OCaml sources tarball). I have proposed
+>> in the solution using a Git submodule to store the archived entries.
+> 
+> Are you sure about this ? It seems to me that git should be able to handle this without too much problem and it should be easy enough not to include them in the release tarball. I personally had a terrible experience with git submodules (though that was a long time ago) and I wouldn't advise anyone to get into this mess.
+
+Git submodules are indeed surprisingly difficult to use reliably.
+Would storing the fragments in an independent branch be workable?
+Those objects would not add more weight to a checkout of OCaml
+trunk, but still be accessible a checkout away.
+
+(Caveat: I haven't reviewed the rest of your proposal in detail, David,
+ so apologies if this is well-trodden ground).
+
+Anil
+
+From gabriel.scherer at gmail.com  Wed Jan 25 14:38:20 2017
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 25 Jan 2017 15:38:20 +0100
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+Message-ID: <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+
+The git sub-module is an optimization. The change that is being
+discussed is to each changelog entry in a separate file, to reduce
+Changes-related merge conflicts. David wrote a script to rebuild a
+complete Changelog from an exploded representation (sections are
+directories, entries are files).
+
+Several developers have argued that keeping too many small files in
+the repository could make it inconvenient to work with on some
+OS/filesystem combinations (mostly Windows, I suppose). There can be
+several hundred entries per release, so it is not an unreasonable
+concern I think.
+David's idea is to only keep the small files in the main repository
+for the in-development versions, and at release time move them to a
+separate repository, so that they are not pulled in by default.
+Ideally we want each commit in the main repository to point to a
+specific commit in the Changes-repository (the commit of the last
+release-time move), so using a submodule makes more sense than a
+separate branch -- with a separate branch there would be no link
+between the versions in the two branches.
+
+I agree that in general submodules can be a pain to use, but in this
+specific case I think that this is not likely to be an issue: most
+people would never need to pull the submodule or update it in any way,
+it would only need to be manipulated at release time (pull, copy
+files, commit, and that's it), which occurs infrequently.
+
+On Wed, Jan 25, 2017 at 3:30 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+>>
+>> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+>>> It is desirable to keep the fragment files, but these add considerable
+>>> weight to the main repository (and OCaml sources tarball). I have proposed
+>>> in the solution using a Git submodule to store the archived entries.
+>>
+>> Are you sure about this ? It seems to me that git should be able to handle this without too much problem and it should be easy enough not to include them in the release tarball. I personally had a terrible experience with git submodules (though that was a long time ago) and I wouldn't advise anyone to get into this mess.
+>
+> Git submodules are indeed surprisingly difficult to use reliably.
+> Would storing the fragments in an independent branch be workable?
+> Those objects would not add more weight to a checkout of OCaml
+> trunk, but still be accessible a checkout away.
+>
+> (Caveat: I haven't reviewed the rest of your proposal in detail, David,
+>  so apologies if this is well-trodden ground).
+>
+> Anil
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+
+From yotambarnoy at gmail.com  Wed Jan 25 14:48:51 2017
+From: yotambarnoy at gmail.com (Yotam Barnoy)
+Date: Wed, 25 Jan 2017 09:48:51 -0500
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+Message-ID: <-1450252009426960289@unknownmsgid>
+
+Why not just delete the separate files with each release?
+
+> On Jan 25, 2017, at 9:39 AM, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+>
+> The git sub-module is an optimization. The change that is being
+> discussed is to each changelog entry in a separate file, to reduce
+> Changes-related merge conflicts. David wrote a script to rebuild a
+> complete Changelog from an exploded representation (sections are
+> directories, entries are files).
+>
+> Several developers have argued that keeping too many small files in
+> the repository could make it inconvenient to work with on some
+> OS/filesystem combinations (mostly Windows, I suppose). There can be
+> several hundred entries per release, so it is not an unreasonable
+> concern I think.
+> David's idea is to only keep the small files in the main repository
+> for the in-development versions, and at release time move them to a
+> separate repository, so that they are not pulled in by default.
+> Ideally we want each commit in the main repository to point to a
+> specific commit in the Changes-repository (the commit of the last
+> release-time move), so using a submodule makes more sense than a
+> separate branch -- with a separate branch there would be no link
+> between the versions in the two branches.
+>
+> I agree that in general submodules can be a pain to use, but in this
+> specific case I think that this is not likely to be an issue: most
+> people would never need to pull the submodule or update it in any way,
+> it would only need to be manipulated at release time (pull, copy
+> files, commit, and that's it), which occurs infrequently.
+>
+>> On Wed, Jan 25, 2017 at 3:30 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+>>> On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch> wrote:
+>>>
+>>>> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+>>>> It is desirable to keep the fragment files, but these add considerable
+>>>> weight to the main repository (and OCaml sources tarball). I have proposed
+>>>> in the solution using a Git submodule to store the archived entries.
+>>>
+>>> Are you sure about this ? It seems to me that git should be able to handle this without too much problem and it should be easy enough not to include them in the release tarball. I personally had a terrible experience with git submodules (though that was a long time ago) and I wouldn't advise anyone to get into this mess.
+>>
+>> Git submodules are indeed surprisingly difficult to use reliably.
+>> Would storing the fragments in an independent branch be workable?
+>> Those objects would not add more weight to a checkout of OCaml
+>> trunk, but still be accessible a checkout away.
+>>
+>> (Caveat: I haven't reviewed the rest of your proposal in detail, David,
+>> so apologies if this is well-trodden ground).
+>>
+>> Anil
+>> _______________________________________________
+>> Infrastructure mailing list
+>> Infrastructure at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/infrastructure
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+
+From louis.gesbert at ocamlpro.com  Wed Jan 25 14:52:00 2017
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 25 Jan 2017 15:52 +0100
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+Message-ID: <1893826.l0sK5iDqmj@agaric>
+
+
+> - Gabriel Scherer, 25/01/2017 15:38 -
+> I agree that in general submodules can be a pain to use, but in this
+> specific case I think that this is not likely to be an issue: most
+> people would never need to pull the submodule or update it in any way,
+> it would only need to be manipulated at release time (pull, copy
+> files, commit, and that's it), which occurs infrequently.
+
+Note however that more recent versions of opam do automatically pull git submodules, so for people using an OCaml compiler bound to the git URL (probably not that many), it might make things slightly slower instead.
+
+Best,
+Louis
+
+From gabriel.scherer at gmail.com  Wed Jan 25 14:55:25 2017
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 25 Jan 2017 15:55:25 +0100
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <1893826.l0sK5iDqmj@agaric>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+ <1893826.l0sK5iDqmj@agaric>
+Message-ID: <CAPFanBH_Dezh_gBfPmf7hsNkiutQQXqE1wfxpxh9QnzO9aDRPA@mail.gmail.com>
+
+In any case, I think that this discussion is maybe a bit premature,
+given that it is not clear yet whether we will proceed forward merging
+#1014. I think we could safely delay discussion here (if there needs
+to be a discussion separate from the GPR?) until a firm decision is
+made on #1014.
+
+
+On Wed, Jan 25, 2017 at 3:52 PM, Louis Gesbert
+<louis.gesbert at ocamlpro.com> wrote:
+>
+>> - Gabriel Scherer, 25/01/2017 15:38 -
+>> I agree that in general submodules can be a pain to use, but in this
+>> specific case I think that this is not likely to be an issue: most
+>> people would never need to pull the submodule or update it in any way,
+>> it would only need to be manipulated at release time (pull, copy
+>> files, commit, and that's it), which occurs infrequently.
+>
+> Note however that more recent versions of opam do automatically pull git submodules, so for people using an OCaml compiler bound to the git URL (probably not that many), it might make things slightly slower instead.
+>
+> Best,
+> Louis
+
+From dra-news at metastack.com  Wed Jan 25 14:59:51 2017
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 25 Jan 2017 14:59:51 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <-1450252009426960289@unknownmsgid>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+ <-1450252009426960289@unknownmsgid>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D901358287D5@Remus.metastack.local>
+
+See https://github.com/ocaml/ocaml/pull/1014#issuecomment-273739477 - also note that tools/processChanges.ml allows the database to be used to generate Markdown or HTML with fairly minimal new coding. The script for *generating* Changes is clearly on the critical path and will update with any future changes in ideas; the script for converting Changes back to fragments is not - it seems sensible to keep the original files, therefore.
+
+
+David
+
+> -----Original Message-----
+> From: Infrastructure [mailto:infrastructure-bounces at lists.ocaml.org] On
+> Behalf Of Yotam Barnoy
+> Sent: 25 January 2017 14:49
+> To: Gabriel Scherer <gabriel.scherer at gmail.com>
+> Cc: infrastructure <infrastructure at lists.ocaml.org>
+> Subject: Re: [ocaml-infra] New Git repository in ocaml GitHub org
+> 
+> Why not just delete the separate files with each release?
+> 
+> > On Jan 25, 2017, at 9:39 AM, Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+> >
+> > The git sub-module is an optimization. The change that is being
+> > discussed is to each changelog entry in a separate file, to reduce
+> > Changes-related merge conflicts. David wrote a script to rebuild a
+> > complete Changelog from an exploded representation (sections are
+> > directories, entries are files).
+> >
+> > Several developers have argued that keeping too many small files in
+> > the repository could make it inconvenient to work with on some
+> > OS/filesystem combinations (mostly Windows, I suppose). There can be
+> > several hundred entries per release, so it is not an unreasonable
+> > concern I think.
+> > David's idea is to only keep the small files in the main repository
+> > for the in-development versions, and at release time move them to a
+> > separate repository, so that they are not pulled in by default.
+> > Ideally we want each commit in the main repository to point to a
+> > specific commit in the Changes-repository (the commit of the last
+> > release-time move), so using a submodule makes more sense than a
+> > separate branch -- with a separate branch there would be no link
+> > between the versions in the two branches.
+> >
+> > I agree that in general submodules can be a pain to use, but in this
+> > specific case I think that this is not likely to be an issue: most
+> > people would never need to pull the submodule or update it in any way,
+> > it would only need to be manipulated at release time (pull, copy
+> > files, commit, and that's it), which occurs infrequently.
+> >
+> >> On Wed, Jan 25, 2017 at 3:30 PM, Anil Madhavapeddy <anil at recoil.org>
+> wrote:
+> >>> On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch>
+> wrote:
+> >>>
+> >>>> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+> >>>> It is desirable to keep the fragment files, but these add
+> >>>> considerable weight to the main repository (and OCaml sources
+> >>>> tarball). I have proposed in the solution using a Git submodule to
+> store the archived entries.
+> >>>
+> >>> Are you sure about this ? It seems to me that git should be able to
+> handle this without too much problem and it should be easy enough not to
+> include them in the release tarball. I personally had a terrible
+> experience with git submodules (though that was a long time ago) and I
+> wouldn't advise anyone to get into this mess.
+> >>
+> >> Git submodules are indeed surprisingly difficult to use reliably.
+> >> Would storing the fragments in an independent branch be workable?
+> >> Those objects would not add more weight to a checkout of OCaml trunk,
+> >> but still be accessible a checkout away.
+> >>
+> >> (Caveat: I haven't reviewed the rest of your proposal in detail,
+> >> David, so apologies if this is well-trodden ground).
+> >>
+> >> Anil
+> >> _______________________________________________
+> >> Infrastructure mailing list
+> >> Infrastructure at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/infrastructure
+> > _______________________________________________
+> > Infrastructure mailing list
+> > Infrastructure at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/infrastructure
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+
+From dra-news at metastack.com  Wed Jan 25 15:01:14 2017
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 25 Jan 2017 15:01:14 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <1893826.l0sK5iDqmj@agaric>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+ <1893826.l0sK5iDqmj@agaric>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D90135828A03@Remus.metastack.local>
+
+Louis Gesbert wrote:
+> > - Gabriel Scherer, 25/01/2017 15:38 -
+> > I agree that in general submodules can be a pain to use, but in this
+> > specific case I think that this is not likely to be an issue: most
+> > people would never need to pull the submodule or update it in any way,
+> > it would only need to be manipulated at release time (pull, copy
+> > files, commit, and that's it), which occurs infrequently.
+> 
+> Note however that more recent versions of opam do automatically pull git
+> submodules, so for people using an OCaml compiler bound to the git URL
+> (probably not that many), it might make things slightly slower instead.
+
+That's a Windows-shaped problem which I haven't got to yet - is it possible to disable or list either modules which should (or shouldn't) be initialised?
+
+
+David 
+
+
+From dra-news at metastack.com  Wed Jan 25 15:04:09 2017
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 25 Jan 2017 15:04:09 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D90135828B5F@Remus.metastack.local>
+
+Indeed - git submodules are almost entirely inappropriate to every use-case. Their only use is to have parts of the tree which do not have to be initialised. 
+
+There can be surprising results - however, the submodule itself is only updated by a script (see tools/changes.sh) and if one happens to be traversing entire versions of the ocaml tree, failing to run git submodule update is not going to break anything, unless you choose for some reason to run make FullChanges.
+
+
+David 
+
+> -----Original Message-----
+> From: Infrastructure [mailto:infrastructure-bounces at lists.ocaml.org] On
+> Behalf Of Gabriel Scherer
+> Sent: 25 January 2017 14:38
+> To: Anil Madhavapeddy <anil at recoil.org>
+> Cc: infrastructure <infrastructure at lists.ocaml.org>
+> Subject: Re: [ocaml-infra] New Git repository in ocaml GitHub org
+> 
+> The git sub-module is an optimization. The change that is being discussed
+> is to each changelog entry in a separate file, to reduce Changes-related
+> merge conflicts. David wrote a script to rebuild a complete Changelog from
+> an exploded representation (sections are directories, entries are files).
+> 
+> Several developers have argued that keeping too many small files in the
+> repository could make it inconvenient to work with on some OS/filesystem
+> combinations (mostly Windows, I suppose). There can be several hundred
+> entries per release, so it is not an unreasonable concern I think.
+> David's idea is to only keep the small files in the main repository for
+> the in-development versions, and at release time move them to a separate
+> repository, so that they are not pulled in by default.
+> Ideally we want each commit in the main repository to point to a specific
+> commit in the Changes-repository (the commit of the last release-time
+> move), so using a submodule makes more sense than a separate branch --
+> with a separate branch there would be no link between the versions in the
+> two branches.
+> 
+> I agree that in general submodules can be a pain to use, but in this
+> specific case I think that this is not likely to be an issue: most people
+> would never need to pull the submodule or update it in any way, it would
+> only need to be manipulated at release time (pull, copy files, commit, and
+> that's it), which occurs infrequently.
+> 
+> On Wed, Jan 25, 2017 at 3:30 PM, Anil Madhavapeddy <anil at recoil.org>
+> wrote:
+> > On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch>
+> wrote:
+> >>
+> >> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+> >>> It is desirable to keep the fragment files, but these add
+> >>> considerable weight to the main repository (and OCaml sources
+> >>> tarball). I have proposed in the solution using a Git submodule to
+> store the archived entries.
+> >>
+> >> Are you sure about this ? It seems to me that git should be able to
+> handle this without too much problem and it should be easy enough not to
+> include them in the release tarball. I personally had a terrible
+> experience with git submodules (though that was a long time ago) and I
+> wouldn't advise anyone to get into this mess.
+> >
+> > Git submodules are indeed surprisingly difficult to use reliably.
+> > Would storing the fragments in an independent branch be workable?
+> > Those objects would not add more weight to a checkout of OCaml trunk,
+> > but still be accessible a checkout away.
+> >
+> > (Caveat: I haven't reviewed the rest of your proposal in detail,
+> > David,  so apologies if this is well-trodden ground).
+> >
+> > Anil
+> > _______________________________________________
+> > Infrastructure mailing list
+> > Infrastructure at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/infrastructure
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+
+From yotambarnoy at gmail.com  Wed Jan 25 15:13:18 2017
+From: yotambarnoy at gmail.com (Yotam Barnoy)
+Date: Wed, 25 Jan 2017 10:13:18 -0500
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D90135828B5F@Remus.metastack.local>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <7B7397F118D34B8788D0F744F9DBF310@erratique.ch>
+ <23668136-9A89-426E-AD94-C35ED4CFC16B@recoil.org>
+ <CAPFanBFVxAAYsYRNxR3OVzw_O29okRaGeE_9TMH21FGdRB2RtQ@mail.gmail.com>
+ <E51C5B015DBD1348A1D85763337FB6D90135828B5F@Remus.metastack.local>
+Message-ID: <CAN6ygOnnQLDvoX7nchW=eZA1TKkLxR44E5i=ETW+kf2JJ8Q-xA@mail.gmail.com>
+
+The fragments exist in full in git history before every release. I see
+no reason to try to save them.
+
+On Wed, Jan 25, 2017 at 10:04 AM, David Allsopp <dra-news at metastack.com> wrote:
+> Indeed - git submodules are almost entirely inappropriate to every use-case. Their only use is to have parts of the tree which do not have to be initialised.
+>
+> There can be surprising results - however, the submodule itself is only updated by a script (see tools/changes.sh) and if one happens to be traversing entire versions of the ocaml tree, failing to run git submodule update is not going to break anything, unless you choose for some reason to run make FullChanges.
+>
+>
+> David
+>
+>> -----Original Message-----
+>> From: Infrastructure [mailto:infrastructure-bounces at lists.ocaml.org] On
+>> Behalf Of Gabriel Scherer
+>> Sent: 25 January 2017 14:38
+>> To: Anil Madhavapeddy <anil at recoil.org>
+>> Cc: infrastructure <infrastructure at lists.ocaml.org>
+>> Subject: Re: [ocaml-infra] New Git repository in ocaml GitHub org
+>>
+>> The git sub-module is an optimization. The change that is being discussed
+>> is to each changelog entry in a separate file, to reduce Changes-related
+>> merge conflicts. David wrote a script to rebuild a complete Changelog from
+>> an exploded representation (sections are directories, entries are files).
+>>
+>> Several developers have argued that keeping too many small files in the
+>> repository could make it inconvenient to work with on some OS/filesystem
+>> combinations (mostly Windows, I suppose). There can be several hundred
+>> entries per release, so it is not an unreasonable concern I think.
+>> David's idea is to only keep the small files in the main repository for
+>> the in-development versions, and at release time move them to a separate
+>> repository, so that they are not pulled in by default.
+>> Ideally we want each commit in the main repository to point to a specific
+>> commit in the Changes-repository (the commit of the last release-time
+>> move), so using a submodule makes more sense than a separate branch --
+>> with a separate branch there would be no link between the versions in the
+>> two branches.
+>>
+>> I agree that in general submodules can be a pain to use, but in this
+>> specific case I think that this is not likely to be an issue: most people
+>> would never need to pull the submodule or update it in any way, it would
+>> only need to be manipulated at release time (pull, copy files, commit, and
+>> that's it), which occurs infrequently.
+>>
+>> On Wed, Jan 25, 2017 at 3:30 PM, Anil Madhavapeddy <anil at recoil.org>
+>> wrote:
+>> > On 25 Jan 2017, at 14:22, Daniel B?nzli <daniel.buenzli at erratique.ch>
+>> wrote:
+>> >>
+>> >> On Wednesday, 25 January 2017 at 14:45, David Allsopp wrote:
+>> >>> It is desirable to keep the fragment files, but these add
+>> >>> considerable weight to the main repository (and OCaml sources
+>> >>> tarball). I have proposed in the solution using a Git submodule to
+>> store the archived entries.
+>> >>
+>> >> Are you sure about this ? It seems to me that git should be able to
+>> handle this without too much problem and it should be easy enough not to
+>> include them in the release tarball. I personally had a terrible
+>> experience with git submodules (though that was a long time ago) and I
+>> wouldn't advise anyone to get into this mess.
+>> >
+>> > Git submodules are indeed surprisingly difficult to use reliably.
+>> > Would storing the fragments in an independent branch be workable?
+>> > Those objects would not add more weight to a checkout of OCaml trunk,
+>> > but still be accessible a checkout away.
+>> >
+>> > (Caveat: I haven't reviewed the rest of your proposal in detail,
+>> > David,  so apologies if this is well-trodden ground).
+>> >
+>> > Anil
+>> > _______________________________________________
+>> > Infrastructure mailing list
+>> > Infrastructure at lists.ocaml.org
+>> > http://lists.ocaml.org/listinfo/infrastructure
+>> _______________________________________________
+>> Infrastructure mailing list
+>> Infrastructure at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/infrastructure
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+
+From talex5 at gmail.com  Wed Jan 25 16:04:05 2017
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Wed, 25 Jan 2017 16:04:05 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <000001d27711$462c6670$d2853350$@metastack.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+Message-ID: <CAG4opy_1zs_wOmmhwViybMOzpCxPj_hyUBtqygKiJcF4Bp_8JQ@mail.gmail.com>
+
+On 25 January 2017 at 13:45, David Allsopp <dra-news at metastack.com> wrote:
+> I'm hoping to merge OCaml GPR#1014
+> (https://github.com/ocaml/ocaml/pull/1014) in advance of the OCaml 4.05 code
+> freeze. The principal aim of this GPR is to stop the Changes file being a
+> constant source of merge conflicts on open pull requests. This is fixed by
+> splitting the Changes file into individual entries which are recombined
+> using a script. At each release, the individual files are merged into
+> Changes and the new Changes file committed in one go (for convenience, in a
+> manner not unrelated to having both configure.ac and configure in a
+> repository).
+>
+> It is desirable to keep the fragment files, but these add considerable
+> weight to the main repository (and OCaml sources tarball). I have proposed
+> in the solution using a Git submodule to store the archived entries. The
+> submodule is at present at https://github.com/dra27/ocaml-changelog and I
+> would like to move this repository to the ocaml namespace. It would be
+> sensible for the repository not to accept pull requests or issues via the
+> GUI and, unless others are keen to be able to perform the OCaml release
+> manager's job, only I (at least for the initial commits) and Damien Doligez
+> definitely need push access to it.
+
+Why do the fragments need to be kept anywhere? If you can explode a
+changes file then you could presumably just configure your Git merge
+driver to do the `merge (explode ours) (explode theirs)` step
+automatically.
+
+Looks like there's already one for GNU style ChangeLog files, e.g.
+
+  http://git.savannah.gnu.org/gitweb/?p=gnulib.git;a=blob;f=lib/git-merge-changelog.c
+
+.git/config:
+          [merge "merge-changelog"]
+                   name = GNU-style ChangeLog merge driver
+                   driver = /usr/local/bin/git-merge-changelog %O %A %B
+
+.gitattributes:
+
+           ChangeLog    merge=merge-changelog
+
+
+-- 
+talex5 (GitHub/Twitter)        http://roscidus.com/blog/
+GPG: 5DD5 8D70 899C 454A 966D  6A51 7513 3C8F 94F6 E0CC
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From dra-news at metastack.com  Wed Jan 25 16:27:20 2017
+From: dra-news at metastack.com (David Allsopp)
+Date: Wed, 25 Jan 2017 16:27:20 +0000
+Subject: [ocaml-infra] New Git repository in ocaml GitHub org
+In-Reply-To: <CAG4opy_1zs_wOmmhwViybMOzpCxPj_hyUBtqygKiJcF4Bp_8JQ@mail.gmail.com>
+References: <000001d27711$462c6670$d2853350$@metastack.com>
+ <CAG4opy_1zs_wOmmhwViybMOzpCxPj_hyUBtqygKiJcF4Bp_8JQ@mail.gmail.com>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9013582BAE7@Remus.metastack.local>
+
+Thomas Leonard wrote:
+> On 25 January 2017 at 13:45, David Allsopp <dra-news at metastack.com> wrote:
+> > I'm hoping to merge OCaml GPR#1014
+> > (https://github.com/ocaml/ocaml/pull/1014) in advance of the OCaml
+> > 4.05 code freeze. The principal aim of this GPR is to stop the Changes
+> > file being a constant source of merge conflicts on open pull requests.
+> > This is fixed by splitting the Changes file into individual entries
+> > which are recombined using a script. At each release, the individual
+> > files are merged into Changes and the new Changes file committed in
+> > one go (for convenience, in a manner not unrelated to having both
+> > configure.ac and configure in a repository).
+> >
+> > It is desirable to keep the fragment files, but these add considerable
+> > weight to the main repository (and OCaml sources tarball). I have
+> > proposed in the solution using a Git submodule to store the archived
+> > entries. The submodule is at present at
+> > https://github.com/dra27/ocaml-changelog and I would like to move this
+> > repository to the ocaml namespace. It would be sensible for the
+> > repository not to accept pull requests or issues via the GUI and,
+> > unless others are keen to be able to perform the OCaml release
+> > manager's job, only I (at least for the initial commits) and Damien
+> Doligez definitely need push access to it.
+> 
+> Why do the fragments need to be kept anywhere?
+
+The question as to why one might keep an output document but not the input sources which generated it I must confess has surprised me, but you live and learn. The fragments obviously form a very primitive database - at the moment the only information contained in that tree which is lost is its structure, but we don't do anything with that, so it's largely moot. 
+
+> If you can explode a changes file
+
+I can explode a Changes file now. If something were to be changed in the future, then that would require updating both the script which explodes the Changes and the script which recombines the fragments (to add new files). For me, I'd keep the fragments somewhere and not worry about having to explode a Changes file again, as that feels like more work. 
+
+> then you could presumably just configure your Git merge
+> driver to do the `merge (explode ours) (explode theirs)` step
+> automatically.
+
+This isn't what's happening - "theirs" is fragment files.
+
+> Looks like there's already one for GNU style ChangeLog files, e.g.
+
+Would be fine if we had a GMU style ChangeLog! :o)
+
+
+David
+

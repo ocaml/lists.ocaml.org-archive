@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Enum problem
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Enum%20problem&In-Reply-To=%3CDUB128-W55AE076FFCFF389DC0EEACB4380%40phx.gbl%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000152.html">
+   <LINK REL="Next"  HREF="000153.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Enum problem</H1>
+    <B>Nick Betteridge</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Enum%20problem&In-Reply-To=%3CDUB128-W55AE076FFCFF389DC0EEACB4380%40phx.gbl%3E"
+       TITLE="[ocaml-ctypes] Enum problem">buzzheavyyear at hotmail.com
+       </A><BR>
+    <I>Fri Feb  6 09:45:22 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000152.html">[ocaml-ctypes] GC finalizer
+</A></li>
+        <LI>Next message: <A HREF="000153.html">[ocaml-ctypes] Enum problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#150">[ date ]</a>
+              <a href="thread.html#150">[ thread ]</a>
+              <a href="subject.html#150">[ subject ]</a>
+              <a href="author.html#150">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hello,
+
+I've been trying to get enums/constant working and have been having a problem in matching types:
+
+Error: This expression has type channel_states S.typ
+       but an expression was expected of type 'a Ctypes.typ = 'a Static.typ
+
+I get the same error when I try the fruit example from ocaml-ctypes/tests/test-enums, although the issue may be due to a) my inexperience with ocaml and b) the way I generate the stubs. However, all of the c functions I'm mapping to compile without problems. This is essentially what I have:
+
+bindings:
+------------
+
+open Ctypes
+
+module Bindings
+  (F : sig type _ fn
+           val foreign : string -&gt; ('a -&gt; 'b) Ctypes.fn -&gt; ('a -&gt; 'b) fn end) (S : Cstubs.Types.TYPE) = struct
+    open F
+
+
+  type channel_states = ENDED | OPENING | OPEN
+
+  let ended    = S.constant &quot;ENDED&quot;   S.int64_t
+  let opening  = S.constant &quot;OPENING&quot; S.int64_t
+  let open_     = S.constant &quot;OPEN&quot;    S.int64_t
+
+  let  channel_states = S.enum &quot; channel_states&quot; [
+      ENDED, ended;
+      OPENING, opening;
+      OPEN, open_;
+    ]
+
+    type  channel_struct
+    let  channel_struct = structure &quot; channel_struct&quot;
+      let (-:) ty label = field  channel_struct label ty
+      let state    = channel_states -: &quot;state&quot;
+      let capacity = uint32_t           -: &quot;capacity&quot;
+    let () = seal (channel_struct : channel_struct structure typ)
+
+    type channel_t = channel_struct structure ptr
+    let channel_t = ptr channel_struct
+
+... the error occurs at the state field at channel_states
+
+
+the generator:
+-------------------
+
+open Channel_bindings
+
+let c_headers = &quot;#include \&quot;/home/nick/channel/include/channel.h\&quot;&quot;
+
+let main () =
+  let ml_out = open_out &quot;lib/channel_generated.ml&quot; in
+  let c_out = open_out &quot;lib/channel_stubs.c&quot; in
+  let ml_fmt = Format.formatter_of_out_channel ml_out in
+  let c_fmt = Format.formatter_of_out_channel c_out in
+  Cstubs.write_ml ml_fmt ~prefix:&quot;libchannel_&quot; (module Bindings);
+  Format.fprintf c_fmt &quot;%s@\n&quot; c_headers;
+  Cstubs.write_c c_fmt ~prefix:&quot;libchannel_&quot; (module Bindings);
+  Format.pp_print_flush ml_fmt ();
+  Format.pp_print_flush c_fmt ();
+  close_out ml_out;
+  close_out c_out
+
+let () =
+  main ()
+
+and the oasis BuildDepends is : ctypes, ctypes.foreign, ctypes.stubs, ctypes.foreign.base, ctypes.foreign.unthreaded
+
+I've been trying to work this out since early wednesday ( and learnt alot!) but I can't think of anything else to try. I've locally pinned ocaml-ctypes from github head.
+
+Cheers
+Nick
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20150206/ab359cc5/attachment.html">http://lists.ocaml.org/pipermail/ctypes/attachments/20150206/ab359cc5/attachment.html</A>&gt;
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000152.html">[ocaml-ctypes] GC finalizer
+</A></li>
+	<LI>Next message: <A HREF="000153.html">[ocaml-ctypes] Enum problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#150">[ date ]</a>
+              <a href="thread.html#150">[ thread ]</a>
+              <a href="subject.html#150">[ subject ]</a>
+              <a href="author.html#150">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

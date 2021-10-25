@@ -1,0 +1,131 @@
+From matthieu.dubuget at gmail.com  Sun Dec  6 16:42:05 2015
+From: matthieu.dubuget at gmail.com (Matthieu Dubuget)
+Date: Sun, 6 Dec 2015 17:42:05 +0100
+Subject: [ocaml-ctypes] Wrapping string into Bigarray
+Message-ID: <5664655D.80002@gmail.com>
+
+
+
+Hello,
+
+I'm posting here some code samples that helped me a lot, hoping they
+could be of any help to somebody else. They were kindly provided by
+Jeremy Yallop
+(https://github.com/yallop/ocaml-ctypes-inverted-stubs-example/issues/11).
+
+I have an OCaml function returning a string, and I wanted to deliver
+this function through a shared library to be called by a foreign language.
+
+My first naive try was to do something like this (see
+https://github.com/yallop/ocaml-ctypes-inverted-stubs-example for a
+complete example of how to wrap OCaml code in a shared library):
+
+```OCaml
+let () = I.internal "compute" (string @-> returning string)
+MyLibrary.my_function
+```
+
+The problem with this solution is that the interface of the `compute`
+function is:
+
+```C
+char* compute(char* x17);
+```
+
+There is no contract on how to free the memory after it has been used,
+which is problematic.
+
+Since I'm a bit lazy, instead of registering the string as a gc root,
+and exposing a deallocation function to C, I decided to delegate all
+the work (allocation/deallocation) to the client of my library. The
+interface being something like:
+
+```C
+int compute(char * question, char * answer_buffer, size_t buffer_sz);
+```
+
+Jeremy proposed two solutions. The first one makes use of Bigarrays:
+
+```OCaml
+let compute question buffer buffer_sz =
+  let int_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.(bigarray_of_ptr array1) int_sz Bigarray.char
+buffer in
+  let computed_size = ... in
+  if computed_size > int_sz then null
+  else  ...
+```
+
+and the second one is based on Ctypes.CArray module:
+
+```OCaml
+let compute question buffer buffer_sz =
+  let int_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.CArray.from_ptr buffer int_sz in
+  let computed_size = ... in
+  if computed_size > int_sz then null
+  else ...
+```
+
+I choosed the first approach with great success. Since my function is
+to be called more than once, I choosed to have the client allocate two
+buffers to be reused. 1 for the question, and another to be filled
+with the answer:
+
+```OCaml
+(* char Ctypes.ptr -> Unsigned.Size_t.t -> char Ctypes.ptr ->
+Unsigned.Size_t.t -> int *)
+let calcul_buffers question question_sz buffer buffer_sz =
+
+  let ans = string_from_ptr question ~length:(Unsigned.Size_t.to_int
+question_sz)
+                 |> Calcback.traite in
+  let ans_sz = Bytes.length ans in
+
+  let int_buffer_sz = Unsigned.Size_t.to_int buffer_sz in
+  let ba_buffer = Ctypes.(bigarray_of_ptr array1) int_buffer_sz
+Bigarray.Char buffer in
+
+  for i = 0 to pred (min int_buffer_sz ans_sz) do
+    Bigarray.Array1.set ba_buffer i ans.[i]
+  done;
+
+  ans_sz
+```
+
+The returned `int` is the size needed to return the complete answer:
+this is also the job of the client to increase the size of the buffer
+if needed.
+
+In order to avoid the for loop, I tried to wrap `(ans:string)` into a
+Bigarray, in order to use a `blit` (I may be wrong, but I think it
+ends as a memcopy, instead of a char by char copy).
+
+The trick was to coerce the string into a `(ptr char)`.
+
+```OCaml
+let compute question question_sz buffer buffer_sz =
+  let ans =
+    string_from_ptr question ~length:(Unsigned.Size_t.to_int question_sz)
+    |> MyLibrary.my_function in
+  let ans_sz = Bytes.length ans in
+
+  let int_buffer_sz = Unsigned.Size_t.to_int buffer_sz in
+  let size_transmitted = min int_buffer_sz ans_sz in
+
+  Bigarray.Array1.blit
+    (bigarray_of_ptr array1 size_transmitted Bigarray.char (coerce
+string (ptr char) ans))
+    (bigarray_of_ptr array1 size_transmitted Bigarray.Char buffer);
+
+  ans_sz
+```
+
+Ctypes is really nice. And I thank Jeremy for his kind support.
+
+Happy hacking.
+
+-- 
+Matthieu Dubuget
+Guide d?autod?fense num?rique : http://guide.boum.org
+

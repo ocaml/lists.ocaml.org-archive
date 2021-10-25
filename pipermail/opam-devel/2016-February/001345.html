@@ -1,0 +1,223 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam and &quot;So you want to write a package manager&quot;
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20and%20%22So%20you%20want%20to%20write%20a%20package%20manager%22&In-Reply-To=%3C1735245.TpKdQKlvgM%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001344.html">
+   <LINK REL="Next"  HREF="001346.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam and &quot;So you want to write a package manager&quot;</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20and%20%22So%20you%20want%20to%20write%20a%20package%20manager%22&In-Reply-To=%3C1735245.TpKdQKlvgM%40maitake%3E"
+       TITLE="[opam-devel] opam and &quot;So you want to write a package manager&quot;">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon Feb 15 07:35:22 GMT 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001344.html">[opam-devel] opam and &quot;So you want to write a package manager&quot;
+</A></li>
+        <LI>Next message: <A HREF="001346.html">[opam-devel] opam and &quot;So you want to write a package manager&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1345">[ date ]</a>
+              <a href="thread.html#1345">[ thread ]</a>
+              <a href="subject.html#1345">[ subject ]</a>
+              <a href="author.html#1345">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Indeed, a very worthwile read, thanks for linking! I pointed the author to 
+Mancoosi, too, which he was glad to hear about.
+
+Per-project dependency handling has been asked for quite a few times, and this 
+is indeed something we should support. It complements and doesn't replace the 
+global ~/.opam though.
+
+Looking upwards to a `.opam` directory and use it as opam root would be 
+straightforward to implement (well, I'd just have to copy-paste some code from 
+ocp-indent). But I don't think it is a good idea:
+1. it duplicates lots of stuff, including synchronising repositories, caches, 
+and compiling OCaml
+2. does it replace ~/.opam or add to it ?
+3. how about `opam config env` ? Should you ensure to run it after you cd to 
+your project ? Sounds dangerous, but it might be handled by the build system.
+4. and what about tools such as merlin ? You surely won't install them within 
+every project...
+
+Our opam-manager&#185; provides an experimental solution to 2. and 3. (and, 
+partially, 1.). The idea is to wrap around installed commands (ocamlc, etc.) 
+and redirect them to the correct switch, as determined by e.g. a project-local 
+configuration file -- alleviating the need for `eval $(opam config env)`.
+
+This wouldn't solve 3., but I would be more in favor of allowing project-local 
+_switch trees_ while keeping the global opam root and automatically choosing 
+the current switch depending on CWD. This at least allows opam to know about 
+the other switches around, and may allow opam-user-setup to handle 4. through 
+minor improvements (it should already work for compiler-version-insensitive 
+tools). It also factorises caching and updates.
+
+Since opam 2.0&#178; is planned to allow selecting the repositories per-switch, 
+this shouldn't be a problem. We may also be able to share compiled artifacts 
+between switches at some point, which is a different issue.
+
+&gt;<i> If I want to use this workflow with opam today, what are my options
+</I>&gt;<i> interface-wise? Use `opam switch export` and share/version the
+</I>&gt;<i> resulting state? In the current world of user-global package state,
+</I>&gt;<i> this export is likely to contain packages that are completely
+</I>&gt;<i> unrelated to the current project. Would it be possible to export only
+</I>&gt;<i> the recursive dependencies of a given opam file, and more generally
+</I>&gt;<i> have easier way to manipulate version state information?
+</I>
+For what Sam calls &quot;lock files&quot;, indeed, there is nothing built-in, but you 
+could:
+- use `switch export`, but in this case you get also unrelated installed 
+packages
+- save the output of `opam list --installed --rec --required-by &lt;pkg&gt;`, and 
+pass that to `opam install` (unfortunately, the --short format currently 
+excludes versions). This won't, of course, handle pinned packages.
+
+A partial export function limited to what is required by a given package would 
+be very nice for this, I guess. We could imagine an opam command that picks up 
+the project-local opam file, possibly a local export, and builds a local switch 
+based on that. The closest we currently have is `opam pin add .` -- possibly 
+with an `opam switch my-project-switch --alias-of ...`.
+
+Note that we are somehow providing a way to do per-switch dep trees, although 
+completely manually, through the way we handle multiple switches.
+
+Another big question is that we otherwise need build systems to be opam-aware. 
+Without interfering when they are run from within opam, of course. Guess I'll 
+get back to working on opam-as-build-system ;)
+
+Best,
+Louis
+
+
+&#185; <A HREF="https://github.com/OCamlPro/opam-manager">https://github.com/OCamlPro/opam-manager</A>
+&#178; yes, it's no longer planned as 1.3, since the repository format and 
+structure of ~/.opam are being changed quite a bit -- no more .comp files.
+
+
+Le samedi 13 f&#233;vrier 2016, 14:28:06 Gabriel Scherer a &#233;crit :
+&gt;<i> Hi all,
+</I>&gt;<i> 
+</I>&gt;<i> Sam Boyer has a very interesting piece on the requirements for package
+</I>&gt;<i> managers at
+</I>&gt;<i>  
+</I>&gt;<i> <A HREF="https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d">https://medium.com/@sdboyer/so-you-want-to-write-a-package-manager-4ae9c17d</A>
+</I>&gt;<i> 9527
+</I>&gt;<i> 
+</I>&gt;<i> It's a bit long (but I think it's worth the read if you are into
+</I>&gt;<i> package managers), but I think that the central point that is of opam
+</I>&gt;<i> 
+</I>&gt;<i> relevance is the following distinction:
+</I>&gt;<i> &gt; OS/system package manager (SPM): this is not why we are here today
+</I>&gt;<i> &gt; Language package manager (LPM): an interactive tool (e.g., `go get`) that
+</I>&gt;<i> &gt; can retrieve and build specified packages of source code for a particular
+</I>&gt;<i> &gt; language. Bad ones dump the fetched source code into a global,
+</I>&gt;<i> &gt; unversioned pool (GOPATH), then cackle maniacally at your fervent hope
+</I>&gt;<i> &gt; that the cumulative state of that pool makes coherent sense.
+</I>&gt;<i> &gt; Project/application dependency manager (PDM): an interactive system for
+</I>&gt;<i> &gt; managing the source code dependencies of a single project in a particular
+</I>&gt;<i> &gt; language. That means specifying, retrieving, updating, arranging on disk,
+</I>&gt;<i> &gt; and removing sets of dependent source code, in such a way that collective
+</I>&gt;<i> &gt; coherency is maintained beyond the termination of any single command. Its
+</I>&gt;<i> &gt; output&#8202;&#8212;&#8202;which is precisely reproducible&#8202;&#8212;&#8202;is a self-contained source
+</I>&gt;<i> &gt; tree that acts as the input to a compiler or interpreter. You might think
+</I>&gt;<i> &gt; of it as &#8220;compiler, phase zero.&#8221;
+</I>&gt;<i> It seems clear to me that the model of &quot;one packaging environment per
+</I>&gt;<i> project&quot;, rather than &quot;one packaging environment per user-scoped
+</I>&gt;<i> state/switch&quot;, is winning in most programming languages (Rust and Go
+</I>&gt;<i> are mentioned in the post, but I'm observed from a distance the same
+</I>&gt;<i> moves in the Python, Ruby and Javascript communities). And for a good
+</I>&gt;<i> reason: it is simply a better model for developers, as it allows to
+</I>&gt;<i> have development environments scoped at the conceptually adequate
+</I>&gt;<i> level, which is the project level -- there is no reason especially in
+</I>&gt;<i> languages that do not allow a given development to include two
+</I>&gt;<i> different versions of the same package (OCaml is guilty of this as
+</I>&gt;<i> well).
+</I>&gt;<i> 
+</I>&gt;<i>  It is in theory possible to do this with OPAM by using project-local
+</I>&gt;<i> root directories, and in fact this is the approach that Guillaume
+</I>&gt;<i> Claret, part of the Coq community and influenced by the Ruby packaging
+</I>&gt;<i> practices, has long advertised:
+</I>&gt;<i>   <A HREF="http://coq-blog.clarus.me/use-opam-for-coq.html">http://coq-blog.clarus.me/use-opam-for-coq.html</A>
+</I>&gt;<i> 
+</I>&gt;<i> I have already mentioned this thorny question on opam-devel,
+</I>&gt;<i>   Subject: One (or more) opam root per projet?
+</I>&gt;<i>   Date: Mon Jan 26 20:58:29 GMT 2015
+</I>&gt;<i>   <A HREF="http://lists.ocaml.org/pipermail/opam-devel/2015-January/000918.html">http://lists.ocaml.org/pipermail/opam-devel/2015-January/000918.html</A>
+</I>&gt;<i> 
+</I>&gt;<i> But I think it would be worth a re-discussion. I think that the
+</I>&gt;<i> writing is on the wall, and that language-specific package managers
+</I>&gt;<i> should strive to support project-local configuration. As said in the
+</I>&gt;<i> previous discussion, having a user-scoped cache is still useful; but I
+</I>&gt;<i> think it should be possible to use OPAM in a mode where this
+</I>&gt;<i> resource-usage-motivated sharing is transparent to the developer,
+</I>&gt;<i> which really has access to per-project packaging environments.
+</I>&gt;<i> 
+</I>&gt;<i> If nothing else, I think we should consider user interface ways to
+</I>&gt;<i> make the already-possible workflow of having a project-local opam root
+</I>&gt;<i> easier to manage. For example, we could decide that, by default, opam
+</I>&gt;<i> walks the filesystem hierarchy towards the root and picks the first
+</I>&gt;<i> directory named .opam as opam root. This would gracefully extend the
+</I>&gt;<i> policy of picking ~/.opam by default.
+</I>&gt;<i> 
+</I>&gt;<i> Another topic touched in this blog post is determinism of packaging
+</I>&gt;<i> version choices. I think that OPAM's version handling is of very high
+</I>&gt;<i> quality compared to some other packaging systems, but this blog post
+</I>&gt;<i> argue that having good version bounds in a package description does
+</I>&gt;<i> not negate the use for a more precise &quot;lock file&quot; that specifies exact
+</I>&gt;<i> versions for all transitive dependencies of a project, that can be
+</I>&gt;<i> shared between developers (and even versioned in the version control
+</I>&gt;<i> system) to improve reproducibility. This topic has been central to the
+</I>&gt;<i> development of Haskell's new tool &quot;stack&quot;, which haskellers are raving
+</I>&gt;<i> about.
+</I>&gt;<i> 
+</I>&gt;<i> If I want to use this workflow with opam today, what are my options
+</I>&gt;<i> interface-wise? Use `opam switch export` and share/version the
+</I>&gt;<i> resulting state? In the current world of user-global package state,
+</I>&gt;<i> this export is likely to contain packages that are completely
+</I>&gt;<i> unrelated to the current project. Would it be possible to export only
+</I>&gt;<i> the recursive dependencies of a given opam file, and more generally
+</I>&gt;<i> have easier way to manipulate version state information?
+</I>&gt;<i> 
+</I>&gt;<i> I know that Louis already has his plate full for 1.3, but I hope that
+</I>&gt;<i> some of those questions could influence the plans for 1.4.
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001344.html">[opam-devel] opam and &quot;So you want to write a package manager&quot;
+</A></li>
+	<LI>Next message: <A HREF="001346.html">[opam-devel] opam and &quot;So you want to write a package manager&quot;
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1345">[ date ]</a>
+              <a href="thread.html#1345">[ thread ]</a>
+              <a href="subject.html#1345">[ subject ]</a>
+              <a href="author.html#1345">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

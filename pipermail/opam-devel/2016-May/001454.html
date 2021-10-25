@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On compiler package and the system compiler (fwd from: https://github.com/ocaml/opam/issues/2537)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20compiler%20package%20and%20the%20system%20compiler%20%28fwd%20from%3A%0A%20https%3A//github.com/ocaml/opam/issues/2537%29&In-Reply-To=%3C2152985.oxllW1kEKA%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="001455.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On compiler package and the system compiler (fwd from: https://github.com/ocaml/opam/issues/2537)</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20compiler%20package%20and%20the%20system%20compiler%20%28fwd%20from%3A%0A%20https%3A//github.com/ocaml/opam/issues/2537%29&In-Reply-To=%3C2152985.oxllW1kEKA%40maitake%3E"
+       TITLE="[opam-devel] On compiler package and the system compiler (fwd from: https://github.com/ocaml/opam/issues/2537)">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon May  2 03:57:21 BST 2016</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="001455.html">[opam-devel] docker hub update?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1454">[ date ]</a>
+              <a href="thread.html#1454">[ thread ]</a>
+              <a href="subject.html#1454">[ subject ]</a>
+              <a href="author.html#1454">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>*&gt; Drup[1] *commented 5 days ago[2] 
+&gt;<i> I created an empty switch last and installed ocaml in it manually. It seems
+</I>&gt;<i> ocaml-version is not udpated. % opam install merlin utop tuareg
+</I>&gt;<i> [ERROR] utop has unmet availability conditions: ocaml-version &gt;= &quot;4.01&quot;
+</I>&gt;<i> [ERROR] merlin has unmet availability conditions: ocaml-version &gt;= &quot;4.00.0&quot;
+</I>&gt;<i> % opam switch show
+</I>&gt;<i> last
+</I>&gt;<i> % opam list -i
+</I>&gt;<i> base-bigarray base   Bigarray library distributed with the OCaml compiler
+</I>&gt;<i> base-threads  base   Threads library distributed with the OCaml compiler
+</I>&gt;<i> base-unix     base   Unix library distributed with the OCaml compiler
+</I>&gt;<i> ocaml         4.03.0 Official 4.03.0 release
+</I>
+Ah, this part is lacking documentation, and there may be some rough edges yet to polish, so let 
+me explain how it works at the moment (on next). And thanks again for testing &#9786; 
+*How it works* 
+So, compilers now being in packages, compiler-specific variables (like typically ocaml-version) 
+can not generally be defined at switch creation time anymore. However, packages have been 
+able to export opam variables since opam 1.0 by providing a &lt;pkgname&gt;.config file at their root 
+(similar to .install; but although this is an older feature it probably lacks documentation too). 
+These variables, however, are scoped with the package name to avoid clashes: if you have foo 
+installed, you can always access foo:lib to get its lib directory (&lt;prefix&gt;/lib/foo normally), but 
+also foo:bar if foo defined bar in its configuration file. 
+The idea, then, to keep compatibility with the previously global ocaml-* variables, is that /for 
+packages installed as compilers/ (/i.e./ &quot;base packages&quot; having the compiler flag set), the 
+variables they define are re-exported in the global scope of the switch. So the ocaml package 
+just has to define an ocaml-version variable through its .config file. 
+It could be much simpler to define these values in the compiler's opam file, but that would be 
+assuming they can be statically defined. In particular, in the case of the system compiler, the 
+package build is simply a polling script that will generate the configuration, and we don't know 
+the OCaml version in advance (so ocaml-version and ocaml:version can be different, with the 
+latter being system in this case). Even for compiled OCamls, we might not know in advance 
+whether native-dynlink is available. 
+In your case, ocaml was installed as a &quot;normal&quot; package, so its variables weren't re-exported: 
+look at files in &lt;switch-prefix&gt;/.opam-switch/config, global-config.config is where global 
+variables are defined, the other files are per-package. Like we have opam install --[un]set-root, 
+we probably need expert commands that allow adjusting the defined compiler in the current 
+switch (you can edit &lt;prefix&gt;/.opam-switch/switch-state easily, but that won't do the variable 
+export part, and is no excuse for not having it in the CLI anyway). 
+*Now let's get to the funny details...* 
+The reason to re-export in the global scope rather than use the variable directly (after all, we 
+could replace uses of ocaml-native-tools with a scoped variable ocaml:native-tools, and even 
+ocaml-version with ocaml:real-version or something like that) is that there is a difference 
+between the two: 
+     *  package variables are only available in scripts, i.e. for actions happening /after/ the solver 
+solved
+     *  global variables can be used anywhere, and, most importantly, in the available: field, 
+which is used to filter the packages /before/ solving, and therefore shouldn't depend on what 
+packages are installed. 
+Obviously, ocaml-version is a variable we absolutely want accessible in the available: field... so 
+we needed to have it in the global scope. 
+What this implies, however, is that it's inconsistent to change your compiler /and/ non-compiler 
+packages in the same set of actions: ocaml-version may be defined incorrectly. Currently, we 
+do /not/ handle this correctly, however it could happen on:1. upgrade of the system compiler2. 
+manual change of the switch's compiler (e.g. through pinning) 
+I have a plan to solve this situation, which requires solving once, limiting the actions to the 
+removals and compiler change, processing them, then re-running the solver in the new 
+environment to complete the expected actions. It's a bit complex to my taste, however, and 
+means that, by design, the user must validate (and start removing packages) before being able 
+to know what the expected end state will be. May be acceptable for a compiler change, though, 
+in 1.2.2, case 1. required a manual, full switch reinstall (that could fail due to broken 
+constraints, I think), and case 2. was impossible altogether. 
+In the current state, the reinstallation of packages following the switch change could be tried 
+on package unavailable for the new version and fail, and the user will need to re-run opam with 
+a proper request to get a correct solution and retry to install them. 
+*Another solution (or not)* 
+Now, if you expected something simpler, you can skip this. More elegant, maybe, but not 
+simpler. Also (spoiler), this doesn't actually solve the problem of dynamic system packages. 
+Generally speaking, it would be nicer to be able to write, instead of
+
+available: ocaml-version &gt;= &quot;4.01&quot;
+depends: [ &quot;ocaml&quot; &gt;= &quot;4.01&quot; ] 
+This allows to pass all the details to the solver, and gets rid of these annoying package/global 
+variables needed for available:. One issue is that currently, we have a mismatch between 
+OCaml versions, and the ocaml package versions, which also encode information on the variant 
+(4.01.0+BER, system). 
+The idea here is to rely on the provides: feature, which allows a package to be available under 
+different names besides its own. This brings a whole lot of difficulties on its own, but that will 
+be for another time -- I have lots on notes on this too. For the time being, let's assume it just 
+works. 
+Using this, we could have the variants defined in different packages (e.g. ocaml+BER), and 
+&quot;providing&quot; the ocaml feature with version 4.01.0.This also works for other compiler features: 
+we currently use two mechanisms, base- packages (e.g. base-threads) that we depend on, and 
+ocaml- variables (e.g. ocaml-native-dynlink) that we use in scripts (and possibly, the available: 
+field). Here a given compiler could &quot;provide&quot; native-dynlink and threads as packages, and other 
+packages directly depend on that. It also seems much more appropriate on a package metadata 
+point of view, a given compiler implementation /providing/ a set of features. 
+What this doesn't solve at all, however, is the system compiler issue, since these provides: 
+must be defined statically 
+*Dynamic packages* 
+We've drifted a bit, but the bulk of the issue actually boils down to this: dynamic packages, and 
+in particular, definition of the system compiler. 
+     *  in 1.2.2, polling and generation of a compiler description, as well as further polling to 
+detect changes, were hard-coded in opam
+     *  in 2.0~alpha, there is no OCaml specific code in opam, the polling is done by the package 
+itself, and the compiler-package-variable-made-global feature bridges the gap to the package 
+selection 
+There may be middle-grounds or alternate solutions: 
+     *  somehow allow the definition of dynamic packages in the repository (seems complex, 
+costly, and most importantly very difficult to do without compromising security -- any dynamic 
+package would need to do its polling before it was selected by the user in any way)
+     *  keep the hard-coded generation, but put it in an ocaml plugin added to the ocaml-agnostic 
+opam. 
+Note that having the system package in the repository has some benefits; for example, in 1.2.2, 
+it is impossible to change its set of base packages, which raised some difficulties when base-
+ocamlbuild started being needed. 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20160502/93fd2de1/attachment-0001.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20160502/93fd2de1/attachment-0001.html</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="001455.html">[opam-devel] docker hub update?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1454">[ date ]</a>
+              <a href="thread.html#1454">[ thread ]</a>
+              <a href="subject.html#1454">[ subject ]</a>
+              <a href="author.html#1454">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

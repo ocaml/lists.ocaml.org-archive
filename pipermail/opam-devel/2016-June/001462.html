@@ -1,0 +1,106 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam 2 containers/building toplevel
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202%20containers/building%20toplevel&In-Reply-To=%3CAAC48483-6274-4AA9-BC2A-FC6B8962A9BF%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001461.html">
+   <LINK REL="Next"  HREF="001463.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam 2 containers/building toplevel</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202%20containers/building%20toplevel&In-Reply-To=%3CAAC48483-6274-4AA9-BC2A-FC6B8962A9BF%40recoil.org%3E"
+       TITLE="[opam-devel] opam 2 containers/building toplevel">anil at recoil.org
+       </A><BR>
+    <I>Wed Jun  1 15:32:18 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001461.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+        <LI>Next message: <A HREF="001463.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1462">[ date ]</a>
+              <a href="thread.html#1462">[ thread ]</a>
+              <a href="subject.html#1462">[ subject ]</a>
+              <a href="author.html#1462">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+&gt;<i> On 1 Jun 2016, at 15:29, David Allsopp &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">dra-news at metastack.com</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> Anil Madhavapeddy wrote:
+</I>&gt;&gt;&gt;<i> On 31 May 2016, at 14:36, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt;
+</I>&gt;&gt;<i> wrote:
+</I>&gt;<i> 
+</I>&gt;<i> &lt;snip&gt;
+</I>&gt;<i> 
+</I>&gt;&gt;&gt;<i> The issue with `make lib-ext` may be that `opam-admin.top` can't find
+</I>&gt;&gt;&gt;<i> the proper opam libraries installed. The Makefile in `admin-scripts/`
+</I>&gt;&gt;&gt;<i> has a quick hack to build bytecode versions, but that reiles on
+</I>&gt;&gt;&gt;<i> `ocamlfind` to locate the installed versions of the dependencies; it
+</I>&gt;&gt;&gt;<i> wouldn't be difficult to improve it to work with `lib-ext` though.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> It would be very useful if they could work with lib-ext and the toplevel
+</I>&gt;&gt;<i> be built by default.  Right now there is some oddness where the extlib
+</I>&gt;&gt;<i> interactive installer is run if I build `opam-admin.top` manually, so I
+</I>&gt;&gt;<i> gave up around there.
+</I>&gt;<i> 
+</I>&gt;<i> lib-ext isn't very well-conceived/constructed, IMNRHO! See <A HREF="https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e97.">https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e97.</A> Part of my reason for spending time last year implementing lib-pkg in the build system ...
+</I>&gt;<i> 
+</I>&gt;<i> I then hacked admin-scripts/compilers-to-packages.ml and changed the #directory entries to include src/{core,repository,format,tools} and src_ext and can run that script which I used to replicate the next branch on opam-repository and so rebased to create <A HREF="https://github.com/dra27/opam-repository/tree/next-windows">https://github.com/dra27/opam-repository/tree/next-windows</A> (I've been doing a lot of work locally, which is why it's lagging behind master at the moment). 
+</I>
+This does sound like the right approach indeed!
+
+&gt;<i> 
+</I>&gt;&gt;&gt;<i> Now, for scripts that get generally useful and somewhat stable, it's
+</I>&gt;&gt;&gt;<i> perfectly fine to migrate them to be part of opam-admin. Moving the
+</I>&gt;&gt;&gt;<i> scripts to their own repo would also be fine if they reach a critical
+</I>&gt;&gt;<i> weight.
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> Should we improve compat of the Makefile and/or move the 1.2-&gt;2.0
+</I>&gt;&gt;&gt;<i> functionality to opam-admin ?
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> For the purposes of container-based testing, it would be great if we could
+</I>&gt;&gt;<i> move the essential functionality into `opam admin` directly.  This will
+</I>&gt;&gt;<i> let me insert in the right `git clone / opam admin upgrade` runs into the
+</I>&gt;&gt;<i> CI scripts so that OPAM 2 is easy to test for end users.
+</I>&gt;<i> 
+</I>&gt;<i> compilers-to-packages.ml will be a one-time thing, though, surely? Once OPAM 2 goes live, surely the main repository will need to work in reverse, back-porting an OPAM 1.x.y repository?
+</I>
+Yes but the functionality still needs to be in opam-admin for other local repositories to be upgraded by their admins.  For instance, we maintain several remotes internally at Docker with pinned versions that we use for reproducible binary builds, and those would need to be upgraded when we migrate to OPAM2. 
+
+Anil
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001461.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+	<LI>Next message: <A HREF="001463.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1462">[ date ]</a>
+              <a href="thread.html#1462">[ thread ]</a>
+              <a href="subject.html#1462">[ subject ]</a>
+              <a href="author.html#1462">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

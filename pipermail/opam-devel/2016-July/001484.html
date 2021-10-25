@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam 2.0~alpha2 -- an update on opam's current dev	status
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202.0%7Ealpha2%20--%20an%20update%20on%20opam%27s%20current%20dev%0A%09status&In-Reply-To=%3C2837346.ykpIdeTAkt%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001477.html">
+   <LINK REL="Next"  HREF="001485.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam 2.0~alpha2 -- an update on opam's current dev	status</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202.0%7Ealpha2%20--%20an%20update%20on%20opam%27s%20current%20dev%0A%09status&In-Reply-To=%3C2837346.ykpIdeTAkt%40agaric%3E"
+       TITLE="[opam-devel] opam 2.0~alpha2 -- an update on opam's current dev	status">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon Jul 18 14:34:04 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001477.html">[opam-devel] switch CI to use Trusty
+</A></li>
+        <LI>Next message: <A HREF="001485.html">[opam-devel] opam 2.0~alpha2 -- an update on opam's current dev status
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1484">[ date ]</a>
+              <a href="thread.html#1484">[ thread ]</a>
+              <a href="subject.html#1484">[ subject ]</a>
+              <a href="author.html#1484">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi all,
+
+We finally have a solution that I find satisfying to the larger blocker we had 
+with opam 2.0 &#8212; inconsistency of the use of `available:` fields based on a 
+variable `ocaml-version` that couldn't be known before the `ocaml` package was 
+installed. See below if you are interested in the details, I have said a few 
+words about it here and there, but a summary is in order.
+
+With this, and after a little bit more testing, I think we should be done with 
+the large repository format changes and rewrites, and that alone is a good 
+reason to release the too-long-awaited successor of 1.2.2. Adding the many, 
+smaller and larger features you're all waiting for (local switches, per-switch 
+remotes, etc., etc.) from there should be smoother and can be done 
+incrementally.
+
+For all users and testers of 2.0~alpha &#8212; thank you &#8212; the alpha2 changes the 
+repository layout a bit, so when I merge and put the new repository rewrite in 
+place on <A HREF="https://opam.ocaml.org/2.0~dev,">https://opam.ocaml.org/2.0~dev,</A> you will need to update your version 
+of opam (I don't want to spend time on maintaining repo mirrors at different 
+dev versions, not counting the issues that might arise on the older versions).
+
+Also, I think we should release opam 2.0 while the default repository is still 
+an automatic rewrite of the 1.2 repository; then, take the time to put a 
+reverse rewrite in place (the 1.2&#8594;2.0 rewrite is far from trivial, changing 
+.comp to opam files, rewriting variables, changing formulas on variables into 
+dependencies on packages, so this won't be easy). Once this is done, automatic 
+testing follows and enough people have made the move, we can independently 
+switch the format of the official opam-repository to 2.0.
+
+
+---
+
+Now for the technical details. The upcoming dev version creates 4 distinct 
+`ocaml` packages:
+- `ocaml-system`: an OCaml compiler from the system, outside of opam. There is 
+an instance of the package for every OCaml release.
+- `ocaml-base-compiler`: the &quot;official&quot; releases of OCaml, compiled from 
+source by opam, with the corresponding version
+- `ocaml-variants`: a single package for all &quot;other&quot; versions of OCaml, built 
+by opam. The package versions have the form `OCAML_VERSION+VARIANT`, e.g. 
+`4.02.3+fp`
+- `ocaml`: a wrapper package that depends on one of the first three, for each 
+OCaml release, mapping the versions in the case of `ocaml-variants`. For 
+example, `ocaml.4.03.3` depends on `ocaml-system{=4.02.3} | ocaml-base-
+compiler{=4.02.3} | ocaml-variants{&gt;=4.02.3 &amp; &lt;4.02.4~}`. Additionally, the 
+package runs an (ocaml) script that detects the specifics of the OCaml 
+version, initialising package variables such as `ocaml:native-dynlink`&#185;.
+
+All of the first three are mutually conflicting, which is the reason for 
+keeping all variants in a single package&#178;. Any constraints on the OCaml 
+version should now be expressed through a dependency to the `ocaml` package 
+instead of the `available:` field.
+
+To this point, this leaves us with the matter of the &quot;system&quot; compilers, which 
+need to be selected manually. To this end, the following provides a nice 
+solution, that doesn't rely on any OCaml-specific mechanism:
+- support for &quot;global&quot; (i.e. not per-switch) opam variables, defined in 
+~/.opam/config, is added
+- ~/.opam/config has a field that allows to initialise those (lazily) from the 
+output of a command (if the command fails or doesn't exist, the variable is 
+simply left uninitialised)
+
+Based on this, we define, in the configuration file, an `ocaml-sys-version` 
+global variable bound to the output of `ocamlc -vnum`. Then we add a 
+constraint `available: ocaml-sys-version = _:version` to the `ocaml-system` 
+package. This way, only the installable ocaml-system package is visible, and 
+additionally, if it changes, existing opam mechanisms will trigger an up/down-
+grade to the correct version. Also, still using existing mechanisms, `opam 
+switch ocaml-system` will pick the right version, while `opam switch 4.02.3` 
+will either pick `ocaml-base-compiler` (if `ocaml-system.4.02.3` is not 
+available) or state that the choice is ambiguous and ask to choose between 
+`ocaml-system` and `ocaml-base-compiler` otherwise. In case the variable is 
+not properly defined, the `ocaml-system` package won't be available, but it 
+won't break anything besides.
+
+We also extend the way in which such a variable can be initially defined in 
+opam, by supporting an `init` file (e.g. ~/.opamrc or /etc/opamrc) that allows 
+to choose, at `opam init` time, many ~/.opam/config options and e.g. the 
+initial repositories to use. Opam has a default, built-in init file that binds 
+to <A HREF="https://opam.ocaml.org">https://opam.ocaml.org</A> and defines `ocaml-sys-version`, but this is better 
+separated from the code, and easier to override, than before. 
+
+
+Hope this all makes sense, comments welcome. All of this is already working, 
+with the proper automatic rewrites, and just needs a little more polish before 
+merging into master.
+
+Best,
+Louis
+
+
+&#185; Contrary to before, this never becomes a global variable and can be used in 
+commands but never in the `available:` field.
+&#178; The `provides:` field would be a more elegant solution to this, but causes 
+more problem than it solves; design work to have it in opam has advanced &#8212; 
+it's yet desirable for many reasons &#8212; but let's keep matters separate.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20160718/e7b4ddbc/attachment.sig">http://lists.ocaml.org/pipermail/opam-devel/attachments/20160718/e7b4ddbc/attachment.sig</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001477.html">[opam-devel] switch CI to use Trusty
+</A></li>
+	<LI>Next message: <A HREF="001485.html">[opam-devel] opam 2.0~alpha2 -- an update on opam's current dev status
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1484">[ date ]</a>
+              <a href="thread.html#1484">[ thread ]</a>
+              <a href="subject.html#1484">[ subject ]</a>
+              <a href="author.html#1484">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

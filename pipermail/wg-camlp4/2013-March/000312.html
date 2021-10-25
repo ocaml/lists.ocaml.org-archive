@@ -1,0 +1,161 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] A new branch to experiment with extension points
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C2090494651.3090344.1362585780838.JavaMail.root%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000311.html">
+   <LINK REL="Next"  HREF="000313.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] A new branch to experiment with extension points</H1>
+    <B>Xavier Clerc</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C2090494651.3090344.1362585780838.JavaMail.root%40inria.fr%3E"
+       TITLE="[wg-camlp4] A new branch to experiment with extension points">xavier.clerc at inria.fr
+       </A><BR>
+    <I>Wed Mar  6 16:03:00 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000311.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+        <LI>Next message: <A HREF="000313.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#312">[ date ]</a>
+              <a href="thread.html#312">[ thread ]</a>
+              <a href="subject.html#312">[ subject ]</a>
+              <a href="author.html#312">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+----- Mail original -----
+&gt;<i> On 03/06/2013 04:17 PM, Xavier Clerc wrote:
+</I>&gt;<i> &gt; I will not discuss the syntax per se, but I wonder whether
+</I>&gt;<i> &gt; having both prefix and suffix attributes is not error-prone.
+</I>&gt;<i> &gt; Could you elaborate on the need of having both?
+</I>&gt;<i> 
+</I>&gt;<i> I proposed to use a prefix attribute (on an include statement) to
+</I>&gt;<i> create
+</I>&gt;<i> ocamldoc sections:
+</I>&gt;<i> 
+</I>&gt;<i> [^^doc section &quot;Section Title&quot;] include
+</I>&gt;<i>     ...
+</I>&gt;<i> end
+</I>&gt;<i> 
+</I>&gt;<i> but I now tend to prefer &quot;floating&quot; attributes in signatures.
+</I>&gt;<i> 
+</I>&gt;<i> Gabriel gave another example to justify the need for a prefix syntax:
+</I>&gt;<i> 
+</I>&gt;<i>   begin [: pragma(non_exhaustive_match) :]
+</I>&gt;<i>      ...
+</I>&gt;<i>   end
+</I>&gt;<i> 
+</I>&gt;<i> but this might be subsumed by the special form:
+</I>&gt;<i> 
+</I>&gt;<i>     begin[@id expr] ... end
+</I>&gt;<i> 
+</I>&gt;<i> which is equivalent to:
+</I>&gt;<i> 
+</I>&gt;<i>    (...)[@id expr]
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> Do people see use cases where the prefix syntax is much better?
+</I>&gt;<i> 
+</I>&gt;<i> &gt; Another, unrelated question: as an extension developer, it
+</I>&gt;<i> &gt; seems that I will have to deal with full-fledged expressions
+</I>&gt;<i> &gt; as attributes values. Do you plan some mechanism to allow
+</I>&gt;<i> &gt; easy access to an identifier used in such an expression.
+</I>&gt;<i> &gt; I mean, it can even refer to another module. This also implies
+</I>&gt;<i> &gt; that you could create dependencies between modules solely
+</I>&gt;<i> &gt; through attributes; is that correct?
+</I>&gt;<i> 
+</I>&gt;<i> Expressions used inside attributes/extension nodes are just
+</I>&gt;<i> syntactical
+</I>&gt;<i> expressions.  They are never type-checked and their identifiers are
+</I>&gt;<i> not
+</I>&gt;<i> resolved; ocamldep does not look inside those expressions.
+</I>&gt;<i> 
+</I>&gt;<i> We could use any &quot;universal&quot; type instead of expressions (strings,
+</I>&gt;<i> s-expressions, xml, json).  Some arguments to use OCaml expressions:
+</I>&gt;<i> 
+</I>&gt;<i>   - This is a rich language, in which we can encode various DSL
+</I>&gt;<i> understood by extensions, so that the extensions don't need to do any
+</I>&gt;<i> parsing.
+</I>&gt;<i> 
+</I>&gt;<i>   - We already have a parser!
+</I>&gt;<i> 
+</I>&gt;<i>   - The syntax will look familiar to OCaml developers and adapting
+</I>&gt;<i> editors to nicely support (colors, indentation, etc) them will be
+</I>&gt;<i> easy.
+</I>&gt;<i> 
+</I>&gt;<i>   - It won't be uncommon to embed fragments of OCaml code, to be
+</I>&gt;<i> inserted into the real code fed to the compiler, within those
+</I>&gt;<i> expressions. Example:
+</I>&gt;<i> 
+</I>&gt;<i>    type t = {
+</I>&gt;<i>       x: int;
+</I>&gt;<i>       y [@default (x + 1)]: int;
+</I>&gt;<i>       z [@optional]: int option;
+</I>&gt;<i>    } [@@builder {with_labels; invariant=(x &lt;= y)}]
+</I>&gt;<i> 
+</I>&gt;<i>   rewritten to:
+</I>&gt;<i> 
+</I>&gt;<i>    type t = {
+</I>&gt;<i>       x: int;
+</I>&gt;<i>       y: int;
+</I>&gt;<i>    }
+</I>&gt;<i> 
+</I>&gt;<i>    let build_t ~x ?(y = x + 1) ?z () =
+</I>&gt;<i>       assert(x &lt;= y);
+</I>&gt;<i>       {x; y; z}
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> As an extension developer, you don't need to suffer from the
+</I>&gt;<i> complexity
+</I>&gt;<i> of OCaml expression.  Instead,  you are free to define the subset of
+</I>&gt;<i> OCaml expressions which make sense inside &quot;your&quot; attributes/extension
+</I>&gt;<i> nodes, and fail when the user doesn't comply with this constraint.
+</I>
+Thanks for the clarification. However, I am now afraid about user side...
+Expression will be treated in a non-uniform way by attributes.
+Moreover, replacing a literal constant with a symbolic one will cause
+extension to stop working. Honestly, I cannot say if it is a big deal.
+But, I think it can be a surprise.
+
+
+Xavier Clerc
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000311.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+	<LI>Next message: <A HREF="000313.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#312">[ date ]</a>
+              <a href="thread.html#312">[ thread ]</a>
+              <a href="subject.html#312">[ subject ]</a>
+              <a href="author.html#312">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

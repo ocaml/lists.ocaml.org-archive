@@ -1,0 +1,228 @@
+From dwws2 at cam.ac.uk  Wed Aug 20 14:47:11 2014
+From: dwws2 at cam.ac.uk (David Sheets)
+Date: Wed, 20 Aug 2014 14:47:11 +0100
+Subject: [ocaml-infra] TLS (https) for ocaml.org
+Message-ID: <53F4A6DF.4060302@cam.ac.uk>
+
+Hello, world!
+
+I just turned on SSLv3 and TLS 1.0, 1.1, 1.2 for ocaml.org using 
+lighttpd's SSL engine. The ocaml.org server configuration does not 
+appear to be version-controlled.
+
+Here is what I did:
+
+- loaded the private certificate onto ocaml.org
+- symlinked private certificate into lighttpd's config
+- symlinked lighttpd's default SSL configuration into "conf-enabled":
+
+$SERVER["socket"] == "0.0.0.0:443" {
+	ssl.engine  = "enable"
+	ssl.pemfile = "/etc/lighttpd/server.pem"
+
+	ssl.cipher-list = 
+"ECDHE-RSA-AES256-SHA384:AES256-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH:!AESGCM"
+	ssl.honor-cipher-order = "enable"
+}
+
+- reloaded the lighttpd daemon's configuration with /etc/init.d script
+- tested that both the vanilla and encrypted HTTP ports work
+- ran the Qualys SSL Tests 
+<https://www.ssllabs.com/ssltest/analyze.html?d=ocaml.org>
+
+Here's what the tests found:
+
+- Prefix handling 	Not valid for "www.ocaml.org"   CONFUSING
+   This causes a Big Scary Warning when accessing via www.ocaml.org
+- Chain issues 	Incomplete
+   This requires another download of the Gandi Standard SSL CA cert.
+   Maybe we should bundle this cert for all our TLS sites?
+- RC4 	Yes (with TLS 1.1 and newer)   WEAK
+   I don't know the severity of this issue. Maybe a simple cipher-list
+   modification? I'm not clear on the compatibility story.
+- Forward Secrecy 	With some browsers
+   This also looks like a configuration issue. Perhaps plain DHE would
+   help?
+
+I welcome any feedback here or on 
+<https://github.com/ocaml/ocaml.org/issues/399>. Please test the site, 
+recommend configuration changes, and look for mixed content issues on 
+all pages. The goal is to get the TLS-served version of the site ready 
+to be pointed at by the middle next week.
+
+Thanks,
+
+David
+
+From sheets at alum.mit.edu  Wed Aug 20 15:43:42 2014
+From: sheets at alum.mit.edu (David Sheets)
+Date: Wed, 20 Aug 2014 15:43:42 +0100
+Subject: [ocaml-infra] opam.ocaml.org/ocaml.org merge
+Message-ID: <CAAWM5Ty_HgHBUt1rWzmf8VtE6SaTgpA+0FVa+WUd5AApJEQWmg@mail.gmail.com>
+
+Hello, world!
+
+We have gathered here at the confluence of two great rivers:
+opam.ocaml.org and ocaml.org. They meet here and flow on,
+indistinguishable and majestic to the sea. Please join me on the bank
+and bathe in the healing waters of...
+
+OPAM.OCAML.ORG
+
+<https://github.com/ocaml/opam2web/pull/113>
+
+A number of things are slightly broken:
+
+- I didn't port the CSS rules to center the buttons on the Home page.
+- I had to disable the affix feature of the Documentation and Blog
+sidebars (see <https://github.com/dsheets/opam2web/commit/9fa8b1cc142a2a287876cc69e15e40e066b33a41>).
+
+Your comments and patches are welcome.
+
+Thanks,
+
+David
+
+From Christophe.Troestler at umons.ac.be  Wed Aug 20 16:12:37 2014
+From: Christophe.Troestler at umons.ac.be (Christophe Troestler)
+Date: Wed, 20 Aug 2014 17:12:37 +0200
+Subject: [ocaml-infra] TLS (https) for ocaml.org
+In-Reply-To: <53F4A6DF.4060302@cam.ac.uk>
+References: <53F4A6DF.4060302@cam.ac.uk>
+Message-ID: <20140820.171237.53367613922641301.Christophe.Troestler@umons.ac.be>
+
+Hi Devid,
+
+On Wed, 20 Aug 2014 14:47:11 +0100, David Sheets wrote:
+> 
+> I just turned on SSLv3 and TLS 1.0, 1.1, 1.2 for ocaml.org using
+> lighttpd's SSL engine. The ocaml.org server configuration does not
+> appear to be version-controlled.
+> 
+> Here is what I did:
+
+We try to document what we do with the machine serving ocaml.org on
+this wiki: https://github.com/ocaml/infrastructure/wiki
+Could you please add your changes?  Thanks.
+
+Cheers,
+C.
+
+From hannes at mehnert.org  Wed Aug 20 16:13:45 2014
+From: hannes at mehnert.org (Hannes Mehnert)
+Date: Wed, 20 Aug 2014 17:13:45 +0200
+Subject: [ocaml-infra] TLS (https) for ocaml.org
+In-Reply-To: <53F4A6DF.4060302@cam.ac.uk>
+References: <53F4A6DF.4060302@cam.ac.uk>
+Message-ID: <53F4BB29.6000403@mehnert.org>
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA384
+
+First some disclaimers:
+- - I'm not a lighthttpd expert
+- - I don't know what is to protect on ocaml.org (what the security
+model is)
+
+On 08/20/2014 15:47, David Sheets wrote:
+> ssl.cipher-list = 
+> "ECDHE-RSA-AES256-SHA384:AES256-SHA256:RC4:HIGH:!MD5:!aNULL:!EDH:!AESGCM"
+
+
+>
+> 
+- - Prefix handling     Not valid for "www.ocaml.org"   CONFUSING
+> This causes a Big Scary Warning when accessing via www.ocaml.org
+
+you might want to enable https only for ocaml.org, docs.ocaml.org,
+forge.ocaml.org, lists.ocaml.org, and opam.ocaml.org (those hostnames
+mentioned in the certificate)?
+
+> - Chain issues     Incomplete This requires another download of the
+> Gandi Standard SSL CA cert. Maybe we should bundle this cert for
+> all our TLS sites?
+
+Yes, that should be done. While my firefox does not complain about the
+certificate chain (most likely it already has ghandi's certificate
+installed), the server should distribute the chain up till the
+self-signed CA certificate -- thus please include ghandi's cert.
+
+> - RC4     Yes (with TLS 1.1 and newer)   WEAK I don't know the
+> severity of this issue. Maybe a simple cipher-list modification?
+> I'm not clear on the compatibility story.
+
+windows XP with (unpatched) IE6 still supports only 3DES and RC4,
+other OS should be fine without RC4
+(http://blog.cloudflare.com/killing-rc4-the-long-goodbye might be of
+interest); also
+http://www.ietf.org/id/draft-ietf-tls-prohibiting-rc4-00.txt
+
+> - Forward Secrecy     With some browsers This also looks like a
+> configuration issue. Perhaps plain DHE would help?
+
+I'd remove the !EDH from the ssl.cipher-list above (and add a !RSA
+instead to prevent non-pfs connections). Also, why !AESGCM? I'd also
+add !RC4, !eNULL, !LOW, !EXP (from
+https://bettercrypto.org/static/applied-crypto-hardening.pdf)
+
+
+hannes
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v2.0.22 (FreeBSD)
+
+iQIcBAEBCQAGBQJT9LspAAoJELyJZYjffCju3KMP/3Jv8ryGYcNNG71ApCY6RMDb
+gj8kQehVqWRVoQxkLnot63ovaz1U56tBrd8sq7fmcVUSEyZlxODzW4PZAxL6bPD/
+ddbESw4QHcoyrVqObgir0GUk05xfYPey19J0adA+4HPjAlIXnGxoZoskiiJpOE9x
+JEDzvs3TST4j/Abybp+ida0HSdt0cUYFFf++qHY6/ej0M6WOxVbq7eh5GS7x1lGf
+hRf9VrMR4i4J0uWOxBR7BK8ZUDkM6BE6IoB+iG5XFH1kP4pCsvkWl9xOnhFtcBm0
+sjjWR34udPUcYl2MxhovoBSk3wKm5jvtvvFAIkdIM4L0EXRAjLy2xS8ZLun9yYHE
+0yhH0kgjcuqYcN1Cexe0rFadhpmlyf6EUZkfnHqVMcPEdwvi11PA4489BPoavwpz
+puXYZP7x3RlgBbKyJxPXMltB+4EvQYtzEdjUbHjAw20/QKZnuiuezaYXQsiVylNT
+IphJS1Tv3+/izsMQohHV2MayDznAmsTLYSkL5adGe809A2OwDhMoc25UQCVbGR7t
+UtWdeJ+W0+7mjHatBoOBaSv/q2MIczehRlGXFQuxyGh8/L1lWMH80XWBFONYVBTO
+F3wvhfQLAfWsFYyLgi0noVPjWfPpMwg4Up0OlvL7CuQmqDJ2NDG9riy2LsPFBZAO
+l+1zLIIsD5gQgzyM/Lfk
+=HXzM
+-----END PGP SIGNATURE-----
+
+From sheets at alum.mit.edu  Wed Aug 20 16:33:17 2014
+From: sheets at alum.mit.edu (David Sheets)
+Date: Wed, 20 Aug 2014 16:33:17 +0100
+Subject: [ocaml-infra] TLS (https) for ocaml.org
+In-Reply-To: <20140820.171237.53367613922641301.Christophe.Troestler@umons.ac.be>
+References: <53F4A6DF.4060302@cam.ac.uk>
+ <20140820.171237.53367613922641301.Christophe.Troestler@umons.ac.be>
+Message-ID: <CAAWM5Tzr0U=+8Wt64Nd=CHhbWUp=sXy+t4rL=8GkmeMS8d8RXg@mail.gmail.com>
+
+On Wed, Aug 20, 2014 at 4:12 PM, Christophe Troestler
+<Christophe.Troestler at umons.ac.be> wrote:
+> Hi Devid,
+>
+> On Wed, 20 Aug 2014 14:47:11 +0100, David Sheets wrote:
+>>
+>> I just turned on SSLv3 and TLS 1.0, 1.1, 1.2 for ocaml.org using
+>> lighttpd's SSL engine. The ocaml.org server configuration does not
+>> appear to be version-controlled.
+>>
+>> Here is what I did:
+>
+> We try to document what we do with the machine serving ocaml.org on
+> this wiki: https://github.com/ocaml/infrastructure/wiki
+> Could you please add your changes?  Thanks.
+
+I found the repository but it was empty and I didn't think to look in
+the wiki. I've made an issue in the repo to add a simple README so
+people don't get lost in the future. I also updated the wiki with the
+certificate stuff.
+
+Thanks,
+
+David
+
+> Cheers,
+> C.
+> _______________________________________________
+> Infrastructure mailing list
+> Infrastructure at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/infrastructure
+

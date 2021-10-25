@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%0A%20managers%22%3B%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3CCAPFanBGJqp_%2BN9TJN2kj2bMoN3BeRRYH66jiDwPCWgyApAV_Fg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001470.html">
+   <LINK REL="Next"  HREF="001471.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20%22Typosquatting%20programming%20language%20package%0A%20managers%22%3B%20how%20to%20protect%20opam-repository%20from%20typo-squatting%3F&In-Reply-To=%3CCAPFanBGJqp_%2BN9TJN2kj2bMoN3BeRRYH66jiDwPCWgyApAV_Fg%40mail.gmail.com%3E"
+       TITLE="[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Thu Jun  9 16:29:42 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001470.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+        <LI>Next message: <A HREF="001471.html">[opam-devel] &quot;Typosquatting programming language package	managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1472">[ date ]</a>
+              <a href="thread.html#1472">[ thread ]</a>
+              <a href="subject.html#1472">[ subject ]</a>
+              <a href="author.html#1472">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Let's clarify: the design of &quot;opam lint&quot; seems that result of its QA tests
+depend on the only input of the checkers, namely the opam file fed to it.
+It does not take into account repository information (so I cannot easily
+implement the check I had in mind), nor eg. url files (while it would seem
+interesting to have a tool to give feedback on a wrong checksum).
+
+I think this design choice has advantages. For example we know that the
+&quot;opam lint&quot; output is going to be the same on a user machine and on the
+repository CI, or is going to be stable across opam repositories.
+
+Note that there is another part of the OPAM codebase with the name &quot;lint&quot;,
+namely admin-scripts/lint.ml, that does repository-global linting (for now
+it just seems to aggregate individual package lint outputs for the whole
+repo). If we added a mode to check a (set of) new proposed package(s)
+against the current repo, it could be an interesting basis.
+
+Thomas: thanks, that seems to suggest there is indeed a missing step and we
+would need to make it happen. (Which means more work than adding to an
+existing infrastructure, but such is life.) Note that I think the
+invocation in this case should be
+
+  opam repo-lint --new-packages `cat tobuild.txt`
+
+because this check must rely on knowledge of what already exists in the
+repository, and (separately) what is new and proposed for inclusion.
+Otherwise, if we just warned about all pairs of packages within typo
+distance, old false positives would keep coming up over and over.
+
+On Thu, Jun 9, 2016 at 11:17 AM, Daniel B&#252;nzli &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">daniel.buenzli at erratique.ch</A>&gt;
+wrote:
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Le jeudi, 9 juin 2016 &#224; 16:16, Daniel B&#252;nzli a &#233;crit :
+</I>&gt;<i>
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Le jeudi, 9 juin 2016 &#224; 15:57, Gabriel Scherer a &#233;crit :
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; &gt; My plan was: in `opam lint`, emit a warning if the linted package name
+</I>&gt;<i> is at edit distance 2 or less (but not 0) of an existing package in the
+</I>&gt;<i> repository. But this does not quite work; I quickly looked at the code and
+</I>&gt;<i> it seems that &quot;opam lint&quot; is meant to be run purely locally, it does not
+</I>&gt;<i> have access to a base of packages available in the repository.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; opam lint is automatically run by camelus when you do a PR to the OCaml
+</I>&gt;<i> OPAM repository so it would be useful for the maintainers (and to the
+</I>&gt;<i> package submitter aswell).
+</I>&gt;<i> Ah sorry I think I misunderstood what you meant by &quot;locally&quot;.
+</I>&gt;<i>
+</I>&gt;<i> Daniel
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/375ed800/attachment-0001.html">http://lists.ocaml.org/pipermail/opam-devel/attachments/20160609/375ed800/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001470.html">[opam-devel] &quot;Typosquatting programming language package managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+	<LI>Next message: <A HREF="001471.html">[opam-devel] &quot;Typosquatting programming language package	managers&quot;; how to protect opam-repository from typo-squatting?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1472">[ date ]</a>
+              <a href="thread.html#1472">[ thread ]</a>
+              <a href="subject.html#1472">[ subject ]</a>
+              <a href="author.html#1472">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

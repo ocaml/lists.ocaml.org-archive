@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] A new branch to experiment with extension points
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C5130F8C1.9020904%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000284.html">
+   <LINK REL="Next"  HREF="000286.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] A new branch to experiment with extension points</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20A%20new%20branch%20to%20experiment%20with%20extension%20points&In-Reply-To=%3C5130F8C1.9020904%40lexifi.com%3E"
+       TITLE="[wg-camlp4] A new branch to experiment with extension points">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Mar  1 18:51:45 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000284.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+        <LI>Next message: <A HREF="000286.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#285">[ date ]</a>
+              <a href="thread.html#285">[ thread ]</a>
+              <a href="subject.html#285">[ subject ]</a>
+              <a href="author.html#285">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 03/01/2013 06:52 PM, Leo White wrote:
+&gt;<i> The standard way to define a delimiter like &quot;(:&quot;, in keeping with how
+</I>&gt;<i> the rest of OCaml is parsed, is to make it a single token from the lexer.
+</I>
+Agreed!
+
+&gt;<i>
+</I>&gt;<i> 1. Extensions:
+</I>&gt;<i>
+</I>&gt;<i>      (: ident expr_opt )
+</I>&gt;<i>    Used as a structure item, signature item, expression or type expression.
+</I>&gt;<i>
+</I>&gt;<i> 2. Attributes:
+</I>&gt;<i>
+</I>&gt;<i>      [: ident expr_opt ]
+</I>&gt;<i>
+</I>&gt;<i>    Attached postfix to structure items, signature items, expressions or
+</I>&gt;<i>    type expressions.
+</I>&gt;<i>
+</I>&gt;<i> 3. With Attributes
+</I>&gt;<i>
+</I>&gt;<i>      with ident ( expr), ident, ident (expr)
+</I>&gt;<i>    Attached postfix to structure items or signature items.
+</I>
+This looks good to me.
+
+We also need attributes on individual types in a type declaration.
+
+Also, I think it make sense for structure/signature items, to consider 
+that attributes are &quot;between&quot; items, to support things like ocamldoc 
+section headers.
+
+I've started to work on a change to the Parsetree (unfinished, not 
+committed yet):
+
+<A HREF="http://alain.frisch.fr/split_type_decls.txt">http://alain.frisch.fr/split_type_decls.txt</A>
+
+where each declared type in a type declaration become a full 
+structure/signature item with a marker telling if this is the first type 
+in the declaration or not (similar to the representation of signatures 
+in the Types module).  This puts some extra invariants in the Parsetree 
+(a Pstr_type Prec_nextmust follow another Pstr_type ..., maybe with 
+attributes in between), but then we don't need to distinguish 
+syntactically attributes on a declared type and attributes on the whole 
+declarations, which would be hard to explain to users.
+
+The goal is to be able to write (keeping my original syntax for 
+attributes in structure items):
+
+===============================================
+..(:doc 2 &quot;My section header&quot;)
+
+type t = {...} ..(:id expr) ..(:id expr)
+and  s = {...} ..(:id expr)
+
+..(:doc 2 &quot;Another section header&quot;)
+===============================================
+
+Here we have the following sequence of structure items:
+
+  Pstr_attribute &quot;doc&quot;
+  Pstr_type (Prec_first, ...)
+  Pstr_attributes &quot;id&quot;
+  Pstr_attributes &quot;id&quot;
+  Pstr_type (Prec_next, ...)
+  Pstr_attributes &quot;id&quot;
+  Pstr_attributes &quot;doc&quot;
+
+
+
+Independently of the syntax, I'd be interested to get feedback on these 
+two proposals:
+
+  -  splitting declarations of mutually recursive types into single 
+declarations in the Parsetree, and
+
+  -  having attributes as standalone items within signatures and 
+structures (so also between types in a single recursive declaration) 
+instead of having them attached to other items.
+
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000284.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+	<LI>Next message: <A HREF="000286.html">[wg-camlp4] A new branch to experiment with extension points
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#285">[ date ]</a>
+              <a href="thread.html#285">[ thread ]</a>
+              <a href="subject.html#285">[ subject ]</a>
+              <a href="author.html#285">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

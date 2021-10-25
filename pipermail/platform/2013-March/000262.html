@@ -1,0 +1,251 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87fw00l236.fsf%40study.localdomain%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000253.html">
+   <LINK REL="Next"  HREF="000261.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87fw00l236.fsf%40study.localdomain%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Tue Mar 12 21:50:37 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000253.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000261.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#262">[ date ]</a>
+              <a href="thread.html#262">[ thread ]</a>
+              <a href="subject.html#262">[ subject ]</a>
+              <a href="author.html#262">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">gabriel.scherer at gmail.com</A>&gt; writes:
+
+&gt;<i> One aspect of Leo's proposition that I found lacking is the absence of
+</I>&gt;<i> a precise framework that could explain the semantics of the proposed
+</I>&gt;<i> features and study their combination.
+</I>
+Certainly, before any final proposal, a precise semantics should be
+worked out.
+
+&gt;<i> - how to compose different &quot;search path files&quot; (by concatenation, I
+</I>&gt;<i> assume; I regret the absence of any conflict handling considerations)
+</I>
+Essentially, yes they are concatenated. In more detail:
+
+When looking for a module, the compiler should work through each search
+path and search path file (using the order they were given to the
+compiler). It should work through each individual search path file
+backwards, checking each mapping. If it finds a mapping for the module
+of the form:
+
+  Foo: &quot;filename&quot;
+
+then it should use that filename. If it finds a mapping for the module
+of the form:
+
+  Foo: Bar
+
+Then it should continue its search, but looking for Bar instead of Foo.
+
+&gt;<i> - whether &quot;-open&quot; arguments would still be opened in absence of the
+</I>&gt;<i> corresponding &quot;open namespace Core&quot; (it looks like &quot;yes&quot;, and that
+</I>&gt;<i> would be a semantics change wrt. the discussed flat-access feature)
+</I>
+Yes, the &quot;-open&quot; argument is basically unrelated to namespaces. It
+simply specifies a module that should be opened in the initial
+environment (just like Pervasives).
+
+&gt;<i> - what happens when you write &quot;open namespace Croe&quot;, making a typo
+</I>
+I think that the compiler should look in its search path for any
+mappings like &quot;Croe#Foo: 'foo.cmi'&quot; or any files croe-foo.cmi. If it
+doesn't find any then it should give an error or a warning.
+
+&gt;<i> - whether each build system would have to implement its own way to
+</I>&gt;<i> describe which -name option are supposed to be passed to which files;
+</I>&gt;<i> it would be natural to pass them a description of the expected final
+</I>&gt;<i> compilation environment (mapping module names to compilation units),
+</I>&gt;<i> but in presence of -name you need to provide another mapping from
+</I>&gt;<i> needed-.cmi names to corresponding-.ml names, and each build system
+</I>&gt;<i> would need to come with its own description language for these &quot;send
+</I>&gt;<i> all foo/&lt;bar&gt;.ml to foo-&lt;bar&gt;.cmi&quot; (which looks awfully like a
+</I>&gt;<i> namespace description language)
+</I>
+I would have thought a simple variable or switch to indicate which
+naming scheme was being used would suffice. I suppose some build systems
+might like to support more complex name mappings using some kind of
+description file. 
+
+The important point is that if we devise some official naming
+description that is in some way supported by the compiler then every
+build system must be updated to support it. If we simply provide a
+command-line argument then we allow the build systems to decide what and
+how to support themselves.
+
+&gt;<i> On a rather orthogonal point, the proposal doesn't explicitly mention
+</I>&gt;<i> the problem of internal module name conflicts. I assume that the
+</I>&gt;<i> solution is &quot;-name&quot;, meaning that the library authors must make sure
+</I>&gt;<i> that the -name option they pass (or the source filename) will be
+</I>&gt;<i> unique among all modules used by their downstream users. As it is an
+</I>&gt;<i> important responsibility, I think this should be emphasized.
+</I>
+I agree that this is important, and should be made clear in any final
+proposal.
+
+&gt;<i> On Tue, Mar 12, 2013 at 12:32 PM, Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> I have no objection to specifying that Core#Common should be connected
+</I>&gt;&gt;<i> to the Core package within the build system.  But it's important to us
+</I>&gt;&gt;<i> that namespace manipulations be observable by the programmer by
+</I>&gt;&gt;<i> reading the code.  If I understand correctly, Leo's proposal involves
+</I>&gt;&gt;<i> stashing that away in the build system, which undermines that goal.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Another thing which may not be obvious is that one sometimes in the
+</I>&gt;&gt;<i> same file wants to access just Core.Std in some scopes in the file,
+</I>&gt;&gt;<i> and Async.Std in other scopes.  Full control of the namespace is
+</I>&gt;&gt;<i> important, and something we do at multiple scopes within a file.
+</I>&gt;&gt;<i> Being able to control this only at the file level, and only from
+</I>&gt;&gt;<i> within the build system, is a poor match for our needs.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The fact that one should write:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> open Core.Std
+</I>&gt;&gt;<i> open Async.Std
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> in a specific order does not strike me as a particular problem, and
+</I>&gt;&gt;<i> even if it were, the solution I think would not be to stuff it into
+</I>&gt;&gt;<i> the build system, but to build a single namespace that opened both
+</I>&gt;&gt;<i> Core and Async.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> If the proposal lands in the way Leo describes, I would think we would
+</I>&gt;&gt;<i> write a ppx extension that, for a certain whitelist of namespaces,
+</I>&gt;&gt;<i> would convert:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    open namespace Core
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> into
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>    open namespace Core
+</I>&gt;&gt;<i>    open Core#Common
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Given that this is easy enough to do at the ppx level, I find it hard
+</I>&gt;&gt;<i> to see what difficulties would be raised by integrating this with the
+</I>&gt;&gt;<i> namespace system.  I understand that it feels mildly unsanitary
+</I>&gt;&gt;<i> because on the implementation end the two things are quite different,
+</I>&gt;&gt;<i> but from a user point of view, I think it's very much the right thing.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> y
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue, Mar 12, 2013 at 6:57 AM, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;&gt;&gt;&gt;<i> Leo's model allows the build system to precisely set the order of default
+</I>&gt;&gt;&gt;&gt;<i> opens, and tools such as ocamlfind could support this just as they do
+</I>&gt;&gt;&gt;&gt;<i> include and link directives at the moment.  I know JS doesn't use
+</I>&gt;&gt;&gt;&gt;<i> ocamlfind, but the moral equivalent could inject the command-line
+</I>&gt;&gt;&gt;&gt;<i> directives very easily.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> To expand on what Anil said, under my proposed system the idea is to push the
+</I>&gt;&gt;&gt;<i> problem of providing &quot;pervasive&quot; modules into the build or package system.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> For example, I would expect Core to provide some kind of package description
+</I>&gt;&gt;&gt;<i> for OCamlFind or similar tool including something like (using made up
+</I>&gt;&gt;&gt;<i> syntax):
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     path := ./core.mlpath
+</I>&gt;&gt;&gt;<i>     open := Core#Common
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> where &quot;core.mlpath&quot; is a search path description file.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Then Async would include a description including something like:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     path := ./async.mlpath
+</I>&gt;&gt;&gt;<i>     path-depends := core
+</I>&gt;&gt;&gt;<i>     open := Async#Common
+</I>&gt;&gt;&gt;<i>     open-depends := core
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> where &quot;async.mlpath&quot; is a search path description file that includes:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     Core#Original#*: Core#*
+</I>&gt;&gt;&gt;<i>     Core#Gc: Async#Gc
+</I>&gt;&gt;&gt;<i>     Core#Condition: Async#Condition
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> where &quot;Gc&quot; and &quot;Condition&quot; are the components of Core that Async
+</I>&gt;&gt;&gt;<i> re-implements.
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> This would mean that commands equivalent to any of the following would all
+</I>&gt;&gt;&gt;<i> produce the correct default environment for using Async:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     ocamlc -package async
+</I>&gt;&gt;&gt;<i>     ocamlc -package async -package core
+</I>&gt;&gt;&gt;<i>     ocamlc -package core -package async
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> I think this is preferable to requiring all users of Async to start their
+</I>&gt;&gt;&gt;<i> files with:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>     open Core.Std
+</I>&gt;&gt;&gt;<i>     open Async.Std
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> which is not something that a user might naturally assume was required.
+</I>&gt;&gt;<i> _______________________________________________
+</I>&gt;&gt;<i> Platform mailing list
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000253.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000261.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#262">[ date ]</a>
+              <a href="thread.html#262">[ thread ]</a>
+              <a href="subject.html#262">[ subject ]</a>
+              <a href="author.html#262">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

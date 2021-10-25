@@ -1,0 +1,105 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Finalising data
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DF%2BWC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000081.html">
+   <LINK REL="Next"  HREF="000085.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Finalising data</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3CCAAxsn%3DF%2BWC2uM4kaL4hPdNduamppPxG-9rCz45LOHdE5Wy8PfA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Finalising data">yallop at gmail.com
+       </A><BR>
+    <I>Mon May 19 15:52:29 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000081.html">[ocaml-ctypes] Finalising data
+</A></li>
+        <LI>Next message: <A HREF="000085.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Florian,
+
+On 19/05/2014, Florian Pichlmeier &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">florian.pichlmeier at mytum.de</A>&gt; wrote:
+&gt;<i> But now i have encountered a new problem.
+</I>&gt;<i> Zeromq uses incomplete types for many data types,
+</I>&gt;<i> like the frame type
+</I>&gt;<i> typedef struct _zframe_t zframe_t;
+</I>&gt;<i>
+</I>&gt;<i> On the OCaml side i use void pointer to represent
+</I>&gt;<i> these data types, and thats where the problem arose.
+</I>&gt;<i>
+</I>&gt;<i> The frame destroy function call for example is that
+</I>&gt;<i>     zframe_destroy (zframe_t **self_p);
+</I>&gt;<i> with the corresponding ocaml function
+</I>&gt;<i>
+</I>&gt;<i> let destroy (msg : t) =
+</I>&gt;<i> let stub = foreign &quot;zframe_destroy&quot; (ptr void @-&gt; returning int) in
+</I>&gt;<i> stub (msg +@ 0)
+</I>&gt;<i>
+</I>&gt;<i> The problem is the msg +@ 0 part.
+</I>
+The ctypes equivalent of zeromq's incomplete struct declaration is a
+call to the 'structure' function without a corresponding call to
+'seal'.  For example, you can represent zframe_t as follows:
+
+    (* struct _zframe_t *)
+    let zframe_t = structure &quot;_zframe_t&quot;
+
+This allows you to give a more precise type to the zframe_destroy binding:
+
+    let zframe_destroy = foreign &quot;zframe_destroy&quot;
+        (ptr (ptr zframe_t) @-&gt; returning int)
+
+Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+complete, so pointer arithmetic (with +@ etc.) should work as you
+expect.
+
+I hope that helps,
+
+Jeremy.
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000081.html">[ocaml-ctypes] Finalising data
+</A></li>
+	<LI>Next message: <A HREF="000085.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,206 @@
+diff --git a/Makefile b/Makefile
+index 2e6113c..9550a0d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -93,15 +93,16 @@ ASMCOMP=asmcomp/arch.cmo asmcomp/debuginfo.cmo \
+ TOPLEVEL=toplevel/genprintval.cmo toplevel/toploop.cmo \
+   toplevel/trace.cmo toplevel/topdirs.cmo toplevel/topmain.cmo
+ 
++OPTTOPLEVEL=toplevel/genprintval.cmx toplevel/opttoploop.cmx \
++  toplevel/opttopdirs.cmx toplevel/opttopmain.cmx
++
+ BYTESTART=driver/main.cmo
+ 
+ OPTSTART=driver/optmain.cmo
+ 
+ TOPLEVELSTART=toplevel/topstart.cmo
+ 
+-NATTOPOBJS=$(UTILS) $(PARSING) $(TYPING) $(COMP) $(ASMCOMP) \
+-  toplevel/genprintval.cmo toplevel/opttoploop.cmo toplevel/opttopdirs.cmo \
+-  toplevel/opttopmain.cmo toplevel/opttopstart.cmo
++OPTTOPLEVELSTART=toplevel/opttopstart.cmx
+ 
+ PERVASIVES=$(STDLIB_MODULES) outcometree topdirs toploop
+ 
+@@ -317,8 +318,10 @@ installoptopt:
+ 	cp compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlcommon.a \
+            compilerlibs/ocamlbytecomp.cmxa compilerlibs/ocamlbytecomp.a \
+            compilerlibs/ocamloptcomp.cmxa compilerlibs/ocamloptcomp.a \
++           compilerlibs/ocamlopttoplevel.cmxa compilerlibs/ocamlopttoplevel.a \
+            $(BYTESTART:.cmo=.cmx) $(BYTESTART:.cmo=.o) \
+            $(OPTSTART:.cmo=.cmx) $(OPTSTART:.cmo=.o) \
++	   $(OPTTOPLEVELSTART) $(OPTTOPLEVELSTART:.cmx=.o) \
+            $(COMPLIBDIR)
+ 	cd $(COMPLIBDIR) && $(RANLIB) ocamlcommon.a ocamlbytecomp.a ocamloptcomp.a
+ 
+@@ -381,9 +384,18 @@ partialclean::
+ 
+ # The native toplevel
+ 
+-ocamlnat: ocamlopt otherlibs/dynlink/dynlink.cmxa $(NATTOPOBJS:.cmo=.cmx)
+-	$(CAMLOPT) $(LINKFLAGS) otherlibs/dynlink/dynlink.cmxa -o ocamlnat \
+-	           $(NATTOPOBJS:.cmo=.cmx) -linkall
++compilerlibs/ocamlopttoplevel.cmxa: $(OPTTOPLEVEL)
++	$(CAMLOPT) -a -o $@ $(OPTTOPLEVEL)
++partialclean::
++	rm -f compilerlibs/ocamlopttoplevel.cmxa compilerlibs/ocamlopttoplevel.a
++
++ocamlnat: ocamlopt otherlibs/dynlink/dynlink.cmxa compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa compilerlibs/ocamlopttoplevel.cmxa $(OPTTOPLEVELSTART)
++	$(CAMLOPT) $(LINKFLAGS) -linkall -o ocamlnat \
++	  otherlibs/dynlink/dynlink.cmxa \
++          compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa \
++          compilerlibs/ocamlopttoplevel.cmxa $(OPTTOPLEVELSTART)
++partialclean::
++	rm -f ocamlnat
+ 
+ toplevel/opttoploop.cmx: otherlibs/dynlink/dynlink.cmxa
+ 
+diff --git a/toplevel/opttopdirs.ml b/toplevel/opttopdirs.ml
+index 8655ef9..075429f 100644
+--- a/toplevel/opttopdirs.ml
++++ b/toplevel/opttopdirs.ml
+@@ -17,7 +17,6 @@
+ open Format
+ open Misc
+ open Longident
+-open Path
+ open Types
+ open Opttoploop
+ 
+diff --git a/toplevel/opttoploop.ml b/toplevel/opttoploop.ml
+index 8d83908..831fe3d 100644
+--- a/toplevel/opttoploop.ml
++++ b/toplevel/opttoploop.ml
+@@ -15,7 +15,6 @@
+ (* The interactive toplevel loop *)
+ 
+ open Path
+-open Lexing
+ open Format
+ open Config
+ open Misc
+@@ -23,9 +22,13 @@ open Parsetree
+ open Types
+ open Typedtree
+ open Outcometree
+-open Lambda
+ 
+ type res = Ok of Obj.t | Err of string
++(* Hack to supress warning:
++ * Warning 37: constructor Ok is never used to build values.
++ * (However, this constructor appears in patterns.)
++ *)
++let res_lint x = if x then Ok (Obj.repr "") else Err ""
+ type evaluation_outcome = Result of Obj.t | Exception of exn
+ 
+ external ndl_run_toplevel: string -> string -> res
+@@ -77,7 +80,7 @@ let rec eval_path = function
+ (* To print values *)
+ 
+ module EvalPath = struct
+-  type value = Obj.t
++  type valu = Obj.t
+   exception Error
+   let eval_path p = try eval_path p with _ -> raise Error
+   let same_value v1 v2 = (v1 == v2)
+@@ -125,8 +128,6 @@ let toplevel_startup_hook = ref (fun () -> ())
+ let phrase_seqid = ref 0
+ let phrase_name = ref "TOP"
+ 
+-open Lambda
+-
+ let load_lambda ppf (size, lam) =
+   if !Clflags.dump_rawlambda then fprintf ppf "%a@." Printlambda.lambda lam;
+   let slam = Simplif.simplify_lambda lam in
+@@ -155,7 +156,7 @@ let load_lambda ppf (size, lam) =
+ (* Print the outcome of an evaluation *)
+ 
+ let rec pr_item env = function
+-  | Tsig_value(id, decl) :: rem ->
++  | Sig_value(id, decl) :: rem ->
+       let tree = Printtyp.tree_of_value_description id decl in
+       let valopt =
+         match decl.val_kind with
+@@ -168,24 +169,24 @@ let rec pr_item env = function
+             Some v
+       in
+       Some (tree, valopt, rem)
+-  | Tsig_type(id, _, _) :: rem when Btype.is_row_name (Ident.name id) ->
++  | Sig_type(id, _, _) :: rem when Btype.is_row_name (Ident.name id) ->
+       pr_item env rem
+-  | Tsig_type(id, decl, rs) :: rem ->
++  | Sig_type(id, decl, rs) :: rem ->
+       let tree = Printtyp.tree_of_type_declaration id decl rs in
+       Some (tree, None, rem)
+-  | Tsig_exception(id, decl) :: rem ->
++  | Sig_exception(id, decl) :: rem ->
+       let tree = Printtyp.tree_of_exception_declaration id decl in
+       Some (tree, None, rem)
+-  | Tsig_module(id, mty, rs) :: rem ->
++  | Sig_module(id, mty, rs) :: rem ->
+       let tree = Printtyp.tree_of_module id mty rs in
+       Some (tree, None, rem)
+-  | Tsig_modtype(id, decl) :: rem ->
++  | Sig_modtype(id, decl) :: rem ->
+       let tree = Printtyp.tree_of_modtype_declaration id decl in
+       Some (tree, None, rem)
+-  | Tsig_class(id, decl, rs) :: cltydecl :: tydecl1 :: tydecl2 :: rem ->
++  | Sig_class(id, decl, rs) :: cltydecl :: tydecl1 :: tydecl2 :: rem ->
+       let tree = Printtyp.tree_of_class_declaration id decl rs in
+       Some (tree, None, rem)
+-  | Tsig_cltype(id, decl, rs) :: tydecl1 :: tydecl2 :: rem ->
++  | Sig_class_type(id, decl, rs) :: tydecl1 :: tydecl2 :: rem ->
+       let tree = Printtyp.tree_of_cltype_declaration id decl rs in
+       Some (tree, None, rem)
+   | _ -> None
+@@ -226,8 +227,9 @@ let execute_phrase print_outcome ppf phr =
+       phrase_name := Printf.sprintf "TOP%i" !phrase_seqid;
+       Compilenv.reset ?packname:None !phrase_name;
+       Typecore.reset_delayed_checks ();
+-      let (str, sg, newenv) = Typemod.type_structure oldenv sstr Location.none
+-      in
++      let (str, sg, newenv) = Typemod.type_toplevel_phrase oldenv sstr in
++      let sg' = Typemod.simplify_signature sg in
++      ignore (Includemod.signatures oldenv sg sg');
+       Typecore.force_delayed_checks ();
+       let res = Translmod.transl_store_phrases !phrase_name str in
+       Warnings.check_fatal ();
+@@ -239,15 +241,13 @@ let execute_phrase print_outcome ppf phr =
+           | Result v ->
+               Compilenv.record_global_approx_toplevel ();
+               if print_outcome then
+-                match str with
+-                | [Tstr_eval exp] ->
++                match str.str_items with
++                | [ { str_desc = Tstr_eval exp }] ->
+                     let outv = outval_of_value newenv v exp.exp_type in
+                     let ty = Printtyp.tree_of_type_scheme exp.exp_type in
+                     Ophr_eval (outv, ty)
+                 | [] -> Ophr_signature []
+-                | _ ->
+-                    Ophr_signature (item_list newenv
+-                                             (Typemod.simplify_signature sg))
++                | _ -> Ophr_signature (item_list newenv sg')
+ 
+               else Ophr_signature []
+           | Exception exn ->
+@@ -432,6 +432,7 @@ let loop ppf =
+       first_line := true;
+       let phr = try !parse_toplevel_phrase lb with Exit -> raise PPerror in
+       if !Clflags.dump_parsetree then Printast.top_phrase ppf phr;
++      Env.reset_missing_cmis ();
+       ignore(execute_phrase true ppf phr)
+     with
+     | End_of_file -> exit 0
+diff --git a/toplevel/opttopmain.ml b/toplevel/opttopmain.ml
+index ac32a5c..4901f3d 100644
+--- a/toplevel/opttopmain.ml
++++ b/toplevel/opttopmain.ml
+@@ -104,6 +104,7 @@ module Options = Main_args.Make_opttop_options (struct
+   let _dscheduling = set dump_scheduling
+   let _dlinear = set dump_linear
+   let _dstartup = set keep_startup_file
++  let _dclambda = set dump_clambda
+ 
+   let anonymous = file_argument
+ end);;

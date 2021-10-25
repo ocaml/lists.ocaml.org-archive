@@ -1,0 +1,262 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Meta Programming from the view of the implementaion
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu5YXiZZqN7uH1u_8dQ6VxKTSELSRhvfSkaOnqJGKAo5Ow%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000103.html">
+   <LINK REL="Next"  HREF="000110.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Meta Programming from the view of the implementaion</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Meta%20Programming%20from%20the%20view%20of%20the%20implementaion&In-Reply-To=%3CCANcqPu5YXiZZqN7uH1u_8dQ6VxKTSELSRhvfSkaOnqJGKAo5Ow%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Meta Programming from the view of the implementaion">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Wed Jan 30 02:34:02 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000103.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+        <LI>Next message: <A HREF="000110.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#105">[ date ]</a>
+              <a href="thread.html#105">[ thread ]</a>
+              <a href="subject.html#105">[ subject ]</a>
+              <a href="author.html#105">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Quotations(Deliminated  DSL) works reasonably well instead of ppx, here is
+my version of ulex in Fan(an improvement compared with ulex or sedlex is t*hat
+it works well on toplevel*).
+
+let rec token enc =  {:lex|
+   &quot;&lt;utf8&gt;&quot; -&gt; begin enc := Ulexing.Utf8; token enc lexbuf end
+  | &quot;&lt;latin1&gt;&quot; -&gt; begin enc := Ulexing.Latin1; token enc lexbuf end
+  | xml_letter+ -&gt; Printf.sprintf &quot;word(%s)&quot; (Ulexing.utf8_lexeme lexbuf)
+  | number -&gt; &quot;number&quot;
+  | eof -&gt; exit 0
+  | [1234-1246] -&gt; &quot;bla&quot;
+  | &quot;(&quot; -&gt;  begin
+      Ulexing.rollback lexbuf; (* Puts the lexeme back into the buffer *)
+      {| &quot;(&quot; [^ '(']* &quot;)&quot; -&gt; Ulexing.utf8_lexeme lexbuf |} lexbuf
+      (* Note the use of an inline lexer *)
+  end
+  | &quot;(*&quot; -&gt; begin comment lexbuf; &quot;comment&quot; end
+  | ' ' -&gt; &quot;whitespace&quot;
+  | _ -&gt; &quot;???&quot; |}
+and comment = {:lex|
+   &quot;*)&quot; -&gt; ()
+  | eof -&gt; failwith &quot;comment&quot;
+  | _ -&gt; let _lexeme = Ulexing.lexeme lexbuf in
+    comment lexbuf |}
+On Tue, Jan 29, 2013 at 2:05 PM, Hongbo Zhang &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">hongboz at seas.upenn.edu</A>&gt;wrote:
+
+&gt;<i> Dear wg-camp4 users,
+</I>&gt;<i>
+</I>&gt;<i>     So far,  the discussion is really interesting and quite helpful, but I
+</I>&gt;<i> want to talk about the meta-programming *from the point of the view of
+</I>&gt;<i> implementation side,* features are easy to propose, but maybe only the
+</I>&gt;<i> compiler/library writers know how hard to implement, I do appreciate that
+</I>&gt;<i> you can sit dow and read the long email, I am also starting to blog(
+</I>&gt;<i> <A HREF="http://hongboz.wordpress.com/">http://hongboz.wordpress.com/</A>) about how to do syntactic meta programming
+</I>&gt;<i> (SMP) in a right way.
+</I>&gt;<i>    I rewrite the whole camlP4(named Fan) from scratch, building the
+</I>&gt;<i> quotation kit and throw away the crappy grammar parser, so plz believe me
+</I>&gt;<i> *that I do understand the whole technology stack of camlP4*, if we could
+</I>&gt;<i> reach some consensus, I would be happy to handle over the maintaining of
+</I>&gt;<i>  Fan, Fan does not loose any feature compared with camlP4, in fact it has
+</I>&gt;<i> more interesting featrues.
+</I>&gt;<i>
+</I>&gt;<i>    Let's begin with some easy, not too technical parts which has a
+</I>&gt;<i> significant effect on user experience though:
+</I>&gt;<i>    1. Performance
+</I>&gt;<i>           Performance does matter, it's a shame that  the most time spent
+</I>&gt;<i> in compiling the ocaml compiler is dedicated to camlP4, but it is an
+</I>&gt;<i> engineering problem, currently compiling Fan only takes less than 20s, and
+</I>&gt;<i> it can be improved further
+</I>&gt;<i>    2. Building issues
+</I>&gt;<i>         The design of having side effects by dynamic loading is
+</I>&gt;<i> generically a bad idea, in Fan* the dynamic loading only register some
+</I>&gt;<i> functionality the Fan support,* it *does not have any other side effec*t,
+</I>&gt;<i> each file stands alone says which (ppx , or filters, or syntax) it want to
+</I>&gt;<i> use with a good default option. so the building is always something like
+</I>&gt;<i> '-pp fan pluging1 plugin2 plugin3', *the order of pulgings does not matter
+</I>&gt;<i> *, also, l*oading all the plugins you have does not have any side effect,
+</I>&gt;<i> even better, you can do the static linking all the plugins you collected,
+</I>&gt;<i> the building process is simplified.  *
+</I>&gt;<i> * * 3. Grammar Extension (*Language namespace*)
+</I>&gt;<i> *       *I concur that grammar extension arbitrarily is a bad idea, and I
+</I>&gt;<i> agree with Gabrier that so far only the quotation(Here  quotation means
+</I>&gt;<i> delimited DSL, quosi-quotation means Lisp style macros) is modular,
+</I>&gt;<i> composable, and  I also agree with Gabrier -ppx* should not be used to do
+</I>&gt;<i> syntax overriding (this should not be called syntax extension actually), *that's
+</I>&gt;<i> a terrible idea to do syntax overriding, since the user never understand
+</I>&gt;<i> what's going on underly without reading the Makefile. So here some my
+</I>&gt;<i> suggestion is that some really conevenient syntax extesion, i.e, (let try..
+</I>&gt;<i> in) should be merged to the built in parser. quotations does not bring too
+</I>&gt;<i> much heavy syntax (imho). In Fan, we proposed the concept of a hierarchical
+</I>&gt;<i> language name space, since once quotation is heavily used, it's really easy
+</I>&gt;<i> to introduce conflict, *the language namespace querying is exactly like
+</I>&gt;<i> java package namespace,* you can import, close import to save some typing.
+</I>&gt;<i>     Here is a taste
+</I>&gt;<i>
+</I>&gt;<i>  -----------------------------------------------------------------------------------------------
+</I>&gt;<i>      {:.Fan.Lang.Meta.expr| a + b |} ------&gt;
+</I>&gt;<i>       `App (`App ((`Id (`Lid &quot;+&quot;)), (`Id (`Lid &quot;a&quot;)))), (`Id (`Lid &quot;b&quot;)))
+</I>&gt;<i>      {:.Fan.Lang.Meta.N.expr| a + b |}  -----&gt;
+</I>&gt;<i>       `App
+</I>&gt;<i>     (_loc,
+</I>&gt;<i>       (`App
+</I>&gt;<i>          (_loc, (`Id (_loc, (`Lid (_loc, &quot;+&quot;)))),
+</I>&gt;<i>            (`Id (_loc, (`Lid (_loc, &quot;a&quot;)))))),
+</I>&gt;<i>       (`Id (_loc, (`Lid (_loc, &quot;b&quot;)))))
+</I>&gt;<i>
+</I>&gt;<i>  -----------------------------------------------------------------------------------------------
+</I>&gt;<i>  the .Fan.Lang.Meta.expr the first '.' means it's from the absolute
+</I>&gt;<i> namespace,  the *N.expr shares exactly the same syntax without location*,
+</I>&gt;<i> though
+</I>&gt;<i>
+</I>&gt;<i>    4. Portable to diffierrent compiler extensions(like LexiFi's fork of
+</I>&gt;<i> ocaml)
+</I>&gt;<i>        I am pretty sure it's pretty easy to do in Fan, only Ast2pt
+</I>&gt;<i> (dumping the intemediate Ast into Parsetree) part need to be changed to
+</I>&gt;<i> diffierent compilers.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> ----------------------------------------------------------------------------------------------------------------
+</I>&gt;<i> Now let's talk about some internal parts of SMP.
+</I>&gt;<i> Quasi-Quotation is the essential part of SMP,  I am surprised so far that
+</I>&gt;<i> the discussion *silently ignores the quasi-quotation,* Leo's answer of
+</I>&gt;<i> writing   three parsers is neither satisfying nor practical(imho).
+</I>&gt;<i>
+</I>&gt;<i> Camlp4 is mainly composed of two parts, one is the extensible parser and *the
+</I>&gt;<i> other significant part is Ast Lifting*. Since we all agree that
+</I>&gt;<i> extensible parser increases the complexity too much, let's simply ignore
+</I>&gt;<i> that part.
+</I>&gt;<i>
+</I>&gt;<i> The Ast Lifting are tightly coupled *with the design of the Abstract
+</I>&gt;<i> Syntax Tree.*  People complain about that Camlp4 Ast is hard to learn and
+</I>&gt;<i> using quasi-quotation to do the pattern match is a bad idea.
+</I>&gt;<i>
+</I>&gt;<i> Let me explain the topic a bit:
+</I>&gt;<i>     Camlp4Ast is hard to learn, I agree, it has some alien names that
+</I>&gt;<i> nobody understand what it  means, quosi-quotation *is definitely a great
+</I>&gt;<i> idea* to boom the meta-programming, but my experience here is *for very
+</I>&gt;<i> very small Ast fragment, using the Abstract Syntax Tree directly,* otherwise
+</I>&gt;<i> Quasi-quotation is a life saver to do the meta programming.
+</I>&gt;<i>    Luckily the quotation kit has nothing to do with the parser part, it's
+</I>&gt;<i> simply several functions(I did some simplify a bit) which turns a normal
+</I>&gt;<i> runtime
+</I>&gt;<i> value into an Ast node generically, *such kind functions are neither easy
+</I>&gt;<i> to write nor easy to read*, *the idea case is that it should be generated
+</I>&gt;<i> once for all, and all the data types in normal ocaml* *should be derived
+</I>&gt;<i> automatically*(some ADT with functions can not be derived). *I bet it's
+</I>&gt;<i> mostly likely a nightmare if we maintain 3 parsers for the ocaml grammar
+</I>&gt;<i> while two other parsers dumping to a meta-level*
+</I>&gt;<i>
+</I>&gt;<i>    So, how to make Ast Lifting easier,
+</I>&gt;<i>         The first guideline is *&quot;Don't mixing with records&quot;, *
+</I>&gt;<i> *         *Once you encoding AST with records, you have to encode the
+</I>&gt;<i> records in the meta level which increases the complexity without bringing
+</I>&gt;<i> any new features, *it's simply not worthwhile.*
+</I>&gt;<i> *
+</I>&gt;<i> *
+</I>&gt;<i> *       * The second guideline is &quot;Don't do *any *syntax desugaring&quot; ,
+</I>&gt;<i> syntax desguaring makes the semantics of syntax meta programming a bit
+</I>&gt;<i> weird. Syntax desguaring happens everywhere in Parsetree, think about the
+</I>&gt;<i> list literals, it uses the syntax desuaring, if you don't use any syntax
+</I>&gt;<i> desugaring, for example, you want to match the bigarray access, you simply
+</I>&gt;<i> needed to match `Bigarray(..)' instead of
+</I>&gt;<i>
+</I>&gt;<i> Pexp_apply
+</I>&gt;<i>         ({pexp_desc=Pexp_ident
+</I>&gt;<i>                      {txt= Ldot (Ldot (Lident &quot;Bigarray&quot;, array),
+</I>&gt;<i> (&quot;get&quot;|&quot;set&quot; as gs)) ;_};_},
+</I>&gt;<i>          label_exprs)
+</I>&gt;<i> ----------------------------
+</I>&gt;<i>        The third guideline is to* *make it *as uniform as possible*
+</I>&gt;<i> *       *This not only helps the user, but *it helps the meta-programming
+</I>&gt;<i> over types to derive some utility types. *Take a look at my Ast encoding
+</I>&gt;<i> in Fan <A HREF="https://github.com/bobzhang/Fan/blob/master/src/Ast.ml">https://github.com/bobzhang/Fan/blob/master/src/Ast.ml</A> (it needs
+</I>&gt;<i> to be polished, plz don't panic when you see variants I use here)
+</I>&gt;<i> *      *The initial Ast has locations and ant support, but* here we
+</I>&gt;<i> derive 3 other Asts thanks to my very regular design*.* AstN is the Ast
+</I>&gt;<i> without locations*, the locations are important, but it is simply not too
+</I>&gt;<i> much helpful when you only do the code generation, but it complicates the
+</I>&gt;<i> expanded code a lot), *AstA is the Ast without antiquotations(simply
+</I>&gt;<i> remove the ant branch), *it is a subtype of Ast(thanks to the choice we
+</I>&gt;<i> use variants here), *AstNA is the Ast without neither locations nor
+</I>&gt;<i> antiquotations*), it is a subtype of AstN.  *In practice, I found the Ast
+</I>&gt;<i> without locations is particular helpful when you only do the code
+</I>&gt;<i> generation, it simplifies this part significantly. The beautif**ul part
+</I>&gt;<i> is that  all the four Ast share the same grammar with the same
+</I>&gt;<i> quosiquotatoin mechanism, as I showed .Fan.Lang.N.expr and .Fan.Lang.expr*
+</I>&gt;<i>     I don't know how many parsers you have to maintain to reach such a
+</I>&gt;<i> goal or it's never going to happen.
+</I>&gt;<i>     Using variants to encode the intermediate ast has a lots of other
+</I>&gt;<i> benefits, but I don't want to cover it in such a short mail.
+</I>&gt;<i>
+</I>&gt;<i>    So,* my proposal is that the community design an Intermediate Ast
+</I>&gt;<i> together, and write a built-in parser to such Intermediate Ast then dump to
+</I>&gt;<i> Parsetree, but I am for that Parsetree still needs to be cleaned a bit but
+</I>&gt;<i> not too much change .  *I do appreciate you can take something away from
+</I>&gt;<i> Fan, I think the Parsetree is* not the ideal part* to do SMP, HTH
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> -- Regards, Hongbo
+</I>&gt;<i>
+</I>
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130129/ce5cc0d5/attachment-0001.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130129/ce5cc0d5/attachment-0001.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000103.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+	<LI>Next message: <A HREF="000110.html">[wg-camlp4] Meta Programming from the view of the implementaion
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#105">[ date ]</a>
+              <a href="thread.html#105">[ thread ]</a>
+              <a href="subject.html#105">[ subject ]</a>
+              <a href="author.html#105">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

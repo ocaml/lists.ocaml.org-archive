@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jQJ%3DdkSAHtCjrB22imC1mWdjfD_thNQWONTiTtFa2qK1g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000180.html">
+   <LINK REL="Next"  HREF="000184.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCACLX4jQJ%3DdkSAHtCjrB22imC1mWdjfD_thNQWONTiTtFa2qK1g%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">yminsky at janestreet.com
+       </A><BR>
+    <I>Wed Feb 27 19:32:59 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000180.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000184.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#181">[ date ]</a>
+              <a href="thread.html#181">[ thread ]</a>
+              <a href="subject.html#181">[ subject ]</a>
+              <a href="author.html#181">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Wed, Feb 27, 2013 at 1:10 PM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">alain.frisch at lexifi.com</A>&gt; wrote:
+&gt;<i> On 02/27/2013 05:31 PM, Yaron Minsky wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Let me try to summarize the current situation about the argument
+</I>&gt;&gt;<i> between Alain, Leo and myself.  I think Leo and I are roughly on the
+</I>&gt;&gt;<i> same page, but I may be missing things.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> - MAKING LONG NAMES AVAILABLE.  Alain prefers to have unambiguous long
+</I>&gt;&gt;<i>    names that are usable in a first class way.  I find this mildly
+</I>&gt;&gt;<i>    distasteful, but would be OK with it as long as it was well hidden
+</I>&gt;&gt;<i>    from the user by default.  Long names shouldn't show up by default
+</I>&gt;&gt;<i>    in source files, error messages or documentation.  I view this as
+</I>&gt;&gt;<i>    quite important for usability of namespaces.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I don't understand how the user is supposed to interpret names in
+</I>&gt;<i> error messages or documentation without explicitly qualified names.
+</I>&gt;<i> It is ok, indeed, to assume that within the documentation of Core,
+</I>&gt;<i> references to its &quot;List&quot; module are written as &quot;List&quot;, but then
+</I>&gt;<i> references to other List modules from other libraries would need to
+</I>&gt;<i> use their long names, right?  If another library, not part of Core,
+</I>&gt;<i> references types from Core_list, should we use simply &quot;List&quot; in its
+</I>&gt;<i> documentation?  Maybe, because Core is intended to be a real
+</I>&gt;<i> replacement of the stdlib, but this would perhaps not apply to other
+</I>&gt;<i> libraries, and it should certainly not be the default to always use
+</I>&gt;<i> short names for external references.
+</I>
+Garrigue's short-paths patch already goes a long way in this
+direction, chopping opened modules from error messages.  Thus, if you
+open Core.Std, a Hashtbl.t will show up as &quot;Hashtbl.t&quot;, not
+&quot;Core.Std.Hashtbl.t&quot;.  We are generally quite happy with this outcome,
+and it works well in our context.  We'd be happy with the same
+behavior with namespaces.
+
+For what it's worth, a Core.Std.List.t actually renders as &quot;list&quot;,
+since there is a type-equivalence there, and the short-paths patch
+picks, well, the type with the shortest path to display.  We're very
+happy with this behavior.
+
+I would very much want this to be done for all libraries, not just
+Core.  For example, we'd like the same behavior when we open
+Async.Std, or, for that matter, My_special_purpose_library.Std.
+
+&gt;<i> Being able to say for a given unit which name mapping is in scope is useful.
+</I>&gt;<i> This allows ocamldoc and error messages to use this mapping to use short
+</I>&gt;<i> names.  But there is also the request of being able to import a name mapping
+</I>&gt;<i> locally, for a sub-structure or locally in a function. While I understand
+</I>&gt;<i> this can be useful as a convenience for the programmer (example: a tool
+</I>&gt;<i> which needs to use locally the compiler-libs could import &quot;ocaml.ns&quot; in a
+</I>&gt;<i> restricted scope), I think it would create confusion to use those local
+</I>&gt;<i> mapping to shorten error messages.
+</I>
+The version of this in Garrigue's short-paths patch has been quite
+good to us.  That experience leads me to think it's not too
+problematic more generally.
+
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> - SOURCE-LEVEL OPENS.  Alain would prefer to have namespace
+</I>&gt;&gt;<i>    manipulations restricted to the command line, and therefore the
+</I>&gt;&gt;<i>    build system.  He thinks of namespaces as something that should be
+</I>&gt;&gt;<i>    used pretty rarely (or at least, there should be very few
+</I>&gt;&gt;<i>    namespaces), and it's therefore OK to push them to the outside.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> This does not completely reflect my position.  My initial proposal was about
+</I>&gt;<i> an &quot;open namespace&quot; statement which imports module aliases from a .ns file
+</I>&gt;<i> locally.  I've then restricted this proposal to only allow importing .ns
+</I>&gt;<i> file globally, and to do that on the command-line in order to make the use
+</I>&gt;<i> of &quot;stdlib replacements&quot; as transparent as the official stdlib for
+</I>&gt;<i> programmers.  I thought this would be a good thing for Core.  Now Leo and
+</I>&gt;<i> you have convinced me that (i) being able to import .ns file locally is also
+</I>&gt;<i> quite useful; (ii) allowing to specify global .ns file on the command-line
+</I>&gt;<i> is neither necessary nor a good idea.  So let me retract my simplified
+</I>&gt;<i> proposal and stick to the original one.
+</I>
+Great!
+
+&gt;<i> That said, I still believe that one needs a way to tell for instance
+</I>&gt;<i> ocamldoc which .ns files to use to shorten references when generating the
+</I>&gt;<i> documentation for a given module.  And I believe it would be extremely
+</I>&gt;<i> confusing for users to allow to use different .ns files on the same page,
+</I>&gt;<i> depending on &quot;open .ns&quot; statements in the .mli file.  So either ocamldoc
+</I>&gt;<i> should get this information from the command-line, or it should find in the
+</I>&gt;<i> source code itself.  I don't really care, as long as this is restricted to a
+</I>&gt;<i> global choice for a given unit.
+</I>
+I agree with this.
+
+&gt;&gt;<i> - NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+</I>&gt;&gt;<i>    namespace to also implicitly open some modules, this essentially
+</I>&gt;&gt;<i>    adding values to the search path in addition to modules.  I would be
+</I>&gt;&gt;<i>    sad to lose this feature, but I don't think it's absolutely
+</I>&gt;&gt;<i>    essential.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I've a preference for keeping independent notions as separate in the
+</I>&gt;<i> language design even if they are commonly used together.  But I agree, this
+</I>&gt;<i> is a non fundamental issue.
+</I>
+I see your point about independence, but in my mind, the difference
+between managing the namespace of modules and managing the namespace
+of values is of more interest to compiler implementors than language
+users.  These are really quite close to the same concept, and does
+comparatively little semantic violence.
+
+y
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000180.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000184.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#181">[ date ]</a>
+              <a href="thread.html#181">[ thread ]</a>
+              <a href="subject.html#181">[ subject ]</a>
+              <a href="author.html#181">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

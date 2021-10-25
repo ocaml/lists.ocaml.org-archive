@@ -1,0 +1,101 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat	stubs
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Cheating%20on%20Foreign.foreign%20to%20use%20Unix.stat%0A%09stubs&In-Reply-To=%3CCAAxsn%3DHPW9RjjG%2BafjW3jNUxvwENCKm4CqrQqmonqY3Z%2BhzCDw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000129.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat	stubs</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Cheating%20on%20Foreign.foreign%20to%20use%20Unix.stat%0A%09stubs&In-Reply-To=%3CCAAxsn%3DHPW9RjjG%2BafjW3jNUxvwENCKm4CqrQqmonqY3Z%2BhzCDw%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat	stubs">yallop at gmail.com
+       </A><BR>
+    <I>Tue Oct 28 22:00:38 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000129.html">[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#130">[ date ]</a>
+              <a href="thread.html#130">[ thread ]</a>
+              <a href="subject.html#130">[ subject ]</a>
+              <a href="author.html#130">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 27 October 2014 12:08, Andrea Giugliano &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">ag400 at leicester.ac.uk</A>&gt; wrote:
+&gt;<i> I am using ctypes in order to passing null pointers as input of Unix
+</I>&gt;<i> syscalls.
+</I>&gt;<i> So far we used the Unix OCaml library to use syscalls (open, chdir, stat),
+</I>&gt;<i> but it does not allow passing null pointers as input paths of the syscalls
+</I>&gt;<i> (i.e. mkdir NULL is not possible using OCaml Unix.mkdir).
+</I>&gt;<i>
+</I>&gt;<i> The thing is I would like to avoid implementing again the logic of Unix
+</I>&gt;<i> operations after having create ctypes stubs,
+</I>&gt;<i> instead I was successful so far in using the Unix stubs as my C functions.
+</I>&gt;<i> For instance I can have:
+</I>&gt;<i>
+</I>&gt;<i> let my_mkdir = Foreign.foreign &quot;unix_mkdir&quot; ~checkerrno:true (string_opt @-&gt;
+</I>&gt;<i> returning int)
+</I>
+While this approach works to some extent, it's not recommended.  The
+unix_mkdir function accepts and returns 'value' values, not strings
+and ints:
+
+   value unix_mkdir(value path, value perm)
+   <A HREF="https://github.com/ocaml/ocaml/blob/98e0051f/otherlibs/unix/mkdir.c#L21">https://github.com/ocaml/ocaml/blob/98e0051f/otherlibs/unix/mkdir.c#L21</A>
+
+Now, an OCaml string stored in a 'value' is represented similarly to a
+C string -- i.e. as a pointer to the first byte of an array of char --
+so some C functions that accept a 'value' will work as you expect when
+you pass then a string using ctypes.  However, you're likely to run
+into unexpected behaviour very quickly:
+
+   # let string_length = Foreign.foreign &quot;caml_string_length&quot;  (string
+@-&gt; returning int);;
+   val string_length : string -&gt; int = &lt;fun&gt;
+   # string_length &quot;abc&quot;;;
+   - : int = -1
+
+There's good news, though: the Unix stubs in the standard library are
+only thin wrappers around system calls, so you won't lose much by
+binding to the system calls directly.  Further, David Sheets has
+already written ctypes bindings to some of the functions you need; his
+bindings don't currently accept null pointers, but you may be able to
+adapt them to your needs:
+
+   <A HREF="https://github.com/dsheets/ocaml-unix-sys-stat/blob/master/lib/ctypes/unix_sys_stat.mli">https://github.com/dsheets/ocaml-unix-sys-stat/blob/master/lib/ctypes/unix_sys_stat.mli</A>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000129.html">[ocaml-ctypes] Cheating on Foreign.foreign to use Unix.stat stubs
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#130">[ date ]</a>
+              <a href="thread.html#130">[ thread ]</a>
+              <a href="subject.html#130">[ subject ]</a>
+              <a href="author.html#130">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

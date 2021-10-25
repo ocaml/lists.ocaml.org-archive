@@ -1,0 +1,162 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Missing comments?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Missing%20comments%3F&In-Reply-To=%3CCADU9VHtXQXxLRYhHAs9%3D2_J10Fav6XoUgBwxkwALD_8dCZvcog%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001452.html">
+   <LINK REL="Next"  HREF="000565.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Missing comments?</H1>
+    <B>Rudi Grinberg</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Missing%20comments%3F&In-Reply-To=%3CCADU9VHtXQXxLRYhHAs9%3D2_J10Fav6XoUgBwxkwALD_8dCZvcog%40mail.gmail.com%3E"
+       TITLE="Missing comments?">rudi.grinberg at gmail.com
+       </A><BR>
+    <I>Thu Sep 20 22:46:14 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001452.html">Missing comments?
+</A></li>
+        <LI>Next message: <A HREF="000565.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1453">[ date ]</a>
+              <a href="thread.html#1453">[ thread ]</a>
+              <a href="subject.html#1453">[ subject ]</a>
+              <a href="author.html#1453">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+Thanks for the quick and informative reply David. The examples seems
+very useful for now and the examples that I've tried
+seem to compile and work as well. So it's not totally outdated. A blog
+post about Async would be very welcome!
+
+On Thu, Sep 20, 2012 at 3:22 AM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+&gt;<i> Sigh, this is out of date. This was probably written before we split
+</I>&gt;<i> async into three parts: the core, the unix-dependent bits, and
+</I>&gt;<i> &quot;extra&quot;, everything else.
+</I>&gt;<i>
+</I>&gt;<i> So one might imagine that reading each of
+</I>&gt;<i> async/{core,unix,extra}/std.ml might be a good idea. But it turns out
+</I>&gt;<i> they're basically commentless.
+</I>&gt;<i>
+</I>&gt;<i> I didn't realise quite how bad the state of our documentation was --
+</I>&gt;<i> I'll try to find some time to work on it.
+</I>&gt;<i>
+</I>&gt;<i> There is some stuff in examples/, but sadly some of that is out of
+</I>&gt;<i> date as well. It's not worthless though, especially if you consider a
+</I>&gt;<i> couple of points that might help modernise the code:
+</I>&gt;<i>
+</I>&gt;<i> 1. Prefer pipes over streams -- they have different semantics, but
+</I>&gt;<i> Pipe's are nicer, and it can be pretty easy to make mistakes with
+</I>&gt;<i> Streams.
+</I>&gt;<i>
+</I>&gt;<i> 2. Prefer &gt;&gt;= over upon/&gt;&gt;&gt;. There is a pretty simple translation:
+</I>&gt;<i>
+</I>&gt;<i> foo
+</I>&gt;&gt;&gt;&gt;<i> fun a -&gt;
+</I>&gt;<i> bar
+</I>&gt;&gt;&gt;&gt;<i> fun b -&gt;
+</I>&gt;<i> baz
+</I>&gt;&gt;&gt;&gt;<i> fun c -&gt;
+</I>&gt;<i> quux
+</I>&gt;<i>
+</I>&gt;<i> -&gt;
+</I>&gt;<i>
+</I>&gt;<i> foo
+</I>&gt;&gt;&gt;<i>= fun a -&gt;
+</I>&gt;<i> bar
+</I>&gt;&gt;&gt;<i>= fun b -&gt;
+</I>&gt;<i> baz
+</I>&gt;&gt;&gt;|<i> fun c -&gt;
+</I>&gt;<i> quux
+</I>&gt;<i>
+</I>&gt;<i> This gives the whole block a deferred result type. For library
+</I>&gt;<i> functions, this is only really a good thing, since your callers can
+</I>&gt;<i> bind on the result, or can throw it away with [whenever] if they don't
+</I>&gt;<i> want to wait for your function to finish (whenever is soon to be
+</I>&gt;<i> renamed don't_wait_for).
+</I>&gt;<i>
+</I>&gt;<i> For blocks at the top-level of your code, there isn't as much benefit
+</I>&gt;<i> (you don't have any callers), but it's still nice to do it for
+</I>&gt;<i> consistency.
+</I>&gt;<i>
+</I>&gt;<i> [A bit more background for the interested:
+</I>&gt;<i>
+</I>&gt;<i> It used to be the case that recursive loops written with bind, e.g.:
+</I>&gt;<i>
+</I>&gt;<i>   let loop () =
+</I>&gt;<i>     if predicate then Deferred.unit else
+</I>&gt;<i>       Clock.after (sec 1.)
+</I>&gt;<i>       &gt;&gt;= fun () -&gt;
+</I>&gt;<i>       loop ()
+</I>&gt;<i>
+</I>&gt;<i> would take space proportional to the depth of recursion. So one would
+</I>&gt;<i> have to write using upon, where
+</I>&gt;<i>
+</I>&gt;<i>   let loop () =
+</I>&gt;<i>     if predicate then () else
+</I>&gt;<i>       Clock.after (sec 1.)
+</I>&gt;<i>       &gt;&gt;&gt; fun () -&gt;
+</I>&gt;<i>       loop ()
+</I>&gt;<i>
+</I>&gt;<i> and you had no way of telling when the loop was done -- if you wanted
+</I>&gt;<i> to do that, you had to create the deferred explicitly:
+</I>&gt;<i>
+</I>&gt;<i>   Deferred.create (fun ivar -&gt;
+</I>&gt;<i>     let loop () =
+</I>&gt;<i>       if predicate then Ivar.fill ivar () else
+</I>&gt;<i>         Clock.after (sec 1.)
+</I>&gt;<i>         &gt;&gt;&gt; fun () -&gt;
+</I>&gt;<i>         loop ()))
+</I>&gt;<i>
+</I>&gt;<i> But this is no longer necessary, and the bind loop should be
+</I>&gt;<i> considered the best style in almost all circumstances. The reason is a
+</I>&gt;<i> really neat trick, but this email is already too long -- I'll try to
+</I>&gt;<i> write a blog post about it.
+</I>&gt;<i> ]
+</I>&gt;<i>
+</I>&gt;<i> On Thu, Sep 20, 2012 at 7:52 AM, Rudi Grinberg &lt;<A HREF="http://lists.ocaml.org/listinfo/core">rudi.grinberg at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> The dummies guide to async says: &quot;Start by looking at
+</I>&gt;&gt;<i> async/lib/std.ml, which has comments that should guide you through
+</I>&gt;&gt;<i> reading the rest of it.&quot;
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> However, looking at:
+</I>&gt;&gt;<i> <A HREF="https://bitbucket.org/yminsky/ocaml-core/raw/8808e3a2571f/base/async/lib/std.ml">https://bitbucket.org/yminsky/ocaml-core/raw/8808e3a2571f/base/async/lib/std.ml</A>
+</I>&gt;&gt;<i>  I don't see anything.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Is this the wrong file? I can't find the comments anywhere else either.
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001452.html">Missing comments?
+</A></li>
+	<LI>Next message: <A HREF="000565.html">scripting with ocaml and core
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1453">[ date ]</a>
+              <a href="thread.html#1453">[ thread ]</a>
+              <a href="subject.html#1453">[ subject ]</a>
+              <a href="author.html#1453">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

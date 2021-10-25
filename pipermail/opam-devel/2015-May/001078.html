@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] On the new mixed mode pins
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3C4808119.gUVmi0AQhx%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001077.html">
+   <LINK REL="Next"  HREF="001079.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] On the new mixed mode pins</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20On%20the%20new%20mixed%20mode%20pins&In-Reply-To=%3C4808119.gUVmi0AQhx%40agaric%3E"
+       TITLE="[opam-devel] On the new mixed mode pins">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Mon May 18 03:27:14 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001077.html">[opam-devel] On the new mixed mode pins
+</A></li>
+        <LI>Next message: <A HREF="001079.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1078">[ date ]</a>
+              <a href="thread.html#1078">[ thread ]</a>
+              <a href="subject.html#1078">[ subject ]</a>
+              <a href="author.html#1078">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thanks Daniel for this review. I think the main mistake here was to advertise mixed-mode as VC pin, while it is functionnally much closer to *path* pin, simply adding a filter to the synched files -- and was indeed devised more as a fix for dirty files in path pins than as a workaround the need to commit in git, which was only an annoyance to those using it to get rid of build artefacts.
+
+&gt;<i> dsheets:
+</I>&gt;<i> I don't usually use `opam update -u` because I don't usually want to
+</I>&gt;<i> deal with whatever rebuilds and errors may occur. I like to know and
+</I>&gt;<i> directly approve of upgrades as they become necessary for other work.
+</I>&gt;<i> I think it's really valuable to have people developing with both lazy
+</I>&gt;<i> upgrade and eager upgrade strategies to cover the version-space. Many
+</I>&gt;<i> times, I've found incorrect version constraints due to this strategy
+</I>&gt;<i> (breakages in minor revs or point releases). Sometimes, I use `opam
+</I>&gt;<i> update -u` to clean up lagging versions. I do this maybe once a month
+</I>&gt;<i> when I explicitly think about it and not during interactive
+</I>&gt;<i> development.
+</I>
+Exactly. I don't often run `opam upgrade` either, but yet have to admit I have already been bitten a couple times by Daniel's issue, which was quite easy to fix as I don't maintain as many interdependant packages.
+
+Note that unless you switch the package you work on in the middle of a change, this is mitigated if you directly test your package using OPAM. Of course, it's not realistic if you have other packages depending on it; and there is no easy way to rollback, since OPAM currently doesn't take binary snapshots and removes every dependent package first.
+
+Now what we wanted to support with mixed pins is more or less this:
+- Quickly trying a change on the trunk in an existing package (opam source --dev --pin)
+- Creating a new package with an easy round-trip for test and update (<A HREF="http://opam.ocaml.org/doc/Packaging.html">http://opam.ocaml.org/doc/Packaging.html</A>) -- this requires a working dir pin.
+- It seems fair to expect that if I have some working directory and ask OPAM to pin to it, it will take its current state by default (having this not work only if the dir is VCed is a bit weird).
+
+I think the last is actually the main point here: less confusing when you start, and then we wanted mixed-mode as an improvement of path pins. Daniel is probably right that this should have nothing to do with users of `-k git`.
+
+&gt;<i> &gt; Daniel:
+</I>&gt;<i> &gt; Mixed-mode doesn't allow you to make `opam update -u` with peace of mind because it will pickup any change you made to uncommited but tracked files of the repository. This means that if you are working on something and leave your files in an uncompilable state, maybe to work on another project and suddenly need to do an `opam update -u` then `opam` will catch the inconsistent state, resulting in compilation errors and failure to install the package. Other nightmare scenarios include compilable changes that you would not like to see being picked up ending being catched and installed by opam without you noticing.
+</I>
+Note that you might want to do `opam update --repositories` to not update your pinned packages' states: that would probably give you some more peace of mind.
+
+&gt;<i> &gt; For me a good mental model of an opam VCS pin is that a pin simply tracks a *single* branch of your repository and *not* as it currently the case whatever ends up being checked out in the working directory of your repository. My working directory lives by its name, I want to be able to do whatever I want there without having to bother about what opam will think of it.
+</I>
+Indeed, currently the default is to sync with `HEAD`; we could detect the checked out branch at pinning time and automatically pin to `<A HREF="git://xxx#branch`">git://xxx#branch`</A> as was later suggested (for local pins only ?). Setting explicitely to `#HEAD` would remain available anyway -- existing pins without branch should be converted ?
+
+&gt;<i> &gt; As was suggested by proponents of mixed mode there are times when you don't want to have the burden of having to make a commit to be able to test for a change. For these cases I propose to add a `&#8212;dirty` or `&#8212;working-dir` option to `opam (re)install`. This works as follows, on `opam reinstall &#8212;dirty PKG` if `PKG` is a VCS pin then rather than using the branch information of the pin it will use the pin's repo working directory on-disk state of tracked files for making the install. The pin will only upgrade again whenever the pin's corresponding branch updates again (i.e. it behaves like a VCS pin). You can of course always require new snapshots by reissuing `opam resintall &#8212;dirty PKG` which will force a reinstall.
+</I>
+It can be useful, but saves the need to commit without saving the need to _remember_ to commit (or use -w instead) ; as such it only half solves the problem IMHO...
+
+&gt;<i> What happens with a branch pin that is dirty-updated? Does it take the
+</I>&gt;<i> working tree or only the working tree if the branch is the same?
+</I>&gt;<i> 
+</I>&gt;<i> &gt; I would say let's keep this simple. This should mean: take the on-disk state
+</I>&gt;<i> &gt; of git-tracked files currently checked out in the working directory of the
+</I>&gt;<i> &gt; pin's git repo. Don't lookup branch information.
+</I>
+Yes, branch in mixed-mode pin doesn't make sense, that's a reason why it's currently turned on when there is no explicit branch set. I can't see a case where you would want to take the list of tracked files from something else than HEAD.
+
+Here is another idea to explore -- we suppose ./ is git-controlled:
+```
+$ opam pin add -k git foo ./    # or
+$ opam pin add -k auto foo ./
+git pinned to currently checked out branch
+
+$ opam pin add foo ./
+[NOTE] ./ is git-controlled, but this will pin to the working directory directly. Use `--kind git` if you want OPAM to track the current git branch instead.
+Do you want to synchronise only the git-tracked files ? [Y/n] 
+```
+
+It amounts to having a separate path/git mixed mode, but the interface probably makes more sense. It could be made explicit with `-k path/git`.
+
+Daniel: see what happens when you're not using OPAM's dev branch ? ;)
+
+Cheers,
+Louis
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150518/6db29a5e/attachment.sig">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150518/6db29a5e/attachment.sig</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001077.html">[opam-devel] On the new mixed mode pins
+</A></li>
+	<LI>Next message: <A HREF="001079.html">[opam-devel] On the new mixed mode pins
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1078">[ date ]</a>
+              <a href="thread.html#1078">[ thread ]</a>
+              <a href="subject.html#1078">[ subject ]</a>
+              <a href="author.html#1078">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

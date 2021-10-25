@@ -1,0 +1,109 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Problem with the lib directory in opam's directory	hierarchy
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Problem%20with%20the%20lib%20directory%20in%20opam%27s%20directory%0A%09hierarchy&In-Reply-To=%3CCAJCP7wEUFWjvrK2tuDf-wiH16R3Er_e6j2PQjj%3DTAxWj4uF32g%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000557.html">
+   <LINK REL="Next"  HREF="000559.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Problem with the lib directory in opam's directory	hierarchy</H1>
+    <B>Kim Nguy&#7877;n</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Problem%20with%20the%20lib%20directory%20in%20opam%27s%20directory%0A%09hierarchy&In-Reply-To=%3CCAJCP7wEUFWjvrK2tuDf-wiH16R3Er_e6j2PQjj%3DTAxWj4uF32g%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Problem with the lib directory in opam's directory	hierarchy">kim at nguyen.vg
+       </A><BR>
+    <I>Wed Apr 22 16:20:17 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000557.html">[ocaml-platform] Secure OPAM?
+</A></li>
+        <LI>Next message: <A HREF="000559.html">[ocaml-platform] Problem with the lib directory in opam's directory hierarchy
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#558">[ date ]</a>
+              <a href="thread.html#558">[ thread ]</a>
+              <a href="subject.html#558">[ subject ]</a>
+              <a href="author.html#558">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+
+It is my understanding that for compiler &quot;foo&quot;, opam creates a
+standard directory hierarchy under ~/.opam/foo/, with the usual
+directories such as bin, etc, lib, share, doc.
+
+The problem lies with the lib directory. It seems that lib is used
+both as the usual lib directory (i.e. the opam equivalent of
+$PREFIX/lib) and as the base directory for ocamlfind packages. Usually
+(e.g. in debian or by installing from sources) the META file and
+runtime support for the ocaml package 'bar' would go in `ocamlc
+-where`/bar/, while the binary files used by the package go into
+$PREFIX/lib/.
+
+Under opam, both sets of files end-up in the same directory, which
+breaks the &quot;usual&quot; make uninstall rule:
+
+uninstall:
+       ... stuff ...
+       rm -rf &quot;$PREFIX&quot;/lib/bar/
+       ocamlfind remove bar
+
+In that case, ocamlfind will not find its files and complain when
+uninstalling. If we switch the two lines, ocamlfind complains with a
+warning if there are directories within bar/ (since the ocamlfind
+hierarchy is supposed to be flat for a given package).
+
+The way that would work in both opam and non opam setups would be:
+
+rm -rf &quot;$PREFIX&quot;/lib/bar/...all the files that are installed...
+ocamlfind remove bar
+rm -rf &quot;$PREFIX&quot;/lib/bar/
+
+(The last line is to not leave a dangling empty bar directory in the
+normal case where the two dirs are distincts. In the opam case, the
+directory is removed by ocamlfind remove).
+
+Is there a better way to do this ? (I'm not asking to change the opam
+directory structure, I just want to understand the best way to be
+compatible with both distrib packagers and opam packagers).
+Also, is it considered good practice to put in an ocamlfind package
+directory files or subdirectory that were not installed via ocamlfind
+install ?
+
+Best,
+-- 
+Kim
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000557.html">[ocaml-platform] Secure OPAM?
+</A></li>
+	<LI>Next message: <A HREF="000559.html">[ocaml-platform] Problem with the lib directory in opam's directory hierarchy
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#558">[ date ]</a>
+              <a href="thread.html#558">[ thread ]</a>
+              <a href="subject.html#558">[ subject ]</a>
+              <a href="author.html#558">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

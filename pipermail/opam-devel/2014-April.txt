@@ -1,0 +1,1356 @@
+From anil at recoil.org  Sat Apr  5 14:33:36 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sat, 5 Apr 2014 14:33:36 +0100
+Subject: [opam-devel] depopt constraints not respected
+Message-ID: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+
+With the React 1.0 API incompatibility now in the repository, it highlights that depopt constraints in OPAM 1.1.x aren't always respected.
+
+See:
+https://github.com/ocaml/opam-repository/pull/1863
+
+which results in Lwt.2.4.4 and React.1.0.0 being selected despite Lwt.2.4.4 having a depopt of React<"1.0.0".
+
+https://travis-ci.org/ocaml/opam-repository/jobs/22335518
+
+# File "src/react/lwt_react.ml", line 384, characters 4-10:
+# Error: This function has type
+#          ?eq:('a -> 'a -> bool) ->
+#          'a React.signal React.signal -> 'a React.signal
+#        It is applied to too many arguments; maybe you forgot a `;'.
+# Command exited with code 2.
+
+Right now the workaround has to be to put a hard "react<1.0.0" in every dependency. Is that the only way?
+
+-anil
+
+From roberto at dicosmo.org  Sat Apr  5 15:04:10 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Sat, 5 Apr 2014 16:04:10 +0200
+Subject: [opam-devel] depopt constraints not respected
+In-Reply-To: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+References: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+Message-ID: <20140405140410.GB18076@voyager>
+
+This was raised in issue #1310, copying here my answer from
+that thread.
+
+The short answer is: when there is an incompatibility/conflict,
+this must show up as a conflict in the metadata, to make sure
+the solver will know.
+
+The right solution is to fix the metadata for (all versions of)
+lwt, that miss this single line
+
+ conflicts: [ "react" { >= "1.0.0"} ]
+
+More generally, one should look at all instances of this pattern
+in the metadata, and fix them... just opened an issue on this
+here
+
+https://github.com/ocaml/opam-repository/issues/1864
+
+--
+Roberto
+
+The metadata for lwt 2.4.4, which is the following
+
+             package: lwt
+             version: 2.4.4
+          repository: default
+        upstream-url: https://github.com/ocsigen/lwt/archive/2.4.4.tar.gz
+       upstream-kind: http
+   upstream-checksum: 7f3e8d63055763004bb49ff4e7db44ea
+             depends: ocamlfind
+             depopts: base-threads | base-unix | conf-libev | ssl | react < 1.0.0 | lablgtk | ocaml-text
+  installed-versions: lwt.2.4.3 [4.01.0+fp], lwt.2.4.4 [eliom_vanilla 4.01.0 3.12.1]
+  available-versions: 2.3.2, 2.4.0, 2.4.1, 2.4.2
+         description: A cooperative threads library for OCaml
+
+gets converted into the CUDF file as
+
+package: lwt
+version: 6
+depends: base-threads , base-unix , ocamlfind
+conflicts: lwt
+opam-name: lwt
+opam-version: 2.4.4
+
+Indeed base-threads, base-unix and ocamlfind are the only packages already
+installed (you are on a new switch, which has exactly those ones), and depopts
+are converted into hard dependencies for installed packages.
+
+So the solver, that only sees the CUDF file, has no knowledge that lwt 2.4.4 is
+incompatible with react >= 1.0.0, and proposes a solution that installs
+react=1.0.0 and you get an error.
+
+One could wonder what the precise semantics of depopts is, but my position here
+is that when a given package is incompatible with another one, this must be
+translated into a conflict, and one should see a
+
+  conflicts : react >= 1.0.0
+
+in the lwt metadata.
+
+
+
+On Sat, Apr 05, 2014 at 02:33:36PM +0100, Anil Madhavapeddy wrote:
+> With the React 1.0 API incompatibility now in the repository, it highlights that depopt constraints in OPAM 1.1.x aren't always respected.
+> 
+> See:
+> https://github.com/ocaml/opam-repository/pull/1863
+> 
+> which results in Lwt.2.4.4 and React.1.0.0 being selected despite Lwt.2.4.4 having a depopt of React<"1.0.0".
+> 
+> https://travis-ci.org/ocaml/opam-repository/jobs/22335518
+> 
+> # File "src/react/lwt_react.ml", line 384, characters 4-10:
+> # Error: This function has type
+> #          ?eq:('a -> 'a -> bool) ->
+> #          'a React.signal React.signal -> 'a React.signal
+> #        It is applied to too many arguments; maybe you forgot a `;'.
+> # Command exited with code 2.
+> 
+> Right now the workaround has to be to put a hard "react<1.0.0" in every dependency. Is that the only way?
+> 
+> -anil
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+From daniel.buenzli at erratique.ch  Sat Apr  5 15:27:50 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 5 Apr 2014 16:27:50 +0200
+Subject: [opam-devel] depopt constraints not respected
+In-Reply-To: <20140405140410.GB18076@voyager>
+References: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+ <20140405140410.GB18076@voyager>
+Message-ID: <C1C34C09CEC6462DAF048F3FB2A93607@erratique.ch>
+
+Le samedi, 5 avril 2014 ? 16:04, Roberto Di Cosmo a ?crit :
+> The right solution is to fix the metadata for (all versions of)
+> lwt, that miss this single line
+>  
+> conflicts: [ "react" { >= "1.0.0"} ]
+If conflicts is just the negation of the depopt constraint why doesn't the system handle that automatically ?  
+
+Daniel
+
+
+
+From roberto at dicosmo.org  Sat Apr  5 16:15:03 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Sat, 5 Apr 2014 17:15:03 +0200
+Subject: [opam-devel] depopt constraints not respected
+In-Reply-To: <C1C34C09CEC6462DAF048F3FB2A93607@erratique.ch>
+References: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+ <20140405140410.GB18076@voyager>
+ <C1C34C09CEC6462DAF048F3FB2A93607@erratique.ch>
+Message-ID: <20140405151503.GA27000@voyager>
+
+One can imagine to ask opam to infer hidden implicit conflicts
+from constraints in the depopts metadata, and maybe this is what
+will end up being implemented, but ...
+
+ - it is good practice to make conflicts explicit when there
+   are conflicts around
+
+ - we have many opam users around that are potentially being
+   hit by this issue right away: is it easier to add a single
+   line to a few packages in the repository, or to change opam,
+   test-it, roll it out and ask everybody to use the git dev
+   version?
+
+--
+Roberto
+   
+
+On Sat, Apr 05, 2014 at 04:27:50PM +0200, Daniel B?nzli wrote:
+> Le samedi, 5 avril 2014 ? 16:04, Roberto Di Cosmo a ?crit :
+> > The right solution is to fix the metadata for (all versions of)
+> > lwt, that miss this single line
+> >  
+> > conflicts: [ "react" { >= "1.0.0"} ]
+> If conflicts is just the negation of the depopt constraint why doesn't the system handle that automatically ?  
+> 
+> Daniel
+> 
+> 
+
+-- 
+Roberto
+
+From daniel.buenzli at erratique.ch  Sat Apr  5 16:35:48 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sat, 5 Apr 2014 17:35:48 +0200
+Subject: [opam-devel] depopt constraints not respected
+In-Reply-To: <20140405151503.GA27000@voyager>
+References: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+ <20140405140410.GB18076@voyager>
+ <C1C34C09CEC6462DAF048F3FB2A93607@erratique.ch>
+ <20140405151503.GA27000@voyager>
+Message-ID: <9C9C7DEF89294013B5C904E81DF640E5@erratique.ch>
+
+
+
+Le samedi, 5 avril 2014 ? 17:15, Roberto Di Cosmo a ?crit :
+
+> - we have many opam users around that are potentially being
+> hit by this issue right away: is it easier to add a single
+> line to a few packages in the repository, or to change opam,
+> test-it, roll it out and ask everybody to use the git dev
+> version?
+
+Sure, but in the long term I'd really like opam doing that. The current situation goes against the DRY principle and common sense.  
+
+Daniel
+
+
+
+From roberto at dicosmo.org  Sat Apr  5 18:35:54 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Sat, 5 Apr 2014 19:35:54 +0200
+Subject: [opam-devel] depopt constraints not respected
+In-Reply-To: <9C9C7DEF89294013B5C904E81DF640E5@erratique.ch>
+References: <42F3AF90-B86A-4E3F-B4BE-B74C12EFED2D@recoil.org>
+ <20140405140410.GB18076@voyager>
+ <C1C34C09CEC6462DAF048F3FB2A93607@erratique.ch>
+ <20140405151503.GA27000@voyager>
+ <9C9C7DEF89294013B5C904E81DF640E5@erratique.ch>
+Message-ID: <20140405173554.GA8084@voyager>
+
+I see your point, and I agree that we should work out together a simple and
+compact solution.
+
+But to be safe we need a well defined semantics, and it's better to have some
+time to work it out and specify it formally before coding, to avoid further
+surprises later on.
+
+Adding the conflicts line has the advantage of fixing the issue at hand and
+keeping the flexibility of the depopts, with a marginal cost, in the meanwhile.
+
+--
+Roberto
+
+
+
+On Sat, Apr 05, 2014 at 05:35:48PM +0200, Daniel B?nzli wrote:
+> 
+> 
+> Le samedi, 5 avril 2014 ? 17:15, Roberto Di Cosmo a ?crit :
+> 
+> > - we have many opam users around that are potentially being
+> > hit by this issue right away: is it easier to add a single
+> > line to a few packages in the repository, or to change opam,
+> > test-it, roll it out and ask everybody to use the git dev
+> > version?
+> 
+> Sure, but in the long term I'd really like opam doing that. The current situation goes against the DRY principle and common sense.  
+> 
+> Daniel
+> 
+> 
+
+From anil at recoil.org  Sun Apr  6 17:43:12 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 6 Apr 2014 17:43:12 +0100
+Subject: [opam-devel] [ocaml-infra] Automatically synching GitHub pulls
+	to OPAM
+In-Reply-To: <CAAxsn=GpZLV=qvGeT5GLDi3RK9X96ohagRzeV8U2ShFYK3ph+g@mail.gmail.com>
+References: <BCCE4DF0-6B43-4372-8320-D145DF5F4369@recoil.org>
+ <1672D36F-95F9-4224-BBFD-37C132699DB8@gmail.com>
+ <50C07C6A-3F50-490E-A01B-4A1573074B4D@cam.ac.uk>
+ <CAAxsn=GpZLV=qvGeT5GLDi3RK9X96ohagRzeV8U2ShFYK3ph+g@mail.gmail.com>
+Message-ID: <C297611A-15F8-40B4-A9EC-82C8ED07A8B7@recoil.org>
+
+On 7 Feb 2014, at 17:02, Jeremy Yallop <yallop at gmail.com> wrote:
+
+> On 7 February 2014 16:46, Amir Chaudhry <amc79 at cam.ac.uk> wrote:
+>> Does seem very useful and an easy way for package maintainers to see how proposed patches might affect them..
+>> 
+>> Naiive question (since I haven't tried this myself): Does the switch grab the latest trunk version and apply the patch or does it take 4.01.0 and apply it?  I notice that the PRs are all for trunk.
+> 
+> The compiler version is a command-line option:
+> 
+>   https://github.com/avsm/opam-sync-github-prs/blob/88a403eb8/generate.ml#L63
+> 
+> I wonder whether it'd be more reliable to use the source branch in the
+> pull request as the 'src' for the switch.  For example, for #6,
+> instead of generating
+> 
+>    src: https://github.com/ocaml/ocaml/archive/4.0.2.tar.gz
+>    patches: https://github.com/ocaml/ocaml/pull/6.diff
+> 
+> we might simply have
+> 
+>   src: https://github.com/hnrgrgr/ocaml/archive/type_constraint_warning.tar.gz
+
+Turns out you were right about this.  I hadn't considered binary diffs
+not being represented in the patch, and so some builds failed if the
+bootstrap was altered.
+
+https://github.com/ocaml/opam-repository/issues/1848
+
+Now fixed to use the source branch instead of applying a patch...
+
+-anil
+
+
+From anil at recoil.org  Tue Apr  8 09:35:49 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 8 Apr 2014 09:35:49 +0100
+Subject: [opam-devel] ssl and https compression
+Message-ID: <78FD2DA6-F040-44D5-AFB9-C8584428193B@recoil.org>
+
+I've upgraded the opam.ocaml.org VM for the latest SSL security drama, but we should probably revisit not depending on HTTP compression and SSL together, as there are several known attacks against this combination: http://en.wikipedia.org/wiki/CRIME
+
+This isn't an immediate problem for urls.txt, but perhaps having a non-HTTPS way of retrieving URLs.txt is a good idea for OPAM 1.2 to account for future issues (e.g. via git?)
+
+-a
+
+From roberto at dicosmo.org  Tue Apr  8 10:21:41 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Tue, 8 Apr 2014 11:21:41 +0200
+Subject: [opam-devel] ssl and https compression
+In-Reply-To: <78FD2DA6-F040-44D5-AFB9-C8584428193B@recoil.org>
+References: <78FD2DA6-F040-44D5-AFB9-C8584428193B@recoil.org>
+Message-ID: <20140408092141.GB10416@voyager>
+
+What about providing by default also an url.txt.gz, like is done for
+index.tar.gz, and have the new versions of opam look for this?
+
+That would make us independent of any extra communication layer complications
+
+On Tue, Apr 08, 2014 at 09:35:49AM +0100, Anil Madhavapeddy wrote:
+> I've upgraded the opam.ocaml.org VM for the latest SSL security drama, but we should probably revisit not depending on HTTP compression and SSL together, as there are several known attacks against this combination: http://en.wikipedia.org/wiki/CRIME
+> 
+> This isn't an immediate problem for urls.txt, but perhaps having a non-HTTPS way of retrieving URLs.txt is a good idea for OPAM 1.2 to account for future issues (e.g. via git?)
+> 
+> -a
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From anil at recoil.org  Tue Apr  8 10:44:23 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 8 Apr 2014 10:44:23 +0100
+Subject: [opam-devel] ssl and https compression
+In-Reply-To: <20140408092141.GB10416@voyager>
+References: <78FD2DA6-F040-44D5-AFB9-C8584428193B@recoil.org>
+ <20140408092141.GB10416@voyager>
+Message-ID: <B1195686-EF57-4A16-AC22-54BC5BE654DA@recoil.org>
+
+Should work, but need to check the intersection of content negotiation to ensure that Nginx won't just transmit that encrypted using transfer-encoding instead.  If I remember right, we use a Stud SSL terminator in front of Nginx, so this shouldn't happen...
+
+-anil
+
+On 8 Apr 2014, at 10:21, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+
+> What about providing by default also an url.txt.gz, like is done for
+> index.tar.gz, and have the new versions of opam look for this?
+> 
+> That would make us independent of any extra communication layer complications
+> 
+> On Tue, Apr 08, 2014 at 09:35:49AM +0100, Anil Madhavapeddy wrote:
+>> I've upgraded the opam.ocaml.org VM for the latest SSL security drama, but we should probably revisit not depending on HTTP compression and SSL together, as there are several known attacks against this combination: http://en.wikipedia.org/wiki/CRIME
+>> 
+>> This isn't an immediate problem for urls.txt, but perhaps having a non-HTTPS way of retrieving URLs.txt is a good idea for OPAM 1.2 to account for future issues (e.g. via git?)
+>> 
+>> -a
+>> _______________________________________________
+>> opam-devel mailing list
+>> opam-devel at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/opam-devel
+> 
+> -- 
+> Roberto Di Cosmo
+> 
+> ------------------------------------------------------------------
+> Professeur               En delegation a l'INRIA
+> PPS                      E-mail: roberto at dicosmo.org
+> Universite Paris Diderot WWW  : http://www.dicosmo.org
+> Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> 5, Rue Thomas Mann       
+> F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> ------------------------------------------------------------------
+> Attachments:
+> MIME accepted, Word deprecated
+>      http://www.gnu.org/philosophy/no-word-attachments.html
+> ------------------------------------------------------------------
+> Office location:
+> 
+> Bureau 3020 (3rd floor)
+> Batiment Sophie Germain
+> Avenue de France
+> Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> -----------------------------------------------------------------
+> GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> 
+
+
+From roberto at dicosmo.org  Tue Apr  8 13:39:51 2014
+From: roberto at dicosmo.org (Roberto Di Cosmo)
+Date: Tue, 8 Apr 2014 14:39:51 +0200
+Subject: [opam-devel] ssl and https compression
+In-Reply-To: <B1195686-EF57-4A16-AC22-54BC5BE654DA@recoil.org>
+References: <78FD2DA6-F040-44D5-AFB9-C8584428193B@recoil.org>
+ <20140408092141.GB10416@voyager>
+ <B1195686-EF57-4A16-AC22-54BC5BE654DA@recoil.org>
+Message-ID: <20140408123951.GB907@voyager>
+
+Ok, if you can look into this, I believe you are the most
+qualified to propose a solution ;-)
+
+On Tue, Apr 08, 2014 at 10:44:23AM +0100, Anil Madhavapeddy wrote:
+> Should work, but need to check the intersection of content negotiation to ensure that Nginx won't just transmit that encrypted using transfer-encoding instead.  If I remember right, we use a Stud SSL terminator in front of Nginx, so this shouldn't happen...
+> 
+> -anil
+> 
+> On 8 Apr 2014, at 10:21, Roberto Di Cosmo <roberto at dicosmo.org> wrote:
+> 
+> > What about providing by default also an url.txt.gz, like is done for
+> > index.tar.gz, and have the new versions of opam look for this?
+> > 
+> > That would make us independent of any extra communication layer complications
+> > 
+> > On Tue, Apr 08, 2014 at 09:35:49AM +0100, Anil Madhavapeddy wrote:
+> >> I've upgraded the opam.ocaml.org VM for the latest SSL security drama, but we should probably revisit not depending on HTTP compression and SSL together, as there are several known attacks against this combination: http://en.wikipedia.org/wiki/CRIME
+> >> 
+> >> This isn't an immediate problem for urls.txt, but perhaps having a non-HTTPS way of retrieving URLs.txt is a good idea for OPAM 1.2 to account for future issues (e.g. via git?)
+> >> 
+> >> -a
+> >> _______________________________________________
+> >> opam-devel mailing list
+> >> opam-devel at lists.ocaml.org
+> >> http://lists.ocaml.org/listinfo/opam-devel
+> > 
+> > -- 
+> > Roberto Di Cosmo
+> > 
+> > ------------------------------------------------------------------
+> > Professeur               En delegation a l'INRIA
+> > PPS                      E-mail: roberto at dicosmo.org
+> > Universite Paris Diderot WWW  : http://www.dicosmo.org
+> > Case 7014                Tel  : ++33-(0)1-57 27 92 20
+> > 5, Rue Thomas Mann       
+> > F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+> > FRANCE.                  Twitter: http://twitter.com/rdicosmo
+> > ------------------------------------------------------------------
+> > Attachments:
+> > MIME accepted, Word deprecated
+> >      http://www.gnu.org/philosophy/no-word-attachments.html
+> > ------------------------------------------------------------------
+> > Office location:
+> > 
+> > Bureau 3020 (3rd floor)
+> > Batiment Sophie Germain
+> > Avenue de France
+> > Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+> > -----------------------------------------------------------------
+> > GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+> > 
+> 
+
+-- 
+Roberto Di Cosmo
+ 
+------------------------------------------------------------------
+Professeur               En delegation a l'INRIA
+PPS                      E-mail: roberto at dicosmo.org
+Universite Paris Diderot WWW  : http://www.dicosmo.org
+Case 7014                Tel  : ++33-(0)1-57 27 92 20
+5, Rue Thomas Mann       
+F-75205 Paris Cedex 13   Identica: http://identi.ca/rdicosmo
+FRANCE.                  Twitter: http://twitter.com/rdicosmo
+------------------------------------------------------------------
+Attachments:
+MIME accepted, Word deprecated
+      http://www.gnu.org/philosophy/no-word-attachments.html
+------------------------------------------------------------------
+Office location:
+ 
+Bureau 3020 (3rd floor)
+Batiment Sophie Germain
+Avenue de France
+Metro Bibliotheque Francois Mitterrand, ligne 14/RER C
+-----------------------------------------------------------------
+GPG fingerprint 2931 20CE 3A5A 5390 98EC 8BFC FCCA C3BE 39CB 12D3                        
+
+From anil at recoil.org  Sun Apr 27 08:01:57 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 27 Apr 2014 08:01:57 +0100
+Subject: [opam-devel] 0install gist for macos x
+Message-ID: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+
+If anyone want's to play around with 0install, I've put a tidied up gist here:
+
+https://gist.github.com/avsm/39d0ced39f9ed45165d5
+
+It'll be submitted upstream soonish hopefully, and then binary bottled (so you can `brew install 0install` without having to compile anything).  The GTK2 GUI is a little clunky on MacOS X as it takes some time to spin up, but works fine in my limited testing so far.
+
+$ 0install add opam http://test.roscidus.com/opam.xml
+
+This spins up the GUI and gives a 'OS version mismatch error' as expected (since Thomas' published test repo is a Linux OPAM binary).  More later as I catch up on e-mail...
+
+-anil
+
+From anil at recoil.org  Sun Apr 27 22:34:10 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Sun, 27 Apr 2014 22:34:10 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+Message-ID: <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+
+On 27 Apr 2014, at 09:44, Thomas Leonard <talex5 at gmail.com> wrote:
+
+> On 27 April 2014 08:01, Anil Madhavapeddy <anil at recoil.org> wrote:
+>> If anyone want's to play around with 0install, I've put a tidied up gist here:
+>> 
+>> https://gist.github.com/avsm/39d0ced39f9ed45165d5
+>> 
+>> It'll be submitted upstream soonish hopefully, and then binary bottled (so you can `brew install 0install` without having to compile anything).  The GTK2 GUI is a little clunky on MacOS X as it takes some time to spin up, but works fine in my limited testing so far.
+> 
+> By the way, we'd be very happy to have a native OS X GUI plugin if
+> anyone has time. It should be fairly easy to do as there's a clean
+> split between the GUI code and the logic: just copy the gui_gtk
+> directory and translate to your favourite toolkit...
+
+Has anyone built a web interface, out of interest?  That would be much more likely to be useful on an ARM board too, as it could provide a configuration frontend.
+
+>> $ 0install add opam http://test.roscidus.com/opam.xml
+>> 
+>> This spins up the GUI and gives a 'OS version mismatch error' as expected (since Thomas' published test repo is a Linux OPAM binary).  More later as I catch up on e-mail...
+> 
+> I've added the Linux-x86 and Darwin-x86_64 binaries too now - let me
+> know if it works!
+
+Almost!  It now downloads the archive, but fails when creating /var/cache (doesn't exist on MacOS X).  Is there an environment variable to control this (or configure time option)?
+
+-anil
+
+From agarwal1975 at gmail.com  Mon Apr 28 13:17:14 2014
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 28 Apr 2014 08:17:14 -0400
+Subject: [opam-devel] `opam config list` doesn't show base-unix on Debian
+Message-ID: <CAMu2m2+8raTWLfLmGPb3M10jY_gkaBsc7_aLUo5sw0i9-FQ-5g@mail.gmail.com>
+
+On most systems, I get:
+
+$ opam config list | grep base-unix
+base-unix:installed                      true
+base-unix:enable                         enable
+
+
+But on Debian, I'm getting:
+
+$ opam config list | grep base-unix
+(* no output *)
+
+
+However, it seems the Unix library is installed:
+
+$ ocaml
+
+        OCaml version 4.01.0
+
+# #load "unix.cma";;
+# Unix.getenv;;
+- : string -> string = <fun>
+
+
+But opam seems not to have it in its list:
+
+$ opam list
+No packages found.
+
+
+Also, this happens:
+
+$ opam switch
+4.01.0  C 4.01.0       Official 4.01.0 release
+
+$ opam switch 4.01.0
+[WARNING] Some of the compiler base packages are not installed. You should
+run:
+
+    $ opam install base-threads base-bigarray base-unix
+
+Odd, but okay, I try it:
+
+$ opam install base-threads base-bigarray base-unix
+The following actions will be performed:
+ - install   base-threads.base
+ - install   base-bigarray.base
+ - install   base-unix.base
+
+=== 3 to install ===
+
+=-=-=-=-=-=-=-=-=-=-=-=- Synchronizing package archives
+-=-=-=-=-=-=-=-=-=-=-=-=
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-= Installing packages
+-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+Installing base-bigarray.base.
+Installing base-threads.base.
+Installing base-unix.base.
+
+Now opam does list the packages:
+$ opam list
+Installed packages for 4.01.0:
+base-bigarray  base  Bigarray library distributed with the OCaml compiler
+base-threads   base  Threads library distributed with the OCaml compiler
+base-unix      base  Unix library distributed with the OCaml compiler
+
+But the config variables still don't get fixed:
+
+$ opam config list | grep base-unix
+(* no output *)
+
+This of course leads to other problems, such as lwt.unix doesn't get
+installed.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140428/5d7de149/attachment.html>
+
+From talex5 at gmail.com  Mon Apr 28 15:39:20 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Mon, 28 Apr 2014 15:39:20 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+Message-ID: <CAG4opy80Ty2rc15FvbihONf53cGAZWtHp-hfQVkiq8Vu0PkFQA@mail.gmail.com>
+
+On 27 April 2014 22:34, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 27 Apr 2014, at 09:44, Thomas Leonard <talex5 at gmail.com> wrote:
+>
+>> On 27 April 2014 08:01, Anil Madhavapeddy <anil at recoil.org> wrote:
+>>> If anyone want's to play around with 0install, I've put a tidied up gist here:
+>>>
+>>> https://gist.github.com/avsm/39d0ced39f9ed45165d5
+>>>
+>>> It'll be submitted upstream soonish hopefully, and then binary bottled (so you can `brew install 0install` without having to compile anything).  The GTK2 GUI is a little clunky on MacOS X as it takes some time to spin up, but works fine in my limited testing so far.
+>>
+>> By the way, we'd be very happy to have a native OS X GUI plugin if
+>> anyone has time. It should be fairly easy to do as there's a clean
+>> split between the GUI code and the logic: just copy the gui_gtk
+>> directory and translate to your favourite toolkit...
+>
+> Has anyone built a web interface, out of interest?  That would be much more likely to be useful on an ARM board too, as it could provide a configuration frontend.
+
+I don't think so, but it shouldn't be very difficult.
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From anil at recoil.org  Mon Apr 28 15:41:51 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 28 Apr 2014 15:41:51 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+ <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+Message-ID: <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+
+On 28 Apr 2014, at 09:26, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> That's odd. It might try writing there (in case it's running as root),
+> but it doesn't need to and normally it can't. It works on Linux even
+> if /var/cache is missing.
+> 
+> What does this output?
+> 
+> 0install run -vvc http://test.roscidus.com/opam.xml
+
+tail snippet below:
+
+[2 downloads]    0 / 1743.0 KB (http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz)< HTTP/1.1 200 OK
+* Server nginx is not blacklisted
+< Server: nginx
+< Date: Mon, 28 Apr 2014 14:40:17 GMT
+< Content-Type: application/octet-stream
+< Content-Length: 1784883
+< Last-Modified: Sun, 27 Apr 2014 08:34:34 GMT
+< Connection: keep-alive
+< ETag: "535cc11a-1b3c33"
+< Accept-Ranges: bytes
+< 
+[2 downloads] 1502296 / 1743.0 KB (http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz)* Connection #0 to host test.roscidus.com left intact
+info: Download 'http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz' completed successfully (1784883 bytes)
+info: Will run: tar --version
+info: Will run: tar -xf /var/folders/vr/h2mdzb2d2gv29pmvbywrnfjh0000gn/T/0install-2c1611-download -C /Users/avsm/.cache/0install.net/implementations/0install-unpack-381553e5 -z
+info: Removing temporary directory '/Users/avsm/.cache/0install.net/implementations/tmp-39611905'
+Not a directory: /var
+... creating directory /var/cache/0install.net/implementations
+... downloading implementation http://test.roscidus.com/opam.xml 1.1.1 (id=sha1new=3de6e1723bfef5d5a9572e20e1977a88b8152190)
+Called from file "support/utils.ml", line 81, characters 8-19
+Called from file "support/utils.ml", line 81, characters 8-19
+Called from file "support/utils.ml", line 81, characters 8-19
+Called from file "support/utils.ml", line 83, characters 6-15
+Re-raised at file "support/common.ml", line 127, characters 10-12
+Called from file "zeroinstall/stores.ml", line 136, characters 2-38
+Called from file "zeroinstall/stores.ml", line 244, characters 8-63
+Called from file "zeroinstall/fetch.ml", line 574, characters 17-116
+Called from file "src/core/lwt.ml", line 646, characters 66-69
+Re-raised at file "zeroinstall/fetch.ml", line 582, characters 21-23
+Called from file "src/core/lwt.ml", line 774, characters 66-71
+Re-raised at file "support/common.ml", line 127, characters 10-12
+Called from file "src/core/lwt.ml", line 691, characters 66-71
+Re-raised at file "zeroinstall/fetch.ml", line 746, characters 16-21
+Called from file "src/core/lwt.ml", line 646, characters 66-69
+Re-raised at file "src/core/lwt.ml", line 782, characters 22-23
+Called from file "src/unix/lwt_main.ml", line 34, characters 8-18
+Called from file "generic_select.ml", line 268, characters 21-35
+Called from file "run.ml", line 59, characters 15-129
+Called from file "cli.ml", line 182, characters 10-36
+Called from file "cli.ml", line 328, characters 6-69
+Called from file "support/utils.ml", line 31, characters 6-15
+
+
+From talex5 at gmail.com  Mon Apr 28 16:07:42 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Mon, 28 Apr 2014 16:07:42 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+ <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+ <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+Message-ID: <CAG4opy9s+L+PXT1scrL4DX918xnuUfME8phFjaQokBaB8e+zTA@mail.gmail.com>
+
+On 28 April 2014 15:41, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 28 Apr 2014, at 09:26, Thomas Leonard <talex5 at gmail.com> wrote:
+>>
+>> That's odd. It might try writing there (in case it's running as root),
+>> but it doesn't need to and normally it can't. It works on Linux even
+>> if /var/cache is missing.
+>>
+>> What does this output?
+>>
+>> 0install run -vvc http://test.roscidus.com/opam.xml
+>
+> tail snippet below:
+>
+> [2 downloads]    0 / 1743.0 KB (http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz)< HTTP/1.1 200 OK
+> * Server nginx is not blacklisted
+> < Server: nginx
+> < Date: Mon, 28 Apr 2014 14:40:17 GMT
+> < Content-Type: application/octet-stream
+> < Content-Length: 1784883
+> < Last-Modified: Sun, 27 Apr 2014 08:34:34 GMT
+> < Connection: keep-alive
+> < ETag: "535cc11a-1b3c33"
+> < Accept-Ranges: bytes
+> <
+> [2 downloads] 1502296 / 1743.0 KB (http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz)* Connection #0 to host test.roscidus.com left intact
+> info: Download 'http://test.roscidus.com/archives/opam-Darwin-x86_64-1.1.1.tgz' completed successfully (1784883 bytes)
+> info: Will run: tar --version
+> info: Will run: tar -xf /var/folders/vr/h2mdzb2d2gv29pmvbywrnfjh0000gn/T/0install-2c1611-download -C /Users/avsm/.cache/0install.net/implementations/0install-unpack-381553e5 -z
+> info: Removing temporary directory '/Users/avsm/.cache/0install.net/implementations/tmp-39611905'
+> Not a directory: /var
+> ... creating directory /var/cache/0install.net/implementations
+> ... downloading implementation http://test.roscidus.com/opam.xml 1.1.1 (id=sha1new=3de6e1723bfef5d5a9572e20e1977a88b8152190)
+> Called from file "support/utils.ml", line 81, characters 8-19
+> Called from file "support/utils.ml", line 81, characters 8-19
+> Called from file "support/utils.ml", line 81, characters 8-19
+> Called from file "support/utils.ml", line 83, characters 6-15
+> Re-raised at file "support/common.ml", line 127, characters 10-12
+> Called from file "zeroinstall/stores.ml", line 136, characters 2-38
+> Called from file "zeroinstall/stores.ml", line 244, characters 8-63
+> Called from file "zeroinstall/fetch.ml", line 574, characters 17-116
+> Called from file "src/core/lwt.ml", line 646, characters 66-69
+> Re-raised at file "zeroinstall/fetch.ml", line 582, characters 21-23
+> Called from file "src/core/lwt.ml", line 774, characters 66-71
+> Re-raised at file "support/common.ml", line 127, characters 10-12
+> Called from file "src/core/lwt.ml", line 691, characters 66-71
+> Re-raised at file "zeroinstall/fetch.ml", line 746, characters 16-21
+> Called from file "src/core/lwt.ml", line 646, characters 66-69
+> Re-raised at file "src/core/lwt.ml", line 782, characters 22-23
+> Called from file "src/unix/lwt_main.ml", line 34, characters 8-18
+> Called from file "generic_select.ml", line 268, characters 21-35
+> Called from file "run.ml", line 59, characters 15-129
+> Called from file "cli.ml", line 182, characters 10-36
+> Called from file "cli.ml", line 328, characters 6-69
+> Called from file "support/utils.ml", line 31, characters 6-15
+
+Ah, I guess it's confused because /var is a symlink and not a
+directory. I've fixed the bug:
+
+https://github.com/0install/0install/commit/8da5a1f82c108903dfea74553df0779f9f9e6d14
+
+A simple work-around is to mkdir /var/cache first.
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From agarwal1975 at gmail.com  Mon Apr 28 16:17:57 2014
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 28 Apr 2014 11:17:57 -0400
+Subject: [opam-devel] `opam config list` doesn't show base-unix on Debian
+In-Reply-To: <CAMu2m2+8raTWLfLmGPb3M10jY_gkaBsc7_aLUo5sw0i9-FQ-5g@mail.gmail.com>
+References: <CAMu2m2+8raTWLfLmGPb3M10jY_gkaBsc7_aLUo5sw0i9-FQ-5g@mail.gmail.com>
+Message-ID: <CAMu2m2Les1jrKG4PpUJdm2BGFCjVLxwO9B3GF9iFOizOXQ8vFw@mail.gmail.com>
+
+I was compiling from opam head. Using opam 1.1.1 makes the problem go away.
+
+
+On Mon, Apr 28, 2014 at 8:17 AM, Ashish Agarwal <agarwal1975 at gmail.com>wrote:
+
+> On most systems, I get:
+>
+> $ opam config list | grep base-unix
+> base-unix:installed                      true
+> base-unix:enable                         enable
+>
+>
+> But on Debian, I'm getting:
+>
+> $ opam config list | grep base-unix
+> (* no output *)
+>
+>
+> However, it seems the Unix library is installed:
+>
+> $ ocaml
+>
+>         OCaml version 4.01.0
+>
+> # #load "unix.cma";;
+> # Unix.getenv;;
+> - : string -> string = <fun>
+>
+>
+> But opam seems not to have it in its list:
+>
+> $ opam list
+> No packages found.
+>
+>
+> Also, this happens:
+>
+> $ opam switch
+> 4.01.0  C 4.01.0       Official 4.01.0 release
+>
+> $ opam switch 4.01.0
+> [WARNING] Some of the compiler base packages are not installed. You should
+> run:
+>
+>     $ opam install base-threads base-bigarray base-unix
+>
+> Odd, but okay, I try it:
+>
+> $ opam install base-threads base-bigarray base-unix
+> The following actions will be performed:
+>  - install   base-threads.base
+>  - install   base-bigarray.base
+>  - install   base-unix.base
+>
+> === 3 to install ===
+>
+> =-=-=-=-=-=-=-=-=-=-=-=- Synchronizing package archives
+> -=-=-=-=-=-=-=-=-=-=-=-=
+>
+> =-=-=-=-=-=-=-=-=-=-=-=-=-=-= Installing packages
+> -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+> Installing base-bigarray.base.
+> Installing base-threads.base.
+> Installing base-unix.base.
+>
+> Now opam does list the packages:
+> $ opam list
+> Installed packages for 4.01.0:
+> base-bigarray  base  Bigarray library distributed with the OCaml compiler
+> base-threads   base  Threads library distributed with the OCaml compiler
+> base-unix      base  Unix library distributed with the OCaml compiler
+>
+> But the config variables still don't get fixed:
+>
+> $ opam config list | grep base-unix
+> (* no output *)
+>
+> This of course leads to other problems, such as lwt.unix doesn't get
+> installed.
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140428/aff36eeb/attachment-0001.html>
+
+From anil at recoil.org  Mon Apr 28 19:41:02 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Mon, 28 Apr 2014 19:41:02 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <CAG4opy9s+L+PXT1scrL4DX918xnuUfME8phFjaQokBaB8e+zTA@mail.gmail.com>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+ <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+ <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+ <CAG4opy9s+L+PXT1scrL4DX918xnuUfME8phFjaQokBaB8e+zTA@mail.gmail.com>
+Message-ID: <B109C863-9832-43DA-BCEF-A634FEDBB6E0@recoil.org>
+
+On 28 Apr 2014, at 16:07, Thomas Leonard <talex5 at gmail.com> wrote:
+> 
+> Ah, I guess it's confused because /var is a symlink and not a
+> directory. I've fixed the bug:
+> 
+> https://github.com/0install/0install/commit/8da5a1f82c108903dfea74553df0779f9f9e6d14
+> 
+> A simple work-around is to mkdir /var/cache first.
+> 
+
+Thanks, a Homebrew pull request with the patch incorporated is now
+at: https://github.com/Homebrew/homebrew/pull/28771
+
+-anil
+
+From talex5 at gmail.com  Sun Apr 27 09:44:36 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Sun, 27 Apr 2014 09:44:36 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+Message-ID: <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+
+On 27 April 2014 08:01, Anil Madhavapeddy <anil at recoil.org> wrote:
+> If anyone want's to play around with 0install, I've put a tidied up gist here:
+>
+> https://gist.github.com/avsm/39d0ced39f9ed45165d5
+>
+> It'll be submitted upstream soonish hopefully, and then binary bottled (so you can `brew install 0install` without having to compile anything).  The GTK2 GUI is a little clunky on MacOS X as it takes some time to spin up, but works fine in my limited testing so far.
+
+By the way, we'd be very happy to have a native OS X GUI plugin if
+anyone has time. It should be fairly easy to do as there's a clean
+split between the GUI code and the logic: just copy the gui_gtk
+directory and translate to your favourite toolkit...
+
+> $ 0install add opam http://test.roscidus.com/opam.xml
+>
+> This spins up the GUI and gives a 'OS version mismatch error' as expected (since Thomas' published test repo is a Linux OPAM binary).  More later as I catch up on e-mail...
+
+I've added the Linux-x86 and Darwin-x86_64 binaries too now - let me
+know if it works!
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From talex5 at gmail.com  Mon Apr 28 09:26:38 2014
+From: talex5 at gmail.com (Thomas Leonard)
+Date: Mon, 28 Apr 2014 09:26:38 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+Message-ID: <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+
+On 27 April 2014 22:34, Anil Madhavapeddy <anil at recoil.org> wrote:
+> On 27 Apr 2014, at 09:44, Thomas Leonard <talex5 at gmail.com> wrote:
+>
+>> On 27 April 2014 08:01, Anil Madhavapeddy <anil at recoil.org> wrote:
+>>> If anyone want's to play around with 0install, I've put a tidied up gist here:
+>>>
+>>> https://gist.github.com/avsm/39d0ced39f9ed45165d5
+>>>
+>>> It'll be submitted upstream soonish hopefully, and then binary bottled (so you can `brew install 0install` without having to compile anything).  The GTK2 GUI is a little clunky on MacOS X as it takes some time to spin up, but works fine in my limited testing so far.
+>>
+>> By the way, we'd be very happy to have a native OS X GUI plugin if
+>> anyone has time. It should be fairly easy to do as there's a clean
+>> split between the GUI code and the logic: just copy the gui_gtk
+>> directory and translate to your favourite toolkit...
+>
+> Has anyone built a web interface, out of interest?  That would be much more likely to be useful on an ARM board too, as it could provide a configuration frontend.
+>
+>>> $ 0install add opam http://test.roscidus.com/opam.xml
+>>>
+>>> This spins up the GUI and gives a 'OS version mismatch error' as expected (since Thomas' published test repo is a Linux OPAM binary).  More later as I catch up on e-mail...
+>>
+>> I've added the Linux-x86 and Darwin-x86_64 binaries too now - let me
+>> know if it works!
+>
+> Almost!  It now downloads the archive, but fails when creating /var/cache (doesn't exist on MacOS X).  Is there an environment variable to control this (or configure time option)?
+
+That's odd. It might try writing there (in case it's running as root),
+but it doesn't need to and normally it can't. It works on Linux even
+if /var/cache is missing.
+
+What does this output?
+
+0install run -vvc http://test.roscidus.com/opam.xml
+
+
+-- 
+Dr Thomas Leonard        http://0install.net/
+GPG: 9242 9807 C985 3C07 44A6  8B9A AE07 8280 59A5 3CC1
+GPG: DA98 25AE CAD0 8975 7CDA  BD8E 0713 3F96 CA74 D8BA
+
+From rudi.grinberg at gmail.com  Tue Apr 29 06:07:06 2014
+From: rudi.grinberg at gmail.com (Rudi Grinberg)
+Date: Tue, 29 Apr 2014 01:07:06 -0400
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <B109C863-9832-43DA-BCEF-A634FEDBB6E0@recoil.org>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+ <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+ <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+ <CAG4opy9s+L+PXT1scrL4DX918xnuUfME8phFjaQokBaB8e+zTA@mail.gmail.com>
+ <B109C863-9832-43DA-BCEF-A634FEDBB6E0@recoil.org>
+Message-ID: <op.xe2a55vmaxolw7@rudis-macbook-pro.local>
+
+This is useful. Will give it a try. I was already imagining hypothetical  
+scenarios explaining how to get 0install working for less technical people:
+
+> What's 0install?
+A package manager
+
+> How do I install it?
+Use opam
+
+> What's opam?
+A package manager
+
+> How do Install it?
+> use homebrew
+
+...
+
+
+On Mon, 28 Apr 2014 14:41:02 -0400, Anil Madhavapeddy <anil at recoil.org>  
+wrote:
+
+> On 28 Apr 2014, at 16:07, Thomas Leonard <talex5 at gmail.com> wrote:
+>>
+>> Ah, I guess it's confused because /var is a symlink and not a
+>> directory. I've fixed the bug:
+>>
+>> https://github.com/0install/0install/commit/8da5a1f82c108903dfea74553df0779f9f9e6d14
+>>
+>> A simple work-around is to mkdir /var/cache first.
+>>
+>
+> Thanks, a Homebrew pull request with the patch incorporated is now
+> at: https://github.com/Homebrew/homebrew/pull/28771
+>
+> -anil
+> _______________________________________________
+> MirageOS-devel mailing list
+> MirageOS-devel at lists.xenproject.org
+> http://lists.xenproject.org/cgi-bin/mailman/listinfo/mirageos-devel
+
+From anil at recoil.org  Tue Apr 29 15:10:55 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Tue, 29 Apr 2014 15:10:55 +0100
+Subject: [opam-devel] [MirageOS-devel] 0install gist for macos x
+In-Reply-To: <op.xe2a55vmaxolw7@rudis-macbook-pro.local>
+References: <5833C89C-B86D-4253-96B3-8CEF16C43AC8@recoil.org>
+ <CAG4opy9RyTUVDhZGi0EcHcUG5yx1qatXX-63NwdV83fUN=nOnA@mail.gmail.com>
+ <8A6462D1-FF71-4873-A602-7450C0F0EBC9@recoil.org>
+ <CAG4opy-1Uk_1JkzzA-g0g32FcrnkDFdvMR5+1n9qjMq4=u_Pgw@mail.gmail.com>
+ <08E5186D-AA0A-4E35-B945-96B4E7F9DBC9@recoil.org>
+ <CAG4opy9s+L+PXT1scrL4DX918xnuUfME8phFjaQokBaB8e+zTA@mail.gmail.com>
+ <B109C863-9832-43DA-BCEF-A634FEDBB6E0@recoil.org>
+ <op.xe2a55vmaxolw7@rudis-macbook-pro.local>
+Message-ID: <3C051340-CE6D-40B3-A0BB-85DC283D99BE@recoil.org>
+
+On 29 Apr 2014, at 06:07, Rudi Grinberg <rudi.grinberg at gmail.com> wrote:
+
+> This is useful. Will give it a try. I was already imagining hypothetical scenarios explaining how to get 0install working for less technical people:
+> 
+>> What's 0install?
+> A package manager
+> 
+>> How do I install it?
+> Use opam
+> 
+>> What's opam?
+> A package manager
+> 
+>> How do Install it?
+>> use homebrew
+
+Haaaaaaang on, you actually use Homebrew to install 0install to install OPAM!
+
+(but more seriously, 0install seems to be a nice ubiquitous solution for binary installations, and a lot better than the existing static binary distribution which has a number of limitations -- the Homebrew version of 0install is really for development I'd think).
+
+-anil
+
+
+From anil at recoil.org  Wed Apr 30 11:29:35 2014
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 30 Apr 2014 11:29:35 +0100
+Subject: [opam-devel] Fwd: [opam-commits] Cron job update-opam failed on
+	opam.ocaml.org
+References: <E1WfJoj-0005zD-3Q@www-ocaml-serv1>
+Message-ID: <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+
+Looks like the new build system in trunk needs the git scripts to be tweaked before an update will work again.
+
+Begin forwarded message:
+
+> From: cron at opam.ocaml.org
+> Subject: [opam-commits] Cron job update-opam failed on opam.ocaml.org
+> Date: 30 April 2014 03:00:13 BST
+> To: opam-commits at lists.ocaml.org
+> 
+> 
+> === FULL LOG ===
+> 
+> 
+> ======== RUNNING COMMAND: update-opam update-from-git.sh opam ========
+> {{{
+> ==> 2014-04-30 02:00:01+00:00
+> ==> Load opam env
+> ==> Running update-from-git.sh opam
+> 
+> From git://github.com/ocaml/opam
+>   4abac1d..b88fe71  master     -> origin/master
+> Removing META
+> Removing Makefile.config
+> Removing _obuild/
+> Removing config.log
+> Removing config.status
+> Removing depends.ocp
+> Removing doc/man-ext/opam-check.md
+> Removing ocp-build.root
+> Removing ocp-build.root.old
+> Removing ocp-build/ocp-build
+> Removing ocp-build/ocp-build.run
+> Removing ocp-build/primitives.cmi
+> Removing ocp-build/primitives.cmo
+> Removing ocp-build/primitives.ml
+> Removing ocp-build/win32_c.o
+> Removing src/core/opamGitVersion.ml
+> Removing src/core/opamScript.ml
+> Removing src/core/opamVersion.ml
+> Already on 'master'
+> Your branch is behind 'origin/master' by 22 commits, and can be fast-forwarded.
+> HEAD is now at b88fe71 Merge pull request #1362 from OCamlPro/rebuild
+> make -C src Makefile.config
+> make[1]: Entering directory `/home/opam/git/opam/src'
+> Makefile:4: *** Please run ./configure.  Stop.
+> make[1]: Leaving directory `/home/opam/git/opam/src'
+> make -C src prepare
+> make[1]: Entering directory `/home/opam/git/opam/src'
+> Makefile:4: *** Please run ./configure.  Stop.
+> make[1]: Leaving directory `/home/opam/git/opam/src'
+> make: *** [prepare] Error 2
+> 
+> ======== CRON JOB update-opam FAILED ========
+> ==> 2014-04-30 02:00:12+00:00
+> ==> Full command was: update-from-git.sh opam
+> _______________________________________________
+> Opam-commits mailing list
+> Opam-commits at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-commits
+> 
+
+
+From louis.gesbert at ocamlpro.com  Wed Apr 30 14:16:44 2014
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 30 Apr 2014 15:16:44 +0200
+Subject: [opam-devel] Fwd: [opam-commits] Cron job update-opam failed on
+	opam.ocaml.org
+In-Reply-To: <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+References: <E1WfJoj-0005zD-3Q@www-ocaml-serv1>
+ <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+Message-ID: <16082434.4Tpr1LK1rf@ocp-dell>
+
+Should be all good now; thanks !
+
+Btw, any idea why we get such stats on xmlm on http://opam.ocaml.org/ ? Are they genuine ?
+
+On Wednesday 30 April 2014 11:29:35 Anil Madhavapeddy wrote:
+> Looks like the new build system in trunk needs the git scripts to be tweaked before an update will work again.
+> 
+> Begin forwarded message:
+> 
+> > From: cron at opam.ocaml.org
+> > Subject: [opam-commits] Cron job update-opam failed on opam.ocaml.org
+> > Date: 30 April 2014 03:00:13 BST
+> > To: opam-commits at lists.ocaml.org
+> > 
+> > 
+> > === FULL LOG ===
+> > 
+> > 
+> > ======== RUNNING COMMAND: update-opam update-from-git.sh opam ========
+> > {{{
+> > ==> 2014-04-30 02:00:01+00:00
+> > ==> Load opam env
+> > ==> Running update-from-git.sh opam
+> > 
+> > From git://github.com/ocaml/opam
+> >   4abac1d..b88fe71  master     -> origin/master
+> > Removing META
+> > Removing Makefile.config
+> > Removing _obuild/
+> > Removing config.log
+> > Removing config.status
+> > Removing depends.ocp
+> > Removing doc/man-ext/opam-check.md
+> > Removing ocp-build.root
+> > Removing ocp-build.root.old
+> > Removing ocp-build/ocp-build
+> > Removing ocp-build/ocp-build.run
+> > Removing ocp-build/primitives.cmi
+> > Removing ocp-build/primitives.cmo
+> > Removing ocp-build/primitives.ml
+> > Removing ocp-build/win32_c.o
+> > Removing src/core/opamGitVersion.ml
+> > Removing src/core/opamScript.ml
+> > Removing src/core/opamVersion.ml
+> > Already on 'master'
+> > Your branch is behind 'origin/master' by 22 commits, and can be fast-forwarded.
+> > HEAD is now at b88fe71 Merge pull request #1362 from OCamlPro/rebuild
+> > make -C src Makefile.config
+> > make[1]: Entering directory `/home/opam/git/opam/src'
+> > Makefile:4: *** Please run ./configure.  Stop.
+> > make[1]: Leaving directory `/home/opam/git/opam/src'
+> > make -C src prepare
+> > make[1]: Entering directory `/home/opam/git/opam/src'
+> > Makefile:4: *** Please run ./configure.  Stop.
+> > make[1]: Leaving directory `/home/opam/git/opam/src'
+> > make: *** [prepare] Error 2
+> > 
+> > ======== CRON JOB update-opam FAILED ========
+> > ==> 2014-04-30 02:00:12+00:00
+> > ==> Full command was: update-from-git.sh opam
+> > _______________________________________________
+> > Opam-commits mailing list
+> > Opam-commits at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/opam-commits
+> > 
+> 
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+
+
+From daniel.buenzli at erratique.ch  Wed Apr 30 14:34:14 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 30 Apr 2014 15:34:14 +0200
+Subject: [opam-devel] Fwd: [opam-commits] Cron job update-opam failed on
+ opam.ocaml.org
+In-Reply-To: <16082434.4Tpr1LK1rf@ocp-dell>
+References: <E1WfJoj-0005zD-3Q@www-ocaml-serv1>
+ <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+ <16082434.4Tpr1LK1rf@ocp-dell>
+Message-ID: <2FDD09D9B1514D52AE893D31F8F24A24@erratique.ch>
+
+Le mercredi, 30 avril 2014 ? 15:16, Louis Gesbert a ?crit :
+> Btw, any idea why we get such stats on xmlm on http://opam.ocaml.org/ ? Are they genuine ?
+
+Ha, my script is working then.  
+
+Daniel
+
+
+
+From sylvain+ocaml at le-gall.net  Wed Apr 30 16:28:05 2014
+From: sylvain+ocaml at le-gall.net (Sylvain Le Gall)
+Date: Wed, 30 Apr 2014 17:28:05 +0200
+Subject: [opam-devel] Fwd: [opam-commits] Cron job update-opam failed on
+	opam.ocaml.org
+In-Reply-To: <2FDD09D9B1514D52AE893D31F8F24A24@erratique.ch>
+References: <E1WfJoj-0005zD-3Q@www-ocaml-serv1>
+ <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+ <16082434.4Tpr1LK1rf@ocp-dell>
+ <2FDD09D9B1514D52AE893D31F8F24A24@erratique.ch>
+Message-ID: <CAOCAUGNMcrHP4g5jU8iRnZ4OMLpTwFkLBLSxRFaEHxZ_ZDeN9A@mail.gmail.com>
+
+2014-04-30 15:34 GMT+02:00 Daniel B?nzli <daniel.buenzli at erratique.ch>:
+
+> Le mercredi, 30 avril 2014 ? 15:16, Louis Gesbert a ?crit :
+> > Btw, any idea why we get such stats on xmlm on http://opam.ocaml.org/ ?
+> Are they genuine ?
+>
+> Ha, my script is working then.
+>
+>
+You mean that xmlm download number is fake or generated by an automatic
+script ?
+
+
+
+> Daniel
+>
+>
+> _______________________________________________
+> opam-devel mailing list
+> opam-devel at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/opam-devel
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/opam-devel/attachments/20140430/e038dd61/attachment.html>
+
+From daniel.buenzli at erratique.ch  Wed Apr 30 16:50:41 2014
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 30 Apr 2014 17:50:41 +0200
+Subject: [opam-devel] Fwd: [opam-commits] Cron job update-opam failed on
+ opam.ocaml.org
+In-Reply-To: <CAOCAUGNMcrHP4g5jU8iRnZ4OMLpTwFkLBLSxRFaEHxZ_ZDeN9A@mail.gmail.com>
+References: <E1WfJoj-0005zD-3Q@www-ocaml-serv1>
+ <A9436212-3722-46B5-AFC0-BCCB25BCD9A1@recoil.org>
+ <16082434.4Tpr1LK1rf@ocp-dell>
+ <2FDD09D9B1514D52AE893D31F8F24A24@erratique.ch>
+ <CAOCAUGNMcrHP4g5jU8iRnZ4OMLpTwFkLBLSxRFaEHxZ_ZDeN9A@mail.gmail.com>
+Message-ID: <941C0CF4A08544B18FDD2373C621A7C3@erratique.ch>
+
+
+
+Le mercredi, 30 avril 2014 ? 17:28, Sylvain Le Gall a ?crit :
+
+> You mean that xmlm download number is fake or generated by an automatic script ?
+
+Download metrics are rubish anyways, but I'd be glad to have enough time on my hands to allow me to trick opam's download metrics.  
+
+Daniel
+
+
+

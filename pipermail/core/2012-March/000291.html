@@ -1,0 +1,143 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> sexp_default
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20sexp_default&In-Reply-To=%3CCACLX4jRJbVF7Qk7%2BZJ1JQq0bKzXeE_aF%2Bm75qoFN%2BFHK2W9DEw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000290.html">
+   <LINK REL="Next"  HREF="000292.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>sexp_default</H1>
+    <B>Yaron Minsky</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20sexp_default&In-Reply-To=%3CCACLX4jRJbVF7Qk7%2BZJ1JQq0bKzXeE_aF%2Bm75qoFN%2BFHK2W9DEw%40mail.gmail.com%3E"
+       TITLE="sexp_default">yminsky at janestreet.com
+       </A><BR>
+    <I>Fri Mar 30 20:45:20 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000290.html">sexp_default
+</A></li>
+        <LI>Next message: <A HREF="000292.html">sexp_default
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#291">[ date ]</a>
+              <a href="thread.html#291">[ thread ]</a>
+              <a href="subject.html#291">[ subject ]</a>
+              <a href="author.html#291">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+This seems like a cool hack.  I'd like to wait for some of the other
+folk who think about the syntax extensions to weigh in, but at first
+glance, the proposal seems good.
+
+I am a little worried about the semantics of !, though.  If I create a type:
+
+    type t = { foo : int sexp_default(7)! } with sexp
+
+then the round-tripping could be pretty weird.  In particular,
+consider this sequence:
+
+   { foo = 3 }
+   |! sexp_of_t  (* this is () *)
+   |! t_of_sexp  (* this is { foo = 7 } *)
+
+This behavior seems pretty unfortunate.  Is that really what it does?
+
+As a side note, Markus, if you're working on more patches: please
+don't do merges in the stuff your proposing.  Yury's conversion code
+doesn't work well on merges.  (merges purely within your code are
+actually OK, as long as you're not merging in from different points in
+the history that was exported from Jane Street.)
+
+y
+
+On Fri, Mar 30, 2012 at 12:19 PM, Markus Mottl &lt;<A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>&gt; wrote:
+&gt;<i> Hi,
+</I>&gt;<i>
+</I>&gt;<i> I have a patch for sexplib, which adds a new record field qualifier
+</I>&gt;<i> &quot;sexp_default&quot;. &#160;It allows users to explicitly add the default
+</I>&gt;<i> expression to be used when a record field is missing in an
+</I>&gt;<i> S-expression. &#160;E.g.:
+</I>&gt;<i>
+</I>&gt;<i> &#160;type t = { foo : int sexp_default(42) } with sexp
+</I>&gt;<i>
+</I>&gt;<i> In this definition &quot;foo&quot; will default to &quot;42&quot; if the S-expression does
+</I>&gt;<i> not specify &quot;foo&quot;. &#160;Any valid OCaml-expression is allowed within the
+</I>&gt;<i> parentheses, including variables and even function calls. &#160;When such a
+</I>&gt;<i> record is converted to an S-expression, the normal behavior is to
+</I>&gt;<i> always emit the field, no matter whether it is equivalent to the
+</I>&gt;<i> default or not. &#160;The reason is that unlike &quot;sexp_list&quot;, &quot;sexp_array&quot;,
+</I>&gt;<i> etc., it may not be obvious to the reader of an S-expression what the
+</I>&gt;<i> default may be.
+</I>&gt;<i>
+</I>&gt;<i> If, however, default fields should be excluded from the conversion,
+</I>&gt;<i> e.g. to generate a minimal default configuration file for later
+</I>&gt;<i> refinement, the following is supported (note the exclamation mark at
+</I>&gt;<i> the end):
+</I>&gt;<i>
+</I>&gt;<i> &#160;type t = { foo : int sexp_default(42)! } with sexp
+</I>&gt;<i>
+</I>&gt;<i> Using manifest types, developers can easily generate equivalent
+</I>&gt;<i> instantiations of a record type with different conversion behavior.
+</I>&gt;<i> E.g.:
+</I>&gt;<i>
+</I>&gt;<i> &#160; &#160;type drop_foo_default = t = { foo : int sexp_default(foo)! } with sexp
+</I>&gt;<i>
+</I>&gt;<i> This way different &quot;default views&quot; could be emitted for a given record.
+</I>&gt;<i>
+</I>&gt;<i> Using manifest types together with module functors and maybe
+</I>&gt;<i> first-class modules to do this dynamically for large numbers of
+</I>&gt;<i> instantiations, one can also easily generate numerous default
+</I>&gt;<i> converters for different contexts. &#160;E.g.:
+</I>&gt;<i>
+</I>&gt;<i> &#160;module Make (Defaults : sig val default : t end) = struct
+</I>&gt;<i> &#160; &#160;type s = t = { foo : int sexp_default(Defaults.default.foo) } with sexp
+</I>&gt;<i> &#160;end
+</I>&gt;<i>
+</I>&gt;<i> Some wizardry with modules and manifest types provides for almost
+</I>&gt;<i> unlimited power for providing defaults and configuring how they are
+</I>&gt;<i> emitted.
+</I>&gt;<i>
+</I>&gt;<i> Let me know if this patch would likely be accepted or if there are any
+</I>&gt;<i> suggestions for improvement, and I'll push it to my fork of OCaml
+</I>&gt;<i> Core.
+</I>&gt;<i>
+</I>&gt;<i> Regards,
+</I>&gt;<i> Markus
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Markus Mottl&#160; &#160; &#160; &#160; <A HREF="http://www.ocaml.info&#160;">http://www.ocaml.info&#160;</A> &#160; &#160; &#160; <A HREF="http://lists.ocaml.org/listinfo/core">markus.mottl at gmail.com</A>
+</I>
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000290.html">sexp_default
+</A></li>
+	<LI>Next message: <A HREF="000292.html">sexp_default
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#291">[ date ]</a>
+              <a href="thread.html#291">[ thread ]</a>
+              <a href="subject.html#291">[ subject ]</a>
+              <a href="author.html#291">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

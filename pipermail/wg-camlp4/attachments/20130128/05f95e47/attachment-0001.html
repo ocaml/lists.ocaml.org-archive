@@ -1,0 +1,30 @@
+<tt>
+&lt;div&gt;&lt;br&gt;&lt;/div&gt;After&nbsp;you&nbsp;doing&nbsp;all&nbsp;those&nbsp;stuff,&nbsp; I&nbsp;am&nbsp;worried&nbsp;that&nbsp;you&nbsp;may&nbsp;find&nbsp;you&nbsp;just&nbsp;re-implemented&nbsp;a&nbsp;new&nbsp;P4.&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;b&gt;I&nbsp;agree&nbsp;that&nbsp;the&nbsp;complexity&nbsp;of&nbsp;extensible&nbsp;parser&nbsp;should&nbsp;be&nbsp;removed,&nbsp; there&#39;s&nbsp;a&nbsp;compromise&nbsp;here.&lt;/b&gt;&lt;/div&gt;<br>
+&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;The&nbsp;ppx&lt;b&gt;&nbsp;shares&nbsp;the&nbsp;same&nbsp;Intermediate&nbsp;Ast&lt;/b&gt;(It&nbsp;could&nbsp;be&nbsp;improved&nbsp;with&nbsp;more&nbsp;meaningful&nbsp;tags&nbsp;names)&nbsp; with&nbsp;camlp4&nbsp;but&nbsp;uses&nbsp;the&nbsp;built&nbsp;in&nbsp;parser.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;The&nbsp;benefit&nbsp;lies&nbsp;in&nbsp;two&nbsp;aspects:&lt;/div&gt;<br>
+&lt;div&gt; &nbsp; &nbsp;1.&nbsp;You&nbsp;get&nbsp;the&nbsp;automatically&nbsp;meta&nbsp;filter,&nbsp;quasi-quotation&nbsp;is&nbsp;for&nbsp;free&lt;/div&gt;&lt;div&gt; &nbsp; &nbsp;2.&nbsp;The&nbsp;camlp4&nbsp;can&nbsp;works&nbsp;well&nbsp;with&nbsp;ppx,&nbsp;the&nbsp;change&nbsp;is&nbsp;incremental,&nbsp;most&nbsp;existing&nbsp;library&nbsp;still&nbsp;works&nbsp;under&nbsp;both&nbsp;cases &lt;/div&gt;&lt;div&gt;<br>
+&lt;br&gt;&lt;/div&gt;&lt;div&gt;Introducing&nbsp;an&nbsp;Intermediate&nbsp;Ast&nbsp;also&nbsp;gives&nbsp;you&nbsp;some&nbsp;freedom,&nbsp;the&nbsp;parsetree&nbsp;does&nbsp;a&nbsp;lot&nbsp;of&nbsp;syntax&nbsp;desguaring(to&nbsp;name&nbsp;a&nbsp;few,&nbsp;range&nbsp;patterns,&nbsp;bigarray,&nbsp;string&nbsp;access,&nbsp;array&nbsp;access),&nbsp;you&nbsp;may&nbsp;change&lt;br&gt;the&nbsp;representation&nbsp;of&nbsp;parsetree,&nbsp;but&nbsp;that&nbsp;introduces&nbsp;complexity&nbsp;in&nbsp;other&nbsp;cases,&nbsp;so&nbsp;my&nbsp;suggestion&nbsp;is&nbsp;that&nbsp;we&nbsp;can&nbsp;separate&nbsp;extensible&nbsp;parser&nbsp;part&nbsp;from&nbsp;camlp4,&nbsp;that&#39;s&nbsp;absolutely&nbsp;doable,&nbsp;then&nbsp;we&nbsp;share&nbsp;the&nbsp;same&nbsp;intermediate&nbsp;Ast&lt;/div&gt;<br>
+&lt;div&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Mon,&nbsp;Jan&nbsp;28,&nbsp;2013&nbsp;at&nbsp;4:01&nbsp;PM,&nbsp;Leo&nbsp;White&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:lpw25@cam.ac.uk&quot;&nbsp;target=&quot;_blank&quot;&gt;lpw25@cam.ac.uk&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+&lt;div&nbsp;class=&quot;im&quot;&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;<br>
+3&nbsp;parsers&nbsp;actually.&lt;br&gt;<br>
+The&nbsp;original&nbsp;parser,&nbsp;the&nbsp;parser&nbsp;to&nbsp;patt,&nbsp;the&nbsp;parser&nbsp;to&nbsp;expr.&lt;br&gt;<br>
+&lt;/blockquote&gt;<br>
+&lt;br&gt;&lt;/div&gt;<br>
+The&nbsp;original&nbsp;parser&nbsp;isn&#39;t&nbsp;necessary&nbsp;for&nbsp;the&nbsp;quotation,&nbsp;and&nbsp;of&nbsp;course&nbsp;the&nbsp;other&nbsp;two&nbsp;parsers&nbsp;are&nbsp;only&nbsp;both&nbsp;needed&nbsp;if&nbsp;you&nbsp;want&nbsp;the&nbsp;quotation&nbsp;to&nbsp;work&nbsp;as&nbsp;both&nbsp;a&nbsp;pattern&nbsp;and&nbsp;an&nbsp;expression.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Anyway,&nbsp;my&nbsp;point&nbsp;is&nbsp;that&nbsp;you&nbsp;do&nbsp;not&nbsp;*need*&nbsp;to&nbsp;implement&nbsp;quotations&nbsp;by&nbsp;parsing&nbsp;to&nbsp;a&nbsp;value&nbsp;and&nbsp;then&nbsp;converting&nbsp;to&nbsp;an&nbsp;AST&nbsp;fragment,&nbsp;in&nbsp;fact&nbsp;it&nbsp;is&nbsp;often&nbsp;easier&nbsp;not&nbsp;to.&lt;br&gt;<br>
+&lt;br&gt;<br>
+That&nbsp;is&nbsp;not&nbsp;to&nbsp;say&nbsp;that&nbsp;some&nbsp;people&nbsp;might&nbsp;not&nbsp;want&nbsp;to&nbsp;implement&nbsp;their&nbsp;quotations&nbsp;by&nbsp;parsing&nbsp;to&nbsp;a&nbsp;value&nbsp;and&nbsp;then&nbsp;converting&nbsp;to&nbsp;an&nbsp;AST&nbsp;fragment.&nbsp;In&nbsp;fact,&nbsp;if&nbsp;they&nbsp;want&nbsp;to&nbsp;use&nbsp;an&nbsp;external&nbsp;parser&nbsp;(over&nbsp;which&nbsp;they&nbsp;have&nbsp;little&nbsp;control)&nbsp;to&nbsp;parse&nbsp;their&nbsp;quotations&nbsp;then&nbsp;they&nbsp;may&nbsp;have&nbsp;to&nbsp;do&nbsp;it&nbsp;that&nbsp;way.&lt;br&gt;<br>
+<br>
+&lt;br&gt;<br>
+For&nbsp;these&nbsp;cases&nbsp;I&nbsp;think&nbsp;there&nbsp;are&nbsp;three&nbsp;options:&lt;br&gt;<br>
+&lt;br&gt;<br>
+1.&nbsp;They&nbsp;can&nbsp;implement&nbsp;conversion&nbsp;functions&nbsp;by&nbsp;hand.&lt;br&gt;<br>
+&lt;br&gt;<br>
+2.&nbsp;They&nbsp;could&nbsp;use&nbsp;some&nbsp;kind&nbsp;of&nbsp;type-conv&nbsp;style&nbsp;extension&nbsp;to&nbsp;automatically&nbsp;produce&nbsp;the&nbsp;conversion&nbsp;functions.&nbsp;I&#39;m&nbsp;sure&nbsp;such&nbsp;an&nbsp;extension&nbsp;would&nbsp;be&nbsp;welcomed&nbsp;by&nbsp;other&nbsp;extension&nbsp;authors.&lt;br&gt;<br>
+&lt;br&gt;<br>
+3.&nbsp;If/when&nbsp;some&nbsp;kind&nbsp;of&nbsp;run-time&nbsp;type&nbsp;representation&nbsp;is&nbsp;added&nbsp;to&nbsp;the&nbsp;language,&nbsp;it&nbsp;could&nbsp;be&nbsp;used&nbsp;to&nbsp;create&nbsp;a&nbsp;generic&nbsp;conversion&nbsp;function.&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;br&nbsp;clear=&quot;all&quot;&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;--&nbsp;&lt;br&gt;--&nbsp;Regards,&nbsp;Hongbo<br>
+&lt;/div&gt;<br>
+
+</tt>

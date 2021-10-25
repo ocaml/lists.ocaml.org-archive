@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [Caml-list] Re: Unix.getlogin () fails when stdin is redirected
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Re%3A%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3Cc7dd99924eaad3383d8d529f66dc1752.squirrel%40gps.dynxs.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[Caml-list] Re: Unix.getlogin () fails when stdin is redirected</H1>
+    <B>Gerd Stolpmann</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20%5BCaml-list%5D%20Re%3A%20Unix.getlogin%20%28%29%20fails%20when%20stdin%20is%20redirected&In-Reply-To=%3Cc7dd99924eaad3383d8d529f66dc1752.squirrel%40gps.dynxs.de%3E"
+       TITLE="[Caml-list] Re: Unix.getlogin () fails when stdin is redirected">info at gerd-stolpmann.de
+       </A><BR>
+    <I>Wed Mar 21 00:51:54 GMT 2012</I>
+    <P><UL>
+        
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1164">[ date ]</a>
+              <a href="thread.html#1164">[ thread ]</a>
+              <a href="subject.html#1164">[ subject ]</a>
+              <a href="author.html#1164">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+
+I second this. There is one OS where getlogin does not follow POSIX and is
+maybe insecure, and the fix cannot be to hide the function for all other
+OS. IMHO, these differences should be handled on a higher level, and not
+in the module providing the bindings.
+
+Semantically, there is a big difference between getlogin and getuid:
+getlogin shall also work when the user calls a setuid program which in
+turn invokes a script. These script commands can then use getlogin to
+identify the original user (which is defined as the user of the session =
+the user of the controlling terminal). In contrast, getuid would return
+the uid to which setuid switched (for the script).
+
+So, I'd say, you cannot repair getlogin with getuid. The best fix is
+probably to just run `/usr/bin/logname &lt;/dev/tty` and read the printed
+name.
+
+Gerd
+
+&gt;<i> getpwuid(getuid()) is not a synonym for get_login (refer to the
+</I>&gt;<i> discussion in the POSIX standard[^1]). You should not shadow posix
+</I>functions by functions with different semantics in the Unix modules;
+providing your own abstraction over the OS is a commendable goal but you
+should do so without silently bypassing core functions.
+&gt;<i>
+</I>&gt;<i> Till
+</I>&gt;<i> [1]:<A HREF="http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html">http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> On Tue, Mar 20, 2012 at 2:28 PM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+</I>&gt;&gt;<i> Note that Jane Street's core library [1] does not use getlogin(3) in
+</I>its replacement Unix module, for exactly this reason:
+&gt;&gt;<i>
+</I>&gt;&gt;<i> (* The standard getlogin function goes through utmp which is
+</I>unreliable, &#194;&#160;see the BUGS section of getlogin(3) *)
+&gt;&gt;<i> let getlogin_orig = Unix.getlogin
+</I>&gt;&gt;<i> let getlogin () = (Unix.getpwuid (getuid ())).Unix.pw_name
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> [1]: <A HREF="https://bitbucket.org/yminsky/ocaml-core/wiki/Home">https://bitbucket.org/yminsky/ocaml-core/wiki/Home</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I just tested your specific example, and it worked fine.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Tue 20 Mar 2012 06:07:59 PM GMT, Ricardo Catalinas Jim&#195;&#169;nez wrote:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> On Tue, Mar 20, 2012 at 06:51:13PM +0100, Ricardo Catalinas Jim&#195;&#169;nez
+</I>wrote:
+&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> I found out the next issue in this simple code:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> let () =
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; print_endline &quot;Hello&quot;;
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; print_endline (Unix.getlogin ())
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Running in the normal case, with `./a.out' gives:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Hello
+</I>&gt;&gt;&gt;&gt;<i> ricardo
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> But running like `./a.out&lt;/dev/null' makes Unix.getlogin fail:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> Hello
+</I>&gt;&gt;&gt;&gt;<i> Fatal error: exception Unix.Unix_error(20, &quot;getlogin&quot;, &quot;&quot;)
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> A simple strace reveals the problem:
+</I>&gt;&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160;open(&quot;/etc/passwd&quot;, O_RDONLY|O_CLOEXEC) = 3
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160;fstat(3, {st_mode=S_IFREG|0644, st_size=509, ...}) = 0
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160;mmap(NULL, 4096, PROT_READ|PROT_WRITE,
+</I>MAP_PRIVATE|MAP_ANONYMOUS, -1,
+&gt;&gt;&gt;&gt;<i> 0) = 0x7fb125554000
+</I>&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160;read(3, &quot;root:x:0:0:root:/root:/bin/bash\n&quot;..., 4096) = 509 &#194;&#160;
+</I>&#194;&#160;read(3, &quot;&quot;, 4096) &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; = 0
+&gt;&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160;close(3) &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;= 0 &#194;&#160;
+</I>&#194;&#160;munmap(0x7fb125554000, 4096) &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;= 0
+&gt;&gt;&gt;&gt;<i> -&gt; &#194;&#160;ioctl(0, SNDCTL_TMR_TIMEBASE or SNDRV_TIMER_IOCTL_NEXT_DEVICE or
+</I>TCGETS, 0x7fff12682c98) = -1 ENOTTY (Inappropriate ioctl for device)
+&#194;&#160; &#194;&#160;write(2, &quot;Fatal error: exception Unix.Unix&quot;..., 59) = 59 &#194;&#160;
+&#194;&#160;exit_group(2) &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160; = ?
+&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Someone knew the answer, man 3 getlogin reads:
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;Note that glibc does not follow the POSIX specification and
+</I>uses
+&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;stdin instead of /dev/tty. &#194;&#160;A bug. &#194;&#160;(Other recent
+</I>systems, like
+&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;SunOS 5.8 and HP-UX 11.11 and FreeBSD 4.8 all return the login
+</I>&gt;&gt;&gt;<i> &#194;&#160; &#194;&#160; &#194;&#160; &#194;&#160;name also when stdin is redirected.)
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i>
+</I>&gt;&gt;&gt;<i> Regards
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> Caml-list mailing list. &#194;&#160;Subscription management and archives:
+</I><A HREF="https://sympa-roc.inria.fr/wws/info/caml-list">https://sympa-roc.inria.fr/wws/info/caml-list</A>
+&gt;&gt;<i> Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+</I>&gt;&gt;<i> Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> Caml-list mailing list.  Subscription management and archives:
+</I>&gt;<i> <A HREF="https://sympa-roc.inria.fr/wws/info/caml-list">https://sympa-roc.inria.fr/wws/info/caml-list</A>
+</I>&gt;<i> Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+</I>&gt;<i> Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+
+-- 
+Gerd Stolpmann, Darmstadt, Germany    <A HREF="http://lists.ocaml.org/listinfo/core">gerd at gerd-stolpmann.de</A>
+Creator of GODI and camlcity.org.
+Contact details:        <A HREF="http://www.camlcity.org/contact.html">http://www.camlcity.org/contact.html</A>
+Company homepage:       <A HREF="http://www.gerd-stolpmann.de">http://www.gerd-stolpmann.de</A>
+*** Searching for new projects! Need consulting for system
+*** programming in Ocaml? Gerd Stolpmann can help you.
+
+
+
+-- 
+Gerd Stolpmann, Darmstadt, Germany    <A HREF="http://lists.ocaml.org/listinfo/core">gerd at gerd-stolpmann.de</A>
+Creator of GODI and camlcity.org.
+Contact details:        <A HREF="http://www.camlcity.org/contact.html">http://www.camlcity.org/contact.html</A>
+Company homepage:       <A HREF="http://www.gerd-stolpmann.de">http://www.gerd-stolpmann.de</A>
+*** Searching for new projects! Need consulting for system
+*** programming in Ocaml? Gerd Stolpmann can help you.
+
+
+
+-- 
+Caml-list mailing list.  Subscription management and archives:
+<A HREF="https://sympa-roc.inria.fr/wws/info/caml-list">https://sympa-roc.inria.fr/wws/info/caml-list</A>
+Beginner's list: <A HREF="http://groups.yahoo.com/group/ocaml_beginners">http://groups.yahoo.com/group/ocaml_beginners</A>
+Bug reports: <A HREF="http://caml.inria.fr/bin/caml-bugs">http://caml.inria.fr/bin/caml-bugs</A>
+
+
+</PRE>
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1164">[ date ]</a>
+              <a href="thread.html#1164">[ thread ]</a>
+              <a href="subject.html#1164">[ subject ]</a>
+              <a href="author.html#1164">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Start of an opam multi-architecture proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Start%20of%20an%20opam%20multi-architecture%20proposal&In-Reply-To=%3C3466884.lI5aZcPVx6%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001241.html">
+   <LINK REL="Next"  HREF="001243.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Start of an opam multi-architecture proposal</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Start%20of%20an%20opam%20multi-architecture%20proposal&In-Reply-To=%3C3466884.lI5aZcPVx6%40maitake%3E"
+       TITLE="[opam-devel] Start of an opam multi-architecture proposal">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Tue Oct 13 02:54:18 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001241.html">[opam-devel] Start of an opam multi-architecture proposal
+</A></li>
+        <LI>Next message: <A HREF="001243.html">[opam-devel] Start of an opam multi-architecture proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1242">[ date ]</a>
+              <a href="thread.html#1242">[ thread ]</a>
+              <a href="subject.html#1242">[ subject ]</a>
+              <a href="author.html#1242">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Nice, well-explained proposal!
+
+I'm not very familiar with cross-compilation, and this has the huge merit of 
+being easy to understand -- hence to handle, I guess.
+
+I have some remarks on the installability checks: recursively trying to solve 
+the cross-arch package dependencies would be a bad idea, and what you propose 
+wouldn't scale well to upgrades, removals, etc. -- thankfully, the solver 
+should be able to do the work for us yet again.
+
+This is like the multi-switch proposal in some way: before calling the solver, 
+all packages (or just those that have some dependency differences between 
+archs, maybe), are duplicated for all archs, and put in the same cudf universe 
+under different names. But then, we can add mutual dependencies between the 
+instances of a given package on each architecture, and this separately for 
+each version of the package. This way, we can be sure they will always be 
+installed together, keeping the desired &quot;one list of packages for all archs&quot;. 
+Cycles are a problem for resolving installation actions, obviously, but they 
+are not for the solver.
+
+After the solver call, we can merge back the instances of each package in the 
+returned solution: the package set is guaranteed to be consistent for every 
+arch, while having a single version of each package across them.
+
+This wouldn't impact the `arch-specific:` field (which _could_ also make the 
+package unavailable in case none of its specific arches is present on the 
+switch, to avoid confusion ?).
+
+I also have a question on build order: is it specified across archs ? Should 
+only `build` always be first ?
+Also, we could probably make it so that `xbin` is an alias for `bin` in the 
+case of the build arch, so that the change is invisible when not doing cross-
+compilation.
+
+I don't otherwise see any big difficulties for implementing this in opam!
+
+Best,
+Louis
+
+
+Le mardi 13 octobre 2015, 01:31:29 Daniel B&#252;nzli a &#233;crit :
+&gt;<i> Hello,
+</I>&gt;<i> 
+</I>&gt;<i> I started to write down a few ideas for supporting multiple architecture
+</I>&gt;<i> (i.e. cross-compilation) in opam. It's far from complete, glosses over many
+</I>&gt;<i> details and maybe too simplistic &#8212; but I have the feeling that it's better
+</I>&gt;<i> to try to keep things simple in that setting.
+</I>&gt;<i> 
+</I>&gt;<i> I will certainly not be the person who can fill in all the details &#8212;
+</I>&gt;<i> especially on how to solve and resolve dependencies, I'm sure the solver
+</I>&gt;<i> experts have a better idea of what is needed here than what I'm proposing.
+</I>&gt;<i> People who are familiar with `apt` multi-architecture support may also be
+</I>&gt;<i> in a better position to design this.
+</I>&gt;<i> 
+</I>&gt;<i> So I just dumped my broken set of ideas on the opam wiki so that people can
+</I>&gt;<i> help to improve it and bring it to a full proposal:
+</I>&gt;<i> 
+</I>&gt;<i> <A HREF="https://github.com/ocaml/opam/wiki/opam-multiarch">https://github.com/ocaml/opam/wiki/opam-multiarch</A>
+</I>&gt;<i> 
+</I>&gt;<i> Feedback and discussion about the general approach is better done on this
+</I>&gt;<i> list I think. And this should start with whether the support should be
+</I>&gt;<i> handled as an inter or intra switch feature; this proposal being the latter
+</I>&gt;<i> (for these reasons [1]). I know there were attempts at the former so it
+</I>&gt;<i> would be nice if we could reach consensus on this first.
+</I>&gt;<i> 
+</I>&gt;<i> Best,
+</I>&gt;<i> 
+</I>&gt;<i> Daniel
+</I>&gt;<i> 
+</I>&gt;<i> [1] <A HREF="https://github.com/ocaml/opam/wiki/opam-multiarch#alternative-designs">https://github.com/ocaml/opam/wiki/opam-multiarch#alternative-designs</A>
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I></PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001241.html">[opam-devel] Start of an opam multi-architecture proposal
+</A></li>
+	<LI>Next message: <A HREF="001243.html">[opam-devel] Start of an opam multi-architecture proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1242">[ date ]</a>
+              <a href="thread.html#1242">[ thread ]</a>
+              <a href="subject.html#1242">[ subject ]</a>
+              <a href="author.html#1242">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

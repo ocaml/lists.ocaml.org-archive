@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Finding dependencies of a specific OPAM package
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Finding%20dependencies%20of%20a%20specific%20OPAM%20package&In-Reply-To=%3C2927820.VlJExX2Iu9%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001020.html">
+   <LINK REL="Next"  HREF="001022.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Finding dependencies of a specific OPAM package</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Finding%20dependencies%20of%20a%20specific%20OPAM%20package&In-Reply-To=%3C2927820.VlJExX2Iu9%40agaric%3E"
+       TITLE="[opam-devel] Finding dependencies of a specific OPAM package">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Tue Mar 24 10:05:38 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001020.html">[opam-devel] Finding dependencies of a specific OPAM package
+</A></li>
+        <LI>Next message: <A HREF="001022.html">[opam-devel] Travis is broken
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1021">[ date ]</a>
+              <a href="thread.html#1021">[ thread ]</a>
+              <a href="subject.html#1021">[ subject ]</a>
+              <a href="author.html#1021">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> - Anil Madhavapeddy, 23/03/2015 16:52 -
+</I>&gt;<i> Good point -- I'm looking for all the reverse dependency package cone of
+</I>&gt;<i> Cohttp that are installable for a particular version of Cohttp.  I will
+</I>&gt;<i> then install each of them separately, so there's no requirement for the
+</I>&gt;<i> results to all be coinstallable.
+</I>
+If you really just need this, you could:
+- get the reverse dependency cone, as before
+- try the coinstallation of cohttp and each member of this cone. If the solver returns no solution, just skip, otherwise check that all goes well:
+
+    COHTTP=cohttp.0.15.2
+    for p in $(opam list --rec --short --sort --depends-on $COHTTP); do
+      if opam install --show $COHTTP $p; then opam install $COHTTP $p; fi
+    done
+
+Note that not specifying the version will just make OPAM choose the installed version, or failing that the highest available: it won't aggregate results for all versions. 
+
+The `--short` format doesn't print any version numbers: if it's a shortcoming that should be fairly easy to improve; also, as Roberto said, any package that has a (possibly transitive) dependency to cohttp that may include that version will be included, even if it's not coinstallable.
+
+To resolve in one step, I guess we could compute the set of packages coinstallable with this version of cohttp using Dose, and then take the intersection. (Or rather, the packages _not_ coinstallable and the difference ?)
+
+&gt;<i> 
+</I>&gt;<i> The goal is to check that a new version of Cohttp doesn't break an existing
+</I>&gt;<i> package that worked with an earlier version, so that we can add an upper
+</I>&gt;<i> bound to the opam package before merging the new release (and of course to
+</I>&gt;<i> use this more generally with other packages too).
+</I>&gt;<i> 
+</I>&gt;<i> -anil
+</I>&gt;<i> 
+</I>&gt;<i> &gt; On 23 Mar 2015, at 16:43, Roberto Di Cosmo &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>&gt; wrote:
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Computing the reverse dependency cone of a package P is just a matter of
+</I>&gt;<i> &gt; visiting the dependency graph, and you do not need any call to the solver
+</I>&gt;<i> &gt; for this. 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; But this reverse dependency cone may very well contain packages not coinstallable with P.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; For example, if you have
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; package: a
+</I>&gt;<i> &gt; depends: cohttp, b
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; package: cohttp
+</I>&gt;<i> &gt; version: 1
+</I>&gt;<i> &gt; conflicts: b
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; package: cohttp
+</I>&gt;<i> &gt; version: 2
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; Then a is a reverse dependency for both versions of cohttp, even if it is
+</I>&gt;<i> &gt; coinstallable only with version 2.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; If you want all packages in the reverse dependency cone of cohttp _that are also
+</I>&gt;<i> &gt; coinstallable with it_, then you need to actually call the solver on each of
+</I>&gt;<i> &gt; them.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; --
+</I>&gt;<i> &gt; Roberto
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; On Mon, Mar 23, 2015 at 04:27:47PM +0000, Anil Madhavapeddy wrote:
+</I>&gt;<i> &gt;&gt; I'm trying to find all the reverse dependency of a particular version of Cohttp.  I can do:
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt;    opam list --depends-on cohttp --rec
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; to get all of the dependencies for all versions.  Unfortunately trying:
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt;    opam list --depends-on cohttp.0.15.2 --rec
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; gives the same results (including packages that depend on earlier versions of Cohttp and are specifically not installable with cohttp.0.15.2)
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; Any suggestions on how to resolve this?  I guess going through the list individually to check constraints is one way, but feely very clunky (and slow due to going through the solver so many times).
+</I>&gt;<i> &gt;&gt; 
+</I>&gt;<i> &gt;&gt; -anil
+</I>&gt;<i> &gt;&gt; _______________________________________________
+</I>&gt;<i> &gt;&gt; opam-devel mailing list
+</I>&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> &gt;&gt; <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i> &gt; 
+</I>&gt;<i> 
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: This is a digitally signed message part.
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/opam-devel/attachments/20150324/3ac39ffe/attachment.sig">http://lists.ocaml.org/pipermail/opam-devel/attachments/20150324/3ac39ffe/attachment.sig</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001020.html">[opam-devel] Finding dependencies of a specific OPAM package
+</A></li>
+	<LI>Next message: <A HREF="001022.html">[opam-devel] Travis is broken
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1021">[ date ]</a>
+              <a href="thread.html#1021">[ thread ]</a>
+              <a href="subject.html#1021">[ subject ]</a>
+              <a href="author.html#1021">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

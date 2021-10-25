@@ -1,0 +1,136 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam binary snapshot
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGOWXSFKjk18GHPHfUVg1TU2f6_iKP%3DBRashu3Ag2iEtBA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000244.html">
+   <LINK REL="Next"  HREF="000245.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam binary snapshot</H1>
+    <B>Sylvain Le Gall</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%20binary%20snapshot&In-Reply-To=%3CCAOCAUGOWXSFKjk18GHPHfUVg1TU2f6_iKP%3DBRashu3Ag2iEtBA%40mail.gmail.com%3E"
+       TITLE="[opam-devel] opam binary snapshot">sylvain+ocaml at le-gall.net
+       </A><BR>
+    <I>Thu Oct 31 13:36:32 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000244.html">[opam-devel] opam binary snapshot
+</A></li>
+        <LI>Next message: <A HREF="000245.html">[opam-devel] opam binary snapshot
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#241">[ date ]</a>
+              <a href="thread.html#241">[ thread ]</a>
+              <a href="subject.html#241">[ subject ]</a>
+              <a href="author.html#241">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+2013/10/31 Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">anil at recoil.org</A>&gt;:
+&gt;<i> On 15 Oct 2013, at 00:36, Mika Illouz &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">mika at illouz.net</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Our current system involves packaging up OCaml stuff as
+</I>&gt;&gt;<i> debian packages, and distributing them to ubuntu clients in binary
+</I>&gt;&gt;<i> form via a internal debian repo.  This gets the ocaml dependencies
+</I>&gt;&gt;<i> necessary to build stuff, even to those don't develop in ocaml, with
+</I>&gt;&gt;<i> minimal cognitive overload.
+</I>&gt;&gt;<i>
+</I>
+&lt;as usual, shameless plug&gt;Most of my libraries use _oasis and I use
+oasis2debian to create and distribute Debian packages which really
+look like what you get from standard Debian distribution (I am a
+former Debian Developer). I think it is a great idea but it has some
+shortcomings, including the need to rebuild everything if a deps in
+the chain change... but we can discuss this elsewhere.&lt;/as usual,
+shameless plug&gt;
+
+&gt;&gt;<i> Some of my colleagues think that distributing ocaml dependencies in
+</I>&gt;&gt;<i> binary form is ultimately more stable.  I am wondering whether I can
+</I>&gt;&gt;<i> satisfy them, with a solution that somehow exports as binary snapshot
+</I>&gt;&gt;<i> of everything under ~/.opam/4.01/  .  One idea is to define a debian
+</I>&gt;&gt;<i> package for a blessed ~/.opam/4.01/ , and export it via our internal
+</I>&gt;&gt;<i> debian repo.  Another idea is just export it to clients via rsync, or
+</I>&gt;&gt;<i> some other shared global storage.
+</I>&gt;<i>
+</I>&gt;<i> [Ccing opam-devel and also Citrix/Rackspace folk, as this came up
+</I>&gt;<i> last week in XenSummit).
+</I>&gt;<i>
+</I>&gt;<i> In general, I'd like to figure out how to use OPAM to build RPMs and
+</I>&gt;<i> Debs just as easily as it can currently do ocamlfind installations.
+</I>&gt;<i> In the short-term, I suspect that if you use a system compiler and
+</I>&gt;<i> have enough external dependency information in the OPAM repository,
+</I>&gt;<i> we could get away with quite a lot by tarring up the .opam directory.
+</I>&gt;<i>
+</I>
+In fact, I also need a tool like this. I was planning to create an
+opam2debian that given a set of packages build a big .deb containing
+the compiled OCaml code. I am extremly interested to see if something
+exists or to participate in coding it (well I'll do it at one point
+but won't complain if someone else does it).
+
+But rather than targeting ~/.opam/4.01 it should be installed in
+/opt/opam/4.01, I think there is an OPAMROOT variable somewhere. This
+way you can get stable filename in your target (because &quot;~&quot; will
+expand differently and some OCaml packages use hardcoded path).
+
+Another interesting challenge is to &quot;fake&quot; the filesystem to make OPAM
+and the underlying build system install in
+$CURDIR/debian/tmp/opt/opam/4.01, while it thinks it install in
+/opt/opam/4.01 (system call diversion may work for most installer).
+And also fake ACL for that (but we have fakeroot in this case).
+
+Concerning just taring the .opam, you will have anyway problem with
+&quot;~&quot; path expansion + missing deps...
+
+If someone want this program, count me in.
+
+&gt;<i> This has also been a frequent request for teaching purposes, so I'd
+</I>&gt;<i> like to experiment with version controlling .opam -- this would just
+</I>&gt;<i> require hooks when adding/creating files in the subdirectory hierarchy,
+</I>&gt;<i> although it would probably be too slow to shell out every time
+</I>&gt;<i> (Thomas' cagit OCaml library may come in useful here).
+</I>&gt;<i>
+</I>&gt;<i> Dave/Jon/John, any thoughts on this?
+</I>&gt;<i>
+</I>
+
+Cheers
+Sylvain
+</PRE>
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000244.html">[opam-devel] opam binary snapshot
+</A></li>
+	<LI>Next message: <A HREF="000245.html">[opam-devel] opam binary snapshot
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#241">[ date ]</a>
+              <a href="thread.html#241">[ thread ]</a>
+              <a href="subject.html#241">[ subject ]</a>
+              <a href="author.html#241">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

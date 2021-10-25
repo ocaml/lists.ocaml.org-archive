@@ -1,0 +1,229 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAOg1smCVCcGd2Fmg2%2BaU9HS6YdjBLuPgbLnWUVPwHBpCRmpXTA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000188.html">
+   <LINK REL="Next"  HREF="000192.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Wojciech Meyer</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CCAOg1smCVCcGd2Fmg2%2BaU9HS6YdjBLuPgbLnWUVPwHBpCRmpXTA%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">wojciech.meyer at gmail.com
+       </A><BR>
+    <I>Thu Feb 28 14:45:06 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000188.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000192.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#191">[ date ]</a>
+              <a href="thread.html#191">[ thread ]</a>
+              <a href="subject.html#191">[ subject ]</a>
+              <a href="author.html#191">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>I'd argue that the namespaces in the C++ should be a best example how
+to implement namespaces in general.
+
+C++ lacks compilation of interfaces, so the header filles containing
+the prototypes, are literaly included. For that reason, in C++ we need
+to write something like this:
+
+// Implement pretty printer for complex number class
+// but here we want see just Complex class that belongs to the parent namespace
+namespace std {
+namespace complex {
+  class Complex;
+  }
+}
+
+ostream operator &lt;&lt; (const ostream&amp;, const std::complex::Complex&amp;);
+
+for somebody who've never had occasion to use nested namespaces, and
+tried, will see how much it is to get the exposed the interface right
+which basically originates from the un-natural literal inclusion of
+the headers. So the declarations *will* clutter the source files.
+Other problem is name mangling, C++ symbols can be very long, and in
+case of Clang we get 6GB of RAM to link the compiler. (because of the
+templates + literal header inclusion + name mangling). We need to
+decide upon how to mangle names.
+
+BTW: I never considered namespaces in C++ as a bad feature of the
+language, but when actually I tried use them, I found that maybe there
+are quite complex to use in nested setting.
+
+That's said, they are canonnical examples what to do, and what not to
+do in the language.
+
+Probably getting it right is not massively difficult as there are just
+few possible operations that are sensible on the language level that
+implement them and C++ has all of them.
+So:
+
+namespace { ... } // Define namespace
+using namespace std; // with a local equivalent
+using namespace std::complex::Complex // with a local equivalent
+new std::complex::Complex; // Fully scoped access
+new complex::Complex; // Assuming that the namespace was open before
+namespace complex = std::complex; // Alias for a namespace
+
+The same example would apply to OCaml of course.
+
+Sorrry, for these C++ snippets, but I think Erkki in principle was
+right that C++ namespaces are very similar to what we want as a basis
+of the system, but if I wouldn't say that namespaces in C++ worked
+flawlessly in C++ even years ago.
+
+
+Wojciech
+
+On Thu, Feb 28, 2013 at 9:01 AM, Erkki Seppala
+&lt;<A HREF="http://lists.ocaml.org/listinfo/platform">flux-ocaml-platform at inside.org</A>&gt; wrote:
+&gt;<i> TLDR; I agree with the parts of proposal suggesting statement &quot;namespace
+</I>&gt;<i> X&quot; to be introduced to .ml and .mli files and then statements &quot;open
+</I>&gt;<i> namespace X&quot;, &quot;let namespace Y = X&quot; and their expression forms. And that
+</I>&gt;<i> this all should be controlled from the source code, not the build
+</I>&gt;<i> system.
+</I>&gt;<i>
+</I>&gt;<i> Yaron Minsky &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">yminsky at janestreet.com</A>&gt; writes:
+</I>&gt;<i>
+</I>&gt;&gt;<i>   My biggest objection to having opens be at the build system level is
+</I>&gt;&gt;<i>   that it makes your code more ambiguous.  When you do namespace
+</I>&gt;&gt;<i>   manipulations, you very much want to see what's happening by
+</I>&gt;&gt;<i>   inspecting the source.  We have a vigorous code review system here,
+</I>&gt;&gt;<i>   and I don't want to start adding code review of the build rules to
+</I>&gt;&gt;<i>   it, and this change would require that.
+</I>&gt;<i>
+</I>&gt;<i> I agree that namespaces should be defined and accessed through the
+</I>&gt;<i> source code. Not the least because it depends on the project's chosen
+</I>&gt;<i> build system on how I should go on changing those definitions. While
+</I>&gt;<i> currently the situation is the same regarding findlib package
+</I>&gt;<i> management, I think it is worth considering that perhaps this kind of
+</I>&gt;<i> namespace system could automatically lead into the build system
+</I>&gt;<i> (ocamldep?)  inferring which packages you need to use and eliminate that
+</I>&gt;<i> piece of configuration from the build system. Only special cases would
+</I>&gt;<i> need more configuration.
+</I>&gt;<i>
+</I>&gt;<i> While C++ might not be the golden standard to look upon on language
+</I>&gt;<i> development, perhaps it can serve as an inspiration. Its namespace
+</I>&gt;<i> system seems to work pretty nicely without complaints from the
+</I>&gt;<i> developers. It has the following constructs:
+</I>&gt;<i>
+</I>&gt;<i> namespace X {
+</I>&gt;<i>   /* introduce values for the namespace X */
+</I>&gt;<i>   int a = 42;
+</I>&gt;<i>   namespace Z {
+</I>&gt;<i>     /* introduce namespace X::Z */
+</I>&gt;<i>     int b = a;
+</I>&gt;<i>   }
+</I>&gt;<i> }
+</I>&gt;<i>
+</I>&gt;<i> namespace X {
+</I>&gt;<i>   /* introduce more values for the namespace X */
+</I>&gt;<i>   int z = 5;
+</I>&gt;<i> }
+</I>&gt;<i>
+</I>&gt;<i> namespace Y = X; /* alias a namespace */
+</I>&gt;<i>
+</I>&gt;<i> int b = X::a; /* access a value in a namespace */
+</I>&gt;<i>
+</I>&gt;<i> using namespace X; /* bring X to current scope (works in function scope
+</I>&gt;<i>                       as well */
+</I>&gt;<i>
+</I>&gt;<i> using X::a; /* bring one value from a namespace to current scope */
+</I>&gt;<i>
+</I>&gt;<i> In implementation side it works by simply relabeling symbols in the
+</I>&gt;<i> generated object files which makes the namespaces open.
+</I>&gt;<i>
+</I>&gt;<i> C++'s compilation system with include files is of course very different
+</I>&gt;<i> from OCaml, but a similar solution to OCaml would mean having a hidden
+</I>&gt;<i> internal name (such as namespace_modulename or possibly even something
+</I>&gt;<i> that like namespace#modulename) for the module created from that
+</I>&gt;<i> compilation unit. It would need to be limited to a single top-level
+</I>&gt;<i> namespace specification per compilation unit, so it would work sort of
+</I>&gt;<i> in reverse compared to C++. For example if x.ml contained statement
+</I>&gt;<i> &quot;namespace Foo&quot;, a module Foo#X would be generated instead of plain X.
+</I>&gt;<i>
+</I>&gt;<i> This solution would not allow the same module names from different
+</I>&gt;<i> namespaces to coexist in a single directory, but I don't see this as an
+</I>&gt;<i> essential feature. The source file names already would be the same, and
+</I>&gt;<i> OCaml compiler produces object files to the same directory as the
+</I>&gt;<i> source. If you have a build system copying files around, it could (and
+</I>&gt;<i> perhaps should!) preserve the directory hierarchy.
+</I>&gt;<i>
+</I>&gt;&gt;<i> - NAMESPACES WITH VALUES.  I have argued for allowing the opening of a
+</I>&gt;&gt;<i>   namespace to also implicitly open some modules, this essentially
+</I>&gt;<i>
+</I>&gt;<i> The previosuly described system would also eliminate the C++-like
+</I>&gt;<i> ability of introducing values to a namespace, unless special module
+</I>&gt;<i> names or other changes, such as an automatic opening of some modules,
+</I>&gt;<i> are implemented. It would be nice to be able to define such top-level
+</I>&gt;<i> values from multiple compilation units, but I'm uncertain how that would
+</I>&gt;<i> be implemented.
+</I>&gt;<i>
+</I>&gt;<i> This approach would need the compiler to find many similarly named .cmi
+</I>&gt;<i> files and decide the proper one to use based on their contents, as
+</I>&gt;<i> mentioned in a previous proposal.
+</I>&gt;<i>
+</I>&gt;<i> Everyone seems to agree that # is a good operator for accessing modules
+</I>&gt;<i> (or values) from namespaces. Or maybe we could go with \ ;-).
+</I>&gt;<i>
+</I>&gt;&gt;<i>   But what Alain is proposing is to make opening a namespace silent at
+</I>&gt;&gt;<i>   the source level.  This strikes me as a grave error.
+</I>&gt;<i>
+</I>&gt;<i> I agree. At worst this could mean that in large projects developers let
+</I>&gt;<i> the build system recompile their files so they can see what namespaces
+</I>&gt;<i> they are using. It seems much better to me to just read it from the
+</I>&gt;<i> source code, which is the same regardless of the project.
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i>   _____________________________________________________________________
+</I>&gt;<i>      / __// /__ ____  __               <A HREF="http://www.modeemi.fi/~flux/\">http://www.modeemi.fi/~flux/\</A>   \
+</I>&gt;<i>     / /_ / // // /\ \/ /                                            \  /
+</I>&gt;<i>    /_/  /_/ \___/ /_/\_\@modeemi.fi                                  \/
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I></PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000188.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000192.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#191">[ date ]</a>
+              <a href="thread.html#191">[ thread ]</a>
+              <a href="subject.html#191">[ subject ]</a>
+              <a href="author.html#191">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

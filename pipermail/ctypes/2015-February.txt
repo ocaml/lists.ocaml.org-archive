@@ -1,0 +1,279 @@
+From jp.deplaix at gmail.com  Mon Feb  2 20:03:44 2015
+From: jp.deplaix at gmail.com (Jacques-Pascal Deplaix)
+Date: Mon, 02 Feb 2015 20:03:44 +0000
+Subject: [ocaml-ctypes] Bind a function with a type external to the
+	library
+In-Reply-To: <CAAxsn=FdRQWBx_MNmE7SnYvjFPzX3hYcEwZMwR5bz3DPMaYcEw@mail.gmail.com>
+References: <54C0232B.2040107@gmail.com>
+ <CAAxsn=FdRQWBx_MNmE7SnYvjFPzX3hYcEwZMwR5bz3DPMaYcEw@mail.gmail.com>
+Message-ID: <54CFD820.3000903@gmail.com>
+
+Thanks a lot !
+
+I've fixed it that way:
+https://github.com/LamaUrbain/ocaml-memphis/commit/7644dbc5970067be264aa5f6b610dbb68e1b5994
+
+Sorry, I wasn't precise on which cairo binding I used. Unfortunately 
+there are two bindings that look pretty much the same. Moreover the 
+header is not installed with the ocaml package, so I couldn't use the C 
+define.
+
+I've another question on a different topic. I'll do another thread for that.
+
+Thanks again,
+
+On 01/27/2015 12:45 PM, Jeremy Yallop wrote:
+> On 21 January 2015 at 22:07, Jacques-Pascal Deplaix
+> <jp.deplaix at gmail.com> wrote:
+>> I'm trying to bind libmemphis with ctypes and I encounter some problems with
+>> one function in particular:
+>> https://github.com/LamaUrbain/ocaml-memphis/blob/master/src/memphis_renderer.ml#L55
+>>
+>> The function takes a cairo_t in C but in OCaml I would like to use
+>> Cairo.context.
+>> So I tried by using Obj.magic in the overloading just below (in the code
+>> linked above) but when I try to use the function it segfaults in some random
+>> cairo function (memphis_renderer_draw_tile is called before and seems to
+>> work).
+>>
+>> Is there an other way to use an OCaml type (Cairo.context) instead of the
+>> abstract C type or the problem might comes from somewhere else ?
+> If the cairo_t value isn't used abstractly inside libmemphis then
+> passing an OCaml value instead of a cairo_t won't work.  You need to
+> somehow extract the address of the underlying C object from the
+> abstract Cairo representation and then pass that address to
+> libmemphis.  A quick look at the Cairo source suggests that something
+> along the following lines might work, but I haven't compiled or tested
+> it:
+>
+>    /* C stub for turning a Cairo.t into a ctypes-compatible address */
+>    #include "ml_cairo.h"
+>    #include <caml/mlvalues.h>
+>    #include <caml/alloc.h>
+>    #include <stdint.h>
+>
+>    value cairo_address(value v)
+>    {
+>       return caml_copy_native_int((intptr_t)cairo_t_val(v));
+>    }
+>
+>
+>    (* ML binding for the C stub *)
+>    external cairo_raw_address : Cairo.t -> nativeint =
+>      "cairo_address"
+>
+>    let ctypes_ptr_of_cairo_t : Cairo.t -> unit Ctypes.ptr =
+>      fun c -> Ctypes.ptr_of_raw_address (cairo_raw_address c)
+
+
+From jp.deplaix at gmail.com  Mon Feb  2 20:16:52 2015
+From: jp.deplaix at gmail.com (Jacques-Pascal Deplaix)
+Date: Mon, 02 Feb 2015 20:16:52 +0000
+Subject: [ocaml-ctypes]  GC finalizer
+Message-ID: <54CFDB34.3070309@gmail.com>
+
+Hi again,
+
+I'm wondering how the values (pointers allocated on the heap) created by 
+a C function, binded through ctypes should be freed. Is there a standard 
+way to do that ?
+
+In my example, the memphis library allocate some memory in 
+Memphis_renderer.create and should be freed via Memphis_renderer.destroy 
+but is there a way to call memphis_renderer_destroy automatically using 
+the OCaml GC ?
+
+Cheers,
+
+From buzzheavyyear at hotmail.com  Fri Feb  6 09:45:22 2015
+From: buzzheavyyear at hotmail.com (Nick Betteridge)
+Date: Fri, 6 Feb 2015 09:45:22 +0000
+Subject: [ocaml-ctypes] Enum problem
+Message-ID: <DUB128-W55AE076FFCFF389DC0EEACB4380@phx.gbl>
+
+Hello,
+
+I've been trying to get enums/constant working and have been having a problem in matching types:
+
+Error: This expression has type channel_states S.typ
+       but an expression was expected of type 'a Ctypes.typ = 'a Static.typ
+
+I get the same error when I try the fruit example from ocaml-ctypes/tests/test-enums, although the issue may be due to a) my inexperience with ocaml and b) the way I generate the stubs. However, all of the c functions I'm mapping to compile without problems. This is essentially what I have:
+
+bindings:
+------------
+
+open Ctypes
+
+module Bindings
+  (F : sig type _ fn
+           val foreign : string -> ('a -> 'b) Ctypes.fn -> ('a -> 'b) fn end) (S : Cstubs.Types.TYPE) = struct
+    open F
+
+
+  type channel_states = ENDED | OPENING | OPEN
+
+  let ended    = S.constant "ENDED"   S.int64_t
+  let opening  = S.constant "OPENING" S.int64_t
+  let open_     = S.constant "OPEN"    S.int64_t
+
+  let  channel_states = S.enum " channel_states" [
+      ENDED, ended;
+      OPENING, opening;
+      OPEN, open_;
+    ]
+
+    type  channel_struct
+    let  channel_struct = structure " channel_struct"
+      let (-:) ty label = field  channel_struct label ty
+      let state    = channel_states -: "state"
+      let capacity = uint32_t           -: "capacity"
+    let () = seal (channel_struct : channel_struct structure typ)
+
+    type channel_t = channel_struct structure ptr
+    let channel_t = ptr channel_struct
+
+... the error occurs at the state field at channel_states
+
+
+the generator:
+-------------------
+
+open Channel_bindings
+
+let c_headers = "#include \"/home/nick/channel/include/channel.h\""
+
+let main () =
+  let ml_out = open_out "lib/channel_generated.ml" in
+  let c_out = open_out "lib/channel_stubs.c" in
+  let ml_fmt = Format.formatter_of_out_channel ml_out in
+  let c_fmt = Format.formatter_of_out_channel c_out in
+  Cstubs.write_ml ml_fmt ~prefix:"libchannel_" (module Bindings);
+  Format.fprintf c_fmt "%s@\n" c_headers;
+  Cstubs.write_c c_fmt ~prefix:"libchannel_" (module Bindings);
+  Format.pp_print_flush ml_fmt ();
+  Format.pp_print_flush c_fmt ();
+  close_out ml_out;
+  close_out c_out
+
+let () =
+  main ()
+
+and the oasis BuildDepends is : ctypes, ctypes.foreign, ctypes.stubs, ctypes.foreign.base, ctypes.foreign.unthreaded
+
+I've been trying to work this out since early wednesday ( and learnt alot!) but I can't think of anything else to try. I've locally pinned ocaml-ctypes from github head.
+
+Cheers
+Nick
+ 		 	   		  
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20150206/ab359cc5/attachment.html>
+
+From yallop at gmail.com  Fri Feb  6 11:21:03 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 6 Feb 2015 11:21:03 +0000
+Subject: [ocaml-ctypes] GC finalizer
+In-Reply-To: <54CFDB34.3070309@gmail.com>
+References: <54CFDB34.3070309@gmail.com>
+Message-ID: <CAAxsn=GbMxoW3tGiE0KCzEn7GsPUtYTJXZMB_YXFZH5RsJ-Oog@mail.gmail.com>
+
+On 2 February 2015 at 20:16, Jacques-Pascal Deplaix
+<jp.deplaix at gmail.com> wrote:
+> I'm wondering how the values (pointers allocated on the heap) created by a C
+> function, binded through ctypes should be freed. Is there a standard way to
+> do that ?
+>
+> In my example, the memphis library allocate some memory in
+> Memphis_renderer.create and should be freed via Memphis_renderer.destroy but
+> is there a way to call memphis_renderer_destroy automatically using the
+> OCaml GC ?
+
+There are a few options.  The simplest thing may be to add a finaliser
+(using Gc.finalise) to the pointer returned from
+Memphpis_renderer.create that calls memphis_renderer_destroy.
+
+From jp.deplaix at gmail.com  Fri Feb  6 17:55:15 2015
+From: jp.deplaix at gmail.com (Jacques-Pascal Deplaix)
+Date: Fri, 06 Feb 2015 17:55:15 +0000
+Subject: [ocaml-ctypes] GC finalizer
+In-Reply-To: <CAAxsn=GbMxoW3tGiE0KCzEn7GsPUtYTJXZMB_YXFZH5RsJ-Oog@mail.gmail.com>
+References: <54CFDB34.3070309@gmail.com>
+ <CAAxsn=GbMxoW3tGiE0KCzEn7GsPUtYTJXZMB_YXFZH5RsJ-Oog@mail.gmail.com>
+Message-ID: <54D50003.2090506@gmail.com>
+
+Thanks a lot !
+
+On 02/06/2015 11:21 AM, Jeremy Yallop wrote:
+> On 2 February 2015 at 20:16, Jacques-Pascal Deplaix
+> <jp.deplaix at gmail.com> wrote:
+>> I'm wondering how the values (pointers allocated on the heap) created by a C
+>> function, binded through ctypes should be freed. Is there a standard way to
+>> do that ?
+>>
+>> In my example, the memphis library allocate some memory in
+>> Memphis_renderer.create and should be freed via Memphis_renderer.destroy but
+>> is there a way to call memphis_renderer_destroy automatically using the
+>> OCaml GC ?
+> There are a few options.  The simplest thing may be to add a finaliser
+> (using Gc.finalise) to the pointer returned from
+> Memphpis_renderer.create that calls memphis_renderer_destroy.
+
+
+From yallop at gmail.com  Fri Feb 13 15:27:07 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 13 Feb 2015 15:27:07 +0000
+Subject: [ocaml-ctypes] Enum problem
+In-Reply-To: <DUB128-W55AE076FFCFF389DC0EEACB4380@phx.gbl>
+References: <DUB128-W55AE076FFCFF389DC0EEACB4380@phx.gbl>
+Message-ID: <CAAxsn=GKyRhDwqqbBBOAzvCqF7F4=z0oxYYK__BfpQNj_v687w@mail.gmail.com>
+
+Dear Nick,
+
+I think if you split your code into two functors: one for retrieving
+struct layout and one for binding functions then things will work out
+better.  The code you've posted only deals with struct layout, so I'll
+make some suggestions for removing the function binding parts to get
+it working.
+
+On 6 February 2015 at 09:45, Nick Betteridge <buzzheavyyear at hotmail.com> wrote:
+> I've been trying to get enums/constant working and have been having a
+> problem in matching types:
+[...]
+> module Bindings
+>   (F : sig type _ fn
+>            val foreign : string -> ('a -> 'b) Ctypes.fn -> ('a -> 'b) fn
+> end) (S : Cstubs.Types.TYPE) = struct
+
+You only need the second functor argument (S) here, so you can change
+the above to:
+
+    module Bindings (S : Cstubs.Types.TYPE) = struct
+
+>     open F
+
+Make this
+
+   open S
+
+This should fix the type mismatch error.
+
+> the generator:
+[...]
+>   Cstubs.write_ml ml_fmt ~prefix:"libchannel_" (module Bindings);
+>   Format.fprintf c_fmt "%s@\n" c_headers;
+>   Cstubs.write_c c_fmt ~prefix:"libchannel_" (module Bindings);
+
+Cstubs.write_ml and Cstubs.write_c are for foreign function bindings.
+There's a corresponding operation, Cstubs_structs.write_c, for
+generating code to retrieve struct layout.  If you remove the call to
+Cstubs.write_ml and replace the last line with
+
+    Cstubs_structs.write_c c_fmt (module Bindings);
+
+then you should get a little further.
+
+Kind regards,
+
+Jeremy.
+

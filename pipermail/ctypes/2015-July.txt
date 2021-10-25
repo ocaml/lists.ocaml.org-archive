@@ -1,0 +1,215 @@
+From jan.doms at gmail.com  Tue Jul  7 09:57:52 2015
+From: jan.doms at gmail.com (Jan Doms)
+Date: Tue, 7 Jul 2015 10:57:52 +0200
+Subject: [ocaml-ctypes] proper way of wrapping syscalls concerning
+	(check_)errno
+Message-ID: <CANdk5LZWQL8Sorb8ceQY-35LJaYPRKmjjXs7bQu8_C7URgdMqA@mail.gmail.com>
+
+Hi,
+
+The documentation mentions the following in regards to check_errno:
+
+"The value ?check_errno, which defaults to false, indicates whether
+Unix.Unix_error should be raised if the C function modifies errno.
+Please note that a function that succeeds is allowed to change errno.
+So use this option with caution. "
+
+According to the pread manpage http://linux.die.net/man/2/pread errno
+should be checked when the return value is -1.
+
+According to wikipedia https://en.wikipedia.org/wiki/Errno.h
+"Most functions indicate that they detected an error by returning a
+special value, typically NULL for functions that return pointers, and
+?1 for functions that return integers."
+
+So I was wondering: what is the proper way to wrap the pread syscall
+with ctypes?
+
+Would it make sense to replace the ~(check_errno : bool) argument with e.g.
+
+type check_errno =
+ | OnMinusOne (* raise based on errno if the return value is -1 *)
+ | OnNullPointer (* raise based on errno if the return value is a null
+pointer *)
+ | WhenChanged (* current behaviour *)
+
+Maybe I'm worrying for nothing, as probably the kernel doesn't change
+errno when no error occured, right?
+
+Thanks in advance,
+Jan
+
+From yallop at gmail.com  Fri Jul 17 00:04:46 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 17 Jul 2015 00:04:46 +0100
+Subject: [ocaml-ctypes] proper way of wrapping syscalls concerning
+	(check_)errno
+In-Reply-To: <CANdk5LZWQL8Sorb8ceQY-35LJaYPRKmjjXs7bQu8_C7URgdMqA@mail.gmail.com>
+References: <CANdk5LZWQL8Sorb8ceQY-35LJaYPRKmjjXs7bQu8_C7URgdMqA@mail.gmail.com>
+Message-ID: <CAAxsn=FZ8D0ebZiCGU=-wH-Biiep7F4XR-f-7Fy2nVQ04vp0=w@mail.gmail.com>
+
+On 7 July 2015 at 09:57, Jan Doms <jan.doms at gmail.com> wrote:
+> The documentation mentions the following in regards to check_errno:
+>
+> "The value ?check_errno, which defaults to false, indicates whether
+> Unix.Unix_error should be raised if the C function modifies errno.
+> Please note that a function that succeeds is allowed to change errno.
+> So use this option with caution. "
+>
+> According to the pread manpage http://linux.die.net/man/2/pread errno
+> should be checked when the return value is -1.
+>
+> According to wikipedia https://en.wikipedia.org/wiki/Errno.h
+> "Most functions indicate that they detected an error by returning a
+> special value, typically NULL for functions that return pointers, and
+> ?1 for functions that return integers."
+>
+> So I was wondering: what is the proper way to wrap the pread syscall
+> with ctypes?
+
+Thanks for raising this.  The support for errno in ctypes isn't quite
+right at present, and it's worth discussing how to improve it.
+
+> Would it make sense to replace the ~(check_errno : bool) argument with e.g.
+>
+> type check_errno =
+>  | OnMinusOne (* raise based on errno if the return value is -1 *)
+>  | OnNullPointer (* raise based on errno if the return value is a null
+> pointer *)
+>  | WhenChanged (* current behaviour *)
+
+This isn't a bad idea, but it's difficult to be exhaustive.  For
+example, some mathematical functions return HUGE_VAL and set errno on
+overflow errors, which isn't properly covered by these three cases.
+
+One alternative approach is to make it possible to return both errno
+and the function's return value to OCaml.  It should then be possible
+to write reusable functions which correspond to the error handling
+strategies in your check_errno type.
+
+> Maybe I'm worrying for nothing, as probably the kernel doesn't change
+> errno when no error occured, right?
+
+In many cases that's true, but it's best not to rely on that if at all possible.
+
+From jan.doms at gmail.com  Fri Jul 17 10:29:12 2015
+From: jan.doms at gmail.com (Jan Doms)
+Date: Fri, 17 Jul 2015 11:29:12 +0200
+Subject: [ocaml-ctypes] proper way of wrapping syscalls concerning
+	(check_)errno
+In-Reply-To: <CAAxsn=FZ8D0ebZiCGU=-wH-Biiep7F4XR-f-7Fy2nVQ04vp0=w@mail.gmail.com>
+References: <CANdk5LZWQL8Sorb8ceQY-35LJaYPRKmjjXs7bQu8_C7URgdMqA@mail.gmail.com>
+ <CAAxsn=FZ8D0ebZiCGU=-wH-Biiep7F4XR-f-7Fy2nVQ04vp0=w@mail.gmail.com>
+Message-ID: <CANdk5Lbg7Hb-xH-J+GCxQNy20sWwijAwm2J-9h9mJWiAAn94OQ@mail.gmail.com>
+
+On 17 July 2015 at 01:04, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 7 July 2015 at 09:57, Jan Doms <jan.doms at gmail.com> wrote:
+>> The documentation mentions the following in regards to check_errno:
+>>
+>> "The value ?check_errno, which defaults to false, indicates whether
+>> Unix.Unix_error should be raised if the C function modifies errno.
+>> Please note that a function that succeeds is allowed to change errno.
+>> So use this option with caution. "
+>>
+>> According to the pread manpage http://linux.die.net/man/2/pread errno
+>> should be checked when the return value is -1.
+>>
+>> According to wikipedia https://en.wikipedia.org/wiki/Errno.h
+>> "Most functions indicate that they detected an error by returning a
+>> special value, typically NULL for functions that return pointers, and
+>> ?1 for functions that return integers."
+>>
+>> So I was wondering: what is the proper way to wrap the pread syscall
+>> with ctypes?
+>
+> Thanks for raising this.  The support for errno in ctypes isn't quite
+> right at present, and it's worth discussing how to improve it.
+>
+>> Would it make sense to replace the ~(check_errno : bool) argument with e.g.
+>>
+>> type check_errno =
+>>  | OnMinusOne (* raise based on errno if the return value is -1 *)
+>>  | OnNullPointer (* raise based on errno if the return value is a null
+>> pointer *)
+>>  | WhenChanged (* current behaviour *)
+>
+> This isn't a bad idea, but it's difficult to be exhaustive.  For
+> example, some mathematical functions return HUGE_VAL and set errno on
+> overflow errors, which isn't properly covered by these three cases.
+>
+> One alternative approach is to make it possible to return both errno
+> and the function's return value to OCaml.  It should then be possible
+> to write reusable functions which correspond to the error handling
+> strategies in your check_errno type.
+
+It is indeed not exhaustive, and making it exhaustive in the way I
+suggested is probably impossible / not a good way forward.
+
+How about just having an accessor (and maybe also a setter) for errno?
+If I'm not mistaken such operations can not currently be written with
+ctypes and need a bit of C, right?
+
+Once you have those it should be easy to implement the idea you had in
+mind (returning both errno and the function return value).
+One could then also implement the following functions in ocaml:
+check_errno (* reads errno and raises appropriate exception if it's
+different from 0 *)
+returning_with_errno                  (* what you had in mind *)
+returning_check_errno_changed (* behaviour like the current ~check_errno:true *)
+returning_check_errno_on_minus_one
+returning_check_errno_on_null
+returning_check_errno_on_huge_val
+...
+
+
+>
+>> Maybe I'm worrying for nothing, as probably the kernel doesn't change
+>> errno when no error occured, right?
+>
+> In many cases that's true, but it's best not to rely on that if at all possible.
+
+From yallop at gmail.com  Fri Jul 17 14:35:25 2015
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Fri, 17 Jul 2015 14:35:25 +0100
+Subject: [ocaml-ctypes] proper way of wrapping syscalls concerning
+	(check_)errno
+In-Reply-To: <CANdk5Lbg7Hb-xH-J+GCxQNy20sWwijAwm2J-9h9mJWiAAn94OQ@mail.gmail.com>
+References: <CANdk5LZWQL8Sorb8ceQY-35LJaYPRKmjjXs7bQu8_C7URgdMqA@mail.gmail.com>
+ <CAAxsn=FZ8D0ebZiCGU=-wH-Biiep7F4XR-f-7Fy2nVQ04vp0=w@mail.gmail.com>
+ <CANdk5Lbg7Hb-xH-J+GCxQNy20sWwijAwm2J-9h9mJWiAAn94OQ@mail.gmail.com>
+Message-ID: <CAAxsn=GY+t=u0pRgPmts-BQC=tuCYomkgTikSExDroNufFzG+g@mail.gmail.com>
+
+On 17 July 2015 at 10:29, Jan Doms <jan.doms at gmail.com> wrote:
+> How about just having an accessor (and maybe also a setter) for errno?
+> If I'm not mistaken such operations can not currently be written with
+> ctypes and need a bit of C, right?
+
+Right.  It can *almost* be done solely in ctypes, like this:
+
+   let errno = foreign_value "errno" int
+
+except that the C standard leaves the exact definition of errno rather
+unspecified.  For example, errno can be defined like this
+
+   extern int errno;
+
+or like this
+
+   #define errno (*__internal_errno())
+
+and the second one won't work with the above ctypes definition.
+However, it's not difficult to write a couple of tiny wrappers to set
+and retrieve errno:
+
+   void set_errno(int e) { errno = e; }
+   int get_errno(void) { return errno; }
+
+together with ctypes bindings:
+
+   let set_errno = foreign "set_errno" (int @-> returning void)
+   let get_errno = foreign "get_errno" (void @-> returning int)
+
+Some care might also be needed to ensure that nothing can change errno
+between a call to a ctypes-bound function and the subsequent call to
+get_errno.
+

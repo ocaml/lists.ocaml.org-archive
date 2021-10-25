@@ -1,0 +1,119 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with probable GC problem
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20probable%20GC%20problem&In-Reply-To=%3CCAAxsn%3DFSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000242.html">
+   <LINK REL="Next"  HREF="000244.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with probable GC problem</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20probable%20GC%20problem&In-Reply-To=%3CCAAxsn%3DFSMkNiWsLsEEnLm_FFMBqiAtteLaaTrrfbAPiA78FtCg%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Help with probable GC problem">yallop at gmail.com
+       </A><BR>
+    <I>Tue Dec 19 23:55:15 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000242.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+        <LI>Next message: <A HREF="000244.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#243">[ date ]</a>
+              <a href="thread.html#243">[ thread ]</a>
+              <a href="subject.html#243">[ subject ]</a>
+              <a href="author.html#243">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Andre,
+
+On 19 December 2017 at 23:00, Andre Nathan &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">andre at digirati.com.br</A>&gt; wrote:
+&gt;<i> It seems like a memory value is being overwritten, or maybe claimed by the
+</I>&gt;<i> OCaml GC, although in the library I explicitly copy the username string, and
+</I>&gt;<i> libmariadb calls strdup() on it so I'm not sure that's the problem.
+</I>&gt;<i>
+</I>&gt;<i> Since the library is very large, I created a branch with the minimal
+</I>&gt;<i> bindings to open and close a connection, so that inspection of the code
+</I>&gt;<i> becomes feasible:
+</I>&gt;<i>
+</I>&gt;<i>   <A HREF="https://github.com/andrenth/ocaml-mariadb/tree/minimal">https://github.com/andrenth/ocaml-mariadb/tree/minimal</A>
+</I>
+Thanks for the clear explanation and reproduction case.  I think that
+your diagnosis is correct
+
+It appears that the problem arises from the nonblocking nature of the
+code.  When a program creates a block of memory using Ctypes.allocate,
+like this
+
+    let user = allocate ...
+
+ctypes ensures the memory is not freed so long as 'user' is reachable.
+Additionally, if 'user' is passed to a C function then ctypes ensures
+that the memory is not freed for the duration of the function call.
+
+However, in the MariaDB bindings 'user' appears to be accessed by
+MariaDB after the C function it's passed to returns.  More concretely,
+the pointer is passed into C like this:
+
+    let user = allocate ... in
+    ...
+    B.mysql_real_connect_start ret mysql host user pass db port socket flags
+
+and then mysql_real_connect_start keeps a reference to 'user' and
+returns immediately.  Since OCaml/ctypes can no longer see any uses of
+'user', the memory is assumed to be no longer needed and so it's
+reclaimed by the GC.  However, MariaDB still has a reference (that it
+later accesses asynchronously) which is unsafe to use after the GC
+reclaims the memory.
+
+If the above is correct then there are at least two solutions.  You
+could ensure somehow that 'user' and other such pointers are kept
+around on the OCaml side until the associated memory is no longer
+needed by MariaDB.  Or you could switch from 'allocate' to a
+malloc/free style arrangement to avoid the automatic collection
+altogether.
+
+There's a bit of guesswork involved in the above, so please follow up
+if it doesn't fix the problem for you!
+
+Kind regards,
+
+Jeremy
+
+PS You may find ocaml-memcpy (<A HREF="https://github.com/yallop/ocaml-memcpy">https://github.com/yallop/ocaml-memcpy</A>)
+a useful alternative to char_ptr_buffer_of_string for copying strings
+between OCaml and C memory.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000242.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+	<LI>Next message: <A HREF="000244.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#243">[ date ]</a>
+              <a href="thread.html#243">[ thread ]</a>
+              <a href="subject.html#243">[ subject ]</a>
+              <a href="author.html#243">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,148 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Lifetime of Ctypes allocation
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCAAxsn%3DFq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW%2BPReKajRanMA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000206.html">
+   <LINK REL="Next"  HREF="000208.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Lifetime of Ctypes allocation</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Lifetime%20of%20Ctypes%20allocation&In-Reply-To=%3CCAAxsn%3DFq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW%2BPReKajRanMA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Lifetime of Ctypes allocation">yallop at gmail.com
+       </A><BR>
+    <I>Mon Apr 18 10:50:45 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000206.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+        <LI>Next message: <A HREF="000208.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#207">[ date ]</a>
+              <a href="thread.html#207">[ thread ]</a>
+              <a href="subject.html#207">[ subject ]</a>
+              <a href="author.html#207">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Markus,
+
+On 16 April 2016 at 13:44, Markus M&#252;ller &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">llmarkvm at gmail.com</A>&gt; wrote:
+&gt;<i> I'm having some trouble on how to properly control the lifetime of an
+</I>&gt;<i> OCaml allocated Ctypes &quot;data structure&quot;. Consider the following simple
+</I>&gt;<i> C function.
+</I>&gt;<i>
+</I>&gt;<i> #include &lt;stdio.h&gt;
+</I>&gt;<i> void f(int * * p)
+</I>&gt;<i> {
+</I>&gt;<i>   printf(&quot;%d %d\n&quot;, *(p[0]), *(p[1]));
+</I>&gt;<i> }
+</I>&gt;<i>
+</I>&gt;<i> Using f in the way shown below is wrong since the memory pointed to by
+</I>&gt;<i> the inner pointers is freed by Gc.full_major.
+</I>&gt;<i>
+</I>&gt;<i> open Ctypes
+</I>&gt;<i> open Foreign
+</I>&gt;<i> let f = foreign &quot;f&quot; ((ptr (ptr int)) @-&gt; returning void)
+</I>&gt;<i> let _ =
+</I>&gt;<i>   let v = allocate_n (ptr int) ~count:2 in
+</I>&gt;<i>   let _ = v &lt;-@ (allocate int 0); (v +@ 1) &lt;-@ (allocate int 1) in
+</I>&gt;<i>     f v ; Gc.full_major () ; f v
+</I>&gt;<i>
+</I>&gt;<i> The following crude attempt to fix it does not work either even though
+</I>&gt;<i> some references to the pointers are bound to global values.
+</I>
+The key here is that there are two types of memory:
+
+   * OCaml-memory (memory containing OCaml values).  The OCaml garbage
+collector knows about everything stored here.
+   * C-memory (i.e. memory containing C values).  The GC doesn't know
+anything about what's stored here.
+
+For values created with 'allocate' there are two components:
+
+   * the allocated memory itself lives in C-memory
+   * the pointer returned by 'allocate' is an OCaml value that lives
+in OCaml memory.
+
+When there are no more references to the pointer then the allocated
+memory will be freed.
+
+With that in mind we can trace through what happens in your code.
+I'll use the word 'address' for C addresses (which are probably just
+numeric values) and 'pointer' for the OCaml objects of type Ctypes.ptr
+which contain both addresses and other information for the GC and for
+typing.
+
+&gt;<i> let v = allocate_n (ptr int) ~count:2 in
+</I>
+This allocates a piece of C-memory large enough to hold two addresses.
+The variable 'v' lives in OCaml-memory, and holds the pointer that
+keeps the C-memory alive.
+
+&gt;<i>     v &lt;-@ (allocate int 0);
+</I>
+This allocates an piece of C-memory large enough to hold an integer,
+initialized with 0.  The address of the allocated memory is written to
+the C-memory referenced by 'v'.
+
+At this point there are no references to the original pointer returned
+by 'allocate', so the allocated memory may be freed.
+
+&gt;<i>     a := (to_voidp (!@ v)) ;
+</I>
+This builds a pointer from the C-memory whose address is stored at
+'v'.  There is no connection with the pointer returned by 'allocate',
+besides the fact that both pointers store the same address.
+
+I hope that helps you to build a mental model of what's going on, and
+what's going wrong.  The main thing to remember is that in order to
+keep a value alive you need to keep a reference to the original
+pointer returned by 'allocate', not just the address of the C memory.
+Here's a slight variant of the above code which does exactly that:
+
+     let a = ref (from_voidp int null)
+    a := allocate int 0 ;
+    v &lt;-@ !a;
+
+Since 'a' holds the original pointer, not just the address of the
+allocated C-memory, the GC won't collect the memory until 'a' is no
+longer accessible.
+
+Kind regards,
+
+Jeremy.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000206.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+	<LI>Next message: <A HREF="000208.html">[ocaml-ctypes] Lifetime of Ctypes allocation
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#207">[ date ]</a>
+              <a href="thread.html#207">[ thread ]</a>
+              <a href="subject.html#207">[ subject ]</a>
+              <a href="author.html#207">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

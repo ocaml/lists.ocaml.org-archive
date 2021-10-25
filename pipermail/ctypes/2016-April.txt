@@ -1,0 +1,336 @@
+From llmarkvm at gmail.com  Sat Apr 16 13:44:37 2016
+From: llmarkvm at gmail.com (=?UTF-8?Q?Markus_M=C3=BCller?=)
+Date: Sat, 16 Apr 2016 14:44:37 +0200
+Subject: [ocaml-ctypes] Lifetime of Ctypes allocation
+Message-ID: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+
+Hello,
+
+I'm having some trouble on how to properly control the lifetime of an
+OCaml allocated Ctypes "data structure". Consider the following simple
+C function.
+
+#include <stdio.h>
+void f(int * * p)
+{
+  printf("%d %d\n", *(p[0]), *(p[1]));
+}
+
+Using f in the way shown below is wrong since the memory pointed to by
+the inner pointers is freed by Gc.full_major.
+
+open Ctypes
+open Foreign
+let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+let _ =
+  let v = allocate_n (ptr int) ~count:2 in
+  let _ = v <-@ (allocate int 0); (v +@ 1) <-@ (allocate int 1) in
+    f v ; Gc.full_major () ; f v
+
+The following crude attempt to fix it does not work either even though
+some references to the pointers are bound to global values.
+
+open Ctypes
+open Foreign
+let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+let a = ref null
+let b = ref null
+let _ =
+  let v = allocate_n (ptr int) ~count:2 in
+  let _ = v <-@ (allocate int 0); (v +@ 1) <-@ (allocate int 1) ; a :=
+(to_voidp (!@ v)) ; b := (to_voidp (!@ (v +@ 1))) in
+    f v ; Gc.full_major () ; f v
+
+How can the allocated memory be properly protected from being freed before time?
+Thanks for your help.
+
+Best regards,
+Markus
+
+From yallop at gmail.com  Mon Apr 18 10:50:45 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 18 Apr 2016 10:50:45 +0100
+Subject: [ocaml-ctypes] Lifetime of Ctypes allocation
+In-Reply-To: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+References: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+Message-ID: <CAAxsn=Fq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW+PReKajRanMA@mail.gmail.com>
+
+Dear Markus,
+
+On 16 April 2016 at 13:44, Markus M?ller <llmarkvm at gmail.com> wrote:
+> I'm having some trouble on how to properly control the lifetime of an
+> OCaml allocated Ctypes "data structure". Consider the following simple
+> C function.
+>
+> #include <stdio.h>
+> void f(int * * p)
+> {
+>   printf("%d %d\n", *(p[0]), *(p[1]));
+> }
+>
+> Using f in the way shown below is wrong since the memory pointed to by
+> the inner pointers is freed by Gc.full_major.
+>
+> open Ctypes
+> open Foreign
+> let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+> let _ =
+>   let v = allocate_n (ptr int) ~count:2 in
+>   let _ = v <-@ (allocate int 0); (v +@ 1) <-@ (allocate int 1) in
+>     f v ; Gc.full_major () ; f v
+>
+> The following crude attempt to fix it does not work either even though
+> some references to the pointers are bound to global values.
+
+The key here is that there are two types of memory:
+
+   * OCaml-memory (memory containing OCaml values).  The OCaml garbage
+collector knows about everything stored here.
+   * C-memory (i.e. memory containing C values).  The GC doesn't know
+anything about what's stored here.
+
+For values created with 'allocate' there are two components:
+
+   * the allocated memory itself lives in C-memory
+   * the pointer returned by 'allocate' is an OCaml value that lives
+in OCaml memory.
+
+When there are no more references to the pointer then the allocated
+memory will be freed.
+
+With that in mind we can trace through what happens in your code.
+I'll use the word 'address' for C addresses (which are probably just
+numeric values) and 'pointer' for the OCaml objects of type Ctypes.ptr
+which contain both addresses and other information for the GC and for
+typing.
+
+> let v = allocate_n (ptr int) ~count:2 in
+
+This allocates a piece of C-memory large enough to hold two addresses.
+The variable 'v' lives in OCaml-memory, and holds the pointer that
+keeps the C-memory alive.
+
+>     v <-@ (allocate int 0);
+
+This allocates an piece of C-memory large enough to hold an integer,
+initialized with 0.  The address of the allocated memory is written to
+the C-memory referenced by 'v'.
+
+At this point there are no references to the original pointer returned
+by 'allocate', so the allocated memory may be freed.
+
+>     a := (to_voidp (!@ v)) ;
+
+This builds a pointer from the C-memory whose address is stored at
+'v'.  There is no connection with the pointer returned by 'allocate',
+besides the fact that both pointers store the same address.
+
+I hope that helps you to build a mental model of what's going on, and
+what's going wrong.  The main thing to remember is that in order to
+keep a value alive you need to keep a reference to the original
+pointer returned by 'allocate', not just the address of the C memory.
+Here's a slight variant of the above code which does exactly that:
+
+     let a = ref (from_voidp int null)
+    a := allocate int 0 ;
+    v <-@ !a;
+
+Since 'a' holds the original pointer, not just the address of the
+allocated C-memory, the GC won't collect the memory until 'a' is no
+longer accessible.
+
+Kind regards,
+
+Jeremy.
+
+From llmarkvm at gmail.com  Mon Apr 18 23:02:31 2016
+From: llmarkvm at gmail.com (=?UTF-8?Q?Markus_M=C3=BCller?=)
+Date: Tue, 19 Apr 2016 00:02:31 +0200
+Subject: [ocaml-ctypes] Lifetime of Ctypes allocation
+In-Reply-To: <CAAxsn=Fq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW+PReKajRanMA@mail.gmail.com>
+References: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+ <CAAxsn=Fq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW+PReKajRanMA@mail.gmail.com>
+Message-ID: <CALKV4kqJQ4f+vqREpY7fqp_NJbN_AefrWO4o+KUKBxkEfGDAfA@mail.gmail.com>
+
+Dear Jeremy,
+
+thanks a lot for your elaborate reply. This program works as expected.
+
+open Ctypes
+open Foreign
+let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+let v = ref (from_voidp (ptr int) null)
+let a = ref (from_voidp int null)
+let b = ref (from_voidp int null)
+let _ =
+  v := allocate_n (ptr int) ~count:2 ;
+  a := allocate int 0 ;
+  b := allocate int 1 ;
+  (!v) <-@ (!a);
+  ((!v) +@ 1) <-@ (!b) ;
+  f (!v) ; Gc.full_major () ; f (!v)
+
+and the following program is fine too.
+
+open Ctypes
+open Foreign
+let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+let v = allocate_n (ptr int) ~count:2
+let a = allocate int 0
+let b = allocate int 1
+let _ =
+  v <-@ a;
+  (v +@ 1) <-@ b ;
+  f v ; Gc.full_major () ; f v
+
+However, having v, a, b in a local scope does not work.
+
+open Ctypes
+open Foreign
+let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+let _ =
+  let v = ref (from_voidp (ptr int) null) in
+  let a = ref (from_voidp int null) in
+  let b = ref (from_voidp int null) in
+  v := allocate_n (ptr int) ~count:2 ;
+  a := allocate int 0 ;
+  b := allocate int 1 ;
+  (!v) <-@ (!a);
+  ((!v) +@ 1) <-@ (!b) ;
+  f (!v) ;
+  Gc.full_major () ;
+  f (!v)
+
+I fail to see why it does not work in this case.
+
+>>     v <-@ (allocate int 0);
+>
+> This allocates an piece of C-memory large enough to hold an integer,
+> initialized with 0.  The address of the allocated memory is written to
+> the C-memory referenced by 'v'.
+>
+> At this point there are no references to the original pointer returned
+> by 'allocate', so the allocated memory may be freed.
+
+Good point: (allocate int 0) is not bound to a variable and thus can be
+freed. However, in the broken example above, a reference exists and
+still it does not work. Can you explain why? Thank you.
+
+Best regards,
+Markus
+
+From yallop at gmail.com  Tue Apr 19 11:33:02 2016
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 19 Apr 2016 11:33:02 +0100
+Subject: [ocaml-ctypes] Lifetime of Ctypes allocation
+In-Reply-To: <CALKV4kqJQ4f+vqREpY7fqp_NJbN_AefrWO4o+KUKBxkEfGDAfA@mail.gmail.com>
+References: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+ <CAAxsn=Fq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW+PReKajRanMA@mail.gmail.com>
+ <CALKV4kqJQ4f+vqREpY7fqp_NJbN_AefrWO4o+KUKBxkEfGDAfA@mail.gmail.com>
+Message-ID: <CAAxsn=FPGFP3JCZJgn_Kx7XxdZTzAbWpjcOJpSRXHEXb+_Xi4Q@mail.gmail.com>
+
+On 18 April 2016 at 23:02, Markus M?ller <llmarkvm at gmail.com> wrote:
+> open Ctypes
+> open Foreign
+> let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+> let v = ref (from_voidp (ptr int) null)
+> let a = ref (from_voidp int null)
+> let b = ref (from_voidp int null)
+> let _ =
+>   v := allocate_n (ptr int) ~count:2 ;
+>   a := allocate int 0 ;
+>   b := allocate int 1 ;
+>   (!v) <-@ (!a);
+>   ((!v) +@ 1) <-@ (!b) ;
+>   f (!v) ; Gc.full_major () ; f (!v)
+>
+> and the following program is fine too.
+>
+> open Ctypes
+> open Foreign
+> let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+> let v = allocate_n (ptr int) ~count:2
+> let a = allocate int 0
+> let b = allocate int 1
+> let _ =
+>   v <-@ a;
+>   (v +@ 1) <-@ b ;
+>   f v ; Gc.full_major () ; f v
+>
+> However, having v, a, b in a local scope does not work.
+>
+> open Ctypes
+> open Foreign
+> let f = foreign "f" ((ptr (ptr int)) @-> returning void)
+> let _ =
+>   let v = ref (from_voidp (ptr int) null) in
+>   let a = ref (from_voidp int null) in
+>   let b = ref (from_voidp int null) in
+>   v := allocate_n (ptr int) ~count:2 ;
+>   a := allocate int 0 ;
+>   b := allocate int 1 ;
+>   (!v) <-@ (!a);
+>   ((!v) +@ 1) <-@ (!b) ;
+>   f (!v) ;
+>   Gc.full_major () ;
+>   f (!v)
+>
+> I fail to see why it does not work in this case.
+
+The GC is free to collect values that are no longer reachable by the
+program, even if there are references to them still "in scope".  Since
+'a' is not used after the call to Gc.full_major, the collector can
+ignore 'a' when determining whether values are reachable.  Here's a
+simpler program that illustrates the same behaviour
+
+   let say_goodbye _ = print_endline "goodbye"
+
+   let _ =
+     let r = ref (object end) in
+     Gc.finalise say_goodbye !r;
+     Gc.full_major ();
+     print_endline "the end"
+
+On my system this prints
+
+   goodbye
+   the end
+
+i.e. the object is finalised by the call to Gc.full_major, even though
+'r' is still in scope.  Since 'r' is not used after the call, this
+behaviour is entirely legitimate.
+
+I think that using 'allocate' works best when you're actually using
+the pointer it returns to address the memory it allocates.  The need
+to use delicate tricks to keep the allocated memory alive is often a
+sign that a different allocation strategy would be a better choice.
+The choice of strategy will depend on how your application uses
+memory.
+
+Kind regards,
+
+Jeremy.
+
+From llmarkvm at gmail.com  Wed Apr 20 00:16:24 2016
+From: llmarkvm at gmail.com (=?UTF-8?Q?Markus_M=C3=BCller?=)
+Date: Wed, 20 Apr 2016 01:16:24 +0200
+Subject: [ocaml-ctypes] Lifetime of Ctypes allocation
+In-Reply-To: <CAAxsn=FPGFP3JCZJgn_Kx7XxdZTzAbWpjcOJpSRXHEXb+_Xi4Q@mail.gmail.com>
+References: <CALKV4kqi=G0EAYAHxjqwf_bBnR3NqKjh=o=DzmsWAaUU1o_PxQ@mail.gmail.com>
+ <CAAxsn=Fq2E2euLhi0ghpkw6TCL1ZOSuK1WXhNW+PReKajRanMA@mail.gmail.com>
+ <CALKV4kqJQ4f+vqREpY7fqp_NJbN_AefrWO4o+KUKBxkEfGDAfA@mail.gmail.com>
+ <CAAxsn=FPGFP3JCZJgn_Kx7XxdZTzAbWpjcOJpSRXHEXb+_Xi4Q@mail.gmail.com>
+Message-ID: <CALKV4koJ-=Hv3q=C2_WdPb2pELfigqFV-O5ZfrNRtL12zCjN6g@mail.gmail.com>
+
+Dear Jeremy,
+
+> The GC is free to collect values that are no longer reachable by the
+> program, even if there are references to them still "in scope".  Since
+> 'a' is not used after the call to Gc.full_major, the collector can
+> ignore 'a' when determining whether values are reachable.
+
+Thanks for the clarification. This explains it.
+
+Best regards,
+Markus
+

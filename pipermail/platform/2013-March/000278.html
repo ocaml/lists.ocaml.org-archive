@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Followup to Leo's proposal
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87ppz36z6w.fsf%40kingston.cl.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000275.html">
+   <LINK REL="Next"  HREF="000279.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Followup to Leo's proposal</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Followup%20to%20Leo%27s%20proposal&In-Reply-To=%3C87ppz36z6w.fsf%40kingston.cl.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] Followup to Leo's proposal">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Wed Mar 13 16:29:11 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000275.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+        <LI>Next message: <A HREF="000279.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#278">[ date ]</a>
+              <a href="thread.html#278">[ thread ]</a>
+              <a href="subject.html#278">[ subject ]</a>
+              <a href="author.html#278">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> The problem is that this potentially recreates part of the name-collision problem we are trying to avoid.  Doing:
+</I>&gt;<i>
+</I>&gt;<i> open namespace Core
+</I>&gt;<i> open namespace Xml
+</I>&gt;<i>
+</I>&gt;<i> becomes risky because Core might decide to include an Xml sub-namespace in the future.  And once it does, one cannot
+</I>&gt;<i> access the toplevel Xml namespace anymore in the scope where Core is opened.
+</I>
+In the unlikely event that there is a conflict, a simple namespace alias
+like:
+
+   open namespace Xml as BaseXml
+   [...]
+   open namespace Core
+   open namespace BaseXml
+
+or a user-written search path file that doesn't define the Xml
+sub-namespace of Core would solve the problem.
+
+Of course, we could also just use the &quot;deep&quot; merging semantics for
+open. It is possible that this may fit better with how people expect
+namespaces to behave.
+
+&gt;<i> Are the limited benefits of hierarchical namespaces worth the trouble?
+</I>
+I really don't think that the benefits of hierarchical namespaces are
+that limited.
+
+&gt;<i> Also, I still don't see clearly how ocamldep (with and without modules) will work with your proposal.  In particular,
+</I>&gt;<i> will &quot;ocamldep -modules&quot; still have the property to not do any access to the filesystem except for the files explicitly
+</I>&gt;<i> passed to it?  I don't see how to preserve this important property without returning only bare module names (with no
+</I>&gt;<i> namespace information) as today.  Which means that the resolution logic (from module names to files) will have to be
+</I>&gt;<i> redone in the build system (as today), but this logic would be much more complex.  Moreover, since different namespaces
+</I>&gt;<i> can be opened in different contexts of the source code, this information should be reported by ocamldep as well (and
+</I>&gt;<i> interpreted by the build system).
+</I>
+Actually, I think that &quot;ocamldep -modules&quot; has the property that it will
+return the full module name of any possible dependency that the file
+could have under any possible search path. By default I would leave this
+as it is so that:
+
+    open namespace Foo
+    Bar.use
+
+would produce &quot;Foo#Bar&quot; and &quot;Bar&quot; as possible dependencies. This is the
+same as it currently does for sub-modules of opened modules.
+
+As you say, it is then the job of the build system to translate these
+names into possible file names using the search path. For directories in
+the search path this remains simple -- just look for &quot;foo-bar.ml&quot;. 
+
+To assist with search path files I would add a new mode for ocamldep (or
+maybe a new tool) to support the following call:
+
+    ocamldep -lookup Foo#Bar foo.mlpath
+
+This would one of the following:
+
+- The filename for Foo#Bar found in the path file &quot;foo.mlpath&quot;
+
+- The new module name that Foo#Bar is aliased to in the path file
+  &quot;foo.mlpath&quot;
+
+- Some indication that &quot;foo.mlpath&quot; says nothing of Foo#Bar.
+
+This should be sufficient to allow build systems to continue to use
+&quot;ocamldep -modules&quot; if they wish. However, a side-effect of adding
+search path files is a dramatic improvement in the usability of regular
+&quot;ocamldep&quot;.
+
+When given a search path file, rather than a directory, ocamldep does
+not need to look in the actual directory to check for the existence of a
+possible dependency. This means that it can base its dependency
+calculation on the files that *will* exist rather than the files that
+already do exist.
+
+This means that a build system can produce a search path file containing
+mappings for all the files that it could produce (this mapping can
+also take account of uses of the &quot;-name&quot; argument). Then it would pass
+this search path to ocamldep and get an accurate list of dependencies,
+including those on files that have not yet been produced.
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000275.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+	<LI>Next message: <A HREF="000279.html">[ocaml-platform] Followup to Leo's proposal
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#278">[ date ]</a>
+              <a href="thread.html#278">[ thread ]</a>
+              <a href="subject.html#278">[ subject ]</a>
+              <a href="author.html#278">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

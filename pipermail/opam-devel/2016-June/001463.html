@@ -1,0 +1,131 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] opam 2 containers/building toplevel
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202%20containers/building%20toplevel&In-Reply-To=%3C2470694.SWJiqHELxS%40maitake%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001462.html">
+   <LINK REL="Next"  HREF="001464.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] opam 2 containers/building toplevel</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20opam%202%20containers/building%20toplevel&In-Reply-To=%3C2470694.SWJiqHELxS%40maitake%3E"
+       TITLE="[opam-devel] opam 2 containers/building toplevel">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Wed Jun  1 15:58:36 BST 2016</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001462.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+        <LI>Next message: <A HREF="001464.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1463">[ date ]</a>
+              <a href="thread.html#1463">[ thread ]</a>
+              <a href="subject.html#1463">[ subject ]</a>
+              <a href="author.html#1463">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Le mercredi 1 juin 2016, 14:29:45 David Allsopp a &#233;crit :
+&gt;<i> Anil Madhavapeddy wrote:
+</I>&gt;<i> &gt; &gt; On 31 May 2016, at 14:36, Louis Gesbert &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">louis.gesbert at ocamlpro.com</A>&gt;
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; wrote:
+</I>&gt;<i> &lt;snip&gt;
+</I>&gt;<i> 
+</I>&gt;<i> &gt; &gt; The issue with `make lib-ext` may be that `opam-admin.top` can't find
+</I>&gt;<i> &gt; &gt; the proper opam libraries installed. The Makefile in `admin-scripts/`
+</I>&gt;<i> &gt; &gt; has a quick hack to build bytecode versions, but that reiles on
+</I>&gt;<i> &gt; &gt; `ocamlfind` to locate the installed versions of the dependencies; it
+</I>&gt;<i> &gt; &gt; wouldn't be difficult to improve it to work with `lib-ext` though.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; It would be very useful if they could work with lib-ext and the toplevel
+</I>&gt;<i> &gt; be built by default.  Right now there is some oddness where the extlib
+</I>&gt;<i> &gt; interactive installer is run if I build `opam-admin.top` manually, so I
+</I>&gt;<i> &gt; gave up around there.
+</I>&gt;<i> 
+</I>&gt;<i> lib-ext isn't very well-conceived/constructed, IMNRHO! See
+</I>&gt;<i> <A HREF="https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e">https://github.com/dra27/opam/commit/f740058a639306c093de3b4f7425a01747239e</A>
+</I>&gt;<i> 97. Part of my reason for spending time last year implementing lib-pkg in
+</I>&gt;<i> the build system ...
+</I>
+Nice fix,  I'd gladly merge the PR
+
+For lib-ext... well, we needed a build system:
+- for OCaml
+- with no dependencies
+
+and it's just to bootstrap. Yes obviously, lib-ext is an ugly hack, and I am 
+not proud of it; the doc+Makefiles makes sure you only use it for building the 
+opam binary and not for usable libraries though
+
+The previous solution was cleaner, but relied on ocp-build. Migrating to 
+OCamlMakefile was a painful experience, but I can't see a better option 
+around. Also, it manages to not be too much trouble to maintain.
+
+It could actually make sense to have a real bootstrap and use a local opam 
+repo; but this has big downsides as well.
+
+&gt;<i> I then hacked admin-scripts/compilers-to-packages.ml and changed the
+</I>&gt;<i> #directory entries to include src/{core,repository,format,tools} and
+</I>&gt;<i> src_ext and can run that script which I used to replicate the next branch
+</I>&gt;<i> on opam-repository and so rebased to create
+</I>&gt;<i> <A HREF="https://github.com/dra27/opam-repository/tree/next-windows">https://github.com/dra27/opam-repository/tree/next-windows</A> (I've been doing
+</I>&gt;<i> a lot of work locally, which is why it's lagging behind master at the
+</I>&gt;<i> moment).
+</I>
+Yes, not very friendly, but that's how I do that kind of thing at the moment
+
+&gt;<i> &gt; &gt; Now, for scripts that get generally useful and somewhat stable, it's
+</I>&gt;<i> &gt; &gt; perfectly fine to migrate them to be part of opam-admin. Moving the
+</I>&gt;<i> &gt; &gt; scripts to their own repo would also be fine if they reach a critical
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; weight.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; &gt; Should we improve compat of the Makefile and/or move the 1.2-&gt;2.0
+</I>&gt;<i> &gt; &gt; functionality to opam-admin ?
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; For the purposes of container-based testing, it would be great if we could
+</I>&gt;<i> &gt; move the essential functionality into `opam admin` directly.  This will
+</I>&gt;<i> &gt; let me insert in the right `git clone / opam admin upgrade` runs into the
+</I>&gt;<i> &gt; CI scripts so that OPAM 2 is easy to test for end users.
+</I>&gt;<i> 
+</I>&gt;<i> compilers-to-packages.ml will be a one-time thing, though, surely? Once OPAM
+</I>&gt;<i> 2 goes live, surely the main repository will need to work in reverse,
+</I>&gt;<i> back-porting an OPAM 1.x.y repository?
+</I>
+Yes, at some point will have to switch the version of submissions to opam-
+repository.
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001462.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+	<LI>Next message: <A HREF="001464.html">[opam-devel] opam 2 containers/building toplevel
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1463">[ date ]</a>
+              <a href="thread.html#1463">[ thread ]</a>
+              <a href="subject.html#1463">[ subject ]</a>
+              <a href="author.html#1463">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

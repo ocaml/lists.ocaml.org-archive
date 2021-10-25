@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] benchmarks
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C511915C6.4010509%40etorok.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000246.html">
+   <LINK REL="Next"  HREF="000250.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] benchmarks</H1>
+    <B>T&#246;r&#246;k Edwin</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20benchmarks&In-Reply-To=%3C511915C6.4010509%40etorok.net%3E"
+       TITLE="[wg-camlp4] benchmarks">edwin+ml-ocaml at etorok.net
+       </A><BR>
+    <I>Mon Feb 11 16:01:10 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000246.html">[wg-camlp4] benchmarks
+</A></li>
+        <LI>Next message: <A HREF="000250.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#247">[ date ]</a>
+              <a href="thread.html#247">[ thread ]</a>
+              <a href="subject.html#247">[ subject ]</a>
+              <a href="author.html#247">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 02/11/2013 05:44 PM, Gerd Stolpmann wrote:
+&gt;<i> Am 11.02.2013 11:45:57 schrieb(en) Gabriel Scherer:
+</I>&gt;&gt;<i> On Mon, Feb 11, 2013 at 11:31 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; It should work just fine with ppx, and has the advantage of reducing the number of ocamlfind calls per-file (which is a considerable overhead on large projects, since it has to scan the META
+</I>&gt;&gt;<i> directories on every invocation).
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> That's of course rather orthogonal to the present discussion, but have
+</I>&gt;&gt;<i> you been in contact with Gerd to see if some caching solution would be
+</I>&gt;&gt;<i> possible? Intuitively it feels like ocamlfind could easily maintain a
+</I>&gt;&gt;<i> cache in /var/run/blah and only clean it on install/remove commands.
+</I>&gt;<i> 
+</I>&gt;<i> As a system engineer I think this is overkill. ocamlfind only loads the META files actually needed (it does not &quot;scan&quot;), and loading a file already in the page cache is a matter of microseconds. Even
+</I>&gt;<i> when you have 100 packages this should be hardly noticeable. Such a cache can even make things worse, because loading once a large cache can be more costly than a few META files (simply because of the
+</I>&gt;<i> data volume).
+</I>&gt;<i> 
+</I>&gt;<i> What is probably more a problem when you have many packages: This generates many -I paths, and the compiler has to search for modules. I don't know how this is implemented, but if it is the naive way,
+</I>&gt;<i> this is an O(n*m) algorithm (n=number of -I directories, m=number of modules to look up).
+</I>
+Is there a reason that ocamlbuild has to spawn the compiler for each file?
+Couldn't it use compiler-libs to perform the compilation directly, and re-use some of the cached information (location of modules, parsed interfaces for example)?
+
+Also I've noticed some suboptimal behaviours with oasis+ocamlbuild+ocamlfind, would that new wg-build list be appropriate to discuss such issues (and find solutions)?
+Or should I just file bugreports for the individual tools?
+
+For example:
+ - ocamlfind returning -I paths in different order (with different -tag), which caused ocamlbuild to think that the &quot;build command&quot; has changed, and thus rebuild files it shouldn't
+ - oasis sometimes adds more -I than necessary (if two libraries share a directory)
+ - oasis sometimes adds too few -I (causing interface mismatch errors between my src/ and test/ for example)
+ - even when there's nothing to rebuild it takes 1-2s to say that
+
+
+Best regards,
+--Edwin
+
+&gt;<i> 
+</I>&gt;<i> Gerd
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;&gt;<i> (An external process invocation would still make some overhead so in
+</I>&gt;&gt;<i> you're case you'd still have to go all the way, but that could improve
+</I>&gt;&gt;<i> the threshold at which such ~hacks become interesting.)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> On Mon, Feb 11, 2013 at 11:31 AM, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">anil at recoil.org</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt; On 11 Feb 2013, at 10:06, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; wrote:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; For a code base like Jane Street's where many &quot;extensions&quot; have to be used everywhere, I suspect that the &quot;independent&quot; ppx processes might become an issue (or maybe not, if compared to camlp4),
+</I>&gt;&gt;<i> but the following solutions would work:
+</I>&gt;&gt;<i> &gt;&gt;
+</I>&gt;&gt;<i> &gt;&gt; - Statically linking a &quot;big rewriter&quot; called with -ppx.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; This worked well in the case of Mirage; in the monolithic repository, we link together all the camlp4 extensions into a single big one, and invoke that across all files.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; It should work just fine with ppx, and has the advantage of reducing the number of ocamlfind calls per-file (which is a considerable overhead on large projects, since it has to scan the META
+</I>&gt;&gt;<i> directories on every invocation).
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; There's also the advantage in camlp4 that this checks that syntax extensions do not conflict. This is less of an issue with ppx, thankfully.
+</I>&gt;&gt;<i> &gt;
+</I>&gt;&gt;<i> &gt; -anil
+</I>&gt;&gt;<i> &gt; _______________________________________________
+</I>&gt;&gt;<i> &gt; wg-camlp4 mailing list
+</I>&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000246.html">[wg-camlp4] benchmarks
+</A></li>
+	<LI>Next message: <A HREF="000250.html">[wg-camlp4] benchmarks
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#247">[ date ]</a>
+              <a href="thread.html#247">[ thread ]</a>
+              <a href="subject.html#247">[ subject ]</a>
+              <a href="author.html#247">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

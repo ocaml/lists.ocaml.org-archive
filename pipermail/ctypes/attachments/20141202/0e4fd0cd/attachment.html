@@ -1,0 +1,33 @@
+<tt>
+&lt;div&nbsp;dir=&quot;ltr&quot;&gt;Jeremy,&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Thanks.&nbsp;What&nbsp;you&nbsp;said&nbsp;makes&nbsp;sense.&nbsp;I&nbsp;think&nbsp;I&nbsp;misunderstood&nbsp;the&nbsp;funptr&nbsp;argument&nbsp;but&nbsp;it&nbsp;is&nbsp;very&nbsp;clear&nbsp;now.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;I&nbsp;saw&nbsp;that&nbsp;&quot;Advanced&nbsp;topic:&nbsp;multithreading&quot;.&nbsp;Given&nbsp;that&nbsp;the&nbsp;library&nbsp;I&#39;m&nbsp;linking&nbsp;in&nbsp;--&nbsp;libuv&nbsp;--&nbsp;spawns&nbsp;the&nbsp;threads&nbsp;itself&nbsp;we&nbsp;will&nbsp;need&nbsp;to&nbsp;be&nbsp;creative&nbsp;about&nbsp;getting&nbsp;them&nbsp;to&nbsp;call&nbsp;the&nbsp;caml&nbsp;register&nbsp;function.&nbsp;That&#39;s&nbsp;next&nbsp;on&nbsp;my&nbsp;list.&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Thanks!&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;Trevor&lt;/div&gt;&lt;/div&gt;&lt;div&nbsp;class=&quot;gmail_extra&quot;&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Tue,&nbsp;Dec&nbsp;2,&nbsp;2014&nbsp;at&nbsp;12:07&nbsp;PM,&nbsp;Jeremy&nbsp;Yallop&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:yallop@gmail.com&quot;&nbsp;target=&quot;_blank&quot;&gt;yallop@gmail.com&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;&lt;span&nbsp;class=&quot;&quot;&gt;On&nbsp;2&nbsp;December&nbsp;2014&nbsp;at&nbsp;13:25,&nbsp;Trevor&nbsp;Smith&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:trevorsummerssmith@gmail.com&quot;&gt;trevorsummerssmith@gmail.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;1)&nbsp;C-function&nbsp;in&nbsp;thread&nbsp;A&nbsp;will&nbsp;be&nbsp;called&nbsp;from&nbsp;OCaml,&nbsp;and&nbsp;places&nbsp;an&nbsp;OCaml&lt;br&gt;<br>
+&gt;&nbsp;callback&nbsp;cb&nbsp;onto&nbsp;a&nbsp;queue.&lt;br&gt;<br>
+&gt;&nbsp;2)&nbsp;C-function&nbsp;in&nbsp;thread&nbsp;B&nbsp;will&nbsp;asynchronously&nbsp;receive&nbsp;the&nbsp;callback&nbsp;on&nbsp;the&lt;br&gt;<br>
+&gt;&nbsp;queue,&nbsp;do&nbsp;some&nbsp;computation,&nbsp;then&nbsp;run&nbsp;cb.&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;My&nbsp;understanding&nbsp;is&nbsp;that&nbsp;I&nbsp;need&nbsp;to&nbsp;re-acquire&nbsp;the&nbsp;runtime&nbsp;lock&nbsp;when&nbsp;cb&nbsp;is&lt;br&gt;<br>
+&gt;&nbsp;ran&nbsp;in&nbsp;thread&nbsp;B.&nbsp;Is&nbsp;that&nbsp;correct?&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;Yes. &nbsp;You&nbsp;should&nbsp;be&nbsp;able&nbsp;to&nbsp;use&nbsp;the&nbsp;&quot;runtime_lock&quot;&nbsp;argument&nbsp;to&nbsp;funptr&lt;br&gt;<br>
+to&nbsp;indicate&nbsp;that&nbsp;the&nbsp;lock&nbsp;should&nbsp;be&nbsp;(re)acquired&nbsp;when&nbsp;calling&nbsp;back&lt;br&gt;<br>
+into&nbsp;OCaml&nbsp;from&nbsp;C:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp;&lt;a&nbsp;href=&quot;https://github.com/ocamllabs/ocaml-ctypes/blob/e190603a4/src/ctypes-foreign-threaded/foreign.mli#L53&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/ocamllabs/ocaml-ctypes/blob/e190603a4/src/ctypes-foreign-threaded/foreign.mli#L53&lt;/a&gt;&lt;br&gt;<br>
+ &nbsp;&lt;a&nbsp;href=&quot;https://github.com/ocamllabs/ocaml-ctypes/blob/e190603a4/src/ctypes-foreign-threaded/foreign.mli#L72-L74&quot;&nbsp;target=&quot;_blank&quot;&gt;https://github.com/ocamllabs/ocaml-ctypes/blob/e190603a4/src/ctypes-foreign-threaded/foreign.mli#L72-L74&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+You&nbsp;probably&nbsp;also&nbsp;need&nbsp;to&nbsp;call&nbsp;caml_c_thread_register()&nbsp;from&nbsp;your&nbsp;C&lt;br&gt;<br>
+code&nbsp;to&nbsp;register&nbsp;the&nbsp;thread&nbsp;that&#39;s&nbsp;going&nbsp;to&nbsp;be&nbsp;calling&nbsp;back&nbsp;into&lt;br&gt;<br>
+OCaml:&lt;br&gt;<br>
+&lt;br&gt;<br>
+ &nbsp; &lt;a&nbsp;href=&quot;http://caml.inria.fr/pub/docs/manual-ocaml-4.00/manual033.html#toc151&quot;&nbsp;target=&quot;_blank&quot;&gt;http://caml.inria.fr/pub/docs/manual-ocaml-4.00/manual033.html#toc151&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+(It&#39;s&nbsp;worth&nbsp;reading&nbsp;that&nbsp;whole&nbsp;&quot;Advanced&nbsp;topic:&nbsp;multithreading&quot;&lt;br&gt;<br>
+section&nbsp;of&nbsp;the&nbsp;OCaml&nbsp;manual,&nbsp;if&nbsp;you&nbsp;haven&#39;t&nbsp;already.)&lt;br&gt;<br>
+&lt;span&nbsp;class=&quot;&quot;&gt;&lt;br&gt;<br>
+&gt;&nbsp;Also,&nbsp;my&nbsp;understanding&nbsp;is&nbsp;that&nbsp;the&nbsp;lock&lt;br&gt;<br>
+&gt;&nbsp;calls&nbsp;are&nbsp;_not_&nbsp;reentrant,&nbsp;so&nbsp;the&nbsp;acquire/release&nbsp;set&nbsp;are&nbsp;needed.&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/span&gt;Right.&lt;br&gt;<br>
+&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

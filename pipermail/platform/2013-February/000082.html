@@ -1,0 +1,137 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302221812200.21744%40hermes-1.csi.cam.ac.uk%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000081.html">
+   <LINK REL="Next"  HREF="000083.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Leo White</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3CPrayer.1.3.5.1302221812200.21744%40hermes-1.csi.cam.ac.uk%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">lpw25 at cam.ac.uk
+       </A><BR>
+    <I>Fri Feb 22 18:12:20 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000081.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000083.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i>This seems a little bit hackish to me, and likely to require more 
+</I>&gt;<i>over-engineering (do we need a tool to create those .cmi files; if they 
+</I>&gt;<i>are plain text file, it's ugly to use the .cmi extension).
+</I>
+I'm still not sure that they are really needed, but if they are the 
+simplest thing to do would be to automatically generate some kind of 
+&quot;core.std.cmn&quot; file whenever an mli file was compiled that contained &quot;in 
+Core.Std&quot;. This would basically indicate that a &quot;Core.Std&quot; namespace 
+existed and that some &quot;.cmi&quot; files in this directory used it.
+
+&gt;<i>We use this quite intensively on LexiFi's code base.  This really speeds 
+</I>&gt;<i>up compilation time under Windows, and we also use it to simplify 
+</I>&gt;<i>deployment (our application is shipped with some .cmi files from many 
+</I>&gt;<i>libraries and automatically compiles user-provided addins against them; 
+</I>&gt;<i>it would be tedious -- and useless -- to reproduce a complete hierarchy 
+</I>&gt;<i>of libraries on the installation side).
+</I>&gt;<i>
+</I>&gt;<i>We would hate to have the third-party libraries we use adopt a new 
+</I>&gt;<i>feature (namespaces) which solves a problem we don't have but forces us 
+</I>&gt;<i>to change in non trivial ways how we organize our code base and deployment.
+</I>
+It is quite a specialised case, but I don't think it would be too hard to 
+accommodate. If the compiler accepted filenames like &quot;list.1.cmi&quot; as 
+possible files containing a &quot;List&quot; module, then you could safely put all 
+your files in a single directory.
+
+&gt;&gt;<i> This is basically an error, so dependencies
+</I>&gt;&gt;<i> should not be expected to be correct.
+</I>&gt;<i>
+</I>&gt;<i>I don't agree.  Having wrong dependencies is a nightmare to debug and 
+</I>&gt;<i>during development having errors in the code is not an exceptional 
+</I>&gt;<i>situation.  A robust build system should handle nicely things like 
+</I>&gt;<i>moving files around, renaming them, etc.
+</I>
+I didn't mean that the build system wouldn't detect the error only that it 
+wouldn't detect it until dependencies were recalculated.
+
+&gt;<i>Imagine you have a big 
+</I>&gt;<i>project with two modules
+</I>&gt;<i>
+</I>&gt;<i>   foo/a.ml in namespace Foo
+</I>&gt;<i>   bar/a.ml in namespace Bar
+</I>&gt;<i>
+</I>&gt;<i>Now you compile x.ml which refers to Foo # A. &quot;ocamldep -modules&quot; 
+</I>&gt;<i>reports that the dependencies for it include mode &quot;A&quot;, which must be 
+</I>&gt;<i>mapped to all buildable a.cmi/a.cmx in your tree, i.e. both foo/a and 
+</I>&gt;<i>bar/a.  (Things are even worse if you use the same syntax as for 
+</I>&gt;<i>modules, because then any reference like Foo.A must be interpreted as a 
+</I>&gt;<i>potential dependency to foo.cmi/cmx or to a.cmi/cmx.)  But maybe 
+</I>&gt;<i>bar/a.ml refers to x.ml, and then you have a circular dependency.
+</I>
+This won't a problem if you use a build system specialised for OCaml, since 
+they would know about namespaces and create the following dependencies:
+
+x.ml: Foo#A
+Foo#A: foo/a.ml
+Bar#A: bar/a.ml
+
+Even the makefile output of OCamlDep could be modified to avoid this 
+problem using phony targets, although it is probably not worth it.
+
+&gt;<i>I'd like any proposal about namespaces to come with a description of (i) 
+</I>&gt;<i>how ocamldep is supposed to behave; (ii) how build systems (based on, 
+</I>&gt;<i>say, make, omake and ocamlbuild) are supposed to be adapted.
+</I>
+For namespaces:
+
+ - Whenever ocamldep encounters a line &quot;in A#B&quot; within c.mli then it creates
+   a dependency &quot;A#B#C: c.mli&quot;.
+
+ - Whenever it finds a use A#B#C in a file e.mli it creates a dependency 
+   &quot;e.mli: A#B#C&quot;.
+
+ - Build systems are modified to include support for phony namespace 
+targets.
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000081.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000083.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#82">[ date ]</a>
+              <a href="thread.html#82">[ thread ]</a>
+              <a href="subject.html#82">[ subject ]</a>
+              <a href="author.html#82">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

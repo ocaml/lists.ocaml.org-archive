@@ -1,0 +1,191 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Against%20the%20use%20of%20syntactically-valid%20OCaml%20code%20for%0A%20syntax%20extension%20purposes&In-Reply-To=%3CCAPFanBEFN6CUZTvVamx%2BQMOZogm8WtPT8b4bC8qDrajJGv78uA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000055.html">
+   <LINK REL="Next"  HREF="000075.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Against%20the%20use%20of%20syntactically-valid%20OCaml%20code%20for%0A%20syntax%20extension%20purposes&In-Reply-To=%3CCAPFanBEFN6CUZTvVamx%2BQMOZogm8WtPT8b4bC8qDrajJGv78uA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Tue Jan 29 10:52:56 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000055.html">[wg-camlp4] How Jane Street uses camlp4
+</A></li>
+        <LI>Next message: <A HREF="000075.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#74">[ date ]</a>
+              <a href="thread.html#74">[ thread ]</a>
+              <a href="subject.html#74">[ subject ]</a>
+              <a href="author.html#74">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear wg-camlp4 list,
+
+I have been reading the list discussion and find it very interesting
+so far. One point that I am worried about is the seemingly consensual
+idea that the way to integrate syntax extensions in a post-camlp4
+world is to massage them into syntactically correct OCaml code, to be
+parsed by the existing parser and later processed by a -ppx filter.
+
+I think this is a terrible idea. Code with a special semantics should
+have a special syntax. Otherwise, how is the user supposed to guess
+which syntactically correct code follows the expected OCaml semantics,
+and which is in fact to be understood in the context of a specific
+syntax extension?
+
+Camlp4 quotations are a generic way to embed foreign pieces of syntax
+into an OCaml parstree in a safe, explicit, modular and composable
+way. I understand that it is annoying to be forced to &quot;quote&quot; code
+that is &quot;mostly valid OCaml code&quot; (eg. encoding type-conv with
+continuations would give something as &lt;:type-conv&lt; type foo = ... with
+... &gt;&gt;, while we would like to preserve the type declaration and
+localize the extension to the &quot;with&quot; part). Sometimes, a full
+quotation syntax is also too heavy to make sense in the precise
+context (eg. regexp patterns in ulex/xstr/whatever). I think we should
+cluster the existing perversions into a small amount of cases that we
+add to the existing OCaml syntax (eg. overloadable string literals for
+unicode support, xstr and PG'OCaml), as a *different* syntax from what
+is currently accepted and well-defined.
+
+(When I say &quot;syntactically valid&quot; this is to be taken relatively to
+the future OCaml language: I would be ok with forbidding some
+currently accepted corner cases to reuse them for extension purposes.)
+
+This coincides with Fabrice's opinion to agree on a common syntax for
+quotations/extensions among extensions. Discipline and robustness at
+the cost of generality, that is (imho) the meaningful direction an
+out-of-camlp4 work should take. I understand the temptation to express
+arbitrary things in the limited (but already useful) -ppx framework as
+it stands now, but I think we should resist it.
+
+So that would be my answer: *reject* reuse of syntactically valid code
+for extension purposes, and isolate a *few* common cases of extensions
+that deserve new extension points to be added to the standard parser
+(arbitrary quotations being the maximally expressive, but also
+heaviest, tool in this framework, into which all non-otherwise-handled
+extension needs would fallback). The question of tool support (Tuareg
+indentation, etc.) is solved by updating tools to support those few
+extension points, no masquerade new semantics under old syntax.
+
+What do you think of embeddings of syntax extension into syntactically
+valid syntax ?
+
+On Mon, Jan 28, 2013 at 4:10 PM, Dario Teixeira &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">darioteixeira at yahoo.com</A>&gt; wrote:
+&gt;<i> Hi,
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Another syntax extension to consider is PG'OCaml's.  Though it seems like
+</I>&gt;<i> it can easily be adapted to the ppx system, it does raise an issue which I
+</I>&gt;<i> think ought to be discussed.
+</I>&gt;<i>
+</I>&gt;<i> Here's how code making use of embedded SQL in PG'OCaml currently looks like:
+</I>&gt;<i> (the dbh parameter is the database handle)
+</I>&gt;<i>
+</I>&gt;<i>   let fetch_users dbh =
+</I>&gt;<i>         PGSQL(dbh) &quot;select id, name from users&quot;
+</I>&gt;<i>
+</I>&gt;<i> This is syntactally incorrect, of course.  Therefore, any adaptation to the
+</I>&gt;<i> ppx system will necessarily be backwards-incompatible with existing code
+</I>&gt;<i> (not a big problem for me personally, but others may disagree).  As for
+</I>&gt;<i> the new syntax, several possibilities exist.  A straightforward one would
+</I>&gt;<i> be to lowercase the &quot;PGSQL&quot; token; embedded SQL statements would thus take
+</I>&gt;<i> the form of fake function calls:
+</I>&gt;<i>
+</I>&gt;<i>   let fetch_users dbh =
+</I>&gt;<i>         pgsql(dbh) &quot;select id, name from users&quot;
+</I>&gt;<i>
+</I>&gt;<i> Another possiblity would be for the SQL statements to be arguments to a fake
+</I>&gt;<i> variant type constructor:
+</I>&gt;<i>
+</I>&gt;<i>   let fetch_users dbh =
+</I>&gt;<i>         PGSQL (dbh, &quot;select id, name from users&quot;)
+</I>&gt;<i>
+</I>&gt;<i> I could go on.  Anyway, regardless of choice, one issue comes to mind.
+</I>&gt;<i> Presently, code using the PG'OCaml syntax extension is conspicuous by its
+</I>&gt;<i> syntactic incorrectness.  Therefore, someone unfamiliar with PG'OCaml who
+</I>&gt;<i> happened to be looking at code using the syntax extension would immediately
+</I>&gt;<i> suspect something camlp4ish was going on.  With ppx, this signaling would
+</I>&gt;<i> go away.  This could make code harder to read if several syntax extensions
+</I>&gt;<i> are simultaneously used, particularly if syntax extensions become more
+</I>&gt;<i> popular because ppx makes it so much easier to write them.
+</I>&gt;<i>
+</I>&gt;<i> One solution is for the community to adopt conventions that make syntax
+</I>&gt;<i> extensions stand out to the naked eye (syntax highlighters in Vim or Emacs
+</I>&gt;<i> could also take advantage of these conventions).  For example: the fake variant
+</I>&gt;<i> constructor could be instead a fake PV constructor ending in &quot;'&quot; (prime).
+</I>&gt;<i> It should not be hard for editors to highlight this code in a special way:
+</I>&gt;<i>
+</I>&gt;<i>   let fetch_users dbh =
+</I>&gt;<i>         `PGSQL' (dbh, &quot;select id, name from users&quot;)
+</I>&gt;<i>
+</I>&gt;<i> What do you think?
+</I>&gt;<i>
+</I>&gt;<i> Best regards,
+</I>&gt;<i> Dario Teixeira
+</I>&gt;<i>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I></PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000055.html">[wg-camlp4] How Jane Street uses camlp4
+</A></li>
+	<LI>Next message: <A HREF="000075.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#74">[ date ]</a>
+              <a href="thread.html#74">[ thread ]</a>
+              <a href="subject.html#74">[ subject ]</a>
+              <a href="author.html#74">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

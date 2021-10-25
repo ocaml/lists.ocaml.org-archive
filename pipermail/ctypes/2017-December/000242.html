@@ -1,0 +1,189 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with probable GC problem
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20probable%20GC%20problem&In-Reply-To=%3C12f7b334-d4de-85a8-d7b4-1eeb434289c3%40digirati.com.br%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000243.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with probable GC problem</H1>
+    <B>Andre Nathan</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20probable%20GC%20problem&In-Reply-To=%3C12f7b334-d4de-85a8-d7b4-1eeb434289c3%40digirati.com.br%3E"
+       TITLE="[ocaml-ctypes] Help with probable GC problem">andre at digirati.com.br
+       </A><BR>
+    <I>Tue Dec 19 23:00:35 GMT 2017</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000243.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#242">[ date ]</a>
+              <a href="thread.html#242">[ thread ]</a>
+              <a href="subject.html#242">[ subject ]</a>
+              <a href="author.html#242">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi
+
+I've been trying to find a bug in my OCaml MariaDB bindings but haven't 
+had any luck so I decided to try the list.
+
+The issue is that after a few hundred runs, the username passed to the 
+MariaDB connection function becomes garbled, failing with a message like
+
+   Access denied for user 'x&#65533;&#65533;P&#65533;'@'localhost' (using password: YES)
+
+It seems like a memory value is being overwritten, or maybe claimed by 
+the OCaml GC, although in the library I explicitly copy the username 
+string, and libmariadb calls strdup() on it so I'm not sure that's the 
+problem.
+
+Since the library is very large, I created a branch with the minimal 
+bindings to open and close a connection, so that inspection of the code 
+becomes feasible:
+
+   <A HREF="https://github.com/andrenth/ocaml-mariadb/tree/minimal">https://github.com/andrenth/ocaml-mariadb/tree/minimal</A>
+
+The example test code simply opens and closes the connection 50k times. 
+It uses Unix.select to avoid dependencies, but the problem also happens 
+with, say, Lwt.
+
+In C, the library is used like this:
+
+   int status;
+   MYSQL mysql, *ret;
+
+   status = mysql_real_connect_start(&amp;ret, &amp;mysql,
+                                     &quot;host&quot;, &quot;user&quot;, &quot;pass&quot;,
+                                     NULL, 0, NULL, 0);
+   while (status) {
+     status = wait_for_mysql(&amp;mysql, status);
+     status = mysql_real_connect_cont(&amp;ret, &amp;mysql, status);
+   }
+
+   if (!ret)
+     fatal(&amp;mysql, &quot;Failed to mysql_real_connect()&quot;);
+
+The idea is to try to connect with the &quot;start&quot; function and keep trying 
+until the socket is ready and &quot;cont&quot; function succeeds.
+
+In OCaml, the bindings are as below:
+
+   type mysql = unit ptr
+   let mysql : mysql typ = ptr void
+
+   type mysql_opt = unit ptr option
+   let mysql_opt : mysql_opt typ = ptr_opt void
+
+   let mysql_real_connect_start = foreign &quot;mysql_real_connect_start&quot;
+     (ptr mysql_opt @-&gt; mysql @-&gt; ptr_opt char @-&gt; ptr_opt char @-&gt;
+      ptr_opt char @-&gt; ptr_opt char @-&gt; uint @-&gt; ptr_opt char @-&gt;
+      ulong @-&gt; returning int)
+
+   let mysql_real_connect_cont = foreign &quot;mysql_real_connect_cont&quot;
+     (ptr mysql_opt @-&gt; mysql @-&gt; int @-&gt; returning int)
+
+Then there are wrappers for the two connect functions:
+
+   let handle_ret f =
+     let ret = allocate B.mysql_opt None in
+     let status = f ret in
+     (status, !@ret)
+
+   let mysql_real_connect_start mysql host user pass db port sock flags =
+     (* convert string option to char ptr option *)
+     let host, user, pass, db, sock = ...
+     let port = Unsigned.UInt.of_int port in
+     let flags = Unsigned.ULong.of_int flags in
+     handle_ret
+       (fun ret -&gt;
+         B.mysql_real_connect_start
+           ret mysql host user pass db port socket flags)
+
+   let mysql_real_connect_cont mysql status =
+     handle_ret (fun ret -&gt; B.mysql_real_connect_cont ret mysql status)
+
+To implement the start/wait/cont loop, I have the function below:
+
+   let rec nonblocking mariadb (start, cont) =
+     match start () with
+     | `Ok v -&gt; return (Ok v)
+     | `Error e -&gt; return (Error e)
+     | `Wait status -&gt;
+         W.wait mariadb status &gt;&gt;= fun s -&gt;
+         nonblocking mariadb ((fun () -&gt; cont status), cont)
+
+Here W is a user-provided module that checks socket readiness.
+
+Then two more wrappers to allow the connect start/cont functions to be 
+used with &quot;nonblocking&quot;:
+
+   let handle_opt mariadb = function
+     | 0, Some _ -&gt; `Ok mariadb
+     | 0, None -&gt; `Error (error mariadb)
+     | s, _ -&gt; `Wait (Status.of_int s)
+
+   let connect_start mariadb host user pass db port sock () =
+     handle_opt mariadb
+       (B.mysql_real_connect_start mariadb host user pass db port sock 0)
+
+   let connect_cont mariadb status =
+     handle_opt mariadb
+       (B.mysql_real_connect_cont mariadb (Status.to_int status))
+
+Collect both functions in a tuple:
+
+   let connect mariadb ?host ?user ?pass ?db ?(port=0) ?socket () =
+     let start = connect_start mariadb host user pass db port socket in
+     let cont = connect_cont mariadb in
+     (start, cont)
+
+And finally the user-visible function, which passes the tuple to 
+&quot;nonblocking&quot;:
+
+   let connect ?host ?user ?pass ?db ?(port=0) ?socket () =
+     match init () with
+     | Some m -&gt;
+         nonblocking m (connect m ?host ?user ?pass ?db ~port ?socket ())
+     | None -&gt;
+         return (Error (2008, &quot;out of memory&quot;))
+
+I'm not sure if any sort of obvious error can be spotted from all that 
+above, but any help would be appreciated.
+
+Thanks in advance,
+Andre
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000243.html">[ocaml-ctypes] Help with probable GC problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#242">[ date ]</a>
+              <a href="thread.html#242">[ thread ]</a>
+              <a href="subject.html#242">[ subject ]</a>
+              <a href="author.html#242">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

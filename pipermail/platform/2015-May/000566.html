@@ -1,0 +1,163 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Dev Version as Package?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Dev%20Version%20as%20Package%3F&In-Reply-To=%3CCAHR%3DVkwTqNW9zrBk%2BkaYWuPmgsj6yY8mq6z6XtEp7E11gWd2bg%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000564.html">
+   <LINK REL="Next"  HREF="000567.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Dev Version as Package?</H1>
+    <B>Thomas Braibant</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Dev%20Version%20as%20Package%3F&In-Reply-To=%3CCAHR%3DVkwTqNW9zrBk%2BkaYWuPmgsj6yY8mq6z6XtEp7E11gWd2bg%40mail.gmail.com%3E"
+       TITLE="[ocaml-platform] Dev Version as Package?">thomas.braibant at gmail.com
+       </A><BR>
+    <I>Tue May  5 20:42:55 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000564.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+        <LI>Next message: <A HREF="000567.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#566">[ date ]</a>
+              <a href="thread.html#566">[ thread ]</a>
+              <a href="subject.html#566">[ subject ]</a>
+              <a href="author.html#566">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi,
+
+We faced this issue at work too. The typical issue is &quot;I want to depend on
+this particular branch of a third party repository&quot;. Pinning packages
+locally would work, but we want something that we can push on CI and build
+servers, and share in the team (and keep in the git history of the
+project).
+
+The solution we came up with is as follows: in our dev repository
+`project`, we keep a particular opam repository `project/opam-repository`.
+This repository contains shadow opam packages. For instance, if I want to
+depend on branch bar of a public project foo, we just add a new version of
+the opam package for foo in `project/opam-repository/packages`, with an
+explicit version number, and with an url like `path-to-project-foo#bar`.
+Then, we keep a opam file in `project` that specifies the explicit
+dependencies (given version of public package) and the dev dependencies
+(home brewed version of public packages). The dev dependencies can only be
+met using the shadow opam files.
+
+Then, our CI/build scripts use something like
+```
+opam remote remove shadow-opam-repository
+opam remote add shadow-opam-repository ./opam-repository
+opam update
+opam pin add --no-action project ./ -y
+opam install --deps-only project -y
+```
+
+Changing version of packages for all devs and our servers is done by
+commiting changes either to the opam-repository or to the opam file in the
+project.
+
+Hope that helps.
+Thomas
+
+
+
+
+
+On Tue, May 5, 2015 at 9:19 PM, Malcolm Matalka &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">mmatalka at gmail.com</A>&gt; wrote:
+
+&gt;<i> Each project I have has its own opam repo which I put as higher priority
+</I>&gt;<i> to the basic one.  Does this do what you want?
+</I>&gt;<i>
+</I>&gt;<i> Trevor Smith &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">trevorsummerssmith at gmail.com</A>&gt; writes:
+</I>&gt;<i>
+</I>&gt;<i> &gt; Hi all,
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; We're using opam internally at work. I have two use cases for our
+</I>&gt;<i> internal
+</I>&gt;<i> &gt; libraries:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; 1) &quot;dev dependencies&quot; -- I want what is in the repo.
+</I>&gt;<i> &gt; 2) &quot;explicit dependency&quot; -- I want a given version.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; opam has #2 covered.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; However it is not clear to me how to do #1 correctly. I can, on a given
+</I>&gt;<i> &gt; machine (ie not on an opam repository), pin a given package to a git
+</I>&gt;<i> repo.
+</I>&gt;<i> &gt; But locally pinning isn't what I want. I want a package in an opam
+</I>&gt;<i> &gt; repository to say &quot;I depend upon this other dev package&quot; so that our
+</I>&gt;<i> build
+</I>&gt;<i> &gt; boxes, and various developer machines will all do the same thing, and I
+</I>&gt;<i> &gt; don't need to separately pin everything on each box.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Has anyone else encountered this situation before?
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Thoughts? Thanks.
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Trevor
+</I>&gt;<i> &gt; _______________________________________________
+</I>&gt;<i> &gt; Platform mailing list
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> &gt; <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> Platform mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">Platform at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/platform">http://lists.ocaml.org/listinfo/platform</A>
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/platform/attachments/20150505/d7ee728a/attachment-0001.html">http://lists.ocaml.org/pipermail/platform/attachments/20150505/d7ee728a/attachment-0001.html</A>&gt;
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000564.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+	<LI>Next message: <A HREF="000567.html">[ocaml-platform] Dev Version as Package?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#566">[ date ]</a>
+              <a href="thread.html#566">[ thread ]</a>
+              <a href="subject.html#566">[ subject ]</a>
+              <a href="author.html#566">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,159 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Help with strings
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C0EF0083A-B8F8-4481-96DD-2C0F3A9F527D%40internode.on.net%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000252.html">
+   <LINK REL="Next"  HREF="000261.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Help with strings</H1>
+    <B>john skaller</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Help%20with%20strings&In-Reply-To=%3C0EF0083A-B8F8-4481-96DD-2C0F3A9F527D%40internode.on.net%3E"
+       TITLE="[ocaml-ctypes] Help with strings">skaller at internode.on.net
+       </A><BR>
+    <I>Wed Dec 27 23:37:02 GMT 2017</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000252.html">[ocaml-ctypes] Help with strings
+</A></li>
+        <LI>Next message: <A HREF="000261.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#254">[ date ]</a>
+              <a href="thread.html#254">[ thread ]</a>
+              <a href="subject.html#254">[ subject ]</a>
+              <a href="author.html#254">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>BTW: Just though I&#8217;d say, Ctypes is a pretty nice library.
+Well done! There&#8217;s no such thing as a perfect foreign interface
+to C, but Ctypes handles much of it reasonably well.
+Indeed, even the &#8220;domestic&#8221; interface to C (using C from C
+code) is pretty messy.
+
+&gt;&gt;<i> I have another question: what&#8217;s the best way to bind an &#8220;enum&#8221;?
+</I>&gt;&gt;<i> If the codes are sequential is there a builtin way to map the enum
+</I>&gt;&gt;<i> into an Ocaml variant?
+</I>&gt;<i> 
+</I>&gt;<i> Ctypes provides two functions for this:
+</I>&gt;<i> 
+</I>&gt;<i>   'constant' retrieves the value of a compile-time constant
+</I>&gt;<i> (enumeration constant, #define value, etc.)
+</I>&gt;<i>   <A HREF="http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant">http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALconstant</A>
+</I>&gt;<i> 
+</I>&gt;<i>   'enum' builds a 'typ' value from a mapping between constants and OCaml values
+</I>&gt;<i>   <A HREF="http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum">http://ocamllabs.io/ocaml-ctypes/Cstubs.Types.TYPE.html#VALenum</A>
+</I>
+Ah, thanks, I missed that.
+
+Hmm. What does it mean when it says &#8220;the size and alignment are retrieved&#8221;??
+The only way to do that would be to generate C code and measure it.
+
+So this is Cstubs which IS used that way. But its a multi-step process I do not
+wish to use.  At least for me at this stage .. too much magic:
+
+<A HREF="https://www.youtube.com/watch?v=cV5mmi7BBMY">https://www.youtube.com/watch?v=cV5mmi7BBMY</A>
+
+Looking at the yaml example, jbuilder is used with a ppx to do this at
+during Ocaml compilation, is that correct?
+
+
+&gt;<i> 
+</I>&gt;<i> Ctypes_type.TYPE is an abstract interface to type descriptions.  The
+</I>&gt;<i> Ctypes module gives a default implementation of the interface.  The
+</I>&gt;<i> interface is also used elsewhere, though; in particular, it's used for
+</I>&gt;<i> describing C types whose layout is retrieved from C:
+</I>&gt;<i> 
+</I>&gt;<i>    <A HREF="https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli">https://github.com/ocamllabs/ocaml-ctypes/blob/0.13.1/src/cstubs/cstubs.mli</A>
+</I>
+Ah, ok, that makes sense.
+
+&gt;<i> 
+</I>&gt;<i> For example, you can bind a struct using the 'structure' and 'field'
+</I>&gt;<i> values in the TYPE interface:
+</I>&gt;<i> 
+</I>&gt;<i>   let s = structure &quot;s&quot;
+</I>&gt;<i>   let x  = field s &quot;x&quot; int
+</I>&gt;<i>   ....
+</I>&gt;<i> 
+</I>&gt;<i> If you use the implementations of 'structure' and 'field in the Ctypes
+</I>&gt;<i> module then the struct layout is computed using an implementation that
+</I>&gt;<i> computes offsets using the alignment information for each type.  But
+</I>&gt;<i> if you use the implementations of 'structure' and 'field' from the
+</I>&gt;<i> Cstubs module then the layout information is retrieved by generating C
+</I>&gt;<i> code that's run through a C compiler.  The interface (i.e. TYPE) is
+</I>&gt;<i> the same in both cases, but it's useful to have different
+</I>&gt;<i> implementations of that interface.
+</I>
+Again, worth adding this description somewhere in the docs.
+Not sure where though, it doesn&#8217;t fit into the &#8220;ocamldoc&#8221; generated
+pages, more into an &#8220;overall design&#8221; doc.
+
+Hmm. How can I contribute easily. Its too early for me to actually
+write docs. However I could create an issue with copies of your
+email comments for someone to integrate.
+
+Also the Q&amp;A style here might suit Stackoverflow?
+
+
+&gt;<i> 
+</I>&gt;&gt;<i> Current rules say Ocaml strings are immutable, use bytes instead.
+</I>&gt;&gt;<i> However, if several threads are running, normally Ocaml is using
+</I>&gt;&gt;<i> a global lock to serialise them. However the lock is normally
+</I>&gt;&gt;<i> released when calling C code. That would not be safe in this
+</I>&gt;&gt;<i> case, using ocaml_string, so presumably in this case the lock
+</I>&gt;&gt;<i> is not released. Is that correct?
+</I>&gt;<i> 
+</I>&gt;<i> Yes, that's correct.  Ctypes supports releasing the lock (via the
+</I>&gt;<i> ~release_runtime_lock argument in Foreign.foreign, or via the
+</I>&gt;<i> concurrency policy in Cstubs), but the lock isn&#8217;t released by default.
+</I>
+Ah. That&#8217;s important info. Hmm. It is possible the client will be
+using the binding which is of a high performance specialised
+file transfer/analysis code with Jane St Async and might expect
+operations to run &#8220;in the background&#8221; using a future. The C library
+uses a thread pool, for example. I suspect this means the lock
+would have to be released. Also  .. when .. or should that be &#8220;if?&#8221;
+multi-core arrives it will create a big mess. (Especially for 
+JS/Async :)
+
+&#8212;
+john skaller
+<A HREF="http://lists.ocaml.org/listinfo/ctypes">skaller at users.sourceforge.net</A>
+<A HREF="http://felix-lang.org">http://felix-lang.org</A>
+
+</PRE>
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000252.html">[ocaml-ctypes] Help with strings
+</A></li>
+	<LI>Next message: <A HREF="000261.html">[ocaml-ctypes] Help with strings
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#254">[ date ]</a>
+              <a href="thread.html#254">[ thread ]</a>
+              <a href="subject.html#254">[ subject ]</a>
+              <a href="author.html#254">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,169 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My uses of syntax extension
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C1359469153.10634.13%40samsung%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000087.html">
+   <LINK REL="Next"  HREF="000027.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My uses of syntax extension</H1>
+    <B>Gerd Stolpmann</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20uses%20of%20syntax%20extension&In-Reply-To=%3C1359469153.10634.13%40samsung%3E"
+       TITLE="[wg-camlp4] My uses of syntax extension">info at gerd-stolpmann.de
+       </A><BR>
+    <I>Tue Jan 29 14:19:13 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000087.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+        <LI>Next message: <A HREF="000027.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#88">[ date ]</a>
+              <a href="thread.html#88">[ thread ]</a>
+              <a href="subject.html#88">[ subject ]</a>
+              <a href="author.html#88">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Am 29.01.2013 15:00:46 schrieb(en) Jeremy Yallop:
+&gt;<i> On 29 January 2013 13:17, Leo White &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">lpw25 at cam.ac.uk</A>&gt; wrote:
+</I>&gt;<i> &gt; quotations should also be used in for extensions that are, as  
+</I>&gt;<i> Gabriel put
+</I>&gt;<i> &gt; it, &quot;mostly valid OCaml code&quot;.
+</I>&gt;<i> 
+</I>&gt;<i> I'd like to offer an opposing view: quotations are for use in
+</I>&gt;<i> metaprogramming, and should not appear in user code (including code
+</I>&gt;<i> that makes use of syntax extensions) at all.
+</I>&gt;<i> 
+</I>&gt;<i> Quotations turn code into values that can be processed by user code.
+</I>&gt;<i> The idea of a quotation is to prevent code being evaluated
+</I>&gt;<i> immediately, instead making it available to the quoting program as a
+</I>&gt;<i> manipulable value.  I don't think that's what we're aiming for here;
+</I>&gt;<i> instead, we're aiming to make it easier to hook syntax transformers
+</I>&gt;<i> into the compiler.
+</I>
+I don't think you can really separate this if it comes to really  
+foreign syntax. I need to parse it anyway, and of course I get then a  
+manipulable value. I can easily provide e.g.
+
+   &lt;:sql&lt; ... &gt;&gt;
+
+and
+
+   &lt;:sqltree&lt; ... &gt;&gt;
+
+at the same time (the latter would just return the parsed syntax tree,  
+whereas the former would directly execute the foreign expression).
+
+Object level and meta level are only separated by one &quot;exec&quot; call.
+
+If your intention is to reserve the quotation notation for the meta  
+level, I don't see the benefit.
+
+Gerd
+
+&gt;<i> Perhaps some examples will make the distinction clearer.
+</I>&gt;<i> 
+</I>&gt;<i> Here's a Campl4 quotation that builds an AST fragment:
+</I>&gt;<i> 
+</I>&gt;<i>       let x = &lt;:expr&lt; y + 1 &gt;&gt;
+</I>&gt;<i> 
+</I>&gt;<i> The value bound to x is now available for use in the program in which
+</I>&gt;<i> the quotation appears.  You can analyse it, embed it in a larger AST,
+</I>&gt;<i> print it, etc.
+</I>&gt;<i> 
+</I>&gt;<i> Here's a MetaOCaml quotation that builds a code value:
+</I>&gt;<i> 
+</I>&gt;<i>       let x = .&lt; y + 1 &gt;.
+</I>&gt;<i> 
+</I>&gt;<i> Again, the value bound to x is now available for use in the program in
+</I>&gt;<i> which the quotation appears.  You can compile it, include it in a
+</I>&gt;<i> larger piece of code, etc.
+</I>&gt;<i> 
+</I>&gt;<i> Here's a string quotation:
+</I>&gt;<i> 
+</I>&gt;<i>       let x = &quot; y + 1 &quot;
+</I>&gt;<i> 
+</I>&gt;<i> Once again, the value bound to x is available for use in the program
+</I>&gt;<i> in which the quotation appears.  You can tokenize it, print it, etc.
+</I>&gt;<i> 
+</I>&gt;<i> In each case above, omitting the quotation delimiters would cause
+</I>&gt;<i> immediate evaluation of the quoted code.  The reason for quoting is to
+</I>&gt;<i> prevent evaluation and make the code available as a value instead.
+</I>&gt;<i> 
+</I>&gt;<i> Now consider the arrow notation example:
+</I>&gt;<i> 
+</I>&gt;<i>       let g = &lt;:proc&lt; x -&gt; y &lt;- f -&lt; x + 1;
+</I>&gt;<i>                            return -&lt; y + 2 &gt;&gt;
+</I>&gt;<i> 
+</I>&gt;<i> Here the aim is quite different: we don't want to prevent immediate
+</I>&gt;<i> evaluation; instead, we want to transform the syntax *for* immediate
+</I>&gt;<i> evaluation.  We don't want g to be bound to some user-manipulable
+</I>&gt;<i> representation of the code.  Instead, we want the *implementation* to
+</I>&gt;<i> consume the desugared notation, type check it and bind the result of
+</I>&gt;<i> evaluating it to g.  The distinction between user-consumable and
+</I>&gt;<i> implementation-consumable code is obscured if we use quotations for
+</I>&gt;<i> both in the source language.  Both quotations and syntax extensions
+</I>&gt;<i> are useful, but let's use different notations for them.  For example,
+</I>&gt;<i> using Alain's proposal, we might write the following for the arrow
+</I>&gt;<i> notation fragment:
+</I>&gt;<i> 
+</I>&gt;<i>       let g = (@proc) x =&gt; (y &lt;= f =&lt; x + 1;
+</I>&gt;<i>                             return =&lt; y + 2)
+</I>&gt;<i> 
+</I>&gt;<i> Jeremy
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> wg-camlp4 mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">wg-camlp4 at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">http://lists.ocaml.org/listinfo/wg-camlp4</A>
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>
+
+
+-- 
+------------------------------------------------------------
+Gerd Stolpmann, Darmstadt, Germany    <A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">gerd at gerd-stolpmann.de</A>
+Creator of GODI and camlcity.org.
+Contact details:        <A HREF="http://www.camlcity.org/contact.html">http://www.camlcity.org/contact.html</A>
+Company homepage:       <A HREF="http://www.gerd-stolpmann.de">http://www.gerd-stolpmann.de</A>
+------------------------------------------------------------
+</PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000087.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+	<LI>Next message: <A HREF="000027.html">[wg-camlp4] My uses of syntax extension
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#88">[ date ]</a>
+              <a href="thread.html#88">[ thread ]</a>
+              <a href="subject.html#88">[ subject ]</a>
+              <a href="author.html#88">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

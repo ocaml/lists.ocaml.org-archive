@@ -1,0 +1,362 @@
+From thomas.braibant at gmail.com  Thu Sep 11 09:31:57 2014
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Thu, 11 Sep 2014 10:31:57 +0200
+Subject: [ocaml-ctypes] Passing a pointer to a struct by address
+Message-ID: <CAHR=VkysmtmrLFxBk0DyW27Ztvywk3nKxOMtQek7UQMeUvmRqw@mail.gmail.com>
+
+Hi list,
+
+I am struggling with one part of a binding I am working on, which
+requires me to give a pointer to a pointer to a struct as an argument
+to a function. The idea is that this corresponds to giving a pointer
+to a struct by address to the function, which is free to use its
+return type to return error codes.
+
+What would be the correct idiom to do that? I could not find a way to
+get the address of a pointer in Ctypes itself, and I wonder if that
+would even be possible?
+
+Best,
+Thomas
+
+(My subscription to this list is still in limbo, so do not forget to CC me ;))
+
+From thomas.braibant at gmail.com  Thu Sep 11 09:53:54 2014
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Thu, 11 Sep 2014 10:53:54 +0200
+Subject: [ocaml-ctypes] Passing a pointer to a struct by address
+In-Reply-To: <CAHR=VkysmtmrLFxBk0DyW27Ztvywk3nKxOMtQek7UQMeUvmRqw@mail.gmail.com>
+References: <CAHR=VkysmtmrLFxBk0DyW27Ztvywk3nKxOMtQek7UQMeUvmRqw@mail.gmail.com>
+Message-ID: <CAHR=VkzLooUNDLOcXu1fNqXCGu=8D2Pbf7Dgb2NhzKW_i8r+PA@mail.gmail.com>
+
+Answering my own question, it appears that
+let p = allocate_n ~count:1 ((ptr my_struct)) in
+let rv = f p in
+    ....
+
+does what I want. Sorry for the noise.
+
+On Thu, Sep 11, 2014 at 10:31 AM, Thomas Braibant
+<thomas.braibant at gmail.com> wrote:
+> Hi list,
+>
+> I am struggling with one part of a binding I am working on, which
+> requires me to give a pointer to a pointer to a struct as an argument
+> to a function. The idea is that this corresponds to giving a pointer
+> to a struct by address to the function, which is free to use its
+> return type to return error codes.
+>
+> What would be the correct idiom to do that? I could not find a way to
+> get the address of a pointer in Ctypes itself, and I wonder if that
+> would even be possible?
+>
+> Best,
+> Thomas
+>
+> (My subscription to this list is still in limbo, so do not forget to CC me ;))
+
+From thomas.braibant at gmail.com  Fri Sep 12 10:15:14 2014
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Fri, 12 Sep 2014 11:15:14 +0200
+Subject: [ocaml-ctypes] Logging function calls
+Message-ID: <CAHR=Vkwc9Usp4fQc7+hx14j9b07BKEDzXBdSKLOdWyF=5gyWRg@mail.gmail.com>
+
+Hi list,
+
+I would like to log function calls using something like the following code:
+
+let rec log:
+type a. a fn -> a -> a =
+    function
+    | Static.Returns ty ->
+       fun result ->
+       Printf.printf "<- %s\n%!" (string_of ty result);
+       result
+    | Static.Function (ty, fn) ->
+       fun f x ->
+       Printf.printf "-> %s\n%!" (string_of ty x);
+       log fn (f x)
+
+This works beautifully for simple enough function arguments. However,
+I would also like to display a bit more than what is currently
+available.
+Two quick examples come to mind.
+
+First, printing the name of manifest constants (e.g., defined in C
+using #define FOO 0x0001337). I would like to log FOO rather than its
+integer value. If I provide a correct printing function, it might even
+produces correct C code.
+
+Second, a bit more akward, printing the content of structs that are
+passed by reference to functions. I do not see a way to print that
+information as valid C, but it would be tremendously useful in my
+logs.
+
+Both cases can probably be solved by redefining string_of using
+suitable extension points in my bindings, but I wonder if someone on
+this list has done something similar.
+
+Best,
+Thomas
+
+From yallop at gmail.com  Sat Sep 13 12:20:25 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Sat, 13 Sep 2014 12:20:25 +0100
+Subject: [ocaml-ctypes] Logging function calls
+In-Reply-To: <CAHR=Vkwc9Usp4fQc7+hx14j9b07BKEDzXBdSKLOdWyF=5gyWRg@mail.gmail.com>
+References: <CAHR=Vkwc9Usp4fQc7+hx14j9b07BKEDzXBdSKLOdWyF=5gyWRg@mail.gmail.com>
+Message-ID: <CAAxsn=FPsgeT7mb8zY5wDpwCJ2MJ+AkpgKDT3vh63qYxAjziUQ@mail.gmail.com>
+
+On 12 September 2014 10:15, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> I would like to log function calls using something like the following code:
+>
+> let rec log:
+> type a. a fn -> a -> a =
+>     function
+>     | Static.Returns ty ->
+>        fun result ->
+>        Printf.printf "<- %s\n%!" (string_of ty result);
+>        result
+>     | Static.Function (ty, fn) ->
+>        fun f x ->
+>        Printf.printf "-> %s\n%!" (string_of ty x);
+>        log fn (f x)
+>
+> This works beautifully for simple enough function arguments. However,
+> I would also like to display a bit more than what is currently
+> available.
+> Two quick examples come to mind.
+>
+> First, printing the name of manifest constants (e.g., defined in C
+> using #define FOO 0x0001337). I would like to log FOO rather than its
+> integer value. If I provide a correct printing function, it might even
+> produces correct C code.
+>
+> Second, a bit more akward, printing the content of structs that are
+> passed by reference to functions. I do not see a way to print that
+> information as valid C, but it would be tremendously useful in my
+> logs.
+
+I think that you can do what you want by matching a little deeper on
+"ty".  Here's a function that prints C values, dereferencing
+pointers-to-structures rather than just printing their addresses:
+
+  let rec format_val : type a. a typ -> Format.formatter -> a -> unit =
+    fun t fmt -> let open Static in match t with
+    | Pointer (Struct _ as s) ->
+       fun v -> Format.fprintf fmt "pointer to %a" (format_val s) !@v
+    | t -> Ctypes.format t fmt
+
+You can then call format_val instead of string_of inside your log function:
+
+  let rec log:
+    type a. a fn -> a -> a =
+      function
+      | Static.Returns ty ->
+         fun result ->
+         Format.(fprintf std_formatter) "<- @[%a@]@\n%!" (format_val ty) result;
+         result
+      | Static.Function (ty, fn) ->
+         fun f x ->
+         Format.(fprintf std_formatter) "-> @[%a@]@\n%!" (format_val ty) x;
+         log fn (f x)
+
+Here are the results, logging the results of passing the address of an
+uninitialized struct to the identity function:
+
+   # let s = structure "s";;
+   val s : '_a structure typ = struct s
+   # let i = field s "i" int;;
+   val i : (int, ('_a, [ `Struct ]) structured) field = <abstr>
+   # let j = field s "j" float;;
+   val j : (float, ('_a, [ `Struct ]) structured) field = <abstr>
+   # let () = seal s;;
+   # let v = make s;;
+   val v : ('_a, [ `Struct ]) structured = {
+       i = -486857096, j = 4.5857492245e-41
+     }
+   # log (ptr s @-> returning (ptr s)) (fun x -> x) (addr v);;
+   -> pointer to { i = -486857096, j = 4.5857492245e-41  }
+   <- pointer to { i = -486857096, j = 4.5857492245e-41  }
+   - : '_a structure ptr = (struct s*) 0x95fc40
+
+From thomas.braibant at gmail.com  Mon Sep 15 10:01:11 2014
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Mon, 15 Sep 2014 11:01:11 +0200
+Subject: [ocaml-ctypes] Logging function calls
+In-Reply-To: <CAAxsn=FPsgeT7mb8zY5wDpwCJ2MJ+AkpgKDT3vh63qYxAjziUQ@mail.gmail.com>
+References: <CAHR=Vkwc9Usp4fQc7+hx14j9b07BKEDzXBdSKLOdWyF=5gyWRg@mail.gmail.com>
+ <CAAxsn=FPsgeT7mb8zY5wDpwCJ2MJ+AkpgKDT3vh63qYxAjziUQ@mail.gmail.com>
+Message-ID: <CAHR=VkzROsicg=o-+2fQOwwoinvsMaVg1dO=YXjhFQEcZFGM6w@mail.gmail.com>
+
+Hi Jeremy,
+
+Thanks for your reply. Your proposal is quite close to what I had in
+mind. Yet, I am a bit puzzled about the dereferencing of the pointer
+in format_val. Shouldn't we test if it is the null-pointer before
+doing that? In that case, is testing if p = Ctypes.null the preferred
+way to do that? (I spotted that pattern somewhere in memory.ml I
+think.)
+
+Regarding my other use case, what I miss is a way to tag a view (with
+the identity coercion both way) with a name, and be able to use that
+name to pick the right pretty printer (for flags, and so on). That
+would be a tiny bit more convenient than reading the integer value of
+(FLAG_BAR | FLAG_FOO) in my log, but I can cope with that.
+
+Best,
+Thomas
+
+
+On Sat, Sep 13, 2014 at 1:20 PM, Jeremy Yallop <yallop at gmail.com> wrote:
+> On 12 September 2014 10:15, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+>> I would like to log function calls using something like the following code:
+>>
+>> let rec log:
+>> type a. a fn -> a -> a =
+>>     function
+>>     | Static.Returns ty ->
+>>        fun result ->
+>>        Printf.printf "<- %s\n%!" (string_of ty result);
+>>        result
+>>     | Static.Function (ty, fn) ->
+>>        fun f x ->
+>>        Printf.printf "-> %s\n%!" (string_of ty x);
+>>        log fn (f x)
+>>
+>> This works beautifully for simple enough function arguments. However,
+>> I would also like to display a bit more than what is currently
+>> available.
+>> Two quick examples come to mind.
+>>
+>> First, printing the name of manifest constants (e.g., defined in C
+>> using #define FOO 0x0001337). I would like to log FOO rather than its
+>> integer value. If I provide a correct printing function, it might even
+>> produces correct C code.
+>>
+>> Second, a bit more akward, printing the content of structs that are
+>> passed by reference to functions. I do not see a way to print that
+>> information as valid C, but it would be tremendously useful in my
+>> logs.
+>
+> I think that you can do what you want by matching a little deeper on
+> "ty".  Here's a function that prints C values, dereferencing
+> pointers-to-structures rather than just printing their addresses:
+>
+>   let rec format_val : type a. a typ -> Format.formatter -> a -> unit =
+>     fun t fmt -> let open Static in match t with
+>     | Pointer (Struct _ as s) ->
+>        fun v -> Format.fprintf fmt "pointer to %a" (format_val s) !@v
+>     | t -> Ctypes.format t fmt
+>
+> You can then call format_val instead of string_of inside your log function:
+>
+>   let rec log:
+>     type a. a fn -> a -> a =
+>       function
+>       | Static.Returns ty ->
+>          fun result ->
+>          Format.(fprintf std_formatter) "<- @[%a@]@\n%!" (format_val ty) result;
+>          result
+>       | Static.Function (ty, fn) ->
+>          fun f x ->
+>          Format.(fprintf std_formatter) "-> @[%a@]@\n%!" (format_val ty) x;
+>          log fn (f x)
+>
+> Here are the results, logging the results of passing the address of an
+> uninitialized struct to the identity function:
+>
+>    # let s = structure "s";;
+>    val s : '_a structure typ = struct s
+>    # let i = field s "i" int;;
+>    val i : (int, ('_a, [ `Struct ]) structured) field = <abstr>
+>    # let j = field s "j" float;;
+>    val j : (float, ('_a, [ `Struct ]) structured) field = <abstr>
+>    # let () = seal s;;
+>    # let v = make s;;
+>    val v : ('_a, [ `Struct ]) structured = {
+>        i = -486857096, j = 4.5857492245e-41
+>      }
+>    # log (ptr s @-> returning (ptr s)) (fun x -> x) (addr v);;
+>    -> pointer to { i = -486857096, j = 4.5857492245e-41  }
+>    <- pointer to { i = -486857096, j = 4.5857492245e-41  }
+>    - : '_a structure ptr = (struct s*) 0x95fc40
+
+From yallop at gmail.com  Tue Sep 16 10:21:28 2014
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Tue, 16 Sep 2014 10:21:28 +0100
+Subject: [ocaml-ctypes] Logging function calls
+In-Reply-To: <CAHR=VkzROsicg=o-+2fQOwwoinvsMaVg1dO=YXjhFQEcZFGM6w@mail.gmail.com>
+References: <CAHR=Vkwc9Usp4fQc7+hx14j9b07BKEDzXBdSKLOdWyF=5gyWRg@mail.gmail.com>
+ <CAAxsn=FPsgeT7mb8zY5wDpwCJ2MJ+AkpgKDT3vh63qYxAjziUQ@mail.gmail.com>
+ <CAHR=VkzROsicg=o-+2fQOwwoinvsMaVg1dO=YXjhFQEcZFGM6w@mail.gmail.com>
+Message-ID: <CAAxsn=FOcQF7pVfuvE-PGdyXRnjhKwJndvZPzr_SwW1Fnu5cbw@mail.gmail.com>
+
+On 15 September 2014 10:01, Thomas Braibant <thomas.braibant at gmail.com> wrote:
+> Thanks for your reply. Your proposal is quite close to what I had in
+> mind. Yet, I am a bit puzzled about the dereferencing of the pointer
+> in format_val. Shouldn't we test if it is the null-pointer before
+> doing that?
+
+Sure: there are different opinions on this, but I agree that a test
+for null would be reasonable here.
+
+> In that case, is testing if p = Ctypes.null the preferred
+> way to do that? (I spotted that pattern somewhere in memory.ml I
+> think.)
+
+It's better in general to use Ctypes.ptr_compare, since ptr is an
+abstract type and the values contain extra data besides the raw
+address.  (I think polymorphic equality will do what you expect for
+the special case of comparing to Ctypes.null, but in general you can
+have two Ctypes.ptr values referencing the same object but not
+considered equal by =.)
+
+Even better, if your pointers are nullable you might use
+Ctypes.ptr_opt to construct them, and pattern matching against
+Some/None to check for null.
+
+> Regarding my other use case, what I miss is a way to tag a view (with
+> the identity coercion both way) with a name, and be able to use that
+> name to pick the right pretty printer (for flags, and so on). That
+> would be a tiny bit more convenient than reading the integer value of
+> (FLAG_BAR | FLAG_FOO) in my log, but I can cope with that.
+
+It'd be convenient to have a way to add custom value printers for
+views, along similar lines to the format_typ optional argument to the
+view function.  I think that would actually solve both your problems
+neatly: you could have a view with a custom printer for your flags
+which turned integers into symbolic names, and a view with a custom
+printer for your pointer-to-struct arguments which printed out the
+pointed-to values rather than the addresses.  Pull requests welcome!
+(or feel free to raise an issue, if you prefer).
+
+From thomas.braibant at gmail.com  Tue Sep 30 11:09:30 2014
+From: thomas.braibant at gmail.com (Thomas Braibant)
+Date: Tue, 30 Sep 2014 12:09:30 +0200
+Subject: [ocaml-ctypes] Inverted stubs
+Message-ID: <CAHR=VkyzSt_EwWdyHdir=B_2h0XGmeCSC5BCga4V0TkcB3noMQ@mail.gmail.com>
+
+Hi list,
+
+First, I would like to report that my first attempt to make bindings
+using Ctypes for a sizable library was a success, and I would like to
+congratulate the people behind Ctypes for making such a wonderful
+library.
+
+Now, I would like to generate inverted stubs that match a third party
+C header file (the same one that I used to make my bindings in the
+first place). Generally speaking, this should be possible I suppose.
+However, one of the functions from this interface returns a struct
+that contains function pointers to all the other functions exposed in
+the interface. I am reasonably convinced that it is out of the scope
+of what Ctypes can do, but I wanted to be sure about that.
+
+Then, I think my best chance is to write a shim in C that does just
+the last step of implementing "the function that returns a struct that
+contains function pointers to all the other functions". If anyone has
+an opinion on this, I would quite happy to hear about it.
+
+Best,
+Thomas
+

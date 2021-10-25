@@ -1,0 +1,1883 @@
+From alain.frisch at lexifi.com  Wed Apr  3 17:51:35 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 03 Apr 2013 18:51:35 +0200
+Subject: [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+In-Reply-To: <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+Message-ID: <515C5E17.6050409@lexifi.com>
+
+On 03/29/2013 02:46 PM, Gabriel Scherer wrote:
+> Would it be possible to use the extension mechanism itself for
+> lightweight quasiquotations?
+
+On 03/29/2013 08:18 PM, Alain Frisch wrote:
+> Something similar to
+> branches/extension_points/experimental/frisch/print_gen.ml could be
+> used to generate automatically an AST lifter.  The difficult part is
+> to design anti-quotations, though, and since I'm not convinced by
+> this approach, I'd rather put energy myself in other projects.
+
+Ok, as usual, I've been sidetracked by your clever idea :-)
+
+I've created a meta quotation expander (or should it be called 
+"quasiquotation" ?), allowing to write AST builders using concrete 
+syntax as in:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot_test.ml?revision=HEAD&view=markup
+
+
+The code for the ppx rewriter supporting this style is:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/metaquot.ml?revision=HEAD&view=markup
+
+It relies on a "Parsetree lifter" class (Ast_lifter.lifter). The same 
+Parsetree lifter can also be used to write a Parsetree printer like the 
+tool ocamlast I've described previously, but now without relying on the 
+toplevel printer (which requires runtime access to parsetree.cmi, etc). 
+  The code for such a printer is in:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&view=markup
+
+
+Ast_lifter.lifter is a partial parametrized class, whose type parameter 
+describes which output is to be produced (Outcometree.value for the 
+printer; Parsetree.expression for the meta quotation expander).  This 
+class needs to be extended (through inheritance) in order to provide 
+"builder functions" for that type, and potentially to override the 
+default behavior for some type under Parsetree.  For instance, the 
+printer decides to map all locations of Oval_ellipsis.  Similarly, the 
+meta quotation expander detects uses of "anti-quotations" and maps them 
+to the identity instead of the default lifting behavior.
+
+The code of ast_lifter.ml looks like:
+
+class virtual ['res] lifter =
+   object (this)
+     method lift_Parsetree_expression : Parsetree.expression -> 'res=
+       fun
+         { Parsetree.pexp_desc = pexp_desc; Parsetree.pexp_loc = pexp_loc;
+           Parsetree.pexp_attributes = pexp_attributes }
+          ->
+         this#record "Parsetree.expression"
+           [("pexp_desc", (this#lift_Parsetree_expression_desc pexp_desc));
+           ("pexp_loc", (this#lift_Location_t pexp_loc));
+           ("pexp_attributes",
+             (this#list
+                (List.map this#lift_Parsetree_attribute pexp_attributes)))]
+     method lift_Parsetree_expression_desc :
+       Parsetree.expression_desc -> 'res=
+       function
+       | Parsetree.Pexp_ident x0 ->
+           this#constr "Parsetree.expression_desc"
+             ("Pexp_ident", [this#lift_Asttypes_loc 
+this#lift_Longident_t x0])
+       | Parsetree.Pexp_constant x0 ->
+           this#constr "Parsetree.expression_desc"
+             ("Pexp_constant", [this#lift_Asttypes_constant x0])
+       .....
+
+which is very tedious to write by hand (and to maintain when the 
+Parsetree evolves).  Of course, this code is not written by hand, it is 
+generated from the definition of the Parsetree using a small tool:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&view=markup
+
+which is executed once to produce ast_lifter.ml:
+
+./genlifter.exe -I ../../parsing -I ../../stdlib Parsetree.expression > 
+ast_lifter.ml
+
+All that can be tried by typing "make lifter" in experimental/frisch (on 
+the extension_points branch, of course, after a successful "make world").
+
+Now, one could go crazy (Camlp4-style) and use the metaquot ppx rewriter 
+within genlifter.ml itself, and then get for free nasty bootstrapping 
+problems :-)
+
+
+
+Alain
+
+From alain at frisch.fr  Wed Apr  3 17:59:17 2013
+From: alain at frisch.fr (Alain Frisch)
+Date: Wed, 03 Apr 2013 18:59:17 +0200
+Subject: [wg-camlp4] Matching on concrete syntax (was: Re: Camlp4 uses)
+In-Reply-To: <515C5E17.6050409@lexifi.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com>
+Message-ID: <515C5FE5.6050304@frisch.fr>
+
+On 04/03/2013 06:51 PM, Alain Frisch wrote:
+> which is very tedious to write by hand (and to maintain when the
+> Parsetree evolves).  Of course, this code is not written by hand, it is
+> generated from the definition of the Parsetree using a small tool:
+>
+> http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/dumpast.ml?revision=HEAD&view=markup
+
+Sorry, this link should be:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/genlifter.ml?revision=HEAD&view=markup 
+
+
+-- Alain
+
+From alain.frisch at lexifi.com  Wed Apr  3 18:16:39 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 03 Apr 2013 19:16:39 +0200
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <515C5FE5.6050304@frisch.fr>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+Message-ID: <515C63F7.4020602@lexifi.com>
+
+Now is a good time to start collecting more concrete feedback from 
+extension developers on the current proposal (ppx + extension_points). 
+Are there people on this list interested in porting their existing 
+extensions (or other tools which can benefit from attributes)?   This 
+will be greatly helpful if the current design can be validated by real 
+extension developers.  Porting real extensions will also help to isolate 
+a good set of "convenience" functions to build or deconstruct AST 
+fragments in a light way.
+
+(Disclaimer: there will still be some more cleanups to the Parsetree 
+definition and helper modules (Ast_mapper, Ast_helper), so the code 
+written now will need to be adjusted for the final version, but I expect 
+those changes to be quite easy.)
+
+
+-- Alain
+
+From alain.frisch at lexifi.com  Wed Apr  3 18:55:44 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 03 Apr 2013 19:55:44 +0200
+Subject: [wg-camlp4] Support for extension points in Camlp4
+In-Reply-To: <515C63F7.4020602@lexifi.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+Message-ID: <515C6D20.5000907@lexifi.com>
+
+Another topic where help would be much appreciated is the support of 
+extension points in Camlp4.  Even if one of the goal of all this 
+discussion is to replace some uses of Camlp4, there is no reason Camlp4 
+could not support itself the three new syntactic features (attributes, 
+extension nodes, quoted strings) in its parsers and its custom 
+representation of the OCaml AST.  In addition to simplifying a migration 
+phase (combining some Camp4 extensions and some -ppx rewriters), 
+supporting extensions points in Camlp4 makes sense even for people who 
+want (or will have) to continue using Camlp4:
+
+  - AST mappers can then be written not only with -ppx but also as 
+Camlp4 AST filters (which supports concrete syntax patterns and 
+expressions).
+
+  - It can be imagined that some extensions are split into an AST 
+transformation part (to be processed by -ppx) and a change to the 
+concrete syntax (with a Camlp4 extension which would only adds 
+attributes and extension nodes to the AST).  This would make it possible 
+to use the core feature of the extension without camlp4 and still 
+provide ad hoc concrete syntax for those who insist on it.
+
+  - Some external tools (a la Bisect) might start using attributes found 
+in the parsetree or typedtree, and projects built with Camlp4 will need 
+a way to embed such attributes in the source files.
+
+
+The current state is that Camlp4 has been adapted to the new Parsetree 
+(i.e. it generate valid fragments), but its internal representation of 
+the OCaml AST and its parsers do not support the new features.  Adding 
+this support should not be very difficult for someone familiar enough 
+with the implementation of Camlp4.  Any volunteer?
+
+
+Alain
+
+From yminsky at janestreet.com  Wed Apr  3 20:47:49 2013
+From: yminsky at janestreet.com (Yaron Minsky)
+Date: Wed, 3 Apr 2013 15:47:49 -0400
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <515C63F7.4020602@lexifi.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+Message-ID: <CACLX4jSN9yoAxF1NSuQsXGkWOmypEvCGiyCFVwQNYqm6sdbMYw@mail.gmail.com>
+
+Alain, if we were to do some experimentation, which branch of the
+compiler should we try it on?
+
+y
+
+On Wed, Apr 3, 2013 at 1:16 PM, Alain Frisch <alain.frisch at lexifi.com> wrote:
+> Now is a good time to start collecting more concrete feedback from extension
+> developers on the current proposal (ppx + extension_points). Are there
+> people on this list interested in porting their existing extensions (or
+> other tools which can benefit from attributes)?   This will be greatly
+> helpful if the current design can be validated by real extension developers.
+> Porting real extensions will also help to isolate a good set of
+> "convenience" functions to build or deconstruct AST fragments in a light
+> way.
+>
+> (Disclaimer: there will still be some more cleanups to the Parsetree
+> definition and helper modules (Ast_mapper, Ast_helper), so the code written
+> now will need to be adjusted for the final version, but I expect those
+> changes to be quite easy.)
+>
+>
+> -- Alain
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From hongboz at seas.upenn.edu  Thu Apr  4 02:05:33 2013
+From: hongboz at seas.upenn.edu (Hongbo Zhang)
+Date: Wed, 3 Apr 2013 21:05:33 -0400
+Subject: [wg-camlp4] Support for extension points in Camlp4
+In-Reply-To: <515C6D20.5000907@lexifi.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com> <515C6D20.5000907@lexifi.com>
+Message-ID: <CANcqPu6unzvPANSead2Uq3P5gRsWKa_n0UZ8VmRAnbX8CH9Gwg@mail.gmail.com>
+
+Hi Alain,
+  I would definitely like to help, but I think it is  a bit too early to
+adapt P4.
+
+
+On Wed, Apr 3, 2013 at 1:55 PM, Alain Frisch <alain.frisch at lexifi.com>wrote:
+
+> Another topic where help would be much appreciated is the support of
+> extension points in Camlp4.  Even if one of the goal of all this discussion
+> is to replace some uses of Camlp4, there is no reason Camlp4 could not
+> support itself the three new syntactic features (attributes, extension
+> nodes, quoted strings) in its parsers and its custom representation of the
+> OCaml AST.  In addition to simplifying a migration phase (combining some
+> Camp4 extensions and some -ppx rewriters), supporting extensions points in
+> Camlp4 makes sense even for people who want (or will have) to continue
+> using Camlp4:
+>
+>  - AST mappers can then be written not only with -ppx but also as Camlp4
+> AST filters (which supports concrete syntax patterns and expressions).
+>
+>  - It can be imagined that some extensions are split into an AST
+> transformation part (to be processed by -ppx) and a change to the concrete
+> syntax (with a Camlp4 extension which would only adds attributes and
+> extension nodes to the AST).  This would make it possible to use the core
+> feature of the extension without camlp4 and still provide ad hoc concrete
+> syntax for those who insist on it.
+>
+>  - Some external tools (a la Bisect) might start using attributes found in
+> the parsetree or typedtree, and projects built with Camlp4 will need a way
+> to embed such attributes in the source files.
+>
+>
+> The current state is that Camlp4 has been adapted to the new Parsetree
+> (i.e. it generate valid fragments), but its internal representation of the
+> OCaml AST and its parsers do not support the new features.  Adding this
+> support should not be very difficult for someone familiar enough with the
+> implementation of Camlp4.  Any volunteer?
+>
+>
+> Alain
+> ______________________________**_________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/**listinfo/wg-camlp4<http://lists.ocaml.org/listinfo/wg-camlp4>
+>
+
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130403/8a91b684/attachment-0001.html>
+
+From alain.frisch at lexifi.com  Thu Apr  4 08:34:54 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 04 Apr 2013 09:34:54 +0200
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <CACLX4jSN9yoAxF1NSuQsXGkWOmypEvCGiyCFVwQNYqm6sdbMYw@mail.gmail.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+ <CACLX4jSN9yoAxF1NSuQsXGkWOmypEvCGiyCFVwQNYqm6sdbMYw@mail.gmail.com>
+Message-ID: <515D2D1E.5090306@lexifi.com>
+
+Hi Yaron,
+
+All the development has been done on the extension_points branch in the 
+SVN.  Don't hesitate to comment early or ask for support if you start 
+some experimentation!
+
+Alain
+
+
+On 04/03/2013 09:47 PM, Yaron Minsky wrote:
+> Alain, if we were to do some experimentation, which branch of the
+> compiler should we try it on?
+>
+> y
+>
+> On Wed, Apr 3, 2013 at 1:16 PM, Alain Frisch <alain.frisch at lexifi.com> wrote:
+>> Now is a good time to start collecting more concrete feedback from extension
+>> developers on the current proposal (ppx + extension_points). Are there
+>> people on this list interested in porting their existing extensions (or
+>> other tools which can benefit from attributes)?   This will be greatly
+>> helpful if the current design can be validated by real extension developers.
+>> Porting real extensions will also help to isolate a good set of
+>> "convenience" functions to build or deconstruct AST fragments in a light
+>> way.
+>>
+>> (Disclaimer: there will still be some more cleanups to the Parsetree
+>> definition and helper modules (Ast_mapper, Ast_helper), so the code written
+>> now will need to be adjusted for the final version, but I expect those
+>> changes to be quite easy.)
+>>
+>>
+>> -- Alain
+>> _______________________________________________
+>> wg-camlp4 mailing list
+>> wg-camlp4 at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/wg-camlp4
+
+
+From alain.frisch at lexifi.com  Thu Apr  4 13:58:21 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 04 Apr 2013 14:58:21 +0200
+Subject: [wg-camlp4] About 'a loc in the Parsetree
+Message-ID: <515D78ED.2040705@lexifi.com>
+
+Dear all (caml-devel + wg-camlp4),
+
+I'd like to discuss the use of the 'a loc type (string loc and 
+Longident.loc) in the definition of the Parsetree.  I think this type 
+was introduced as part of the "binannot" project, in order to keep more 
+location information in the Typedtree, to be used by external tools 
+reading .cmt files.
+
+First, some "unlocated" identifiers remain in the Parsetree
+(cf Ptyp_var, Ptyp_alias, Ptyp_poly, Pfield, Pexp_send, Pexp_newtype, 
+Pctf_val, Pctf_virt, Pctf_meth, Pcf_inher).  I assume this is simply an 
+oversight. Or is there any deeper reason for keeping locations for some 
+identifiers but not all of them?
+
+Second, some locations are redundant for constructions whose syntax is 
+just the identifier (Ppat_var, Pexp_ident, Pmty_ident, Pmod_ident).  The 
+same location is store in the 'a loc record and in pexp_loc/ppat_loc/etc 
+field.  I guess that the rationale is that some imaginary alternative 
+concrete syntax for the language would use a different representation 
+for those constructions.  Another argument is uniformity of 
+representation.  But those redundant location introduce some overhead 
+when building and deconstructing very common fragments of Parsetrees. 
+For building fragments, this can be largely accommodated by the use of 
+constructor functions, but for pattern matching on AST, there is no such 
+easy solution.  One could consider getting rid of those redundant "'a 
+loc" wrappers.  Any opinion on this topic?
+
+
+Alain
+
+
+From gabriel.scherer at inria.fr  Thu Apr  4 15:51:45 2013
+From: gabriel.scherer at inria.fr (Gabriel Scherer)
+Date: Thu, 4 Apr 2013 16:51:45 +0200
+Subject: [wg-camlp4] About 'a loc in the Parsetree
+In-Reply-To: <515D78ED.2040705@lexifi.com>
+References: <515D78ED.2040705@lexifi.com>
+Message-ID: <CAPFanBGw5y-r5aL6xVEcUJR6UxmS-=8JEOGAVNpY9eXGrGGyEA@mail.gmail.com>
+
+I think the bin-annot code is recent enough (sic) to be changed
+without worries as long as you maintain the feature set.
+I would suspect the addition of 'a loc were directed by the needs of
+existing tools making use of identifier information (.annot and
+ctags/browserish prototypes), with the understanding to add more later
+if needed.
+
+Adding locations to the missing places, and removing them where
+they're redundant seems the right thing to do, and we'd better do it
+sooner than later.
+
+(How good is your coverage of the existing codebase, in the
+distribution, that depends on the parsetree and typedtree structure?
+There is Camlp4 of course, and in this case I think you could easily
+make it compatible to your changes. I am a bit more worried about the
+not-clearly-defined stuff that was added with bin-annot, (printing
+typedtree and stuff), some of which in tools/, some in other places,
+that I'm not sure are all exercised or even compiled by the usual
+"make world.opt" drill.)
+
+On Thu, Apr 4, 2013 at 2:58 PM, Alain Frisch <alain.frisch at lexifi.com> wrote:
+> Dear all (caml-devel + wg-camlp4),
+>
+> I'd like to discuss the use of the 'a loc type (string loc and
+> Longident.loc) in the definition of the Parsetree.  I think this type was
+> introduced as part of the "binannot" project, in order to keep more location
+> information in the Typedtree, to be used by external tools reading .cmt
+> files.
+>
+> First, some "unlocated" identifiers remain in the Parsetree
+> (cf Ptyp_var, Ptyp_alias, Ptyp_poly, Pfield, Pexp_send, Pexp_newtype,
+> Pctf_val, Pctf_virt, Pctf_meth, Pcf_inher).  I assume this is simply an
+> oversight. Or is there any deeper reason for keeping locations for some
+> identifiers but not all of them?
+>
+> Second, some locations are redundant for constructions whose syntax is just
+> the identifier (Ppat_var, Pexp_ident, Pmty_ident, Pmod_ident).  The same
+> location is store in the 'a loc record and in pexp_loc/ppat_loc/etc field.
+> I guess that the rationale is that some imaginary alternative concrete
+> syntax for the language would use a different representation for those
+> constructions.  Another argument is uniformity of representation.  But those
+> redundant location introduce some overhead when building and deconstructing
+> very common fragments of Parsetrees. For building fragments, this can be
+> largely accommodated by the use of constructor functions, but for pattern
+> matching on AST, there is no such easy solution.  One could consider getting
+> rid of those redundant "'a loc" wrappers.  Any opinion on this topic?
+>
+>
+> Alain
+>
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From wojciech.meyer at gmail.com  Thu Apr  4 16:59:58 2013
+From: wojciech.meyer at gmail.com (Wojciech Meyer)
+Date: Thu, 04 Apr 2013 16:59:58 +0100
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <515C63F7.4020602@lexifi.com> (Alain Frisch's message of "Wed, 03
+ Apr 2013 19:16:39 +0200")
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+Message-ID: <wfbo9u477l.fsf@gmail.com>
+
+Hi Alain,
+
+I did consider already early testing of your branch, and even write some
+code to try it. Currently out of power to do this, because loads of work
+at the moment. I can however uncover what can be done with the
+extension_points. So the idea wast to write FFI bindings generator using
+the attributes to generate needed meta information for this
+purpose. Because everybody knows, that generating FFI is possible in
+most cases, and most likely you will look at architecture of Haskell's
+"greencard" tool [1], you will find you really want to annotate the
+ml/mli files, and generate both implementation files and C files from
+it. This is nice trade of versus ocaml-idl, that have a separate DSL
+(and btw, we should really use this tool when it's possible and I do
+consider reusing some of the code out there). This reduces burden of
+implementing all this boilerplate, but I'm not convinced yet if that
+will work in all the cases that should be considered. (the interesting
+one are for instance closures callable from C and exceptions).
+
+[1] http://www.haskell.org/nhc98/greencard.html
+
+Alain Frisch <alain.frisch at lexifi.com> writes:
+
+> Now is a good time to start collecting more concrete feedback from
+> extension developers on the current proposal (ppx +
+> extension_points). Are there people on this list interested in porting
+> their existing extensions (or other tools which can benefit from
+> attributes)?   This will be greatly helpful if the current design can
+> be validated by real extension developers.  Porting real extensions
+> will also help to isolate a good set of "convenience" functions to
+> build or deconstruct AST fragments in a light way.
+>
+> (Disclaimer: there will still be some more cleanups to the Parsetree
+> definition and helper modules (Ast_mapper, Ast_helper), so the code
+> written now will need to be adjusted for the final version, but I
+> expect those changes to be quite easy.)
+>
+>
+> -- Alain
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+--
+Wojciech Meyer
+http://danmey.org
+
+From alain.frisch at lexifi.com  Thu Apr  4 19:34:54 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 04 Apr 2013 20:34:54 +0200
+Subject: [wg-camlp4] About 'a loc in the Parsetree
+In-Reply-To: <CAPFanBGw5y-r5aL6xVEcUJR6UxmS-=8JEOGAVNpY9eXGrGGyEA@mail.gmail.com>
+References: <515D78ED.2040705@lexifi.com>
+ <CAPFanBGw5y-r5aL6xVEcUJR6UxmS-=8JEOGAVNpY9eXGrGGyEA@mail.gmail.com>
+Message-ID: <515DC7CE.9070407@lexifi.com>
+
+On 4/4/2013 4:51 PM, Gabriel Scherer wrote:
+> (How good is your coverage of the existing codebase, in the
+> distribution, that depends on the parsetree and typedtree structure?
+> There is Camlp4 of course, and in this case I think you could easily
+> make it compatible to your changes.
+
+"make world opt opt.opt" is ok. It means in particular that Camlp4 has 
+been minimally adapted to target the revised Parsetree only; it hasn't 
+been extended to support new syntactic features in its parser and own 
+representation of the OCaml AST.  As I mentioned in my email to 
+wg-camlp4 (not caml-devel), any help in updating Camlp4 will be much 
+appreciated, and I think it's better to work on this quite soon in order 
+to evaluate possible migration plans and inter-operation between camlp4 
+and ppx + extension_points.  For instance, if Jane Street starts porting 
+some of their extensions to ppx in order to experiment with 
+extension_points and provide feedback, they will need camlp4 to support 
+attributes/extensions to be able to apply those ppx filters to their 
+real code base, which also depends on other camlp4 extensions.
+
+Ocamldoc compiles but I haven't tried it.  Maybe it works fine, maybe it 
+needs to be adapted to report in a clean way new features. Also even 
+without big refactoring plans, it would probably be easy to have it 
+support attributes in addition to the current syntax for comments (thus 
+making it possible for -ppx rewriters to generate documentations snippet).
+
+> I am a bit more worried about the
+> not-clearly-defined stuff that was added with bin-annot, (printing
+> typedtree and stuff), some of which in tools/, some in other places,
+> that I'm not sure are all exercised or even compiled by the usual
+> "make world.opt" drill.)
+
+pprintast (the pretty-printer of the Parsetree in "source syntax") 
+compiles but fails on or does not print properly new constructions.
+
+I'm not aware of other new fancy stuff depending on the Parsetree.
+
+
+Alain
+
+From alain.frisch at lexifi.com  Tue Apr  9 15:39:40 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Tue, 09 Apr 2013 16:39:40 +0200
+Subject: [wg-camlp4] About Ptyp_poly nodes in the Parsetree
+Message-ID: <5164282C.5010507@lexifi.com>
+
+Dear all,
+
+I'd like to get your opinion about the representation of "polymorphic 
+types" (Ptyp_poly) nodes in the Parsetree.  Such nodes can only appear 
+on specific places (currently as record field type or method type), but 
+this invariant is not enforced by the Parsetree definition, thus making 
+it possible for AST rewriters breaking it (problem I).  Currently, the 
+type-checker would accept such ill-formed types (and probably complain 
+later with weird error messages).  Dually, where the type-checker 
+supports a Ptyp_poly node, the Parsetree has to be such a node, even if 
+the list of quantified variable is empty.  This is enforced by 
+parser.mly, but again, AST rewriters can break this invariant (problem II).
+
+Problem II is probably the most serious one in practice, since it forces 
+authors of ppx rewriters to insert explicitly Ptyp_poly nodes where needed.
+
+In this commit:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi?view=revision&sortby=date&revision=13491
+
+I've addressed problem II by pushing to the type-checker the 
+responsibility to add "empty" Ptyp_poly quantification wherever needed 
+(if the Parsetree is not already a Ptyp_poly node).
+
+
+Do you think this is enough, or should we do something about problem I 
+as well?
+
+A simple option would be to add runtime checks, i.e. ensure that the 
+type-checker fails with a proper error message is a Ptyp_poly node is 
+found in a context where it is not supported.  This would probably allow 
+authors of ppx rewriters to identify problems quickly.  A stricter 
+approach would be to encode in the Parsetree definition itself the 
+invariant about where Ptyp_poly node can appear.  Concretely, one could 
+simply define a type:
+
+  poly_type = string list * core_type
+
+remove the Ptyp_poly constructor, and use poly_type instead of core_type 
+where applicable.
+
+This approach is more robust, of course, but also less flexible: tools 
+which manipulate Parsetree need to explicitly wrap core_types into 
+poly_types where applicable.  And if OCaml ever supports poly types in 
+more contexts (e.g. as sum type constructor arguments, which should not 
+pose any theoretical problem), the code of the tools will need to be 
+changed accordingly.
+
+A variant would be to "inline" the "string list" in the surrounding 
+structure (e.g. as an extra field in label_declaration), and use an 
+optional argument in Ast_helper to facilitate the creation of those 
+structures for the case where the list is empty.
+
+What's your opinion?
+
+
+Alain
+
+From alain.frisch at lexifi.com  Wed Apr 10 13:51:52 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 10 Apr 2013 14:51:52 +0200
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <87620e6ike.fsf@study.localdomain>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain>
+Message-ID: <51656068.9060908@lexifi.com>
+
+On 03/26/2013 08:56 PM, Leo White wrote:
+>> On 03/25/2013 03:05 PM, Leo White wrote:
+>>> Another small clean-up I'd like would be to change "ptype_params" from
+>>> "string loc option list" to "core_type list" and the first part of
+>>> "pci_params" from "string loc list" to "core_type list".
+>>
+>> Would you change the parser to accept arbitrary types (instead of _ and type variables), and enforce the previous
+>> constraint in the type-checker?
+>
+> It might be better to get a syntax error there as it's probably
+> a common beginner mistake. On the other hand, if the error from the type
+> checker is nice and clear then it shouldn't be a problem. Either way, we
+> might as well support extensions and attributes there.
+
+I think we should keep the Parsetree type as close as possible (at 
+reasonable costs) to the set of ASTs that can be produced by the parser. 
+  This will reduce the risk of generating Parsetree fragments which 
+cannot be pretty-printed (as source code) faithfully.
+
+So, if we want to move from "string loc list" to "core_type list" (which 
+will give attributes for free on parameters), we should accept arbitrary 
+types in the parser and fail in the type-checker.  (There is no real 
+drawback for the end-user.)  The problem is that this  introduces 
+conflicts in the grammar.  The simpler way I've found to address them 
+without changing the parser too much is to add the variance prefixes (+ 
+and -) as new constructors in core_type (with corresponding grammar 
+rules), but this is not very nice.
+
+Leo: do you have an opinion on what to do?
+
+-- Alain
+
+From gabriel.scherer at gmail.com  Wed Apr 10 14:34:10 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 10 Apr 2013 15:34:10 +0200
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <51656068.9060908@lexifi.com>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+Message-ID: <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+
+I think that having additional constructors in core_type that are
+semantically meaningless (the variance annotations) will not help
+third-party extension writers either. What are the reasons for having
+the whole core_type in place where type variables are expected?
+
+On Wed, Apr 10, 2013 at 2:51 PM, Alain Frisch <alain.frisch at lexifi.com> wrote:
+> On 03/26/2013 08:56 PM, Leo White wrote:
+>>>
+>>> On 03/25/2013 03:05 PM, Leo White wrote:
+>>>>
+>>>> Another small clean-up I'd like would be to change "ptype_params" from
+>>>> "string loc option list" to "core_type list" and the first part of
+>>>> "pci_params" from "string loc list" to "core_type list".
+>>>
+>>>
+>>> Would you change the parser to accept arbitrary types (instead of _ and
+>>> type variables), and enforce the previous
+>>> constraint in the type-checker?
+>>
+>>
+>> It might be better to get a syntax error there as it's probably
+>> a common beginner mistake. On the other hand, if the error from the type
+>> checker is nice and clear then it shouldn't be a problem. Either way, we
+>> might as well support extensions and attributes there.
+>
+>
+> I think we should keep the Parsetree type as close as possible (at
+> reasonable costs) to the set of ASTs that can be produced by the parser.
+> This will reduce the risk of generating Parsetree fragments which cannot be
+> pretty-printed (as source code) faithfully.
+>
+> So, if we want to move from "string loc list" to "core_type list" (which
+> will give attributes for free on parameters), we should accept arbitrary
+> types in the parser and fail in the type-checker.  (There is no real
+> drawback for the end-user.)  The problem is that this  introduces conflicts
+> in the grammar.  The simpler way I've found to address them without changing
+> the parser too much is to add the variance prefixes (+ and -) as new
+> constructors in core_type (with corresponding grammar rules), but this is
+> not very nice.
+>
+> Leo: do you have an opinion on what to do?
+>
+> -- Alain
+>
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From alain.frisch at lexifi.com  Wed Apr 10 15:25:12 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 10 Apr 2013 16:25:12 +0200
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+Message-ID: <51657648.2050509@lexifi.com>
+
+On 04/10/2013 03:34 PM, Gabriel Scherer wrote:
+> I think that having additional constructors in core_type that are
+> semantically meaningless (the variance annotations) will not help
+> third-party extension writers either. What are the reasons for having
+> the whole core_type in place where type variables are expected?
+
+I can see the following reasons:
+
+  - It's actually not only type variables.  Since the introduction of 
+GADT, you can also use "_" as a type parameter (only for type 
+declarations, not classes).  This is currently encoded as a "string loc 
+option", which is not very self-describing.
+
+  - Using core_type gives attributes for free. Otherwise, we need to 
+complexify to Parsetree definition and the parser to allow attributes 
+explicitly.
+
+  - If we represent variance information +/- as constructors of 
+core_type, it further simplifies the definition in the Parsetree (from 
+"(variance * string loc option) list" to "core_type list"), thus making 
+it sometimes simpler to match or create fragments of ASTs.
+
+  - I see it generally as a good thing that fragments with identical 
+syntax are represented in the same way in the Parsetree.  Of course, 
+this is far from being the case because there are lots of duplication 
+between the various syntactic categories, but since a "'a" as a type 
+parameter will also be used with the same syntax "'a" as a type 
+expression close to it (in the same type declaration), one could argue 
+that they should be of the same "kind".
+
+But I'm not pushing too much in this direction.  Leo made the request, 
+so I'd let him comment!
+
+Alain
+
+From lpw25 at cam.ac.uk  Wed Apr 10 20:21:31 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Wed, 10 Apr 2013 20:21:31 +0100
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <51656068.9060908@lexifi.com> (Alain Frisch's message of "Wed, 10
+ Apr 2013 14:51:52 +0200")
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+Message-ID: <86fvyytcn8.fsf@cam.ac.uk>
+
+> I think we should keep the Parsetree type as close as possible (at reasonable costs) to the set of ASTs that can be
+> produced by the parser. This will reduce the risk of generating Parsetree fragments which cannot be pretty-printed (as
+> source code) faithfully.
+
+In general I agree with this, however there are always going to be
+places where the Parsetree accepts more values than the parser. 
+
+> So, if we want to move from "string loc list" to "core_type list" (which will give attributes for free on parameters),
+> we should accept arbitrary types in the parser and fail in the type-checker.  (There is no real drawback for the
+> end-user.)  The problem is that this  introduces conflicts in the grammar.  The simpler way I've found to address them
+> without changing the parser too much is to add the variance prefixes (+ and -) as new constructors in core_type (with
+> corresponding grammar rules), but this is not very nice.
+
+Adding variance constructors to core_type seems like it will create more
+problems than it solves.  I think it would be simpler to have type
+parameters only accept Ptyp_any, Ptyp_var and Ptyp_extension.
+
+From hongboz at seas.upenn.edu  Wed Apr 10 20:32:36 2013
+From: hongboz at seas.upenn.edu (Hongbo Zhang)
+Date: Wed, 10 Apr 2013 15:32:36 -0400
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <86fvyytcn8.fsf@cam.ac.uk>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com>
+ <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk>
+ <515187C8.2030109@lexifi.com> <87620e6ike.fsf@study.localdomain>
+ <51656068.9060908@lexifi.com> <86fvyytcn8.fsf@cam.ac.uk>
+Message-ID: <CANcqPu7=KzXA+mJqixeGGj66TS6_bznvjtwWORJeZb=cJo56JA@mail.gmail.com>
+
+On Wed, Apr 10, 2013 at 3:21 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+
+> > I think we should keep the Parsetree type as close as possible (at
+> reasonable costs) to the set of ASTs that can be
+> > produced by the parser. This will reduce the risk of generating
+> Parsetree fragments which cannot be pretty-printed (as
+> > source code) faithfully.
+>
+> In general I agree with this, however there are always going to be
+> places where the Parsetree accepts more values than the parser.
+>
+Actually, that's the value of polymorphic variants,  you can make the type
+definitions
+as precise as the parser while not complicate the type definitions too much
+
+>
+> > So, if we want to move from "string loc list" to "core_type list" (which
+> will give attributes for free on parameters),
+> > we should accept arbitrary types in the parser and fail in the
+> type-checker.  (There is no real drawback for the
+> > end-user.)  The problem is that this  introduces conflicts in the
+> grammar.  The simpler way I've found to address them
+> > without changing the parser too much is to add the variance prefixes (+
+> and -) as new constructors in core_type (with
+> > corresponding grammar rules), but this is not very nice.
+>
+> Adding variance constructors to core_type seems like it will create more
+> problems than it solves.  I think it would be simpler to have type
+> parameters only accept Ptyp_any, Ptyp_var and Ptyp_extension.
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+>
+
+
+
+-- 
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130410/d8cc3d55/attachment.html>
+
+From lpw25 at cam.ac.uk  Wed Apr 10 20:34:22 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Wed, 10 Apr 2013 20:34:22 +0100
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+ (Gabriel Scherer's message of "Wed, 10 Apr 2013 15:34:10 +0200")
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+Message-ID: <86bo9mtc1t.fsf@cam.ac.uk>
+
+> I think that having additional constructors in core_type that are
+> semantically meaningless (the variance annotations) will not help
+> third-party extension writers either. What are the reasons for having
+> the whole core_type in place where type variables are expected?
+
+In addition to the reasons Alain gave, type parameters should be
+core_types because, in the Typedtree, they have a corresponding
+Types.type_expr. Although they are syntactically always a Ptyp_var or
+Ptyp_any, after constraints have been taken into account they represent
+a general type expression. 
+
+For example:
+
+  type 'a t constraint 'a = 'b list
+
+is morally equivalent to:
+
+  type 'b list t
+
+By representing type parameters as core_types in the Typedtree they can include a
+reference to the corresponding type_expr. For consistency they should be
+represented as core_types in the Parsetree as well.
+
+
+From gabriel.scherer at gmail.com  Wed Apr 10 20:47:33 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 10 Apr 2013 21:47:33 +0200
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <86bo9mtc1t.fsf@cam.ac.uk>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+ <86bo9mtc1t.fsf@cam.ac.uk>
+Message-ID: <CAPFanBEZeG17cAwM2CxgTz4=L=3bBVyf1aZSjQqDJ1erSJ_ExA@mail.gmail.com>
+
+> By representing type parameters as core_types in the Typedtree they can include a
+> reference to the corresponding type_expr. For consistency they should be
+> represented as core_types in the Parsetree as well.
+
+I certainly miss some information for a better understanding, but I
+don't see what the argument is here. The typetree structure is adapted
+to type-checking and therefore different from the bare AST structure,
+I get that. Why should we change the AST structure to make it more
+adapted to type-checking, when precisely we're trying to make more
+suitable to purely syntactic manipulations? I'd rather say that the
+parsetree should be suited to syntactic representation, and the
+typetree to representation of type information.
+
+(I see an argument for keeping the type-checker as simple as possible,
+begin a critical and more fragile part of the compiler, and if that
+was necessary decide to make the parsetree a bit more complex for this
+reason. In that case, however, it doesn't look like using core_type in
+the parsetree would make the type-checker much more readable or
+robust.)
+
+Hongbo: I am personally wary of use of polymorphic variants for large
+ASTs as they tend to result in error messages and inference behavior
+that are hard to understand, and require a fair amount of type
+annotations to be tamed. I've done designs with and without
+polymorphic variant, and my experience has been that keeping simple
+algebraic datatypes is often a better choice on the long run (it's a
+compromise between safety and simplicity). I'm curious about how your
+own experiment with polymorphic variants in Fan has been going on, but
+maybe it's not reasonable for the core parsetree representation.
+
+On Wed, Apr 10, 2013 at 9:34 PM, Leo White <lpw25 at cam.ac.uk> wrote:
+>> I think that having additional constructors in core_type that are
+>> semantically meaningless (the variance annotations) will not help
+>> third-party extension writers either. What are the reasons for having
+>> the whole core_type in place where type variables are expected?
+>
+> In addition to the reasons Alain gave, type parameters should be
+> core_types because, in the Typedtree, they have a corresponding
+> Types.type_expr. Although they are syntactically always a Ptyp_var or
+> Ptyp_any, after constraints have been taken into account they represent
+> a general type expression.
+>
+> For example:
+>
+>   type 'a t constraint 'a = 'b list
+>
+> is morally equivalent to:
+>
+>   type 'b list t
+>
+> By representing type parameters as core_types in the Typedtree they can include a
+> reference to the corresponding type_expr. For consistency they should be
+> represented as core_types in the Parsetree as well.
+>
+
+From alain.frisch at lexifi.com  Thu Apr 11 08:27:41 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 11 Apr 2013 09:27:41 +0200
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <86bo9mtc1t.fsf@cam.ac.uk>
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+ <86bo9mtc1t.fsf@cam.ac.uk>
+Message-ID: <516665ED.5090007@lexifi.com>
+
+On 04/10/2013 09:34 PM, Leo White wrote:
+> For example:
+>
+>    type 'a t constraint 'a = 'b list
+>
+> is morally equivalent to:
+>
+>    type 'b list t
+
+We use sometimes the following pattern:
+
+class virtual ['a] foo = object
+   constraint 'a = #bar
+   method private virtual bar: 'a
+   ...
+end
+
+and indeed, it could make sense to allow writing this directly as:
+
+class virtual [#bar as 'a] foo = object
+   method private virtual bar: 'a
+end
+
+Do you know if it would be difficult to adapt the type-checker to 
+support arbitrary types in place of parameters (with the same semantics 
+as constraints, I guess)?  If this fits nicely in the current 
+type-checker, it would be a good argument to support arbitrary types in 
+the Parsetree and the concrete syntax.
+
+
+Alain
+
+From lpw25 at cam.ac.uk  Thu Apr 11 11:27:26 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Thu, 11 Apr 2013 11:27:26 +0100
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <CAPFanBEZeG17cAwM2CxgTz4=L=3bBVyf1aZSjQqDJ1erSJ_ExA@mail.gmail.com>
+ (Gabriel Scherer's message of "Wed, 10 Apr 2013 21:47:33 +0200")
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+ <86bo9mtc1t.fsf@cam.ac.uk>
+ <CAPFanBEZeG17cAwM2CxgTz4=L=3bBVyf1aZSjQqDJ1erSJ_ExA@mail.gmail.com>
+Message-ID: <87wqs9pdkh.fsf@kingston.cl.cam.ac.uk>
+
+> I certainly miss some information for a better understanding, but I
+> don't see what the argument is here. The typetree structure is adapted
+> to type-checking and therefore different from the bare AST structure,
+> I get that. Why should we change the AST structure to make it more
+> adapted to type-checking, when precisely we're trying to make more
+> suitable to purely syntactic manipulations? I'd rather say that the
+> parsetree should be suited to syntactic representation, and the
+> typetree to representation of type information.
+>
+
+I think that my point is that the type parameters are semantically
+core_types (as evidenced by having a corresponding
+Types.type_expr). They are also, as Alain has pointed out, syntactically
+core_types (albeit a restricted class of core_types). To me this
+indicates that they should be represented as a core_type in the Parsetree.
+
+In practical terms, it is only a small change to use Ptyp_var/Ptyp_any
+instead of Some/None. It also makes it easy to access the corresponding
+Types.type_expr from the Typedtree. Alain's other points about it
+being more self-documenting etc. are also good reasons to change it.
+
+From lpw25 at cam.ac.uk  Thu Apr 11 11:33:42 2013
+From: lpw25 at cam.ac.uk (Leo White)
+Date: Thu, 11 Apr 2013 11:33:42 +0100
+Subject: [wg-camlp4] Changes to the parsetree
+In-Reply-To: <516665ED.5090007@lexifi.com> (Alain Frisch's message of "Thu, 11
+ Apr 2013 09:27:41 +0200")
+References: <87r4jh3nnj.fsf@kingston.cl.cam.ac.uk>
+ <1625554563.3446096.1363346665809.JavaMail.root@lexifi.com>
+ <CAPFanBG+2necpa3XvjQLhLiYM0rc1m9tpj=6yJ60i2GDaS3h-g@mail.gmail.com>
+ <87sj3wojlp.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBFgNn1knLyafsAh6bxy5V_O--cyuvfUJ-ba-MBRfrKLmg@mail.gmail.com>
+ <514ACFC1.5090705@lexifi.com> <87ppytm53s.fsf@kingston.cl.cam.ac.uk>
+ <CAPFanBHi473eqdtW8hpoH1xk+buMjiRQ_xLgH3SiJOE1gu67ag@mail.gmail.com>
+ <514C424A.6070905@lexifi.com> <51503841.7040708@lexifi.com>
+ <87mwtrh8w9.fsf@kingston.cl.cam.ac.uk> <515187C8.2030109@lexifi.com>
+ <87620e6ike.fsf@study.localdomain> <51656068.9060908@lexifi.com>
+ <CAPFanBFH5KH+k1+ovSk6xO3UrnaT4t0+j=mZJkosVrzL_K4S5g@mail.gmail.com>
+ <86bo9mtc1t.fsf@cam.ac.uk> <516665ED.5090007@lexifi.com>
+Message-ID: <87sj2xpda1.fsf@kingston.cl.cam.ac.uk>
+
+> Do you know if it would be difficult to adapt the type-checker to support arbitrary types in place of parameters (with
+> the same semantics as constraints, I guess)?  If this fits nicely in the current type-checker, it would be a good
+> argument to support arbitrary types in the Parsetree and the concrete syntax.
+
+I don't think that it is difficult for the type-checker to support it,
+but it is awkward for the parser. I'm also not sure that it is a
+desirable change. I think that
+
+  type 'a t constraint 'a = 'b list
+
+is probably more readable than
+
+  type 'a list t
+
+From alain.frisch at lexifi.com  Thu Apr 11 15:19:19 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 11 Apr 2013 16:19:19 +0200
+Subject: [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+In-Reply-To: <20775.25929.388649.943057@blau.inf.tu-dresden.de>
+References: <20775.25929.388649.943057@blau.inf.tu-dresden.de>
+Message-ID: <5166C667.3070405@lexifi.com>
+
+On 02/22/2013 01:32 PM, Hendrik Tews wrote:
+> I would therefore strongly suggest to provide complete
+> documentation for the ast that preprocessors must process with
+> the _beta_ release of the next version.
+
+Do you have a suggestion for the form such a documentation should take? 
+  I can imagine describing how each fragment of concrete syntax is 
+represented in the abstract syntax, but this would not be really 
+different from paraphrasing the code of the parser.
+
+The new tool "ocamlast" gives you an easy way to see how a piece of 
+concrete syntax is represented:
+
+~/ocaml/extension_points $ tools/ocamlast -e "1 + 3"
+{pexp_desc =
+   Pexp_apply ({pexp_desc = Pexp_ident {txt = Lident "+"}},
+    [("", {pexp_desc = Pexp_constant (Const_int 1)});
+     ("", {pexp_desc = Pexp_constant (Const_int 3)})])}
+
+~/ocaml/extension_points $ tools/ocamlast -p "'0'..'3'"
+{ppat_desc =
+   Ppat_or ({ppat_desc = Ppat_constant (Const_char '0')},
+    {ppat_desc =
+      Ppat_or ({ppat_desc = Ppat_constant (Const_char '1')},
+       {ppat_desc =
+         Ppat_or ({ppat_desc = Ppat_constant (Const_char '2')},
+          {ppat_desc = Ppat_constant (Const_char '3')})})})}
+
+(locations and empty attribute lists are omitted by default)
+
+It seems to me that such a tool is actually a good replacement for an 
+explicit documentation of the Parsetree, both for the user and for the 
+maintainers.  Do you agree?
+
+
+-- Alain
+
+From tews at os.inf.tu-dresden.de  Fri Apr 12 10:26:58 2013
+From: tews at os.inf.tu-dresden.de (Hendrik Tews)
+Date: Fri, 12 Apr 2013 11:26:58 +0200
+Subject: [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+In-Reply-To: <5166C667.3070405@lexifi.com> (Alain Frisch's message of "Thu, 11
+ Apr 2013 16:19:19 +0200")
+References: <20775.25929.388649.943057@blau.inf.tu-dresden.de>
+ <5166C667.3070405@lexifi.com>
+Message-ID: <6x4nfchzfh.fsf@blau.inf.tu-dresden.de>
+
+Hi, 
+
+I have suggestions, but it is a bit lengthy. In short: ocamlast
+is great, but I don't believe it will satisfy all documentation
+needs. 
+
+
+Alain Frisch <alain.frisch at lexifi.com> writes:
+
+   On 02/22/2013 01:32 PM, Hendrik Tews wrote:
+   > I would therefore strongly suggest to provide complete
+   > documentation for the ast that preprocessors must process with
+   > the _beta_ release of the next version.
+
+   Do you have a suggestion for the form such a documentation should
+   take? I can imagine describing how each fragment of concrete syntax is
+   represented in the abstract syntax, but this would not be really
+   different from paraphrasing the code of the parser.
+
+You are right, but only from the insider's point of view. You
+have to remember that potential preprocessor programmers (like
+myself) have never seen the parser before and they don't want to
+became an parsing/parser.mly expert before starting. For
+instance, when I look at parser.mly, I see
+
+  | pattern BAR pattern
+      { mkpat(Ppat_or($1, $3)) }
+
+and nothing is clear. When I look up mkpat, then all I know is
+that an or-pattern is not a Ppat_or node, it is some record, for
+which I don't even know the type. So I would have to search for
+ppat_desc, and select the right one of the 100 matches that grep
+reports. Note that I have been lucky here, because mkpat is very
+simple and is defined in parser.mly . There are surely more
+complicated functions that are elsewhere defined.
+
+>From my point of view the parser is not a documentation.
+
+
+I believe there are (at least) two documentation needs:
+
+(1) getting the ast tree for some concrete syntax
+
+(2) understanding which concrete syntax a given ast node
+    represents
+
+
+For (1) the ocamlast tool is really great! (I've been using my
+own camlp4ast tool quite a lot.) I agree that with ocamlast a
+description of how each piece of concrete syntax is represented
+is not necessary. 
+
+There might however be cases with the danger of wrong
+generalization. What I mean with this is the following: The
+ocamlast tool only works on correct OCaml code. I cannot feed
+it with "assert _ " in order to get the most general ast
+tree for assertions. So instead I have to feed it with, for
+instance, "assert true" and get Pexp_assert ... I might now
+believe that "assert false" is also represented with Pexp_assert,
+which is wrong. 
+
+So, if there are cases, where similar looking concrete syntax is
+represented differently, then they should be listed somewhere.
+
+
+For documentation need (2), ocamlast is not really a help. For
+(2) I would suggest to annotate each constructor in parsetree.mli
+with the concrete syntax. For instance 
+
+  | Pexp_while of expression * expression
+     (** while <expression> do <expression> done *)
+
+This annotation should of course include the types that occur in
+the ast but are outside of parsetree.mli, such as Longident.t or
+constant. 
+
+There are probably a lot of side conditions. For
+instance, "expr_1; expr_2; expr_3" is 
+Pexp_sequence(expr_1, Pexp_sequence (expr_2, expr3) and not
+Pexp_sequence( Pexp_sequence(expr_1, expr_2), expr3) (or vice
+versa). 
+
+Another kind of side condition is that certain nodes do not and
+must not occur inside other nodes. For instance, the left
+expression in Pexp_sequence is never a Pexp_sequence. (This is
+probably wrong, but you get the idea.)
+
+Such side conditions should be described somehow for those who
+need to construct ast's and those who need to pattern match on
+ast's. 
+
+
+You could write the documentation for (1) and (2) in comments or
+ocamldoc comments in the source files. However, I would prefer
+something like a wiki page, where we users can immediately
+contribute. I, for instance, used the camlp4 wiki [1] a lot to
+remember my own findings at a place where it could benefit
+others.
+
+[1] http://brion.inria.fr/gallium/index.php/Abstract_Syntax_Tree
+
+
+Bye,
+
+Hendrik
+
+From tews at os.inf.tu-dresden.de  Fri Apr 12 10:33:03 2013
+From: tews at os.inf.tu-dresden.de (Hendrik Tews)
+Date: Fri, 12 Apr 2013 11:33:03 +0200
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <515C63F7.4020602@lexifi.com> (Alain Frisch's message of "Wed, 03
+ Apr 2013 19:16:39 +0200")
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+Message-ID: <6xzjx4gkkw.fsf@blau.inf.tu-dresden.de>
+
+
+I will probably eventually port otags, but I wait until the first
+version of documentation for case (2) (see
+http://lists.ocaml.org/pipermail/wg-camlp4/2013-April/000400.html)
+is available.
+
+Bye,
+
+Hendrik
+
+From gabriel.scherer at gmail.com  Fri Apr 12 10:43:13 2013
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Fri, 12 Apr 2013 11:43:13 +0200
+Subject: [wg-camlp4] Extension developers: we need you!
+In-Reply-To: <515C63F7.4020602@lexifi.com>
+References: <687334906.960850.1359473842585.JavaMail.root@inria.fr>
+ <5107F74E.8010603@frisch.fr> <51559149.2020900@lexifi.com>
+ <CAPFanBEDhSAqq97uV6_vf675Q6Oz_18OptR9dU4JadeC5REe6A@mail.gmail.com>
+ <515C5E17.6050409@lexifi.com> <515C5FE5.6050304@frisch.fr>
+ <515C63F7.4020602@lexifi.com>
+Message-ID: <CAPFanBHqUrYRkQSjrsH4qCXANvyuT4UE8S87TRN4ba9aTt=Y8A@mail.gmail.com>
+
+A small remark requesting no immediate action, but maybe suggestions
+of things to work on (not necessarily for Alain) in the future.
+
+I remarked in a recent extension example by Alain (
+https://github.com/ocaml/ocaml/commit/f7fee51ae33e357714b03f7f9b025a1a48182549
+) that a non-neglectible portion of the code logic is dedicated to
+"option processing". Alain uses optional attributes to tune the code
+generation of his -ppx extension, and he has to process them very much
+like command-line options in an application: get the value of them,
+turn that into program-specific logic, handle options that don't make
+sense when provided both at the same time, etc.
+
+>From his commit:
+
++(*
+[...]
++  We recognize some special attributes on record fields (or their associated
++  type) and on constructor argument types:
++
++  - [@label id]: specify a label for the parameter of the builder function
++    (for records, it is set automatically from the label name
++    but it can be overridden).
++
++  - [@opt]: the parameter is optional (this assume that the field/argument
++    has an option type).
++
++  - [@default expr]: the parameter is optional, with a default value
++    (cannot be used with [@opt]).
++*)
+
+[...]
+
++  let param named name loc attrs =
++    let default = find_attr "default" attrs in
++    let opt = has_attr "opt" attrs in
++    let label =
++      match find_attr "label" attrs with
++      | None -> if named then name else ""
++      | Some e ->
++          match get_lid e with
++          | Some s -> s
++          | None -> fatal e.pexp_loc "'label' attribute must be a
+string literal"
++    in
++    let label =
++      if default <> None || opt then
++        if label = "" then fatal loc "Optional arguments must be
+named" else "?" ^ label
++      else label
++    in
++    if default <> None && opt then fatal loc "Cannot have both 'opt'
+and 'default' attributes";
++    lam ~label ?default (pvar name), (name, evar name)
+
+I expect that we will see similarly-looking pieces of code in most
+extensions using attributes to tune behavior, and that would be a good
+candidate for a proper library abstraction allowing a more declarative
+style of programming.
+
+What are the right abstraction to describe such optional attributes?
+Can we reuse libraries dedicated to command-line processing, or only
+their ideas?
+
+As far as I know, the most advanced work in this direction in the
+OCaml community is Daniel B?nzli's Cmdliner library:
+  http://erratique.ch/software/cmdliner/doc/Cmdliner
+Can we reuse Cmdliner for -ppx extensions?
+
+(On the paper that is work that would also apply to Camlp4/Fan
+extensions, but in practice I haven't encountered this kind of
+optional parametrizations in mainstream Camlp4 extension, and I
+suspect Alain's attribute model is a necessary and sufficient feature
+for them to gain wider use.)
+
+Consider this email as a TODO list item: at some point, we would need
+someone to invest time to think about that, and produce a reusable
+library for this aspect of extension development.
+
+PS: Alain, type-driven code generation is a terrible name to qualify
+this particular extension, as I was expecting code generation driven
+by type information in a typedtree. This is code generated from
+(syntactic) type *definitions*. If "type-definition-driven code
+generation" is too long, maybe "deriving-style extension" would be
+reasonable.
+
+On Wed, Apr 3, 2013 at 7:16 PM, Alain Frisch <alain.frisch at lexifi.com> wrote:
+> Now is a good time to start collecting more concrete feedback from extension
+> developers on the current proposal (ppx + extension_points). Are there
+> people on this list interested in porting their existing extensions (or
+> other tools which can benefit from attributes)?   This will be greatly
+> helpful if the current design can be validated by real extension developers.
+> Porting real extensions will also help to isolate a good set of
+> "convenience" functions to build or deconstruct AST fragments in a light
+> way.
+>
+> (Disclaimer: there will still be some more cleanups to the Parsetree
+> definition and helper modules (Ast_mapper, Ast_helper), so the code written
+> now will need to be adjusted for the final version, but I expect those
+> changes to be quite easy.)
+>
+>
+> -- Alain
+> _______________________________________________
+> wg-camlp4 mailing list
+> wg-camlp4 at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/wg-camlp4
+
+From alain.frisch at lexifi.com  Fri Apr 12 17:20:04 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Fri, 12 Apr 2013 18:20:04 +0200
+Subject: [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+In-Reply-To: <6x4nfchzfh.fsf@blau.inf.tu-dresden.de>
+References: <20775.25929.388649.943057@blau.inf.tu-dresden.de>
+ <5166C667.3070405@lexifi.com> <6x4nfchzfh.fsf@blau.inf.tu-dresden.de>
+Message-ID: <51683434.9050907@lexifi.com>
+
+On 04/12/2013 11:26 AM, Hendrik Tews wrote:
+> and nothing is clear. When I look up mkpat, then all I know is
+> that an or-pattern is not a Ppat_or node, it is some record, for
+> which I don't even know the type. So I would have to search for
+> ppat_desc, and select the right one of the 100 matches that grep
+> reports. Note that I have been lucky here, because mkpat is very
+> simple and is defined in parser.mly . There are surely more
+> complicated functions that are elsewhere defined.
+
+In order to write robust AST rewriters, you'll need to be quite familiar 
+with the definition of the Parsetree structure, so reading parsetree.mli 
+once will be more or less necessary anyway.
+
+The fact that most fragments are represented with a record containing a 
+"location" field, a "description" field (and now, an "attributes" field) 
+is pretty uniform.  I agree that the Parsetree definition would deserve 
+some documentation and some introductory content will be useful as well, 
+but even without any further documentation, finding the information 
+relative to "Ppat_or" is not very difficult if you read parsetree.mli.
+
+> There might however be cases with the danger of wrong
+> generalization. What I mean with this is the following: The
+> ocamlast tool only works on correct OCaml code. I cannot feed
+> it with "assert _ " in order to get the most general ast
+> tree for assertions. So instead I have to feed it with, for
+> instance, "assert true" and get Pexp_assert ... I might now
+> believe that "assert false" is also represented with Pexp_assert,
+> which is wrong.
+>
+> So, if there are cases, where similar looking concrete syntax is
+> represented differently, then they should be listed somewhere.
+
+It makes sense to list all such weird cases, or, when it makes sense, to 
+fix them.  For this specific examples (Pexp_assertfalse), Romain Bardou 
+(email on Jan. 28) argued that it should stay as of today.  Do other 
+people agree?
+
+> For documentation need (2), ocamlast is not really a help. For
+> (2) I would suggest to annotate each constructor in parsetree.mli
+> with the concrete syntax. For instance
+>
+>    | Pexp_while of expression * expression
+>       (** while <expression> do <expression> done *)
+
+Good idea. I've started with type expressions:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/parsing/parsetree.mli?r1=13512&r2=13517
+
+Do you feel this brings useful information in this form?
+
+> There are probably a lot of side conditions. For
+> instance, "expr_1; expr_2; expr_3" is
+> Pexp_sequence(expr_1, Pexp_sequence (expr_2, expr3) and not
+> Pexp_sequence( Pexp_sequence(expr_1, expr_2), expr3) (or vice
+> versa).
+
+(e1; e2; e3) is indeed parsed as (e1; (e2; e3)), but ((e1; e2); e3) will 
+be represented as you expect (confirmed by ocamlast).  I don't think it 
+is worth documenting again the definition of the Parsetree 
+disambiguation and associativity rules; this is already done in the 
+manual, and rules can be discovered with ocamlast.
+
+Moreover, I'd argue that authors of ppx extensions don't really need to 
+be familiar with this topic, since they operate on abstract syntax. 
+What's important is rather to specify invariants on the Parsetree data 
+structure, especially those which are not checked by the type-checker. 
+(And we should probably strengthen the type-checker to test more of 
+those conditions such as the validity of identifier strings, etc.)
+
+> Another kind of side condition is that certain nodes do not and
+> must not occur inside other nodes. For instance, the left
+> expression in Pexp_sequence is never a Pexp_sequence. (This is
+> probably wrong, but you get the idea.)
+
+Indeed, this is wrong, but I get the idea :-)  Luckily, there aren't 
+many such structural invariants, and it should not be too difficult to 
+list them.
+
+> You could write the documentation for (1) and (2) in comments or
+> ocamldoc comments in the source files. However, I would prefer
+> something like a wiki page, where we users can immediately
+> contribute.
+
+Authors of ppx extensions are probably going to have parsetree.mli under 
+they eyes quite often.  It seems good to me to put some documentation 
+directly there.  Which is not to say that an external wiki won't be 
+useful as well.
+
+
+Alain
+
+From alain.frisch at lexifi.com  Fri Apr 12 17:51:30 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Fri, 12 Apr 2013 18:51:30 +0200
+Subject: [wg-camlp4] About the "bool" argument fo Ppat_construct and
+	Pexp_construct
+Message-ID: <51683B92.30508@lexifi.com>
+
+Dear all,
+
+The Ppat_construct and Pexp_construct constructors in Parsetree have a 
+"bool" argument supposed to encode the fact that if the argument is a 
+tuple of length N, then it actually represents the N arguments of an 
+N-ary constructor, so that it won't type-check if the constructor is 
+declared with a single argument being a N-tuple type.  (In the normal 
+OCaml syntax, this cannot be distinguished.)
+
+I believe this was introduced to give better error messages with Camlp4 
+revised syntax, but the behavior seems to be disabled by default (can 
+anyone confirm?) and I don't see how to enable it.  The following is 
+accepted if we compile with camlp4:
+
+=======================================
+type t = [C of (int * int)];
+
+value f = fun [ C x y -> x + y ];
+=======================================
+
+and I believe rejecting this was the reason to introduce the Boolean.
+
+
+Does anyone object to removing the Boolean?
+
+Alain
+
+From alain.frisch at lexifi.com  Tue Apr 16 16:50:37 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Tue, 16 Apr 2013 17:50:37 +0200
+Subject: [wg-camlp4] Improvements to the OCaml Parsetree
+In-Reply-To: <51069CB5.6000706@inria.fr>
+References: <51069877.5070307@lexifi.com> <51069CB5.6000706@inria.fr>
+Message-ID: <516D734D.2060307@lexifi.com>
+
+On 01/28/2013 04:43 PM, Romain Bardou wrote:
+> About assert false as a special node: I think it should stay like this.
+>
+> It may add a case to treat, but the treatment will usually be trivial.
+> If it is not, then it will probably be an instance of the assert case,
+> in which case you can just call the assert case with <<false>> as an
+> argument. Else it means that you have a very different treatment for
+> false and in this case, you?re glad that they are separate.
+>
+> Moreover, this case really is a special case as it is typed differently.
+> I think it is better if the parse tree reflects this, so that the
+> programmer is conscious of this when transforming assertions.
+
+I've given it some thought, and I'm no longer convinced by the argument. 
+  I can see two concrete reasons for treating "assert false" in the 
+type-checker:
+
+  - -ppx rewriters could very well produce an assert node with a "false" 
+expression and it would behave differently from an "assert false" in the 
+source code.  This would be quite puzzling, and round-tripping with the 
+concrete syntax becomes impossible.
+
+  - It is not clear what to do with "assert (false[@foo])".
+
+
+I don't think we should insist to keep the Parsetree as close as 
+possible to the concrete syntax if this adds extra complexity (e.g. 
+keeping parentheses and other syntactic details does not seem very 
+useful), but this seems to be a case where there is no strong reason to 
+not do it and it will actually simplify the Parsetree to do so.
+
+So unless someone strongly objects to it, I'll get rid of 
+Pexp_assertfalse and add support for the special case in the type-checker.
+
+
+Alain
+
+From alain.frisch at lexifi.com  Wed Apr 17 13:56:04 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Wed, 17 Apr 2013 14:56:04 +0200
+Subject: [wg-camlp4] Changes to the Parsetree
+Message-ID: <516E9BE4.8050301@lexifi.com>
+
+Dear all,
+
+Here is a list of the most important recent changes I've applied to the 
+Parsetree in the extension_points branch.  The primary goals are to 
+reduce the number of implicit invariants (not represented in the data 
+structure itself) and make the Parsetree more user-friendly.
+
+  - Splitting Pexp_constraint into two constructors, one to represent 
+type constraints (e : t), another one to represent type coercion (e : t1 
+:> t2) or (e :> t).
+
+  - Splitting Pexp_function into two constructors, one for "function P1 
+-> E1 | ... | Pn -> En", another for "fun P -> E / fun ~l:P -> E / fun 
+?l:P -> E / fun ?l:(P = E) -> E".  (And removing support for "fun P when 
+E -> E".)
+
+  - Merging Pexp_assertfalse into Pexp_assert.
+
+  - Keeping an explicit representation of interval patterns.
+
+  - Explicit representation of "when" guards for function/match/try in a 
+new "case" record type {pc_lhs: pattern; pc_guard: expression option; 
+pc_rhs: expression}, instead of Pexp_when.
+
+  - And a few more, listed in extension_points.txt.
+
+
+Don't hesitate to comment on those changes, or to suggest other ones.
+
+Also, the Parsetree module now documents all constructions and tries to 
+list required invariants.
+
+
+Alain
+
+From tews at os.inf.tu-dresden.de  Thu Apr 18 11:23:58 2013
+From: tews at os.inf.tu-dresden.de (Hendrik Tews)
+Date: Thu, 18 Apr 2013 12:23:58 +0200
+Subject: [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+In-Reply-To: <51683434.9050907@lexifi.com> (Alain Frisch's message of "Fri, 12
+ Apr 2013 18:20:04 +0200")
+References: <20775.25929.388649.943057@blau.inf.tu-dresden.de>
+ <5166C667.3070405@lexifi.com> <6x4nfchzfh.fsf@blau.inf.tu-dresden.de>
+ <51683434.9050907@lexifi.com>
+Message-ID: <6xwqs0i1c1.fsf@blau.inf.tu-dresden.de>
+
+Alain Frisch <alain.frisch at lexifi.com> writes:
+
+   > There might however be cases with the danger of wrong
+   > generalization. What I mean with this is the following: The
+   > ocamlast tool only works on correct OCaml code. I cannot feed
+   > it with "assert _ " in order to get the most general ast
+   > tree for assertions. So instead I have to feed it with, for
+   > instance, "assert true" and get Pexp_assert ... I might now
+   > believe that "assert false" is also represented with Pexp_assert,
+   > which is wrong.
+
+I forgot to note, that "assert false" is of course a bad example.
+With Pexp_assertfalse standing next to Pexp_assert, everything is
+clear in this case.
+
+   > For documentation need (2), ocamlast is not really a help. For
+   > (2) I would suggest to annotate each constructor in parsetree.mli
+   > with the concrete syntax. For instance
+   >
+   >    | Pexp_while of expression * expression
+   >       (** while <expression> do <expression> done *)
+
+   Good idea. I've started with type expressions:
+
+This is precisely the kind of documentation that I was asking
+for. Good that you also integrated side conditions, eg n >=2 for
+Ptyp_tuple. 
+
+   > There are probably a lot of side conditions. For
+   > instance, "expr_1; expr_2; expr_3" is
+   > Pexp_sequence(expr_1, Pexp_sequence (expr_2, expr3) and not
+   > Pexp_sequence( Pexp_sequence(expr_1, expr_2), expr3) (or vice
+   > versa).
+
+   (e1; e2; e3) is indeed parsed as (e1; (e2; e3)), but ((e1; e2); e3)
+   will be represented as you expect (confirmed by ocamlast).  I don't
+   think it is worth documenting again the definition of the Parsetree
+   disambiguation and associativity rules; this is already done in the
+   manual, and rules can be discovered with ocamlast.
+
+   Moreover, I'd argue that authors of ppx extensions don't really need
+   to be familiar with this topic, since they operate on abstract syntax.
+   What's important is rather to specify invariants on the Parsetree data
+   structure, especially those which are not checked by the type-checker.
+   (And we should probably strengthen the type-checker to test more of
+   those conditions such as the validity of identifier strings, etc.)
+
+The sequence example is bad. I simply mean that 
+side conditions / invariants should be mentioned. First, for
+constructing ast's that will not cause the compiler to crash. But
+also for ignoring irrelevant cases when pattern matching on an
+ast.
+
+   > You could write the documentation for (1) and (2) in comments or
+   > ocamldoc comments in the source files. However, I would prefer
+   > something like a wiki page, where we users can immediately
+   > contribute.
+
+   Authors of ppx extensions are probably going to have parsetree.mli
+   under they eyes quite often.  It seems good to me to put some
+   documentation directly there.  Which is not to say that an external
+   wiki won't be useful as well.
+
+I suggested a wiki because, in the past, it took sometimes ages
+to get the documentation fixed. But if the documentation in
+parsetree.mli is complete and if changes are integrated in
+reasonable time, then a wiki is superfluous.
+
+Bye,
+
+Hendrik
+
+From tews at os.inf.tu-dresden.de  Thu Apr 18 12:39:44 2013
+From: tews at os.inf.tu-dresden.de (Hendrik Tews)
+Date: Thu, 18 Apr 2013 13:39:44 +0200
+Subject: [wg-camlp4] About Ptyp_poly nodes in the Parsetree
+In-Reply-To: <5164282C.5010507@lexifi.com> (Alain Frisch's message of "Tue, 09
+ Apr 2013 16:39:40 +0200")
+References: <5164282C.5010507@lexifi.com>
+Message-ID: <6xsj2ohxtr.fsf@blau.inf.tu-dresden.de>
+
+Alain Frisch <alain.frisch at lexifi.com> writes:
+
+   I'd like to get your opinion about the representation of "polymorphic
+   types" (Ptyp_poly) nodes in the Parsetree.
+
+Personally, I don't think that I or II is a problem. Well, II is
+a bit inconvenient, and it is nice that it is fixed now.
+
+Besides I and II there are probably more 
+side conditions / invariants for the ast that are not enforced by
+the type of the ast. I would view I and II as a specific instance
+of how to deal with incorrect ast's. 
+
+>From the extension developers point of view it would be nice if
+the type checker would enforce all invariants. Alternatively, one
+could have an ast-checker extension, that checks all invariants.
+One could put the ast-checker extension into the extension pipe
+whenever something is strange.
+
+
+Bye,
+
+Hendrik
+
+From alain.frisch at lexifi.com  Thu Apr 18 16:54:46 2013
+From: alain.frisch at lexifi.com (Alain Frisch)
+Date: Thu, 18 Apr 2013 17:54:46 +0200
+Subject: [wg-camlp4] Next steps
+Message-ID: <51701746.9010008@lexifi.com>
+
+Dear all,
+
+Here are some remaining tasks where some help would be appreciated:
+
+- Starting to port some Camp4 extensions to -ppx with extension_points 
+and report on the experience.
+
+(Some examples of tiny ppx filters exist in the experimental/frisch 
+directory on the extension_points branch:
+
+http://caml.inria.fr/cgi-bin/viewvc.cgi/ocaml/branches/extension_points/experimental/frisch/Makefile?view=markup
+)
+
+- Extend Ast_helper.Convenience with useful functions, as detected while 
+rewriting some Camlp4 extensions.
+
+- Update parsing/pprintast.ml to support attributes/extensions.  It is 
+the code used when passing "-dsource" to the compiler and it is very 
+useful to debug -ppx filters (and other AST-based tools).
+
+- Update Camlp4 (its parsers and its own OCaml AST) to support 
+attributes/extensions.
+
+
+Alain
+
+From romain.bardou at inria.fr  Fri Apr 26 17:22:32 2013
+From: romain.bardou at inria.fr (Romain Bardou)
+Date: Fri, 26 Apr 2013 18:22:32 +0200
+Subject: [wg-camlp4] Improvements to the OCaml Parsetree
+In-Reply-To: <516D734D.2060307@lexifi.com>
+References: <51069877.5070307@lexifi.com> <51069CB5.6000706@inria.fr>
+ <516D734D.2060307@lexifi.com>
+Message-ID: <517AA9C8.8080109@inria.fr>
+
+Le 16/04/2013 17:50, Alain Frisch a ?crit :
+> On 01/28/2013 04:43 PM, Romain Bardou wrote:
+>> About assert false as a special node: I think it should stay like this.
+>>
+>> It may add a case to treat, but the treatment will usually be trivial.
+>> If it is not, then it will probably be an instance of the assert case,
+>> in which case you can just call the assert case with <<false>> as an
+>> argument. Else it means that you have a very different treatment for
+>> false and in this case, you?re glad that they are separate.
+>>
+>> Moreover, this case really is a special case as it is typed differently.
+>> I think it is better if the parse tree reflects this, so that the
+>> programmer is conscious of this when transforming assertions.
+> 
+> I've given it some thought, and I'm no longer convinced by the argument.
+>  I can see two concrete reasons for treating "assert false" in the
+> type-checker:
+> 
+>  - -ppx rewriters could very well produce an assert node with a "false"
+> expression and it would behave differently from an "assert false" in the
+> source code.  This would be quite puzzling, and round-tripping with the
+> concrete syntax becomes impossible.
+
+Sorry for the delay, I was not paying attention to the list at the time
+(and the personal copy was sent to my list folder automatically as well?).
+
+Not that I strongly object at all, but I would just point out that the
+reverse is also true: one may not understand why some expression
+sometimes has type 'a and sometimes has type, well, something else.
+
+For instance, let's imagine a rewriter expands:
+
+let check () =
+  check_platform_is[@32]
+
+into either:
+
+let check () =
+  assert false (* if on 64bits *)
+
+or:
+
+let check () =
+  () (* if on 32bits *)
+
+Now, imagine the programmer does not realize this, and puts the
+following type in the .mli:
+
+val check: 'a (* or anything except unit *)
+
+If he does not actually call this function, the programmer will only see
+the error when compiling for another platform, and he may be quite
+puzzled as well.
+
+Now, that's maybe not a strong enough argument against simplification
+though. Just an interesting fact.
+
+>  - It is not clear what to do with "assert (false[@foo])".
+
+That's very true.
+
+-- 
+Romain Bardou
+

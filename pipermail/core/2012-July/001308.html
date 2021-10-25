@@ -1,0 +1,129 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> Erlang-like Gen server using Async
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3CCAAHaHtnUyhDyimPx517eXSAubZog743_kjCzQSisp%3DiXEbCUyw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001307.html">
+   <LINK REL="Next"  HREF="001309.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>Erlang-like Gen server using Async</H1>
+    <B>orbitz</B> 
+    <A HREF="mailto:core%40lists.ocaml.org?Subject=Re%3A%20Erlang-like%20Gen%20server%20using%20Async&In-Reply-To=%3CCAAHaHtnUyhDyimPx517eXSAubZog743_kjCzQSisp%3DiXEbCUyw%40mail.gmail.com%3E"
+       TITLE="Erlang-like Gen server using Async">orbitz at gmail.com
+       </A><BR>
+    <I>Tue Jul  3 09:11:19 BST 2012</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001307.html">Erlang-like Gen server using Async
+</A></li>
+        <LI>Next message: <A HREF="001309.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1308">[ date ]</a>
+              <a href="thread.html#1308">[ thread ]</a>
+              <a href="subject.html#1308">[ subject ]</a>
+              <a href="author.html#1308">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Thank you for the responses.  I'm probably going to switch to the &gt;&gt;=, &gt;&gt;&gt;,
+&gt;&gt;|<i> operators.  I wasn't sure if I liked them when I first started but I'll
+</I>try them out.  They will probably be clearer now that I have had time to
+think about the code in terms of bind and upon.
+
+For the upon code, in gen_server_test.ml that should be switched to bind, I
+agree.  In gen_server.ml, I use upon to represent the event loop, which
+represents a detached computation so nobody should ever wait on that  I
+think the use of upon there is valid, but let me know if you disagree.
+
+For the original problem I raised, about a gen server being able to
+reference itself, the best solution I've come up with is passing the init
+function a tuple of (msg -&gt; unit * exited Ivar.t).  The init function can
+give this tuple to other services it wants to create.  I'm still not a big
+fan of it though, but my Ocaml-type-fu is weak.
+
+Thanks again
+
+On Tue, Jul 3, 2012 at 8:46 AM, David House &lt;<A HREF="http://lists.ocaml.org/listinfo/core">dhouse at janestreet.com</A>&gt; wrote:
+
+&gt;<i> On Tue, Jul 3, 2012 at 5:34 AM, Sam &lt;<A HREF="http://lists.ocaml.org/listinfo/core">sdefabbiakane at gmail.com</A>&gt; wrote:
+</I>&gt;<i> &gt; You're refererencing some things in Async's Deferred module (like
+</I>&gt;<i> &gt; 'Deferred.return', etc) with their qualified names, which is unnecessary:
+</I>&gt;<i> &gt; you can just use 'return'. This is partially a style point, but Deferred
+</I>&gt;<i> is
+</I>&gt;<i> &gt; generally understood to be the top-level monad if you have Async open.
+</I>&gt;<i> (This
+</I>&gt;<i> &gt; is also the case for some functions in other modules, like printf, which
+</I>&gt;<i> is
+</I>&gt;<i> &gt; in the top level in Core.)
+</I>&gt;<i>
+</I>&gt;<i> Not sure I totally agree -- I think Deferred.return is a clearer name
+</I>&gt;<i> than return on its own. I generally try to avoid use of return by
+</I>&gt;<i> using map instead of bind as the last chained infix operator, e.g.:
+</I>&gt;<i>
+</I>&gt;<i>   foo
+</I>&gt;<i>   &gt;&gt;= fun a -&gt;
+</I>&gt;<i>   bar a
+</I>&gt;<i>   &gt;&gt;= fun () -&gt;
+</I>&gt;<i>   baz
+</I>&gt;<i>   &gt;&gt;| fun c -&gt;
+</I>&gt;<i>   quux c
+</I>&gt;<i>
+</I>&gt;<i> (This also shows another style point I'm a fan of: arrange your code
+</I>&gt;<i> with binds/maps on the left, so that it is clear where they all are.
+</I>&gt;<i> This is important, because they're basically the possible context
+</I>&gt;<i> switch points in your code. So you should be aware where they are. The
+</I>&gt;<i> above example looks silly, but generally you have much longer lines
+</I>&gt;<i> between the binds, and it looks fine.)
+</I>&gt;<i>
+</I>&gt;<i> &gt; Generally functions that do deferred things should generally have a
+</I>&gt;<i> Deferred
+</I>&gt;<i> &gt; type. Don't use upon to try to give yourself functions of type 'unit'.
+</I>&gt;<i>
+</I>&gt;<i> +1, and in fact I'd say any use of upon is supicious. Note that [x &gt;&gt;&gt;
+</I>&gt;<i> f] is equivalent (pretty much) to [whenever (x &gt;&gt;= f)] (at some point
+</I>&gt;<i> we are renaming &quot;whenever&quot; to &quot;don't_wait_for&quot; -- I can't remember
+</I>&gt;<i> whether that has hit yet). But as you say, you should just let things
+</I>&gt;<i> have deferred return types if they do deferred things. This means that
+</I>&gt;<i> clients of that function have the choice whether to wait for that
+</I>&gt;<i> function (by binding on it), or not to (by calling
+</I>&gt;<i> whenever/don't_wait_for).
+</I>&gt;<i>
+</I>&gt;<i> The only exception is very tight loops, where upon is more efficient
+</I>&gt;<i> than bind, because it avoids allocating an extra deferred.
+</I>&gt;<i>
+</I>-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/core/attachments/20120703/42e4fe58/attachment-0001.html">http://lists.ocaml.org/pipermail/core/attachments/20120703/42e4fe58/attachment-0001.html</A>&gt;
+</PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001307.html">Erlang-like Gen server using Async
+</A></li>
+	<LI>Next message: <A HREF="001309.html">Erlang-like Gen server using Async
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1308">[ date ]</a>
+              <a href="thread.html#1308">[ thread ]</a>
+              <a href="subject.html#1308">[ subject ]</a>
+              <a href="author.html#1308">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/core">More information about the core
+mailing list</a><br>
+</body></html>

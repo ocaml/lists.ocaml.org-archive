@@ -1,0 +1,130 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Pointer to pointer and null check
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Pointer%20to%20pointer%20and%20null%20check&In-Reply-To=%3C5b7fd0d1-e820-f406-8624-2827313423c1%40digirati.com.br%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   
+   <LINK REL="Next"  HREF="000213.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Pointer to pointer and null check</H1>
+    <B>Andre Nathan</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Pointer%20to%20pointer%20and%20null%20check&In-Reply-To=%3C5b7fd0d1-e820-f406-8624-2827313423c1%40digirati.com.br%3E"
+       TITLE="[ocaml-ctypes] Pointer to pointer and null check">andre at digirati.com.br
+       </A><BR>
+    <I>Thu Jul 21 21:40:57 BST 2016</I>
+    <P><UL>
+        
+        <LI>Next message: <A HREF="000213.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#212">[ date ]</a>
+              <a href="thread.html#212">[ thread ]</a>
+              <a href="subject.html#212">[ subject ]</a>
+              <a href="author.html#212">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi
+
+I'm trying to write bindings to an API that in simplified form looks
+like this, for a given opaque type `foo_t`:
+
+  int foo_bar(foo_t **ret, foo_t *foo);
+
+In C it's used like this:
+
+  foo_t *foo = foo_new();
+  foo_t *ret;
+  int r = foo_bar(&amp;ret, foo);
+
+  if (r == 0) {
+    if (ret != NULL) {
+      /* success */
+    } else {
+      /* error */
+    }
+  } else {
+    /* not important */
+  }
+
+So if the return is 0, one has to check whether ret is NULL to determine
+failure or success.
+
+I have defined in the OCaml side:
+
+  type foo = unit ptr
+  let foo : foo typ = ptr void
+
+  let foo_bar = foreign &quot;foo_bar&quot; (ptr foo @-&gt; foo @-&gt; returning int)
+
+  let foo_bar x =
+    let ret = allocate foo x in
+    let r = foo_bar ret x in
+    (r, ret)
+
+Given that `ret` was allocated before the call, it will never be NULL
+after the call, so determining if there was an error becomes impossible.
+
+I also tried defining a structure type instead:
+
+  type foo
+  let foo : foo structure typ = structure &quot;foo_t&quot;
+
+  let foo_bar = foreign &quot;foo_bar&quot;
+    (ptr ptr foo @-&gt; ptr foo @-&gt; returning int)
+
+  let foo_bar x =
+    let ret = from_voidp foo null in
+    let r = foo_bar (addr ret) x in
+    (r, ret)
+
+but of course I can't call `addr` on a `Ctypes_static.pointer`. Also,
+apparently the way to check for NULL is to use `ptr_opt`, but I'm not
+sure how that would fit in a function like this where the result is
+returned via an argument.
+
+Any help would be greatly appreciated.
+
+Best regards,
+Andre
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: OpenPGP digital signature
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/ctypes/attachments/20160721/bf1cc58e/attachment.sig">http://lists.ocaml.org/pipermail/ctypes/attachments/20160721/bf1cc58e/attachment.sig</A>&gt;
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	
+	<LI>Next message: <A HREF="000213.html">[ocaml-ctypes] Pointer to pointer and null check
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#212">[ date ]</a>
+              <a href="thread.html#212">[ thread ]</a>
+              <a href="subject.html#212">[ subject ]</a>
+              <a href="author.html#212">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

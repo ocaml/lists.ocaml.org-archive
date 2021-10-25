@@ -1,0 +1,141 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-list%5D%20Working%20Group%3A%20the%20future%20of%20syntax%0A%20extensions%20in%20OCaml%2C%20after%20camlp4&In-Reply-To=%3C51077DEC.5060109%40frisch.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000064.html">
+   <LINK REL="Next"  HREF="000069.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20%5BCaml-list%5D%20Working%20Group%3A%20the%20future%20of%20syntax%0A%20extensions%20in%20OCaml%2C%20after%20camlp4&In-Reply-To=%3C51077DEC.5060109%40frisch.fr%3E"
+       TITLE="[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4">alain at frisch.fr
+       </A><BR>
+    <I>Tue Jan 29 07:44:44 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000064.html">[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4
+</A></li>
+        <LI>Next message: <A HREF="000069.html">[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#67">[ date ]</a>
+              <a href="thread.html#67">[ thread ]</a>
+              <a href="subject.html#67">[ subject ]</a>
+              <a href="author.html#67">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 1/28/2013 10:12 PM, Gerd Stolpmann wrote:
+&gt;<i> But I'd also like to fight for stream parsers a bit. In general, they
+</I>&gt;<i> are a nice way to write top-down parsers. Like for all top-down parsers,
+</I>&gt;<i> the class of acceptable grammars is not very powerful (less than
+</I>&gt;<i> LALR(1)), but you can easily add things that are nearly impossible with
+</I>&gt;<i> bottom-up parsers, like stores or contextuality, and you can locally
+</I>&gt;<i> escape from the parsing discipline entirely. Sometimes it is a perfect
+</I>&gt;<i> match.
+</I>
+In my experience with top-down parsers, a manually written recursive 
+descent with pattern matching on (normal) lists of tokens, plus a few 
+&quot;combinators&quot;, works also fine.
+
+&gt;<i>  From an old OCaml manual:
+</I>&gt;<i>
+</I>&gt;<i>...
+</I> &gt;
+&gt;<i>
+</I>&gt;<i> stream-component ::= &#8217; expr
+</I>&gt;<i>                     | expr
+</I>&gt;<i> stream-matching ::= stream-pattern [pattern] -&gt; expr
+</I>&gt;<i>                      { | stream-pattern [pattern] -&gt; expr}
+</I>&gt;<i> stream-pattern ::= [&lt; &gt;]
+</I>&gt;<i>                    | [&lt; stream-pat-comp {; stream-pat-comp [?? expr]} &gt;]
+</I>&gt;<i> stream-pat-comp ::= &#8217; pattern [when expr]
+</I>&gt;<i>                    | pattern = expr
+</I>&gt;<i>                    | ident
+</I>
+Let me throw a crazy idea: maybe we could merge the grammar for patterns 
+and expressions, and let the type checker reject bad patterns and bad 
+expressions from this more admissible class.  This would give plenty of 
+space for extensions.
+
+A quick inspection of Parsetree shows that the following syntactic forms 
+are available for patterns but not expressions:
+
+  - Alias pattern:  p as x
+  - &quot;open record&quot; flag: { l1=p1; _ }
+  - or pattern: p1 | p2
+  - type pattern: #t
+  - range patterns: c1..c2 (currently desugared by the Parser)
+
+It seems possible to enrich the class of parsed expressions with those 
+cases without introducing conflicts (to be checked...).
+
+Assuming it is indeed technically possible, do you think it would be a 
+good idea to merge the syntactic categories of patterns and expressions?
+
+
+Alain
+
+
+&gt;<i>
+</I>&gt;<i> Doing this with -ppx is certainly a challenge.
+</I>&gt;<i>
+</I>&gt;<i> Some ideas:
+</I>&gt;<i>
+</I>&gt;<i>   - [&lt; &gt;]: Maybe we should simply add several types of brackets to
+</I>&gt;<i>     the grammar. Syntax as for list, but reserved for extensions.
+</I>&gt;<i>
+</I>&gt;<i>   - 'expr: This is like a tag. Maybe use I(expr) instead, where &quot;I&quot;
+</I>&gt;<i>     means &quot;item&quot;.
+</I>&gt;<i>
+</I>&gt;<i>   - pattern = expr: I guess this is what Alain sees as difficulty.
+</I>&gt;<i>     As quotation it would look strange. What we need here is something
+</I>&gt;<i>     in the Parsetree that allows us to include expressions into patterns
+</I>&gt;<i>     (which would look like a &quot;computed pattern&quot;). Maybe `(expr) inside
+</I>&gt;<i>     patterns. Or another notation...
+</I>&gt;<i>
+</I>&gt;<i> Gerd
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Alain
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000064.html">[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4
+</A></li>
+	<LI>Next message: <A HREF="000069.html">[wg-camlp4] [Caml-list] Working Group: the future of syntax extensions in OCaml, after camlp4
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#67">[ date ]</a>
+              <a href="thread.html#67">[ thread ]</a>
+              <a href="subject.html#67">[ subject ]</a>
+              <a href="author.html#67">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

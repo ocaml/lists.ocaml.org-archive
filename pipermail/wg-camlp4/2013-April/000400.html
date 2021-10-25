@@ -1,0 +1,170 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20no-use%20of%20camlp4%20syntax%20extensions%20for%20Otags&In-Reply-To=%3C6x4nfchzfh.fsf%40blau.inf.tu-dresden.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000399.html">
+   <LINK REL="Next"  HREF="000403.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] My no-use of camlp4 syntax extensions for Otags</H1>
+    <B>Hendrik Tews</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20My%20no-use%20of%20camlp4%20syntax%20extensions%20for%20Otags&In-Reply-To=%3C6x4nfchzfh.fsf%40blau.inf.tu-dresden.de%3E"
+       TITLE="[wg-camlp4] My no-use of camlp4 syntax extensions for Otags">tews at os.inf.tu-dresden.de
+       </A><BR>
+    <I>Fri Apr 12 10:26:58 BST 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000399.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+        <LI>Next message: <A HREF="000403.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#400">[ date ]</a>
+              <a href="thread.html#400">[ thread ]</a>
+              <a href="subject.html#400">[ subject ]</a>
+              <a href="author.html#400">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi, 
+
+I have suggestions, but it is a bit lengthy. In short: ocamlast
+is great, but I don't believe it will satisfy all documentation
+needs. 
+
+
+Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt; writes:
+
+   On 02/22/2013 01:32 PM, Hendrik Tews wrote:
+   &gt; I would therefore strongly suggest to provide complete
+   &gt; documentation for the ast that preprocessors must process with
+   &gt; the _beta_ release of the next version.
+
+   Do you have a suggestion for the form such a documentation should
+   take? I can imagine describing how each fragment of concrete syntax is
+   represented in the abstract syntax, but this would not be really
+   different from paraphrasing the code of the parser.
+
+You are right, but only from the insider's point of view. You
+have to remember that potential preprocessor programmers (like
+myself) have never seen the parser before and they don't want to
+became an parsing/parser.mly expert before starting. For
+instance, when I look at parser.mly, I see
+
+  | pattern BAR pattern
+      { mkpat(Ppat_or($1, $3)) }
+
+and nothing is clear. When I look up mkpat, then all I know is
+that an or-pattern is not a Ppat_or node, it is some record, for
+which I don't even know the type. So I would have to search for
+ppat_desc, and select the right one of the 100 matches that grep
+reports. Note that I have been lucky here, because mkpat is very
+simple and is defined in parser.mly . There are surely more
+complicated functions that are elsewhere defined.
+
+&gt;<i>From my point of view the parser is not a documentation.
+</I>
+
+I believe there are (at least) two documentation needs:
+
+(1) getting the ast tree for some concrete syntax
+
+(2) understanding which concrete syntax a given ast node
+    represents
+
+
+For (1) the ocamlast tool is really great! (I've been using my
+own camlp4ast tool quite a lot.) I agree that with ocamlast a
+description of how each piece of concrete syntax is represented
+is not necessary. 
+
+There might however be cases with the danger of wrong
+generalization. What I mean with this is the following: The
+ocamlast tool only works on correct OCaml code. I cannot feed
+it with &quot;assert _ &quot; in order to get the most general ast
+tree for assertions. So instead I have to feed it with, for
+instance, &quot;assert true&quot; and get Pexp_assert ... I might now
+believe that &quot;assert false&quot; is also represented with Pexp_assert,
+which is wrong. 
+
+So, if there are cases, where similar looking concrete syntax is
+represented differently, then they should be listed somewhere.
+
+
+For documentation need (2), ocamlast is not really a help. For
+(2) I would suggest to annotate each constructor in parsetree.mli
+with the concrete syntax. For instance 
+
+  | Pexp_while of expression * expression
+     (** while &lt;expression&gt; do &lt;expression&gt; done *)
+
+This annotation should of course include the types that occur in
+the ast but are outside of parsetree.mli, such as Longident.t or
+constant. 
+
+There are probably a lot of side conditions. For
+instance, &quot;expr_1; expr_2; expr_3&quot; is 
+Pexp_sequence(expr_1, Pexp_sequence (expr_2, expr3) and not
+Pexp_sequence( Pexp_sequence(expr_1, expr_2), expr3) (or vice
+versa). 
+
+Another kind of side condition is that certain nodes do not and
+must not occur inside other nodes. For instance, the left
+expression in Pexp_sequence is never a Pexp_sequence. (This is
+probably wrong, but you get the idea.)
+
+Such side conditions should be described somehow for those who
+need to construct ast's and those who need to pattern match on
+ast's. 
+
+
+You could write the documentation for (1) and (2) in comments or
+ocamldoc comments in the source files. However, I would prefer
+something like a wiki page, where we users can immediately
+contribute. I, for instance, used the camlp4 wiki [1] a lot to
+remember my own findings at a place where it could benefit
+others.
+
+[1] <A HREF="http://brion.inria.fr/gallium/index.php/Abstract_Syntax_Tree">http://brion.inria.fr/gallium/index.php/Abstract_Syntax_Tree</A>
+
+
+Bye,
+
+Hendrik
+</PRE>
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000399.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+	<LI>Next message: <A HREF="000403.html">[wg-camlp4] My no-use of camlp4 syntax extensions for Otags
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#400">[ date ]</a>
+              <a href="thread.html#400">[ thread ]</a>
+              <a href="subject.html#400">[ subject ]</a>
+              <a href="author.html#400">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

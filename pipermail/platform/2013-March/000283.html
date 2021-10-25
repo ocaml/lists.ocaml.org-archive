@@ -1,0 +1,204 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] Benchmarking in OPAM
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Benchmarking%20in%20OPAM&In-Reply-To=%3C8B4B9739-06E8-4BA2-AA8A-E68517BB1E58%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000266.html">
+   <LINK REL="Next"  HREF="000303.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] Benchmarking in OPAM</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20Benchmarking%20in%20OPAM&In-Reply-To=%3C8B4B9739-06E8-4BA2-AA8A-E68517BB1E58%40recoil.org%3E"
+       TITLE="[ocaml-platform] Benchmarking in OPAM">anil at recoil.org
+       </A><BR>
+    <I>Thu Mar 14 10:48:57 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000266.html">[ocaml-platform] [opam-devel] OPAM 0.9.6 released
+</A></li>
+        <LI>Next message: <A HREF="000303.html">[ocaml-platform] Benchmarking in OPAM
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#283">[ date ]</a>
+              <a href="thread.html#283">[ thread ]</a>
+              <a href="subject.html#283">[ subject ]</a>
+              <a href="author.html#283">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+[+CC platform@]
+On 10 Mar 2013, at 21:45, Gabriel Scherer &lt;<A HREF="http://lists.ocaml.org/listinfo/platform">gabriel.scherer at gmail.com</A>&gt; wrote:
+
+&gt;<i> More precisely, what I've been trying to do this week-end is to find
+</I>&gt;<i> the right structure to use the benchmarks that I received from users
+</I>&gt;<i> after
+</I>&gt;<i>  <A HREF="http://gallium.inria.fr/~scherer/gagallium/we-need-a-representative-benchmark-suite/">http://gallium.inria.fr/~scherer/gagallium/we-need-a-representative-benchmark-suite/</A>
+</I>&gt;<i> 
+</I>&gt;<i> I worked on this a bit yesterday with Simon Castellan and Fr&#233;d&#233;ric
+</I>&gt;<i> Bour, and for now we decided to reuse code from Edwin T&#246;r&#246;k, that
+</I>&gt;<i> itself relies on Edgar Friendly Bench's library, that has some
+</I>&gt;<i> similarities with Criterion -- I'm not really familiar with the
+</I>&gt;<i> internals of either of those three libs, but they try to impress users
+</I>&gt;<i> with statistics, confidence internal etc.
+</I>&gt;<i> 
+</I>&gt;<i> The focus is to be able to get quick yet reliable feedback on the
+</I>&gt;<i> interest of some compiler optimization among representative OCaml
+</I>&gt;<i> programs. That is fairly different from the classic use cases of
+</I>&gt;<i> continuous integration (CI) of improving the libraries themselves,
+</I>&gt;<i> monitoring correctness (through test batteries) and portability among
+</I>&gt;<i> architectures.
+</I>&gt;<i> 
+</I>&gt;<i> To get lots of short-lived opam compiler switches corresponding to SVN
+</I>&gt;<i> or git development branches of the compiler (to be reinstalled each
+</I>&gt;<i> time you make a change to the branch, that is quite often), I've
+</I>&gt;<i> tested the use of &quot;preinstalled&quot; but got some feedback from Thomas on
+</I>&gt;<i> better ways to do it (
+</I>&gt;<i> <A HREF="https://github.com/OCamlPro/opam/pull/519#issuecomment-14682101">https://github.com/OCamlPro/opam/pull/519#issuecomment-14682101</A> ),
+</I>&gt;<i> using secret OPAM features. To get quick feedback it is rather
+</I>&gt;<i> important to minimize a package's dependencies.
+</I>&gt;<i> 
+</I>&gt;<i> Finally, we realized that we really need two distinct kinds of
+</I>&gt;<i> benchmarking software:
+</I>&gt;<i> - one &quot;benchmark library&quot; that is solely meant to run performance
+</I>&gt;<i> tests and return the results (will be used by and linked with the
+</I>&gt;<i> benchmark programs, so recompiled at each compiler change, so should
+</I>&gt;<i> be rather light if possible)
+</I>&gt;<i> - one &quot;benchmark manager&quot; that compares results between different
+</I>&gt;<i> runs, plots nice graphics, stores results over time or send them to a
+</I>&gt;<i> CI server, format them in XML or what not. This one is run from the
+</I>&gt;<i> system compiler and can have arbitrarily large feature sets and
+</I>&gt;<i> dependencies.
+</I>&gt;<i> 
+</I>&gt;<i> I believe a similar split would be meaningful for unit testing as
+</I>&gt;<i> well. Of course, if you're considering daily automated large-scale
+</I>&gt;<i> package building and checking, instead of tight feedback loops, it is
+</I>&gt;<i> much less compelling to force a split, you can just bundle the two
+</I>&gt;<i> kind of features under the same package.
+</I>
+The split you describe is generally good discipline, as it encourages
+library authors to encode more small benchmarks that can be called from
+larger tools.
+
+The benchmark manager is definitely something we want to have in the
+OPAM hosted test system.  It's very difficult to get representative
+benchmark results without a good mix of architectures and operating
+systems, and we're going to pepper lots of odd setups into OPAM (and
+eventually have the facility to crowdsource other people's machines
+into the build pool, to make it easier to contribute resources).
+
+So for the moment, focussing on the benchmark library would seem to
+be the best thing to do: I've not really used any of them, and would
+be interested in knowing what I ought to adopt for (e.g.) the Mirage
+protocol libraries.  Once we have that in place, the OPAM test integration
+should be much more straightforward.
+
+-anil
+
+PS: We've been building up interesting IPC test data for about a year
+now: <A HREF="http://www.cl.cam.ac.uk/research/srg/netos/ipc-bench/results.html">http://www.cl.cam.ac.uk/research/srg/netos/ipc-bench/results.html</A>
+and obtaining results from different architectures has been consistently
+puzzling and illuminating at the same time.  See my FOSDEM talk on how
+complex IO can be: <A HREF="http://anil.recoil.org/talks/fosdem-io-2012.pdf">http://anil.recoil.org/talks/fosdem-io-2012.pdf</A>
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000266.html">[ocaml-platform] [opam-devel] OPAM 0.9.6 released
+</A></li>
+	<LI>Next message: <A HREF="000303.html">[ocaml-platform] Benchmarking in OPAM
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#283">[ date ]</a>
+              <a href="thread.html#283">[ thread ]</a>
+              <a href="subject.html#283">[ subject ]</a>
+              <a href="author.html#283">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

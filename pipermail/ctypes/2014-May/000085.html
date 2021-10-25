@@ -1,0 +1,139 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Finalising data
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3C20140526162102.56256.19915%40andromeda1.ze.tum.de%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000082.html">
+   <LINK REL="Next"  HREF="000087.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Finalising data</H1>
+    <B>Florian Pichlmeier</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Finalising%20data&In-Reply-To=%3C20140526162102.56256.19915%40andromeda1.ze.tum.de%3E"
+       TITLE="[ocaml-ctypes] Finalising data">florian.pichlmeier at mytum.de
+       </A><BR>
+    <I>Mon May 26 17:21:02 BST 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000082.html">[ocaml-ctypes] Finalising data
+</A></li>
+        <LI>Next message: <A HREF="000087.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#85">[ date ]</a>
+              <a href="thread.html#85">[ thread ]</a>
+              <a href="subject.html#85">[ subject ]</a>
+              <a href="author.html#85">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Dear Jeremy,
+
+i changed the representation of zframe_t
+
+type frame
+type t = frame structure ptr
+let zframe_t : frame structure typ = structure &quot;_zframe_t&quot;
+
+&gt;<i> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+</I>&gt;<i> complete, so pointer arithmetic (with +@ etc.) should work as you
+</I>&gt;<i> expect.
+</I>
+I tried this approach with pointer arithmetic (+@), but i still get
+the Static.IncompleteType exception when i call the destroy function.
+ 
+let destroy (msg : t) =
+  let stub = foreign &quot;zframe_destroy&quot; ((ptr zframe_t) @-&gt; returning int) in
+  stub (msg +@ 0)
+
+Another problem is, that the zframe_destroy function expects **zframe_t as input,
+but with msg +@ 0 i only get *zframe_t. Does it suffice to declare the function
+like i did above, or do i need another approach?
+
+Again, many thanks for your efforts.
+
+Florian
+
+Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+
+
+&gt;<i> Dear Florian,
+</I>&gt;<i> 
+</I>&gt;<i> On 19/05/2014, Florian Pichlmeier &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">florian.pichlmeier at mytum.de</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> &gt; But now i have encountered a new problem.
+</I>&gt;<i> &gt; Zeromq uses incomplete types for many data types,
+</I>&gt;<i> &gt; like the frame type
+</I>&gt;<i> &gt; typedef struct _zframe_t zframe_t;
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; On the OCaml side i use void pointer to represent
+</I>&gt;<i> &gt; these data types, and thats where the problem arose.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; The frame destroy function call for example is that
+</I>&gt;<i> &gt;     zframe_destroy (zframe_t **self_p);
+</I>&gt;<i> &gt; with the corresponding ocaml function
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; let destroy (msg : t) =
+</I>&gt;<i> &gt; let stub = foreign &quot;zframe_destroy&quot; (ptr void @-&gt; returning int) in
+</I>&gt;<i> &gt; stub (msg +@ 0)
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; The problem is the msg +@ 0 part.
+</I>&gt;<i> &gt; 
+</I>&gt;<i> &gt; 
+</I>&gt;<i> 
+</I>&gt;<i> The ctypes equivalent of zeromq's incomplete struct declaration is a
+</I>&gt;<i> call to the 'structure' function without a corresponding call to
+</I>&gt;<i> 'seal'.  For example, you can represent zframe_t as follows:
+</I>&gt;<i> 
+</I>&gt;<i>     (* struct _zframe_t *)
+</I>&gt;<i>     let zframe_t = structure &quot;_zframe_t&quot;
+</I>&gt;<i> 
+</I>&gt;<i> This allows you to give a more precise type to the zframe_destroy binding:
+</I>&gt;<i> 
+</I>&gt;<i>     let zframe_destroy = foreign &quot;zframe_destroy&quot;
+</I>&gt;<i>         (ptr (ptr zframe_t) @-&gt; returning int)
+</I>&gt;<i> 
+</I>&gt;<i> Although 'zframe_t' is incomplete, 'ptr zframe_t' (i.e. zframe_t*) is
+</I>&gt;<i> complete, so pointer arithmetic (with +@ etc.) should work as you
+</I>&gt;<i> expect.
+</I>&gt;<i> 
+</I>&gt;<i> I hope that helps,
+</I>&gt;<i> 
+</I>&gt;<i> Jeremy.
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I></PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000082.html">[ocaml-ctypes] Finalising data
+</A></li>
+	<LI>Next message: <A HREF="000087.html">[ocaml-ctypes] Finalising data
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#85">[ date ]</a>
+              <a href="thread.html#85">[ thread ]</a>
+              <a href="subject.html#85">[ subject ]</a>
+              <a href="author.html#85">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

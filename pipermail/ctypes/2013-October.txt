@@ -1,0 +1,504 @@
+From agarwal1975 at gmail.com  Tue Oct  1 21:52:21 2013
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Tue, 1 Oct 2013 16:52:21 -0400
+Subject: [ocaml-ctypes] linking with non-standard C library
+Message-ID: <CAMu2m2K0VumHyOzmiYprnY77ApB+EjSShhYiqrJ-9piOXq=n2Q@mail.gmail.com>
+
+I've managed to compile the ncurses example with the following commands:
+
+ncurses_cmd.native: ncurses.ml ncurses.mli ncurses_cmd.ml
+ ocamlfind ocamlc -c -g -annot -package unix,threads,bigarray -thread -o
+ncurses.cmi ncurses.mli
+ocamlfind ocamlopt -c -g -annot -package
+unix,threads,bigarray,ctypes,ctypes.foreign -thread -o ncurses.cmx
+ncurses.ml
+ ocamlfind ocamlopt -a -cclib -lncurses ncurses.cmx -o ncurses.cmxa
+ocamlfind ocamlopt -c -g -annot -package unix,threads,bigarray -thread -o
+ncurses_cmd.cmx ncurses_cmd.ml
+ ocamlfind ocamlopt -g -linkpkg -package
+unix,threads,bigarray,ctypes,ctypes.foreign -thread ncurses.cmxa
+ncurses_cmd.cmx -o ncurses_cmd.native
+
+
+Now, I'm trying to mimic this to wrap a library that is not in my system's
+default location. A couple of questions:
+
+* What is the recommended way to package this? Should I include the source
+of the external C library within my OCaml repo?
+
+* What options do I have to use to link in a library in a custom location?
+I've tried every variation of -cclib, -ccopt -L/path/to/lib, -linkall, and
+am just guessing at this point. No matter what, I always get this error:
+
+Fatal error: exception Dl.DL_error("dlsym(RTLD_DEFAULT, sam_open): symbol
+not found")
+Raised at file "src/dl.ml", line 42, characters 26-44
+Called from file "src/foreign.ml", line 18, characters 25-53
+Called from file "samtools.ml", line 4, characters 15-60
+
+However, I'm pretty sure "sam_open" is exported by the library I'm using:
+
+$ nm libbam.a | grep sam_open
+0000000000000060 T _sam_open
+0000000000005cf0 S _sam_open.eh
+                 U _sam_open
+                 U _sam_open
+                 U _sam_open
+                 U _sam_open
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131001/a76e563c/attachment.html>
+
+From phil at hagelb.org  Thu Oct  3 18:22:24 2013
+From: phil at hagelb.org (Phil Hagelberg)
+Date: Thu, 03 Oct 2013 10:22:24 -0700
+Subject: [ocaml-ctypes] libffi compatibility
+Message-ID: <87zjqqfewf.fsf@enigma.home.hagelb.org>
+
+
+I'm preparing to distribute my ctypes-using project to folks who don't
+have OCaml installed, so I'm compiling a .native executable.
+
+Most of what I read about distributing OCaml is that for native binaries
+you can compile it on any 64-bit Linux system, and it should work on any
+other 64-bit Linux. But I get the feeling libffi complicates things a
+bit; my Debian-compiled binary refuses to run on newer Ubuntus ("error
+while loading shared libraries: libffi.so.5: cannot open shared object
+file") and straight up segfaults on Fedora 19.
+
+So I'm guessing I'll need to compile separately for each
+distribution/version I want to support? Are there any tools to make this
+process more streamlined? I briefly looked at the OpenSuSE Build
+Service[1], but it looks pretty complicated. What about different
+versions of Mac OS X?
+
+Also on a somewhat-related note, I have this to find the readline library:
+
+  let libreadline = Dl.(dlopen ~filename:"libreadline.so" ~flags:[RTLD_NOW])
+
+However, the ".so" needs to be replaced with ".dylib" for Mac OS X
+compatibility. Is there a recommended way to specify dlopen filenames
+portably, or should I just catch the exception and try to fall back to
+.dylib if it can't find the .so?
+
+thanks,
+Phil
+
+[1] - http://build.opensuse.org
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131003/753d3909/attachment.sig>
+
+From anil at recoil.org  Fri Oct  4 10:01:12 2013
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 4 Oct 2013 10:01:12 +0100
+Subject: [ocaml-ctypes] libffi compatibility
+In-Reply-To: <87zjqqfewf.fsf@enigma.home.hagelb.org>
+References: <87zjqqfewf.fsf@enigma.home.hagelb.org>
+Message-ID: <61870618-663E-4868-8862-C3E7BAFC24CA@recoil.org>
+
+On 3 Oct 2013, at 18:22, Phil Hagelberg <phil at hagelb.org> wrote:
+
+> 
+> I'm preparing to distribute my ctypes-using project to folks who don't
+> have OCaml installed, so I'm compiling a .native executable.
+> 
+> Most of what I read about distributing OCaml is that for native binaries
+> you can compile it on any 64-bit Linux system, and it should work on any
+> other 64-bit Linux. But I get the feeling libffi complicates things a
+> bit; my Debian-compiled binary refuses to run on newer Ubuntus ("error
+> while loading shared libraries: libffi.so.5: cannot open shared object
+> file") and straight up segfaults on Fedora 19.
+
+Right; while static linking is (reasonably) doable on Linux, libffi
+introduce a dynamic loading component.  You may want to try to link to
+libffi statically from ctypes, which would link in libffi.a instead of
+libffi.so.<major>.
+
+In the longer term though, I'm finding it's easier to distribute a
+source version. If your users don't have OCaml installed, would they
+be satisfied with a script that outputs a native executable? For instance,
+I added a 'make cold' target to OPAM 1.1 that bootstraps it without OCaml
+installed, and then that's sufficient to build any OPAM library without
+a compiler.  It does take a little longer though...
+
+> So I'm guessing I'll need to compile separately for each
+> distribution/version I want to support? Are there any tools to make this
+> process more streamlined? I briefly looked at the OpenSuSE Build
+> Service[1], but it looks pretty complicated. What about different
+> versions of Mac OS X?
+
+I've slowly been working through this for OPAM itself, and I'm afraid
+there aren't really any clear services on this front that don't involve
+a lot of manual gruntwork.
+
+> Also on a somewhat-related note, I have this to find the readline library:
+> 
+>  let libreadline = Dl.(dlopen ~filename:"libreadline.so" ~flags:[RTLD_NOW])
+> 
+> However, the ".so" needs to be replaced with ".dylib" for Mac OS X
+> compatibility. Is there a recommended way to specify dlopen filenames
+> portably, or should I just catch the exception and try to fall back to
+> .dylib if it can't find the .so?
+
+It's probably best to embed a -cclib -lreadline that will cause the
+system linker to do the right thing, rather than dlopen it manually.
+Do you specifically need to do this at runtime via Dl.dlopen, or would
+some build assistance help out here?
+
+-anil
+
+
+From agarwal1975 at gmail.com  Fri Oct  4 14:48:57 2013
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Fri, 4 Oct 2013 09:48:57 -0400
+Subject: [ocaml-ctypes] libffi compatibility
+In-Reply-To: <87zjqqfewf.fsf@enigma.home.hagelb.org>
+References: <87zjqqfewf.fsf@enigma.home.hagelb.org>
+Message-ID: <CAMu2m2+OHk+Tsx5fA_Mi7LuZuud4nKxpftpo93KCsTxgw55BKw@mail.gmail.com>
+
+> I'm preparing to distribute my ctypes-using project
+
+Can you please provide a link to your project.
+
+
+
+On Thu, Oct 3, 2013 at 1:22 PM, Phil Hagelberg <phil at hagelb.org> wrote:
+
+>
+> I'm preparing to distribute my ctypes-using project to folks who don't
+> have OCaml installed, so I'm compiling a .native executable.
+>
+> Most of what I read about distributing OCaml is that for native binaries
+> you can compile it on any 64-bit Linux system, and it should work on any
+> other 64-bit Linux. But I get the feeling libffi complicates things a
+> bit; my Debian-compiled binary refuses to run on newer Ubuntus ("error
+> while loading shared libraries: libffi.so.5: cannot open shared object
+> file") and straight up segfaults on Fedora 19.
+>
+> So I'm guessing I'll need to compile separately for each
+> distribution/version I want to support? Are there any tools to make this
+> process more streamlined? I briefly looked at the OpenSuSE Build
+> Service[1], but it looks pretty complicated. What about different
+> versions of Mac OS X?
+>
+> Also on a somewhat-related note, I have this to find the readline library:
+>
+>   let libreadline = Dl.(dlopen ~filename:"libreadline.so"
+> ~flags:[RTLD_NOW])
+>
+> However, the ".so" needs to be replaced with ".dylib" for Mac OS X
+> compatibility. Is there a recommended way to specify dlopen filenames
+> portably, or should I just catch the exception and try to fall back to
+> .dylib if it can't find the .so?
+>
+> thanks,
+> Phil
+>
+> [1] - http://build.opensuse.org
+>
+> _______________________________________________
+> Ctypes mailing list
+> Ctypes at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/ctypes
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131004/7e796d8d/attachment.html>
+
+From phil at hagelb.org  Fri Oct  4 18:39:41 2013
+From: phil at hagelb.org (Phil Hagelberg)
+Date: Fri, 04 Oct 2013 10:39:41 -0700
+Subject: [ocaml-ctypes] libffi compatibility
+In-Reply-To: <61870618-663E-4868-8862-C3E7BAFC24CA@recoil.org>
+References: <87zjqqfewf.fsf@enigma.home.hagelb.org>,
+ <61870618-663E-4868-8862-C3E7BAFC24CA@recoil.org>
+Message-ID: <87vc1dey02.fsf@enigma.home.hagelb.org>
+
+
+Anil Madhavapeddy writes:
+
+> Right; while static linking is (reasonably) doable on Linux, libffi
+> introduce a dynamic loading component.  You may want to try to link to
+> libffi statically from ctypes, which would link in libffi.a instead of
+> libffi.so.<major>.
+
+That sounds promising; can you explain how it would work? I don't see it
+mentioned in the ctypes documentation.
+
+My suspicion is that readline is much more stable than libffi, so while
+technically there could still be incompatibility dynamically loading
+readline, in practice it would be much less common than incompatibility
+arising from dynamically loading libffi. But that's just a wildly
+unqualified guess.
+
+> In the longer term though, I'm finding it's easier to distribute a
+> source version. If your users don't have OCaml installed, would they
+> be satisfied with a script that outputs a native executable?
+
+It's tempting, but I think most of my users wouldn't be interested in
+trying this program if the installation took half an hour. Of course
+it's always an option for users on systems where I can't provide a
+precompiled binary, but those people typically have more patience to
+begin with. =)
+
+>> However, the ".so" needs to be replaced with ".dylib" for Mac OS X
+>> compatibility. Is there a recommended way to specify dlopen filenames
+>> portably, or should I just catch the exception and try to fall back to
+>> .dylib if it can't find the .so?
+>
+> It's probably best to embed a -cclib -lreadline that will cause the
+> system linker to do the right thing, rather than dlopen it manually.
+> Do you specifically need to do this at runtime via Dl.dlopen, or would
+> some build assistance help out here?
+
+I've never worked with C libraries before; I was just following the
+advice I found on the issue tracker regarding a similar problem:
+
+  https://github.com/ocamllabs/ocaml-ctypes/issues/70
+
+Is changing my `ocamlbuild` invocation the best way to do that?
+
+  $ ocamlbuild -use-ocamlfind -lflags -cclib,-lreadline grench.native
+
+For context, the project in question is here:
+
+  https://github.com/technomancy/grenchman
+
+thanks,
+Phil
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131004/b4678eef/attachment.sig>
+
+From phil at hagelb.org  Tue Oct  8 23:39:43 2013
+From: phil at hagelb.org (Phil Hagelberg)
+Date: Tue, 08 Oct 2013 15:39:43 -0700
+Subject: [ocaml-ctypes] libffi compatibility
+In-Reply-To: <61870618-663E-4868-8862-C3E7BAFC24CA@recoil.org>
+References: <87zjqqfewf.fsf@enigma.home.hagelb.org>,
+ <61870618-663E-4868-8862-C3E7BAFC24CA@recoil.org>
+Message-ID: <87r4bvfkuo.fsf@enigma.home.hagelb.org>
+
+
+Anil Madhavapeddy writes:
+
+> It's probably best to embed a -cclib -lreadline that will cause the
+> system linker to do the right thing, rather than dlopen it manually.
+
+I tried this[1], and it works great on my primary Debian system, but when I
+try compiling it on Ubuntu (with libffi6 instead of libffi5; not sure if
+that's relevant), the compilation succeeds, but I get this when I try to
+run the program:
+
+    Fatal error: exception Dl.DL_error("grench: undefined symbol: readline")
+    Raised at file "src/dl.ml", line 42, characters 26-44
+    Called from file "src/foreign.ml", line 18, characters 25-53
+
+The native binary I compiled on my Debian libffi5 system doesn't work on
+newer Ubuntu systems with libffi6. Do I need a different binary for each
+version of libffi I want to target on Linux, or is it one for each
+distro release?
+
+I'm very new to C libraries, so I'm probably missing something obvious,
+but it's not working how I expected.
+
+-Phil
+
+[1] - $ ocamlbuild -use-ocamlfind -lflags -cclib,-lreadline grench.native
+    on https://github.com/technomancy/grenchman
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 489 bytes
+Desc: not available
+URL: <http://lists.ocaml.org/pipermail/ctypes/attachments/20131008/9209dcd9/attachment.sig>
+
+From yallop at gmail.com  Mon Oct 14 14:47:54 2013
+From: yallop at gmail.com (Jeremy Yallop)
+Date: Mon, 14 Oct 2013 14:47:54 +0100
+Subject: [ocaml-ctypes] Variadic Functions
+In-Reply-To: <20131011160736.42106.14489@andromeda1.ze.tum.de>
+References: <20130924154344.65387.32437@magellan1.ze.tum.de>
+ <CAAxsn=H_JJV3yX3LruMddAcDKX_nmv-dUgb8B9ekXDgPMGx1Xg@mail.gmail.com>
+ <20131011144626.42098.72945@andromeda1.ze.tum.de>
+ <CAAxsn=FkWOgoSoeJWVidSj9G2k00tX9rfFaz_MW2AoLuo7N_9w@mail.gmail.com>
+ <20131011160736.42106.14489@andromeda1.ze.tum.de>
+Message-ID: <CAAxsn=HrpXqwz-K=Xv14yj7BNc98xk076ysguXXMXTfEzOdnNw@mail.gmail.com>
+
+Hi Florian,
+
+There are a few ways to approach this.  I think my preferred approach
+is to use string_opt, which maps OCaml's None to a null pointer.  You
+can then create null-terminated arrays pretty easily:
+
+   # Array.of_list string_opt [Some "foo"; Some "bar"; None];;
+   - : string option Array.t = { 0x27d8fc0, 0x27d9020, (nil) }
+
+(There's a small pitfall with the string and string_opt types that you
+may already be aware of: ctypes always passes a copy of OCaml strings
+to C, so if the C code is writing to the strings then you should use
+'char ptr' or some similar type instead.)
+
+A slightly more raw approach, if you have an existing array of the
+appropriate length, is to simply assign to the last element:
+
+   # a;;
+   - : int ptr Array.t = { 0x27d9f30, 0x27d9090 }
+   # a.(Array.length a - 1) <- from_voidp int null;;
+   - : unit = ()
+   # a;;
+   - : int ptr Array.t = { 0x27d9f30, (nil) }
+
+Hope this helps,
+
+Jeremy.
+
+On 11 October 2013 17:07, Florian Pichlmeier
+<florian.pichlmeier at mytum.de> wrote:
+> Hi,
+>
+> thanks a lot for that quick response, it worked like a charm.
+> The only problem now is that the other receive function expects
+> the message to be null terminated. How do i get that with ctypes,
+> that the last element in the array is NULL?
+>
+> Thanks again for your work,
+>
+> Florian
+>
+> Jeremy Yallop <yallop at gmail.com> wrote:
+>
+>
+>> Hi Florian,
+>>
+>> The problem is the array argument; things should work better if you
+>> change the binding to something like this:
+>>
+>>   let stub = foreign "zstr_sendx_array"
+>>       ptr void @-> ptr string @-> size_t @-> returning int)
+>>
+>> You'll be able to call stub by passing 'Array.start c_array'.
+>>
+>> Kind regards,
+>>
+>> Jeremy.
+>>
+>> On 11 October 2013 15:46, Florian Pichlmeier
+>> <florian.pichlmeier at mytum.de> wrote:
+>>
+>> > Hello Jeremy,
+>> >
+>> > i tried the approach with a more wrappable function.
+>> >
+>> > int
+>> > zstr_sendx_array (void *socket, char **string, size_t nmsg)
+>> > {
+>> >     zmsg_t *msg = zmsg_new ();
+>> >     for (size_t i=0;i<nmsg;i++) {
+>> >         zmsg_addstr (msg, *string);
+>> >         (*string)++;
+>> >     }
+>> >     return zmsg_send (&msg, socket);
+>> > }
+>> >
+>> > and call it that
+>> >
+>> > let sendx socket msg_list =
+>> >   let c_array : string Ctypes.array = Array.of_list string msg_list
+>> >   in
+>> >   let stub = foreign "zstr_sendx_array"
+>> >     ((ptr void) @-> (array (List.length msg_list) string ) @-> size_t @-> returning int)
+>> >   in
+>> >   match stub socket c_array (Size_t.of_int(List.length msg_list))with
+>> >   | _ -> ()
+>> >
+>> > But i get this error
+>> >
+>> > Fatal error: exception Static.Unsupported("Unsupported argument type")
+>> >
+>> > Do you have an idea what my mistake is?
+>> >
+>> > Thank you.
+>> >
+>> > Florian
+>> >
+>> > Jeremy Yallop <yallop at gmail.com> wrote:
+>> >
+>> >
+>> >
+>> > > On 24 September 2013 12:43, Florian Pichlmeier
+>> > > <florian.pichlmeier at mytum.de> wrote:
+>> > >
+>> > >
+>> > > > Some of these functions are variadic functions, like this one
+>> > > >
+>> > > > //  Create new poller
+>> > > > CZMQ_EXPORT zpoller_t *
+>> > > >     zpoller_new (void *reader, ...);
+>> > > >
+>> > > > Is there a way with ctypes to emulate this signature?
+>> > > >
+>> > > >
+>> > > >
+>> > > >
+>> > >
+>> > > The short answer, unfortunately, is "no".  This type of function is
+>> > > rather tricky to wrap.  This isn't due to a limitation of ctypes; it's
+>> > > because there isn't a way to write wrappers for variadic functions in
+>> > > standard C [0, 1]
+>> > >
+>> > > Ideally the C library interface should provide a more wrappable
+>> > > interface in addition to the variadic function, e.g.
+>> > >
+>> > >     zpoller_t *zpoller_new_vec(void **readers);    /* argument is a
+>> > > null-terminated array of pointers */
+>> > >
+>> > > or
+>> > >
+>> > >     zpoller_t *zpoller_new_vec(void **readers, size_t nreaders);
+>> > >
+>> > > It might be worth sending a pull request to the czmq maintainers to
+>> > > modify the interface.
+>> > >
+>> > > If you're not too concerned by portability you can use the fact that
+>> > > some C implementations (e.g. GCC on Linux) have the same calling
+>> > > convention for variadic and regular functions.  Here ctypes offers an
+>> > > advantage over handwritten bindings: since C types are exposed as
+>> > > OCaml values you can construct a signature dynamically according to
+>> > > the number of arguments you want to pass to  the function.  For
+>> > > example, you might call the function using any of the signatures
+>> > >
+>> > >     ptr void @-> returning (ptr (zpoller_t))
+>> > >
+>> > >     ptr void @-> ptr void @-> returning (ptr (zpoller_t))
+>> > >
+>> > >     ptr void @-> ptr void @-> ptr void @-> returning (ptr (zpoller_t))
+>> > >
+>> > > and so on.  In fact, it ought to be possible (but probably not easy)
+>> > > to write a function which accepts a list of pointers, constructs a
+>> > > suitable signature for zpoller_new and calls the function.
+>> > >
+>> > > Jeremy.
+>> > >
+>> > > [0] http://c-faq.com/varargs/handoff.html
+>> > > [1] http://c-faq.com/varargs/invvarargs.html
+>> > >
+>> > >
+>> > >
+>> > >
+>> > >
+>> >
+>>
+>>
+

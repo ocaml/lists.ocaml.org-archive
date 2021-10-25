@@ -1,0 +1,127 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512738CF.70905%40lexifi.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000058.html">
+   <LINK REL="Next"  HREF="000074.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Alain Frisch</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512738CF.70905%40lexifi.com%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">alain.frisch at lexifi.com
+       </A><BR>
+    <I>Fri Feb 22 09:22:23 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000058.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000074.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#61">[ date ]</a>
+              <a href="thread.html#61">[ thread ]</a>
+              <a href="subject.html#61">[ subject ]</a>
+              <a href="author.html#61">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On 2/21/2013 7:39 PM, Leo White wrote:
+&gt;<i> More generally, almost all naming systems are hierarchical. It is a
+</I>&gt;<i> tried and tested way of organising things.
+</I>
+The namespace system I've used most, XML Namespaces, has flat qualifiers 
+(we could argue that they are in general URL/URN, with a hierarchical 
+structure, but namespaces are really just strings matched with strict 
+equality).
+
+I agree with Xavier that if we give a hierarchical syntax to namespaces, 
+this should somehow be reflected in the semantics to avoid confusion.
+
+&gt;<i> Is it really so tedious for the compiler to look in multiple .cmi files
+</I>&gt;<i> until the right one is found?
+</I>
+Nothing is really tedious for a compiler, but there are technical 
+drawbacks of doing so:
+
+  - Performance:  looking up and opening files takes time, especially 
+under bad OS such as Windows.
+
+  - It prevents from putting .cmi files from many libraries in the same 
+directory, which is sometimes useful (to simplify deployment; to control 
+precisely the set of .cmi available for a given file; to improve 
+performance by avoiding repeated lookups in many directories).
+
+  - Spurious dependencies: technically, since the compiler will open 
+them, all x.cmi files in the search path should be considered as 
+dependencies for a module which refers to X.  This is necessary to have 
+a correct notion of dependency for the build system (formally, each 
+x.cmi could become the &quot;correct one&quot; if its namespace changes in the 
+source file; and since all these files are opened, they should not be 
+overwritten in parallel).  This complexifies the build system, 
+especially for parallel builds, and creates a risk of dependency cycles.
+
+
+&gt;<i> I also think that long filenames *are* tedious, if they weren't people
+</I>&gt;<i> would use them already. If you are using a large library, even with a
+</I>&gt;<i> good aliasing feature, you would end up writing:
+</I>&gt;<i>
+</I>&gt;<i>   open Core_Std_Mutex as Mutex
+</I>&gt;<i>   open Core_Std_Thread as Thread
+</I>&gt;<i>   open Core_Std_Date as Date
+</I>&gt;<i>
+</I>&gt;<i> at the beginning of all your files, instead of writing:
+</I>&gt;<i>
+</I>&gt;<i>   open Core.Std
+</I>
+That's why I've proposed to allow specifying mapping between references 
+to external modules in dedicated files.  We could have a file 
+core_std.ns (probably shipped with Core) with this content:
+
+Mutex = Core_std_mutex
+Thread = Core_std_thread
+Date = Core_std_date
+
+and just a reference in the source code (or on the command-line):
+
+   open namespace Core_std
+
+which would load core_std.ns and use the corresponding module renaming 
+in the rest of the module.
+
+Regards,
+
+Alain
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000058.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000074.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#61">[ date ]</a>
+              <a href="thread.html#61">[ thread ]</a>
+              <a href="subject.html#61">[ subject ]</a>
+              <a href="author.html#61">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

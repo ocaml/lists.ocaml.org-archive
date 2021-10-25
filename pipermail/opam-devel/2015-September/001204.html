@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Container based Travis CI service
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Container%20based%20Travis%20CI%20service&In-Reply-To=%3C2147C163-5F3F-422A-88F2-186501705B7E%40gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="001203.html">
+   <LINK REL="Next"  HREF="001205.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Container based Travis CI service</H1>
+    <B>Michael Gr&#252;newald</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Container%20based%20Travis%20CI%20service&In-Reply-To=%3C2147C163-5F3F-422A-88F2-186501705B7E%40gmail.com%3E"
+       TITLE="[opam-devel] Container based Travis CI service">michipili at gmail.com
+       </A><BR>
+    <I>Sun Sep  6 19:09:49 BST 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="001203.html">[opam-devel] Container based Travis CI service
+</A></li>
+        <LI>Next message: <A HREF="001205.html">[opam-devel] What context do install an remove run in?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1204">[ date ]</a>
+              <a href="thread.html#1204">[ thread ]</a>
+              <a href="subject.html#1204">[ subject ]</a>
+              <a href="author.html#1204">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+&gt;<i> On 03 Sep 2015, at 19:34, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">anil at recoil.org</A>&gt; wrote:
+</I>&gt;<i> 
+</I>&gt;<i> Thanks for posting this to the list, Michael.  We definitely need to do
+</I>&gt;<i> something about Travis, since the legacy infrastructure is failing regularly
+</I>&gt;<i> with network timeouts.
+</I>
+I am completely new to depexts so let me describe the problem in
+few words, just to be sure I got it right: the opam-repository
+has a Travis CI script which will build each PR (typically,
+a package update or a new package) and depext (the opam plugin)
+kicks in to install missing dependencies living outside the
+opam world, typically using the host OS package manager.
+
+Then the setup I wrote about is definitely not a replacement
+tool for the depext plugin, at least for the opam-repository.
+For a &#8220;normal&#8221; repository &#8211; whose test suite does not need to
+install arbitrary packages dynamically &#8211; the setup I describe
+can easily me mimicked to switch to the new container infrastructure,
+also taking advantage of caching!
+
+I had some thought about the special case of the opam-repository
+and it looks like we will have a hard time unless some amenagements
+are made to the Travis infrastructure.  The most promising
+solutions I could figure out involves the fakeroot command
+or a tool similar to strace to trace system calls, but I
+am not sure how good this is supported in Travis CI containers.
+I am also not a Linux user and I am therefore not familiar with
+the intricate details of the fakeroot command but at a first glance
+it seems, that we could setup a new, container-based, continuous
+integration environment according to the following lines:
+
+1. Installation step:
+
+  1.1 install all Ubuntu packages needed by
+      all packages in the opam repository
+
+  1.2 install all the needed versions from OCaml using
+      opam; be sure to cache this!
+
+2. Test step for package *foo*
+
+  2.1 acquire the list of depexts for *foo* and add it
+      ocaml, opam and maybe some other essential packages.
+
+  2.2 query the package database to obtain a list of all files
+      owned by packages in the list prepare in the
+      previous step; be sure to include config files, if
+      appropriate.
+
+  2.3 prepare a fakeroot environment replicating the files
+      listed in the previous steps, with hard links.
+
+  2.4 jump in the fakeroot environment and test the package
+
+Of course, the point of steps 2.1-2.4 is to hide packages
+not found in the depexts spec from the scope of the build,
+to ensure that this list is comprehensive.
+
+An alternative to 2.3-2.4 would be
+
+  2.3&#8217; test the package under strace or a similar
+       facility in Ubuntu
+
+  2.4&#8217; confront the results of strace with the list of
+       authorised files found in 2.2, if we see that the
+       test accessed other files, then reject it.
+
+If no strace alternative is easily usable in Travis CI,
+we could run the build script with customised open(2) and
+stat(2) functions, to throw an error when a forbidden file
+is accessed.  This relatively easy to do, using the
+LD_PRELOAD mechanism, as illustrated here:
+
+  <A HREF="http://stackoverflow.com/questions/6083337/overriding-malloc-using-the-ld-preload-mechanism">http://stackoverflow.com/questions/6083337/overriding-malloc-using-the-ld-preload-mechanism</A>
+
+
+I think the ease of implementation of these solutions are,
+from the easier to the harder:
+
+  1. use a strace-alike mechanism
+  2. use customised system calls open(2), stat(2), and
+     all their cousins
+  3. build a suitable fakeroot environment
+
+Best,
+Michael
+
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="001203.html">[opam-devel] Container based Travis CI service
+</A></li>
+	<LI>Next message: <A HREF="001205.html">[opam-devel] What context do install an remove run in?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#1204">[ date ]</a>
+              <a href="thread.html#1204">[ thread ]</a>
+              <a href="subject.html#1204">[ subject ]</a>
+              <a href="author.html#1204">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,287 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Package%20signing%20%28was%20Re%3A%20%20OPAM%201.3%20roadmap%29&In-Reply-To=%3C6257682.bRB5lkC42o%40agaric%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000991.html">
+   <LINK REL="Next"  HREF="000993.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)</H1>
+    <B>Louis Gesbert</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20Package%20signing%20%28was%20Re%3A%20%20OPAM%201.3%20roadmap%29&In-Reply-To=%3C6257682.bRB5lkC42o%40agaric%3E"
+       TITLE="[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)">louis.gesbert at ocamlpro.com
+       </A><BR>
+    <I>Wed Mar 11 02:39:22 GMT 2015</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000991.html">[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+</A></li>
+        <LI>Next message: <A HREF="000993.html">[opam-devel] Package signing (was Re: OPAM 1.3 roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#992">[ date ]</a>
+              <a href="thread.html#992">[ thread ]</a>
+              <a href="subject.html#992">[ subject ]</a>
+              <a href="author.html#992">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Good timing: I already spent some time documenting myself on this and started thinking on the design for a signed OPAM repo -- so we're just getting in sync. I'd very much like to discuss these issues directly some time soon.
+
+# On the current state
+
+the current client-server protocol and repackaging of archives are kind of there by legacy more than by design, and this could be a good opportunity to improve on them -- so we shouldn't let them get in the way. We can break the repository handling for 1.3 and have 1.2 keep working on a backwards compatible mirror, like 1.1 does now (hm, hopefully better ; for that we'll need to keep a compatible (but possibly minimal) `/urls.txt` file on the new repo -- it's always downloaded first -- and have a redirect in the `/repo` file).
+
+I've recently documented the repository format a bit at [1], but here is some more detail:
+* The repository updates are handled by the scripts at <A HREF="https://github.com/ocaml/opam.ocaml.org,">https://github.com/ocaml/opam.ocaml.org,</A> and rely on opam-admin (src/tools on the opam github repo):
+  - The github repository is updated using `git fetch`
+  - opam-admin scans changed checksums in url files (using the previously generated urls.txt) and downloads all corresponding package archives from their upstream
+  - these archives are uncompressed, the files in the packages' metadata `files/` subdirectory are copied over, and it's repackaged as an `archives/pkgname.version+opam.tar.gz` archive. I don't think this last step is really needed anymore (see #1090).
+  - a new `urls.txt` is generated, with checksums of all files on the repo (excluding itself, obviously). So the checksums in there replace those from the packages' url files for matters of checking repackaged `+opam.tar.gz` archives.
+  - all metadata (ie all but `+opam.tar.gz` archives) is bundled into an `index.tar.gz` file
+  - the doc pages and blog are generated at this stage and added to the directory, too
+
+Once this is done, the newly generated repository directory is swapped with the old one. This doesn't guarantee consistency of sessions for people who would have already downloaded the `urls.txt` file. This is run every hour at *:15.
+
+* The client repository updates proceed as follows (over http only, for rsync, git etc., we just pull the changes and don't need `urls.txt` or `index.tar.gz`):
+  - `urls.txt` is downloaded (using http compression if available)
+  - if the number of new/missing files (excl. archives) is lower than a threshold, download them individually
+  - otherwise, download `index.tar.gz` and uncompress it in place of the previous repository image
+
+It's not a very advanced rsync protocol, just a quick way to handle updates that we started with, and while the repository was quite small.
+
+* And the client package downloads:
+  - an `archives/pkg.version+opam.tar.gz` file is looked up from the repository, in case it acts as mirror (this is done also for non HTTP repos).
+  - if not found, the upstream archive mentionned in the package's `url` file is download
+  - the md5 is checked against the one in the repos' `urls.txt` or the package's `url` file
+
+The http download command is fully customisable (since last week!), but you're right with the defaults: `curl --insecure` if found, `wget --no-check-certificate` otherwise (or if on a mac, since recently as well, to workaround a curl bug). OpamGlobals.curl_command would be added curl command-line arguments, see OPAMFETCH in the new manpage for the new possibilities. 
+
+[1] <A HREF="http://opam.ocaml.org/doc/Manual.html#IndexesandservingoverHTTPS">http://opam.ocaml.org/doc/Manual.html#IndexesandservingoverHTTPS</A>
+
+
+# Proposal (just random remarks)
+
+Threat model:
+* an attacker can compromise the repository
+* an attacker can steal individual developper keys
+
+Package signature: this should probably sign over
+* the package definition, excluding the url file (everything under `~repo/packages/&lt;pkg&gt;/&lt;pkg&gt;.&lt;version&gt;/`)
+* the upstream package archive (and possibly its url and mirrors ?)
+
+Key delegation:
+* We can simply delegate to sub-directories of the repository
+* OPAM should probably be changed not to accept package definitions anywhere in the hierarchy then (I _think_ `~repo/foo/foo.1/bar.1/` would work as a definition for `bar.1` at the moment, OPAM makes no assumptions on the hierarchy)
+
+Root key:
+* TUF propoposes several root keys with a threshold. That could be a nice security since it makes revocation of root keys possible.
+
+claimed/unclaimed/recently claimed maintainer keys (from Python's pep480):
+* I think we'll need some kind of 'unclaimed' at least to ensure the progressive migration to signed packages, having all maintainers sign up-front before rolling 1.3 sounds difficult. Then we don't have Pypi's flow of incoming packages, so we may not need as much infrastructure -- having a default delegated maintainer could be enough.
+
+Timestamp server:
+* I'd love to see that done by a unikernel that fetches from github, signs, then pushes back to the repository HTTP server. Still needs to get its key from somewhere though.
+
+
+# open questions
+
+* Allowing non-maintainer updates: I have been wondering about this as well. It's not easy, and modification of dependency constraints can be an attack vector already (adding a dep to a compromised package, or even an unsafe older package version). Sometimes, there is also a trivial packaging bug, and the repository maintainers should be able to fix it if the package maintainer is not responsive enough. We could try and detect 'innocuous' changes, but that sounds like something that can get too complex very quickly and will open more weaknesses. No better solution than letting the modified package get signed by a general repository maintainer, maybe with a time window for the rightful owner to sign it ? I'll think some more about it.
+
+* The way the community works at the moment, verifying keys through mail / github / IRC sounds ok to begin with.
+
+* Signed git commits. I kind of like the idea but don't see how it could get involved in this either.
+
+* opam-publish: I'd like to see it get more widely used. Maybe I should make it more clear that the first step (`opam publish prepare`) only gathers metadata locally and is very generic, while the second (`opam publish submit`) is github specific and bound to opam-repository by default. Anyway, the signing process will be open and should be reproducible by hand, with minimum hassle. But having opam-publish generate, and manage keys would be a definite gain in usability IMO.
+
+* We should require maintainers to sign their packages -&gt; the clients shouldn't accept unsigned packages by default, but there could be &quot;unclaimed&quot; (repository maintainer handled) signatures on the repo to begin with.
+
+* dependencies to command-line utilities: OPAM's parallel command engine relies on parallelism at the sub-process level (we don't want to embed lwt into OPAM); but having our own download handling would certainly help with several issues, also including portability.
+
+
+# some more
+
+* Would we want to use the TUF specified json format ?
+
+* Last, I'd like your advice and opinion on the algorithms and signing to use. Small elliptic-curve based signature (ed25519) seem to be all the hype now with stuff like signify or minilock. What is the state of what we currently have in native OCaml, and what would you recommend ?
+
+
+Thanks for giving a hand in this!
+Louis
+
+
+
+&gt;<i> - Hannes Mehnert, 10/03/2015 18:33 -
+</I>&gt;<i> ## Current state
+</I>&gt;<i> 
+</I>&gt;<i> Please correct me if I'm wrong and/or direct me to documentation,
+</I>&gt;<i> focussing on the 'standard' http repo:
+</I>&gt;<i>  - the main repository (<A HREF="https://opam.ocaml.org">https://opam.ocaml.org</A>) is downloaded
+</I>&gt;<i> (core/opamSystem.ml) using either wget, curl or OpamGlobals.curl_command
+</I>&gt;<i> [arguments passed are --no-check-certificate/--insecure]
+</I>&gt;<i>   -&gt; how is the sync from github done?
+</I>&gt;<i>  - this contains of:
+</I>&gt;<i>   a) packages (consisting of opam and checksum, plus arbitrary scripts)
+</I>&gt;<i>   b) version
+</I>&gt;<i>   c) config
+</I>&gt;<i> 
+</I>&gt;<i> Is only index.tar.gz downloaded? Or the full file list?
+</I>&gt;<i> 
+</I>&gt;<i> The file urls.txt contains:
+</I>&gt;<i>  - package file names, md5, permission
+</I>&gt;<i>  - archives/packagename+opam, md5, permission
+</I>&gt;<i> 
+</I>&gt;<i> This is generated by repositories/opamHTTP.ml. Where does the archives
+</I>&gt;<i> information come from?
+</I>&gt;<i> 
+</I>&gt;<i> When a package is installed, the archive is downloaded either from a
+</I>&gt;<i> mirror (this +opam url) or from the url in the package description.
+</I>&gt;<i> Why is there repacking done and +opam URLs? Why do the md5 strings of
+</I>&gt;<i> archives/foo/foo.x+opam.tar.gz and packages/foo/foo.x/url not match?
+</I>&gt;<i> 
+</I>&gt;<i> Thus, currently the opam repository server has to be trusted, and also
+</I>&gt;<i> the transport layer is not authenticated (thus, a MITM might be in the
+</I>&gt;<i> way).
+</I>&gt;<i> 
+</I>&gt;<i> On 02/23/2015 01:07, Louis Gesbert wrote:
+</I>&gt;<i> &gt; # Secure the repository and updates:
+</I>&gt;<i> &gt;
+</I>&gt;<i> &gt; Integrate some implementation of TUF to have signed packages,
+</I>&gt;<i> &gt; signed metadata and signed timestamps, and allow OPAM to detect
+</I>&gt;<i> &gt; anything suspicious. This implies: * defining a signing and
+</I>&gt;<i> &gt; repository update workflow, adding as little burden as possible *
+</I>&gt;<i> &gt; update opam-admin to apply the signing rules * obviously, update
+</I>&gt;<i> &gt; opam to check all that * update opam-publish (?) to help contribute
+</I>&gt;<i> &gt; signed packages, depending on the chosen workflow
+</I>&gt;<i> 
+</I>&gt;<i> ## (Unfortunately incomplete) proposal
+</I>&gt;<i> What is the threat model? I personally would prefer to not have to trust
+</I>&gt;<i> the repository server.
+</I>&gt;<i> 
+</I>&gt;<i> How to get there? Each package has to be signed by its maintainer.
+</I>&gt;<i> 
+</I>&gt;<i> Maintainer workload:
+</I>&gt;<i> Instead of generating a md5 sum, a digital signature is generated over
+</I>&gt;<i> all files which are relevant for the given package. This includes the
+</I>&gt;<i> opam file (because it can execute (arbitrary?) commands during
+</I>&gt;<i> building), patches, ... Instead of the md5, this signature is pushed
+</I>&gt;<i> to the repository.
+</I>&gt;<i> 
+</I>&gt;<i> User experience:
+</I>&gt;<i> Opam checks the digital signature of the package and refuses
+</I>&gt;<i> installation on mismatch.
+</I>&gt;<i> 
+</I>&gt;<i> The transport layer between repository and user does not need to be
+</I>&gt;<i> secured and authenticated at all! While mirrors themselves will
+</I>&gt;<i> continue to work, repackaging of tarballs won't (unless these are
+</I>&gt;<i> signed, and in general we try to minimize online systems which have
+</I>&gt;<i> access to private keys).
+</I>&gt;<i> 
+</I>&gt;<i> ## Key management
+</I>&gt;<i> I use &quot;user&quot; for the person who wants to install a package on their
+</I>&gt;<i> computer, and &quot;maintainer&quot; for the person who releases and pushes
+</I>&gt;<i> packages.
+</I>&gt;<i> 
+</I>&gt;<i> Key management is the tricky bit!  Each repository is rooted in a
+</I>&gt;<i> single key, which is used to sign delegation of packaging roles.  Opam
+</I>&gt;<i> distributes the public key of its main repository with its source and
+</I>&gt;<i> binary.  For alternative repositories, these root keys have to be
+</I>&gt;<i> distributed and verified on a second channel (or cross signed by the
+</I>&gt;<i> master opam repository!).  The root key is most of the time offline.
+</I>&gt;<i> 
+</I>&gt;<i> Each maintainer has a key.  opam-publish uses this to sign the package
+</I>&gt;<i> contents.  A maintainer has to get verified out-of-band, and is then
+</I>&gt;<i> legible to push updates for the single package.  Of course, a
+</I>&gt;<i> maintainer can lose their key (or it might get stolen).  Therefore,
+</I>&gt;<i> revocation must be a first-class citizen within the system (and always
+</I>&gt;<i> delivered with repository updates).  There can also be various levels
+</I>&gt;<i> -- claimed/unclaimed/recently claimed (from
+</I>&gt;<i> <A HREF="http://legacy.python.org/dev/peps/pep-0480/">http://legacy.python.org/dev/peps/pep-0480/</A>).
+</I>&gt;<i> 
+</I>&gt;<i> A user's opam uses the root key to verify the correct and legible
+</I>&gt;<i> signature on a package.
+</I>&gt;<i> 
+</I>&gt;<i> A timestamp server signs the entire repository content every hour
+</I>&gt;<i> (thus a) a user can detect if an attacker tries to present old
+</I>&gt;<i> packages; and b) mix-and-match attacks are impossible)
+</I>&gt;<i> 
+</I>&gt;<i> ## Trust
+</I>&gt;<i> The time of the users system must be strictly increasing and should be
+</I>&gt;<i> the same as the repository/timestamp server.
+</I>&gt;<i> 
+</I>&gt;<i> ## Open questions
+</I>&gt;<i> Maintainer M of package X releases a version 1.0.  It is obvious that
+</I>&gt;<i> package Y, maintained by N, requires from now on a version constraint
+</I>&gt;<i> &lt; 1.0.  Should M be able to include this constraint update into the
+</I>&gt;<i> pull request, and sign this?  Or should N intervene?  At the moment,
+</I>&gt;<i> in opam-repository people != maintainer push such changes (which I
+</I>&gt;<i> think is good for quick evolution and quick fixes).  Maybe a group of
+</I>&gt;<i> 'core' maintainers who can sign (only such constraint updates!?!)
+</I>&gt;<i> should be defined (but certainly their keys are more attractive to
+</I>&gt;<i> steal then).
+</I>&gt;<i> 
+</I>&gt;<i> Which trust model to use?  Verify key via email, web portal, or in
+</I>&gt;<i> person by already existing maintainers (web of trust)?  Should a user
+</I>&gt;<i> be able to blacklist and whitelist specific keys?
+</I>&gt;<i> 
+</I>&gt;<i> Is it worth to investigate GnuPG integration (signing git commits?)?
+</I>&gt;<i> In my opinion it is not.
+</I>&gt;<i> 
+</I>&gt;<i> Can we require maintainers to use opam-publish?  Obviously there'll be
+</I>&gt;<i> pure command-line ways to achieve the same result.
+</I>&gt;<i> 
+</I>&gt;<i> We should require maintainers to sign their packages (making it very
+</I>&gt;<i> easy and flawless), otherwise we have a huge set of users who will
+</I>&gt;<i> just accept everything (signed and unsigned packages) and the actual
+</I>&gt;<i> security gains are negligable.
+</I>&gt;<i> 
+</I>&gt;<i> ## Dependencies
+</I>&gt;<i> Should opam rely on command-line utilities, as it does atm with
+</I>&gt;<i> wget/curl?  Or should it prefer to use OCaml libraries which provide
+</I>&gt;<i> cryptographic functionality (such as hashing and asymmetric operations)?
+</I>&gt;<i> 
+</I>&gt;<i> While I certainly prefer the latter, I'd love to hear from opam
+</I>&gt;<i> developers what they think about it.
+</I>&gt;<i> 
+</I>&gt;<i> 
+</I>&gt;<i> Let me know what you think of it!
+</I>&gt;<i> 
+</I>&gt;<i> hannes
+</I>&gt;<i> _______________________________________________
+</I>&gt;<i> opam-devel mailing list
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">opam-devel at lists.ocaml.org</A>
+</I>&gt;<i> <A HREF="http://lists.ocaml.org/listinfo/opam-devel">http://lists.ocaml.org/listinfo/opam-devel</A>
+</I>&gt;<i> 
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000991.html">[opam-devel] Package signing (was Re:  OPAM 1.3 roadmap)
+</A></li>
+	<LI>Next message: <A HREF="000993.html">[opam-devel] Package signing (was Re: OPAM 1.3 roadmap)
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#992">[ date ]</a>
+              <a href="thread.html#992">[ thread ]</a>
+              <a href="subject.html#992">[ subject ]</a>
+              <a href="author.html#992">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

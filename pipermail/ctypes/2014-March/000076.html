@@ -1,0 +1,124 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Foreign function interface support
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCANE7k9dvDnU3aE%2BzzFZMS2io-YhRScVek8n6a%2Bbf043PF0XmbA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000075.html">
+   
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Foreign function interface support</H1>
+    <B>Pavel Zaichenkov</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCANE7k9dvDnU3aE%2BzzFZMS2io-YhRScVek8n6a%2Bbf043PF0XmbA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Foreign function interface support">zaichenkov at gmail.com
+       </A><BR>
+    <I>Sun Mar  9 01:15:30 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000075.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+        
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#76">[ date ]</a>
+              <a href="thread.html#76">[ thread ]</a>
+              <a href="subject.html#76">[ subject ]</a>
+              <a href="author.html#76">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Your suggestions helped me indeed.
+
+I finally made picosat bindings work.
+If you are interested, here is the repository:
+<A HREF="https://github.com/zayac/ocaml-picosat.">https://github.com/zayac/ocaml-picosat.</A> This works for OS X only yet,
+but I will add relevant flags for Ubuntu later.
+
+On 4 March 2014 11:34, Jeremy Yallop &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">yallop at gmail.com</A>&gt; wrote:
+&gt;<i> On 04/03/2014, Pavel Zaichenkov &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">zaichenkov at gmail.com</A>&gt; wrote:
+</I>&gt;&gt;<i> It fails for both OS X and Ubuntu.
+</I>&gt;<i>
+</I>&gt;<i> Passing -Wl,--no-as-needed should fix the problem on Ubuntu.  Here's a
+</I>&gt;<i> full example that works (for me) on both Ubuntu and OS X.  I'm calling
+</I>&gt;<i> ocamlfind directly rather than using corebuild, but perhaps this'll be
+</I>&gt;<i> some help in constructing a corebuild command that does what you need.
+</I>&gt;<i>  (The '-verbose 1' corebuild option will show you the commands that
+</I>&gt;<i> corebuild is executing.)
+</I>&gt;<i>
+</I>&gt;<i> In both cases picosat.ml and test.ml contain exactly the code that you posted.
+</I>&gt;<i>
+</I>&gt;<i> On Ubuntu:
+</I>&gt;<i>
+</I>&gt;<i>   $ ocamlfind opt -a -cclib -lpicosat -cclib -Wl,--no-as-needed
+</I>&gt;<i> -package ctypes.foreign picosat.ml -o picosat.cmxa
+</I>&gt;<i>   $ ocamlfind opt    -cclib -lpicosat -cclib -Wl,--no-as-needed
+</I>&gt;<i> -package ctypes.foreign -linkpkg picosat.cmxa test.ml -o test.native
+</I>&gt;<i>
+</I>&gt;<i> On OS X
+</I>&gt;<i>
+</I>&gt;<i>   $ ocamlfind opt -a -cclib -lpicosat -package ctypes.foreign
+</I>&gt;<i> picosat.ml -o picosat.cmxa
+</I>&gt;<i>   $ ocamlfind opt    -cclib -lpicosat -package ctypes.foreign -linkpkg
+</I>&gt;<i> picosat.cmxa test.ml -o test.native
+</I>&gt;<i>
+</I>&gt;<i> You can check that the picosat library has been linked in using 'ldd
+</I>&gt;<i> test.native' on Ubuntu or 'otool -L test.native' on OS X; you should
+</I>&gt;<i> see a line like this:
+</I>&gt;<i>
+</I>&gt;<i>    libpicosat.so.1 =&gt; /usr/lib/libpicosat.so.1 (0x00007fa11567d000)
+</I>&gt;<i>
+</I>&gt;<i> or like this:
+</I>&gt;<i>
+</I>&gt;<i>    libpicosat.dylib (compatibility version 0.0.0, current version 0.0.0)
+</I>&gt;<i>
+</I>&gt;&gt;<i> Btw, I get &quot;Unbound value returning_checking_errno&quot; error for datetime
+</I>&gt;&gt;<i> example in both systems.
+</I>&gt;<i>
+</I>&gt;<i> As Daniel said, this is due to an API change in ctypes between 0.1.X
+</I>&gt;<i> (which is described in RWO) and 0.2.X (which is what OPAM now installs
+</I>&gt;<i> by default).  It's still possible to install 0.1.1 using OPAM if you
+</I>&gt;<i> want a version of ctypes that's fully compatible with the RWO text,
+</I>&gt;<i> but the API changes are actually fairly few, so it may be worth
+</I>&gt;<i> persisting with the latest version.  In this case the change you need
+</I>&gt;<i> is to change
+</I>&gt;<i>
+</I>&gt;<i>    foreign &quot;gettimeofday&quot;
+</I>&gt;<i>       (ptr timeval @-&gt; ptr timezone @-&gt; returning_checking_errno int)
+</I>&gt;<i>
+</I>&gt;<i> to
+</I>&gt;<i>
+</I>&gt;<i>    foreign &quot;gettimeofday&quot; ~check_errno:true
+</I>&gt;<i>       (ptr timeval @-&gt; ptr timezone @-&gt; returning int)
+</I>&gt;<i>
+</I>&gt;<i> Hope that helps,
+</I>&gt;<i>
+</I>&gt;<i> Jeremy.
+</I></PRE>
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000075.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+	
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#76">[ date ]</a>
+              <a href="thread.html#76">[ thread ]</a>
+              <a href="subject.html#76">[ subject ]</a>
+              <a href="author.html#76">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

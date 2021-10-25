@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Time for a summary?
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCANcqPu7eG0v16GXkzz0kaQ66KLGT-sVGRTpYeVt9bHmr%2BeSUoA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000224.html">
+   <LINK REL="Next"  HREF="000222.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Time for a summary?</H1>
+    <B>Hongbo Zhang</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Time%20for%20a%20summary%3F&In-Reply-To=%3CCANcqPu7eG0v16GXkzz0kaQ66KLGT-sVGRTpYeVt9bHmr%2BeSUoA%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Time for a summary?">hongboz at seas.upenn.edu
+       </A><BR>
+    <I>Thu Feb  7 14:56:22 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000224.html">[wg-camlp4] Time for a summary?
+</A></li>
+        <LI>Next message: <A HREF="000222.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#220">[ date ]</a>
+              <a href="thread.html#220">[ thread ]</a>
+              <a href="subject.html#220">[ subject ]</a>
+              <a href="author.html#220">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>On Thu, Feb 7, 2013 at 5:09 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain.frisch at lexifi.com</A>&gt;
+wrote:
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> &quot;-ppx&quot; on its own is even faster to build, since there is nothing to
+</I>build (it is just a command-line flag, in the same way as &quot;-pp&quot; on which
+Fan relies, I guess).
+
+Not always, as I pointed out, as long as you combine several global Ast
+Rewriter, I am  optimistic that Fan has a great chance to outperform
+ppx.(currently with respect to the compiling performance, Fan is on par
+with ocamlc.opt directly, slightly slower)
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>     2. Fan does not require any compiler change, easy to distribute, on
+</I>&gt;&gt;<i> the contrary the pervasive change to compiler is close to kill P4, Fan
+</I>&gt;&gt;<i> or any other advanced external tools
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> ppx is already part of the development version and required minimal
+</I>changes.  We are also discussing the addition of a few syntactic constructs
+which will only impact the definition of Parsetree and the official parser.
+ This cannot really be considered as a &quot;pervasive change&quot; to the compiler.
+&gt;<i>
+</I>&gt;<i> Can you elaborate on why you think this would kill Camlp4 or Fan?  I know
+</I>from experience that Camlp4 is quite tedious to update when the concrete
+syntax of OCaml changes, but I'm sure someone will manage to update
+Camlp4/Fan definition of OCaml's AST and the associate parsers.
+&gt;<i>
+</I>&gt;<i> -ppx is compatible with pre-processors implemented with -pp (Camlp4/Fan),
+</I>as long as those pre-processors can understand the new syntactic constructs
+and pass them back to OCaml.
+&gt;<i>
+</I>Well, things are always possible, but just too difficult in some cases,
+remember that (Camlp4/Camlp5/Fan) preprocess the intermediate Ast, if we
+clutter Parsetree too much, like adding some attributes node per syntax
+category and ignored by the compiler later, which may require all other
+tools to mix Intermediate Ast with Parsetree, it's always possible, just
+too hard. I am perfectly fine with ppx so far, and I am happy to see bisect
+switch to ppx, because global Ast Rewriter happen to be very fit there, but
+ if we try to make everything possible in ppx, there's a large chance that
+it will result in a ugly design in the compiler.
+&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> &gt; unlike P4, it will
+</I>&gt;<i> &gt; not inhibit OCaml's compiler's progress.
+</I>&gt;<i>
+</I>&gt;<i> Your point above illustrates that it is not that simple: a simple
+</I>addition to the OCaml syntax, which would normally require to adapt only
+&gt;<i> parser.mly, parsetree.mli, ast_mapper.ml/mli and a few other modules in
+</I>the compilers, also requires to port the same changes to Fan's definition
+of the OCaml AST and to its parsers.
+&gt;<i> ]
+</I>
+I think the amount of work is similar, the only difference is that we
+maintain the change ast2pt.ml(dump intermediate ast into parsetree), it's
+just a piece of cake, and we don't need to maintain ast_mapper, since it is
+generated automatically in Fan. For the fan ast, we have tools
+   {|derive(Map2
+      Fold2 OIter MetaExpr MetaPatt Map Fold Print OPrint OEq
+      GenLoc  Strip ) |}
+for FanAst, suppose in one day you have those tools for parsetree, the
+maintenance will
+be a nightmare.
+
+&gt;&gt;<i>     4. It's easy to port P4's code base to Fan, it only takes me 2 hours
+</I>&gt;&gt;<i> to port Alain's ulex to Fan
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> It did not take that much longer to port ulex from Camlp4 to -ppx, and as
+</I>an extra added bonus, it really gave me the feeling that I could finally
+*breathe* and understand exactly what I'm writing. Frankly, I'm more
+comfortable writing:
+&gt;<i>
+</I>&gt;<i>   E.let_ Recursive states
+</I>&gt;<i>     (E.sequence
+</I>&gt;<i>        (appfun &quot;Sedlexing.start&quot; [eid lexbuf])
+</I>&gt;<i>        (E.match_ (appfun (state_fun 0) [eid lexbuf])
+</I>&gt;<i>           (cases @ [P.any (), error])
+</I>&gt;<i>        )
+</I>&gt;<i>     )
+</I>&gt;<i>
+</I>&gt;<i> than:
+</I>&gt;<i>
+</I>&gt;<i>   &lt;:expr&lt; fun lexbuf -&gt;
+</I>&gt;<i>     let rec $list:Array.to_list states$ in
+</I>&gt;<i>     do { Ulexing.start lexbuf;
+</I>&gt;<i>          match __ulex_state_0 lexbuf with
+</I>&gt;<i>          [ $list:Array.to_list cases$ | _ -&gt; raise Ulexing.Error ] } &gt;&gt;
+</I>&gt;<i>
+</I>&gt;<i> which requires me to learn two new &quot;sub-languages&quot; (the revised syntax
+</I>and the notion of quotation / antiquotation).  Imagine that the &quot;rec&quot; flag
+above should be set only according to some condition to be checked; I know
+directly how to write that in regular OCaml but I would need to dig into
+Camlp4 documentation (or not) to see how to introduce an &quot;anti-quotation on
+the rec flag&quot;.
+
+Here, this happens to hit the sweet spot of quosi-quotation, first, I agree
+that the revised syntax should be adapted to original syntax, and that's
+part of my on-going work.
+Let me explain a bit why quosi-quotation is superb here:
+1. It quickly goes into my muscle memory, because I write ocaml everyday
+(not parsetree), it's just my *intuition* that the Ast should be
+constructed that way, and I don't need to remember those alien function
+names, to be honest, I don't know what's the module E here. If I want to
+make a piece of code into data, I just need to quote them, add &quot;{:expr||}&quot;
+surrounding them, that's all. How would that happen in your &quot;E&quot; module?
+2. The E module seems to be a bit magic here, but Fan's quosiquotation
+works very nice with Emacs or any decent IDE, just like slime for lisp, I
+type one key in my Emacs, it just expand the code explicitly(I attached the
+result), but it's never going to happen with your &quot;E&quot; module, since it
+requires *explicit multiple staging*.
+3. For the parsetree, if you want to do syntactic grep over bigarray, you
+will get into much trouble:
+   ({pexp_desc=Pexp_ident
+                    {txt= Ldot (Ldot (Lident &quot;Bigarray&quot;, array),
+(&quot;get&quot;|&quot;set&quot; as gs)) ;_};_}
+   This does not solve the problem at all, since it can not discriminate
+&quot;a.{b,c}&quot; from &quot;Bigarray.get a b c &quot; in Fan, you only need to do say
+   &quot;`Bigarray (a,b,c)&quot;
+   There are so many syntax desugaring in the parsetree that I don't know
+where to stop.
+
+&gt;&gt;<i>     5. Global Ast Rewriter is available but discouraged
+</I>&gt;&gt;<i>     6. Local Ast Rewriter is provided(deriving and type_conv conflicts
+</I>&gt;&gt;<i> will never happen in Fan)
+</I>&gt;&gt;<i>         {:ocaml| type u = A of int |}
+</I>&gt;&gt;<i>         {:derive| (sexp,json) |}
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Can you describe in more detail your position concerning the following
+</I>points?
+&gt;<i>
+</I>If it can be implemented by ppx, it can be straightforwardly translated
+into Fan, since ppx is simply a tiny proper subset of Fan(the part of
+global Ast Rewriter). There are so many great ideas proposed here that I
+would shamelessly steal into Fan even without bothering any change to the
+compiler. Fan provides first class parser/lexer(or in-line parser lexer),
+which is good, and there are people who appreciate it(
+<A HREF="https://sympa.inria.fr/sympa/arc/caml-list/2013-02/msg00020.html">https://sympa.inria.fr/sympa/arc/caml-list/2013-02/msg00020.html</A>), john
+harrop even claims that &quot;Parsers written using Camlp4 are nicer than with
+any other tool I have ever used&quot;, but users are not locked in specific
+parsing technology, it's perfectly fine if you want to use either menhir or
+ocamlyacc.
+
+
+--
+-- Regards, Hongbo
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/67c154b5/attachment.html">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/67c154b5/attachment.html</A>&gt;
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: tmp.ml
+Type: application/octet-stream
+Size: 3179 bytes
+Desc: not available
+URL: &lt;<A HREF="http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/67c154b5/attachment.obj">http://lists.ocaml.org/pipermail/wg-camlp4/attachments/20130207/67c154b5/attachment.obj</A>&gt;
+</PRE>
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000224.html">[wg-camlp4] Time for a summary?
+</A></li>
+	<LI>Next message: <A HREF="000222.html">[wg-camlp4] Time for a summary?
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#220">[ date ]</a>
+              <a href="thread.html#220">[ thread ]</a>
+              <a href="subject.html#220">[ subject ]</a>
+              <a href="author.html#220">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

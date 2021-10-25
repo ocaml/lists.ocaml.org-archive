@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Against%20the%20use%20of%20syntactically-valid%20OCaml%20code%0A%20for%20syntax%20extension%20purposes&In-Reply-To=%3CCAPFanBE%2BX%3DM3C%2BCHWq024zAFLEHnrp1hDT-FNLv3aJN8LontVw%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000106.html">
+   <LINK REL="Next"  HREF="000108.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes</H1>
+    <B>Gabriel Scherer</B> 
+    <A HREF="mailto:wg-camlp4%40lists.ocaml.org?Subject=Re%3A%20%5Bwg-camlp4%5D%20Against%20the%20use%20of%20syntactically-valid%20OCaml%20code%0A%20for%20syntax%20extension%20purposes&In-Reply-To=%3CCAPFanBE%2BX%3DM3C%2BCHWq024zAFLEHnrp1hDT-FNLv3aJN8LontVw%40mail.gmail.com%3E"
+       TITLE="[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes">gabriel.scherer at gmail.com
+       </A><BR>
+    <I>Wed Jan 30 06:31:17 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000106.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+        <LI>Next message: <A HREF="000108.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#107">[ date ]</a>
+              <a href="thread.html#107">[ thread ]</a>
+              <a href="subject.html#107">[ subject ]</a>
+              <a href="author.html#107">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>&gt;<i> What's missing is maybe the ability to annotate either the binding itself as
+</I>&gt;<i> opposed to the whole expression (more interesting when the whole expression
+</I>&gt;<i> has multiple bindings: let p1 = e1 and p2 = e2 and ...).  But is that really
+</I>&gt;<i> necessary?  One can always use the convention that an annotation on the
+</I>&gt;<i> binding would actually need to be put at the toplevel of the pattern itself.
+</I>
+My understanding is that this is precisely what type-conv does:
+annotate the type declaration itself, rather than the type expression
+or the whole phrase. I'm not sure what kind of annotations are being
+considered here, but a pragma-style @ignore_unused_variable for
+example should be bound to the declaration itself. Finally, using a
+convention to annotate the pattern may give rise to critical pairs /
+ambiguities where the semantics of the program depends of whether we
+consider the annotation to cover the pattern or the declaration (for
+annotations that make sense in both, eg. @profile).
+
+On Wed, Jan 30, 2013 at 7:17 AM, Alain Frisch &lt;<A HREF="http://lists.ocaml.org/listinfo/wg-camlp4">alain at frisch.fr</A>&gt; wrote:
+&gt;<i> On 1/29/2013 7:53 PM, Gabriel Scherer wrote:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I'm not sure the idea of having &quot;postfix&quot; and &quot;prefix&quot; annotations
+</I>&gt;&gt;<i> makes sense for all grammar rules (and mixing them with a modality of
+</I>&gt;&gt;<i> &quot;external or ocaml-syntax&quot; feels like conflating separate concerns).
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> I agree.  If we have a syntax for embedding arbitrary syntax (basically, a
+</I>&gt;<i> new kind of string literals in expressions and patterns, with adifferent
+</I>&gt;<i> lexing rules, and rejected by the type-checker), let's say {{ ... }}, we
+</I>&gt;<i> could use it either as a stand-alone expression
+</I>&gt;<i>
+</I>&gt;<i>  {{ ... }}
+</I>&gt;<i>
+</I>&gt;<i> or as an attribute on another expression:
+</I>&gt;<i>
+</I>&gt;<i>  (@{{ ... }}) e
+</I>&gt;<i>
+</I>&gt;<i> So I don't think we need to provide parsed and non-parsed variants of
+</I>&gt;<i> attributes.
+</I>&gt;<i>
+</I>&gt;<i> What makes sense is maybe to distinguish attributes which can be dropped
+</I>&gt;<i> silently by the compiler (but used by other tools like ocamldoc, for
+</I>&gt;<i> instance) and those on which the type-checker needs to fail.  This is not
+</I>&gt;<i> strictly necessary if we already have a new kind of expressions on which the
+</I>&gt;<i> type-checkers fail, and it does not really bring much security because the
+</I>&gt;<i> user could easily use the other syntax of attributes and get (probably)
+</I>&gt;<i> simply a type error instead of a &quot;remaining attribute&quot; error.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i> I'd rather consider where annotation may happen for grammar rules
+</I>&gt;&gt;<i> individually. For example, in the case of &quot;let p = e1 in e2&quot;, I'm
+</I>&gt;&gt;<i> quite sure we may want to annotate either the whole expression or
+</I>&gt;&gt;<i> specifically the declaration, and while I see how prefix and postfix
+</I>&gt;&gt;<i> both make sense for the whole expression, I'm not sure they would both
+</I>&gt;&gt;<i> make sense to annotate the binding, and considering only those cases
+</I>&gt;&gt;<i> could lead them to being dropped.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Still in this case 'let p = e1 in e2', how should we distinguish:
+</I>&gt;&gt;<i> - an annotation on the expressions 'e1' and 'e2'
+</I>&gt;&gt;<i> - an annotation on the pattern 'p' (possibly seen as an expressions)
+</I>&gt;&gt;<i> - an annotation on the binding itself
+</I>&gt;&gt;<i> - an annotation on the expression as a whole?
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> We need of course to define priority rules, but I don't see why postfix and
+</I>&gt;<i> prefix couldn't make sense for all constructions (maybe with some more
+</I>&gt;<i> parentheses):
+</I>&gt;<i>
+</I>&gt;<i> On the whole expression:
+</I>&gt;<i>  (@ ..) (let p = e1 in e2)
+</I>&gt;<i>  (let p = e1 in e2) (% ..)
+</I>&gt;<i>
+</I>&gt;<i> On the pattern:
+</I>&gt;<i>  let (@ ..) p = e1 in e2
+</I>&gt;<i>  let p (% ..) = e1 in e2
+</I>&gt;<i>
+</I>&gt;<i> On e1:
+</I>&gt;<i>  let p = (@ ..) e1 in e2
+</I>&gt;<i>  let p = e1 (% ..) in e2
+</I>&gt;<i>
+</I>&gt;<i> On e2:
+</I>&gt;<i>  let p = e1 in (@ ..) e2
+</I>&gt;<i>  let p = e1 in e2 (% ..)
+</I>&gt;<i>
+</I>&gt;<i> What's missing is maybe the ability to annotate either the binding itself as
+</I>&gt;<i> opposed to the whole expression (more interesting when the whole expression
+</I>&gt;<i> has multiple bindings: let p1 = e1 and p2 = e2 and ...).  But is that really
+</I>&gt;<i> necessary?  One can always use the convention that an annotation on the
+</I>&gt;<i> binding would actually need to be put at the toplevel of the pattern itself.
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> Alain
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000106.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+	<LI>Next message: <A HREF="000108.html">[wg-camlp4] Against the use of syntactically-valid OCaml code for syntax extension purposes
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#107">[ date ]</a>
+              <a href="thread.html#107">[ thread ]</a>
+              <a href="subject.html#107">[ subject ]</a>
+              <a href="author.html#107">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/wg-camlp4">More information about the wg-camlp4
+mailing list</a><br>
+</body></html>

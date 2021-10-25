@@ -1,0 +1,405 @@
+From alain at frisch.fr  Fri Jul  1 08:19:24 2016
+From: alain at frisch.fr (Alain Frisch)
+Date: Fri, 1 Jul 2016 09:19:24 +0200
+Subject: [ocaml-platform] Is it taking too long for OCaml software to
+ become 4.03-compatible? Would release process changes help?
+In-Reply-To: <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+References: <CAPFanBEC=zZSw_8UmADyZBt6KRWnEAoq6tRLRErUBXX58JieeQ@mail.gmail.com>
+ <20160629171432.GB3637@nunchakus.loria.fr>
+ <CAOCAUGP9s46DTU8Nu-+xgL25YteEOJC6XQiou9RFs6VdVf4qQQ@mail.gmail.com>
+ <454D3F1D40C4438C8782A78F6B87B0E8@erratique.ch>
+ <CAHvkLrN8+Ejn+nTsi0m0_tpH6zdfvwiA6L-PZGLmO0=AjR+b1g@mail.gmail.com>
+ <8C1A944008B743FBA8F7AD2B9CBFD45A@erratique.ch>
+ <CAN6ygOnn8hgR=jaoEGK__aJi6J7=kNKzYA0OUUHKQHYVFH=xeQ@mail.gmail.com>
+ <CAPFanBGh3acBdZMOpHV8cfETK-bu2GTWfb4zm_n8+osNP2XtbA@mail.gmail.com>
+ <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+Message-ID: <35560a45-88b8-ca9f-6a20-724cd7b4a182@frisch.fr>
+
+On 30/06/2016 17:09, Fabrice Le Fessant wrote:
+> The reason why OPAM-builder cannot monitor trunk is by design: to
+> achieve almost real time on a 4-core computer for 5 versions of OCaml,
+> opam-builder makes an extensive use of caching binary installations of
+> dependencies. This cannot be done on a moving target like trunk, where
+> you would have to recompile all packages (all versions, sometimes with
+> different depends because of depopts) at every commit in the trunk,
+> after clearing the cache. That's the reason why I only do it for
+> official beta releases, and opam-builder takes two or three days to
+> compile the repo.
+
+Testing only the latest version of each package would already be very 
+useful.  As a matter of fact, it could even detect earlier some problems 
+by restricting the universe only to latest version of all packages (see 
+below).
+
+Moreover, it could be interesting to define a subset of "strategic" 
+packages that we should really be up-to-date on OCaml release dates. 
+Wasn't it part of the "platform" project to define such a curated list 
+of packages?
+
+Do you have a description of OPAM-builder current strategy?  I found out 
+yesterday that a simple "opam install ppx_type_conv" would fail on a 
+clean 4.03 switch, because the latest version of that package compatible 
+with 4.03 depends on ppx_deriving with no upper bound constraint, and 
+OPAM chooses to install the latest version of ppx_deriving which turns 
+out to be incompatible with that version of ppx_type_conv.  But 
+OPAM-builder did not report any error for that version of ppx_type_conv: 
+it picked an older version of ppx_deriving (which works fine).  I'm 
+wondering if this is because of a different solver configuration, or a 
+deliberate (or not) consequence of OPAM-builder strategy.
+
+
+Alain
+
+From Fabrice.Le_fessant at inria.fr  Fri Jul  1 09:32:27 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Fri, 01 Jul 2016 08:32:27 +0000
+Subject: [ocaml-platform] Is it taking too long for OCaml software to
+ become 4.03-compatible? Would release process changes help?
+In-Reply-To: <5775418A.9070405@inria.fr>
+References: <CAPFanBEC=zZSw_8UmADyZBt6KRWnEAoq6tRLRErUBXX58JieeQ@mail.gmail.com>
+ <20160629171432.GB3637@nunchakus.loria.fr>
+ <CAOCAUGP9s46DTU8Nu-+xgL25YteEOJC6XQiou9RFs6VdVf4qQQ@mail.gmail.com>
+ <454D3F1D40C4438C8782A78F6B87B0E8@erratique.ch>
+ <CAHvkLrN8+Ejn+nTsi0m0_tpH6zdfvwiA6L-PZGLmO0=AjR+b1g@mail.gmail.com>
+ <8C1A944008B743FBA8F7AD2B9CBFD45A@erratique.ch>
+ <CAN6ygOnn8hgR=jaoEGK__aJi6J7=kNKzYA0OUUHKQHYVFH=xeQ@mail.gmail.com>
+ <CAPFanBGh3acBdZMOpHV8cfETK-bu2GTWfb4zm_n8+osNP2XtbA@mail.gmail.com>
+ <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+ <CAPFanBEjXYw1bUtTASbO6DyTQpsKDt5JYygC4TRHdXpkgDCY_A@mail.gmail.com>
+ <5775418A.9070405@inria.fr>
+Message-ID: <CAHvkLrM08fyTJZTOt17DN1QdWhONiN-O+-+BnjPGvc+cj23iCQ@mail.gmail.com>
+
+On Thu, Jun 30, 2016 at 5:58 PM Xavier Leroy <Xavier.Leroy at inria.fr> wrote:
+
+> What would it take to get, say, one full build every day?  I think we
+> could find some funds for that, e.g. from the Caml consortium.  After
+> all, a cool 12 cores / 24 threads blade server costs only 2.5 kEur or
+> so.
+
+
+I forgot to say that, actually, the multi-core arch is only used for
+parallel compilation of multiple OCaml versions (i.e. each switch is
+compiled in parallel with other switches), but within a switch, parallel
+build of packages is disabled, because we cache modifications to the
+installation (even with the new version of OPAM, that builds in parallel
+and install sequentially, we don't have the guarrantee that an incorrect
+package will not modify the installation during its build, i.e. for example
+`coq` that creates a symlink in $bindir during its build...).
+
+I might have over-estimated the time it takes to rebuild completely a
+switch, I think it is lower with 4.03.0, because many packages are not
+available for it, and probably the same for trunk. It might actually
+already be under one day.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160701/39d233b3/attachment.html>
+
+From Fabrice.Le_fessant at inria.fr  Fri Jul  1 10:10:28 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Fri, 01 Jul 2016 09:10:28 +0000
+Subject: [ocaml-platform] Is it taking too long for OCaml software to
+ become 4.03-compatible? Would release process changes help?
+In-Reply-To: <35560a45-88b8-ca9f-6a20-724cd7b4a182@frisch.fr>
+References: <CAPFanBEC=zZSw_8UmADyZBt6KRWnEAoq6tRLRErUBXX58JieeQ@mail.gmail.com>
+ <20160629171432.GB3637@nunchakus.loria.fr>
+ <CAOCAUGP9s46DTU8Nu-+xgL25YteEOJC6XQiou9RFs6VdVf4qQQ@mail.gmail.com>
+ <454D3F1D40C4438C8782A78F6B87B0E8@erratique.ch>
+ <CAHvkLrN8+Ejn+nTsi0m0_tpH6zdfvwiA6L-PZGLmO0=AjR+b1g@mail.gmail.com>
+ <8C1A944008B743FBA8F7AD2B9CBFD45A@erratique.ch>
+ <CAN6ygOnn8hgR=jaoEGK__aJi6J7=kNKzYA0OUUHKQHYVFH=xeQ@mail.gmail.com>
+ <CAPFanBGh3acBdZMOpHV8cfETK-bu2GTWfb4zm_n8+osNP2XtbA@mail.gmail.com>
+ <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+ <35560a45-88b8-ca9f-6a20-724cd7b4a182@frisch.fr>
+Message-ID: <CAHvkLrP31vQVhnScqQehFzgibmr8fo_e4hX_TQUCp4GQ0fd1hA@mail.gmail.com>
+
+On Fri, Jul 1, 2016 at 9:19 AM Alain Frisch <alain at frisch.fr> wrote:
+
+> On 30/06/2016 17:09, Fabrice Le Fessant wrote:
+> Testing only the latest version of each package would already be very
+> useful.  As a matter of fact, it could even detect earlier some problems
+> by restricting the universe only to latest version of all packages (see
+> below).
+>
+
+Actually, one of my plans when creating opam-builder was to output a list
+of versions that would be compatible for a small set of packages (the
+platform), and create an opam-repository with only them, i.e. it would be
+the equivalent of Debian stable while the standard repository would be
+Debian unstable. Clearly, we currently under-use the information that is
+available in opam-builder.
+
+
+> Moreover, it could be interesting to define a subset of "strategic"
+> packages that we should really be up-to-date on OCaml release dates.
+> Wasn't it part of the "platform" project to define such a curated list
+> of packages?
+>
+
+About that part of the discussion, I am really against any additional
+constraint that would delay a release of OCaml. We waited for years before
+deciding to have a regular release schedule (every 6 months), and now,
+everybody tries to delay releases for various reasons. So, yes to more
+monitoring of the compatibility of platform packages with trunk and
+beta-releases, but no to delaying the release because of platform packages
+being late to meet compatibility.
+
+
+> Do you have a description of OPAM-builder current strategy?
+
+
+Everything is on Github:
+Opam-Builder: http://github.com/OCamlPro/opam-builder
+OPAM fork: https://github.com/lefessan/opam/tree/2016-03-02-opam-builder
+
+For the strategy, it is the same as OPAM's standard strategy, i.e. it tries
+to match your query while minimizing the number of installed packages.
+That's the reason why it prefers `ppx_deriving.3.3` to `ppx_deriving.4.0`
+(that have an additional requirement to `result`). As a side note, as there
+are more and more meta packages (i.e. whose build/installation cost is
+null), we should clearly change that strategy to (1) add an installation
+cost in every package (`1` by default, `0` for meta-packages) and (2) try
+to minimize installation cost instead of number of packages.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160701/babc194e/attachment.html>
+
+From alain at frisch.fr  Fri Jul  1 10:54:50 2016
+From: alain at frisch.fr (Alain Frisch)
+Date: Fri, 1 Jul 2016 11:54:50 +0200
+Subject: [ocaml-platform] Is it taking too long for OCaml software to
+ become 4.03-compatible? Would release process changes help?
+In-Reply-To: <CAHvkLrP31vQVhnScqQehFzgibmr8fo_e4hX_TQUCp4GQ0fd1hA@mail.gmail.com>
+References: <CAPFanBEC=zZSw_8UmADyZBt6KRWnEAoq6tRLRErUBXX58JieeQ@mail.gmail.com>
+ <20160629171432.GB3637@nunchakus.loria.fr>
+ <CAOCAUGP9s46DTU8Nu-+xgL25YteEOJC6XQiou9RFs6VdVf4qQQ@mail.gmail.com>
+ <454D3F1D40C4438C8782A78F6B87B0E8@erratique.ch>
+ <CAHvkLrN8+Ejn+nTsi0m0_tpH6zdfvwiA6L-PZGLmO0=AjR+b1g@mail.gmail.com>
+ <8C1A944008B743FBA8F7AD2B9CBFD45A@erratique.ch>
+ <CAN6ygOnn8hgR=jaoEGK__aJi6J7=kNKzYA0OUUHKQHYVFH=xeQ@mail.gmail.com>
+ <CAPFanBGh3acBdZMOpHV8cfETK-bu2GTWfb4zm_n8+osNP2XtbA@mail.gmail.com>
+ <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+ <35560a45-88b8-ca9f-6a20-724cd7b4a182@frisch.fr>
+ <CAHvkLrP31vQVhnScqQehFzgibmr8fo_e4hX_TQUCp4GQ0fd1hA@mail.gmail.com>
+Message-ID: <d0d1ce39-1a2d-58eb-e50d-fa6516743a36@frisch.fr>
+
+On 01/07/2016 11:10, Fabrice Le Fessant wrote:
+> About that part of the discussion, I am really against any additional
+> constraint that would delay a release of OCaml. We waited for years
+> before deciding to have a regular release schedule (every 6 months), and
+> now, everybody tries to delay releases for various reasons. So, yes to
+> more monitoring of the compatibility of platform packages with trunk and
+> beta-releases, but no to delaying the release because of platform
+> packages being late to meet compatibility.
+
+I fully agree.  The responsibility of the core team is to ensure the 
+quality of the core distribution and to provide some clear and reliable 
+information about the release cycle.  Each package maintainer is then 
+responsible for ensuring their package work correctly, in a timely 
+manner.  Then, if some groups want to create more stable subsets (your 
+idea of a stable opam repository, or the "platform"), they would be 
+responsible for managing the life-cycle and the stability of their subsets.
+
+>     Do you have a description of OPAM-builder current strategy?
+>
+>
+> For the strategy, it is the same as OPAM's standard strategy, i.e. it
+> tries to match your query while minimizing the number of installed
+> packages. That's the reason why it prefers `ppx_deriving.3.3` to
+> `ppx_deriving.4.0` (that have an additional requirement to `result`).
+
+Weird.  I tried again from an empty 4.03 switch and I get:
+
+$ opam install ppx_type_conv
+
+The following actions will be performed:
+   ?  install ocamlbuild    0.9.2              [required by ppx_type_conv]
+   ?  install ocamlfind     1.6.2              [required by ppx_type_conv]
+   ?  install result        1.2                [required by ppx_deriving]
+   ?  install ppx_tools     5.0+4.03.0         [required by ppx_type_conv]
+   ?  install cppo          1.3.2              [required by ppx_deriving]
+   ?  install ppx_core      113.33.01+4.03     [required by ppx_type_conv]
+   ?  install ppx_deriving  4.0                [required by ppx_type_conv]
+   ?  install ppx_optcomp   113.33.00+4.03     [required by ppx_driver]
+   ?  install ppx_driver    113.33.01+4.03     [required by ppx_type_conv]
+   ?  install ppx_type_conv 113.33.01+4.03
+
+(which leads to a failure)
+
+If I install ppx_deriving.3.3 manually, I get ocamlbuild, ocamlfind, 
+cppo, ppx_tools, ppx_deriving, and then "opam install ppx_type_conv" 
+suggests to install: ppx_core, ppx_optcomp, ppx_driver, ppx_type_conv. 
+And this succeeds.  So the solver did not suggest in my case the path 
+with fewer installed packages.  And I don't think that I ever tweaked 
+the OPAM strategy.
+
+
+
+Alain
+
+From hendrik at topoi.pooq.com  Fri Jul  1 16:17:24 2016
+From: hendrik at topoi.pooq.com (Hendrik Boom)
+Date: Fri, 1 Jul 2016 11:17:24 -0400
+Subject: [ocaml-platform] Is it taking too long for OCaml software to
+ become 4.03-compatible? Would release process changes help?
+In-Reply-To: <CAHvkLrP31vQVhnScqQehFzgibmr8fo_e4hX_TQUCp4GQ0fd1hA@mail.gmail.com>
+References: <20160629171432.GB3637@nunchakus.loria.fr>
+ <CAOCAUGP9s46DTU8Nu-+xgL25YteEOJC6XQiou9RFs6VdVf4qQQ@mail.gmail.com>
+ <454D3F1D40C4438C8782A78F6B87B0E8@erratique.ch>
+ <CAHvkLrN8+Ejn+nTsi0m0_tpH6zdfvwiA6L-PZGLmO0=AjR+b1g@mail.gmail.com>
+ <8C1A944008B743FBA8F7AD2B9CBFD45A@erratique.ch>
+ <CAN6ygOnn8hgR=jaoEGK__aJi6J7=kNKzYA0OUUHKQHYVFH=xeQ@mail.gmail.com>
+ <CAPFanBGh3acBdZMOpHV8cfETK-bu2GTWfb4zm_n8+osNP2XtbA@mail.gmail.com>
+ <CAHvkLrMuSz1rFpO9hz5hOgXtUAbsjsB8-J+4fb=c6Rpn3UBUqg@mail.gmail.com>
+ <35560a45-88b8-ca9f-6a20-724cd7b4a182@frisch.fr>
+ <CAHvkLrP31vQVhnScqQehFzgibmr8fo_e4hX_TQUCp4GQ0fd1hA@mail.gmail.com>
+Message-ID: <20160701151724.GA9859@topoi.pooq.com>
+
+On Fri, Jul 01, 2016 at 09:10:28AM +0000, Fabrice Le Fessant wrote:
+> On Fri, Jul 1, 2016 at 9:19 AM Alain Frisch <alain at frisch.fr> wrote:
+> 
+> > On 30/06/2016 17:09, Fabrice Le Fessant wrote:
+> > Testing only the latest version of each package would already be very
+> > useful.  As a matter of fact, it could even detect earlier some problems
+> > by restricting the universe only to latest version of all packages (see
+> > below).
+> >
+> 
+> Actually, one of my plans when creating opam-builder was to output a list
+> of versions that would be compatible for a small set of packages (the
+> platform), and create an opam-repository with only them, i.e. it would be
+> the equivalent of Debian stable while the standard repository would be
+> Debian unstable. Clearly, we currently under-use the information that is
+> available in opam-builder.
+
+I'm told that that is how Debian thought they could organise things.  
+But they discovered that they also needed a  testing repository.  I'm 
+not sure why, but I think it had to do with unstabe being, well, too 
+unstable.  Packages mgrated from unstable to testing after a week with 
+no serious bugs appearing aginst them, but nly after their dependencies 
+had also migrated.
+
+> 
+> 
+> > Moreover, it could be interesting to define a subset of "strategic"
+> > packages that we should really be up-to-date on OCaml release dates.
+> > Wasn't it part of the "platform" project to define such a curated list
+> > of packages?
+> >
+> 
+> About that part of the discussion, I am really against any additional
+> constraint that would delay a release of OCaml. We waited for years before
+> deciding to have a regular release schedule (every 6 months), and now,
+> everybody tries to delay releases for various reasons. So, yes to more
+> monitoring of the compatibility of platform packages with trunk and
+> beta-releases, but no to delaying the release because of platform packages
+> being late to meet compatibility.
+> 
+> 
+> > Do you have a description of OPAM-builder current strategy?
+> 
+> 
+> Everything is on Github:
+> Opam-Builder: http://github.com/OCamlPro/opam-builder
+> OPAM fork: https://github.com/lefessan/opam/tree/2016-03-02-opam-builder
+> 
+> For the strategy, it is the same as OPAM's standard strategy, i.e. it tries
+> to match your query while minimizing the number of installed packages.
+> That's the reason why it prefers `ppx_deriving.3.3` to `ppx_deriving.4.0`
+> (that have an additional requirement to `result`). As a side note, as there
+> are more and more meta packages (i.e. whose build/installation cost is
+> null), we should clearly change that strategy to (1) add an installation
+> cost in every package (`1` by default, `0` for meta-packages) and (2) try
+> to minimize installation cost instead of number of packages.
+> 
+> --Fabrice
+
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+
+
+From yann.salmon at prepas.org  Tue Jul  5 19:49:46 2016
+From: yann.salmon at prepas.org (Yann Salmon)
+Date: Tue, 5 Jul 2016 20:49:46 +0200
+Subject: [ocaml-platform] Caching the opam repository
+Message-ID: <577C014A.7080608@prepas.org>
+
+Bonjour,
+
+we are going to install opam and OCaml on many computers and I would
+like to do so with as few internet downloads as possible as our
+connection is rather slow.
+
+We would also like to avoid building a whole mirror of the opam
+repository, or even mirroring a predefined subset of it.
+
+Has somebody managed to set up a solution similar to apt-cache and co ?
+That is : the mirror expands and updates itself when a package is
+requested from it but it cannot provide it directly.
+
+-- 
+Cordialement,
+Yann Salmon
+
+Informatique
+MPSI, PCSI, MP*, PC*
+Descartes - Tours
+
+<http://pro.yannsalmon.fr/>
+
+From louis.gesbert at ocamlpro.com  Wed Jul  6 09:04:27 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Wed, 06 Jul 2016 10:04:27 +0200
+Subject: [ocaml-platform] Caching the opam repository
+In-Reply-To: <577C014A.7080608@prepas.org>
+References: <577C014A.7080608@prepas.org>
+Message-ID: <3295518.v8QhiaqsbM@agaric>
+
+There is no built-in way to do this, but setting an http proxy and the proper curl/wget configuration to go through it in opam shouldn't be too difficult. Has anyone successfully set something similar up already ? If so, directions or a tutorial could be added to (or linked from) our doc pages.
+
+Passing the option to e.g. curl could be done by setting the proper command (with the `--proxy` option) in ~/.opam/config, field `download-command:`. This would allow to have the set up proxy be used only by opam, without exporting `http_proxy`.
+
+Then it boils down to setting a caching proxy to keep the archives. One limitation of this approach is that it won't reuse the file digests that opam already has ; while archives very rarely change, it has happened (and required an update to the hash stored in the opam repository)
+
+
+
+
+
+> - Yann Salmon, 05/07/2016 20:49 -
+> Bonjour,
+> 
+> we are going to install opam and OCaml on many computers and I would
+> like to do so with as few internet downloads as possible as our
+> connection is rather slow.
+> 
+> We would also like to avoid building a whole mirror of the opam
+> repository, or even mirroring a predefined subset of it.
+> 
+> Has somebody managed to set up a solution similar to apt-cache and co ?
+> That is : the mirror expands and updates itself when a package is
+> requested from it but it cannot provide it directly.
+> 
+> 
+
+From daniel.buenzli at erratique.ch  Wed Jul  6 09:28:27 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Wed, 6 Jul 2016 09:28:27 +0100
+Subject: [ocaml-platform] Caching the opam repository
+In-Reply-To: <3295518.v8QhiaqsbM@agaric>
+References: <577C014A.7080608@prepas.org> <3295518.v8QhiaqsbM@agaric>
+Message-ID: <912E5013EB1D4552AD22FCFFB3122D30@erratique.ch>
+
+Le mercredi, 6 juillet 2016 ? 09:04, Louis Gesbert a ?crit :
+> Then it boils down to setting a caching proxy to keep the archives. One limitation of this approach is that it won't reuse the file digests that opam already has ; while archives very rarely change, it has happened (and required an update to the hash stored in the opam repository)
+
+Assuming nfs, what about symlink tricks with $(opam config var root) ?
+
+Daniel
+
+
+

@@ -1,0 +1,93 @@
+<tt>
+Is&nbsp;there&nbsp;a&nbsp;concrete&nbsp;difference&nbsp;in&nbsp;behavior&nbsp;you&#39;re&nbsp;concerned&nbsp;about?&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;y&lt;br&gt;&lt;br&gt;&lt;div&nbsp;class=&quot;gmail_quote&quot;&gt;On&nbsp;Tue,&nbsp;Mar&nbsp;20,&nbsp;2012&nbsp;at&nbsp;2:48&nbsp;PM,&nbsp;Till&nbsp;Varoquaux&nbsp;&lt;span&nbsp;dir=&quot;ltr&quot;&gt;&lt;&lt;a&nbsp;href=&quot;mailto:till@pps.jussieu.fr&quot;&gt;till@pps.jussieu.fr&lt;/a&gt;&gt;&lt;/span&gt;&nbsp;wrote:&lt;br&gt;<br>
+&lt;blockquote&nbsp;class=&quot;gmail_quote&quot;&nbsp;style=&quot;margin:0&nbsp;0&nbsp;0&nbsp;.8ex;border-left:1px&nbsp;#ccc&nbsp;solid;padding-left:1ex&quot;&gt;getpwuid(getuid())&nbsp;is&nbsp;not&nbsp;a&nbsp;synonym&nbsp;for&nbsp;get_login&nbsp;(refer&nbsp;to&nbsp;the&lt;br&gt;<br>
+discussion&nbsp;in&nbsp;the&nbsp;POSIX&nbsp;standard[^1]).&nbsp;You&nbsp;should&nbsp;not&nbsp;shadow&nbsp;posix&lt;br&gt;<br>
+functions&nbsp;by&nbsp;functions&nbsp;with&nbsp;different&nbsp;semantics&nbsp;in&nbsp;the&nbsp;Unix&nbsp;modules;&lt;br&gt;<br>
+providing&nbsp;your&nbsp;own&nbsp;abstraction&nbsp;over&nbsp;the&nbsp;OS&nbsp;is&nbsp;a&nbsp;commendable&nbsp;goal&nbsp;but&lt;br&gt;<br>
+you&nbsp;should&nbsp;do&nbsp;so&nbsp;without&nbsp;silently&nbsp;bypassing&nbsp;core&nbsp;functions.&lt;br&gt;<br>
+&lt;br&gt;<br>
+Till&lt;br&gt;<br>
+[1]:&lt;a&nbsp;href=&quot;http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html&quot;&nbsp;target=&quot;_blank&quot;&gt;http://pubs.opengroup.org/onlinepubs/007904975/functions/getlogin.html&lt;/a&gt;&lt;br&gt;<br>
+&lt;div&nbsp;class=&quot;HOEnZb&quot;&gt;&lt;div&nbsp;class=&quot;h5&quot;&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+On&nbsp;Tue,&nbsp;Mar&nbsp;20,&nbsp;2012&nbsp;at&nbsp;2:28&nbsp;PM,&nbsp;David&nbsp;House&nbsp;&lt;&lt;a&nbsp;href=&quot;mailto:dhouse@janestreet.com&quot;&gt;dhouse@janestreet.com&lt;/a&gt;&gt;&nbsp;wrote:&lt;br&gt;<br>
+&gt;&nbsp;Note&nbsp;that&nbsp;Jane&nbsp;Street&#39;s&nbsp;core&nbsp;library&nbsp;[1]&nbsp;does&nbsp;not&nbsp;use&nbsp;getlogin(3)&nbsp;in&nbsp;its&lt;br&gt;<br>
+&gt;&nbsp;replacement&nbsp;Unix&nbsp;module,&nbsp;for&nbsp;exactly&nbsp;this&nbsp;reason:&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;(*&nbsp;The&nbsp;standard&nbsp;getlogin&nbsp;function&nbsp;goes&nbsp;through&nbsp;utmp&nbsp;which&nbsp;is&nbsp;unreliable,&lt;br&gt;<br>
+&gt;&nbsp; see&nbsp;the&nbsp;BUGS&nbsp;section&nbsp;of&nbsp;getlogin(3)&nbsp;*)&lt;br&gt;<br>
+&gt;&nbsp;let&nbsp;getlogin_orig&nbsp;=&nbsp;Unix.getlogin&lt;br&gt;<br>
+&gt;&nbsp;let&nbsp;getlogin&nbsp;()&nbsp;=&nbsp;(Unix.getpwuid&nbsp;(getuid&nbsp;())).Unix.pw_name&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;[1]:&nbsp;&lt;a&nbsp;href=&quot;https://bitbucket.org/yminsky/ocaml-core/wiki/Home&quot;&nbsp;target=&quot;_blank&quot;&gt;https://bitbucket.org/yminsky/ocaml-core/wiki/Home&lt;/a&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;I&nbsp;just&nbsp;tested&nbsp;your&nbsp;specific&nbsp;example,&nbsp;and&nbsp;it&nbsp;worked&nbsp;fine.&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;On&nbsp;Tue&nbsp;20&nbsp;Mar&nbsp;2012&nbsp;06:07:59&nbsp;PM&nbsp;GMT,&nbsp;Ricardo&nbsp;Catalinas&nbsp;Jiménez&nbsp;wrote:&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&nbsp;On&nbsp;Tue,&nbsp;Mar&nbsp;20,&nbsp;2012&nbsp;at&nbsp;06:51:13PM&nbsp;+0100,&nbsp;Ricardo&nbsp;Catalinas&nbsp;Jiménez&nbsp;wrote:&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;I&nbsp;found&nbsp;out&nbsp;the&nbsp;next&nbsp;issue&nbsp;in&nbsp;this&nbsp;simple&nbsp;code:&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;let&nbsp;()&nbsp;=&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; &nbsp;print_endline&nbsp;&quot;Hello&quot;;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; &nbsp;print_endline&nbsp;(Unix.getlogin&nbsp;())&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;Running&nbsp;in&nbsp;the&nbsp;normal&nbsp;case,&nbsp;with&nbsp;`./a.out&#39;&nbsp;gives:&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;Hello&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;ricardo&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;But&nbsp;running&nbsp;like&nbsp;`./a.out&lt;/dev/null&#39;&nbsp;makes&nbsp;Unix.getlogin&nbsp;fail:&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;Hello&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;Fatal&nbsp;error:&nbsp;exception&nbsp;Unix.Unix_error(20,&nbsp;&quot;getlogin&quot;,&nbsp;&quot;&quot;)&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;A&nbsp;simple&nbsp;strace&nbsp;reveals&nbsp;the&nbsp;problem:&lt;br&gt;<br>
+&gt;&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; open(&quot;/etc/passwd&quot;,&nbsp;O_RDONLY|O_CLOEXEC)&nbsp;=&nbsp;3&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; fstat(3,&nbsp;{st_mode=S_IFREG|0644,&nbsp;st_size=509,&nbsp;...})&nbsp;=&nbsp;0&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; mmap(NULL,&nbsp;4096,&nbsp;PROT_READ|PROT_WRITE,&nbsp;MAP_PRIVATE|MAP_ANONYMOUS,&nbsp;-1,&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;0)&nbsp;=&nbsp;0x7fb125554000&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; read(3,&nbsp;&quot;root:x:0:0:root:/root:/bin/bash\n&quot;...,&nbsp;4096)&nbsp;=&nbsp;509&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; read(3,&nbsp;&quot;&quot;,&nbsp;4096)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;=&nbsp;0&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; close(3)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; =&nbsp;0&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; munmap(0x7fb125554000,&nbsp;4096)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; =&nbsp;0&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;-&gt;&nbsp; ioctl(0,&nbsp;SNDCTL_TMR_TIMEBASE&nbsp;or&nbsp;SNDRV_TIMER_IOCTL_NEXT_DEVICE&nbsp;or&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp;TCGETS,&nbsp;0x7fff12682c98)&nbsp;=&nbsp;-1&nbsp;ENOTTY&nbsp;(Inappropriate&nbsp;ioctl&nbsp;for&nbsp;device)&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; write(2,&nbsp;&quot;Fatal&nbsp;error:&nbsp;exception&nbsp;Unix.Unix&quot;...,&nbsp;59)&nbsp;=&nbsp;59&lt;br&gt;<br>
+&gt;&gt;&gt;&nbsp; &nbsp; exit_group(2)&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;=&nbsp;?&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&nbsp;Someone&nbsp;knew&nbsp;the&nbsp;answer,&nbsp;man&nbsp;3&nbsp;getlogin&nbsp;reads:&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&nbsp; &nbsp; &nbsp; &nbsp; Note&nbsp;that&nbsp;glibc&nbsp;does&nbsp;not&nbsp;follow&nbsp;the&nbsp;POSIX&nbsp;specification&nbsp;and&nbsp;uses&lt;br&gt;<br>
+&gt;&gt;&nbsp; &nbsp; &nbsp; &nbsp; stdin&nbsp;instead&nbsp;of&nbsp;/dev/tty.&nbsp; A&nbsp;bug.&nbsp; (Other&nbsp;recent&nbsp;systems,&nbsp;like&lt;br&gt;<br>
+&gt;&gt;&nbsp; &nbsp; &nbsp; &nbsp; SunOS&nbsp;5.8&nbsp;and&nbsp;HP-UX&nbsp;11.11&nbsp;and&nbsp;FreeBSD&nbsp;4.8&nbsp;all&nbsp;return&nbsp;the&nbsp;login&lt;br&gt;<br>
+&gt;&gt;&nbsp; &nbsp; &nbsp; &nbsp; name&nbsp;also&nbsp;when&nbsp;stdin&nbsp;is&nbsp;redirected.)&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&lt;br&gt;<br>
+&gt;&gt;&nbsp;Regards&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&gt;&nbsp;--&lt;br&gt;<br>
+&gt;&nbsp;Caml-list&nbsp;mailing&nbsp;list.&nbsp; Subscription&nbsp;management&nbsp;and&nbsp;archives:&lt;br&gt;<br>
+&gt;&nbsp;&lt;a&nbsp;href=&quot;https://sympa-roc.inria.fr/wws/info/caml-list&quot;&nbsp;target=&quot;_blank&quot;&gt;https://sympa-roc.inria.fr/wws/info/caml-list&lt;/a&gt;&lt;br&gt;<br>
+&gt;&nbsp;Beginner&#39;s&nbsp;list:&nbsp;&lt;a&nbsp;href=&quot;http://groups.yahoo.com/group/ocaml_beginners&quot;&nbsp;target=&quot;_blank&quot;&gt;http://groups.yahoo.com/group/ocaml_beginners&lt;/a&gt;&lt;br&gt;<br>
+&gt;&nbsp;Bug&nbsp;reports:&nbsp;&lt;a&nbsp;href=&quot;http://caml.inria.fr/bin/caml-bugs&quot;&nbsp;target=&quot;_blank&quot;&gt;http://caml.inria.fr/bin/caml-bugs&lt;/a&gt;&lt;br&gt;<br>
+&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;br&gt;<br>
+--&lt;br&gt;<br>
+Caml-list&nbsp;mailing&nbsp;list.&nbsp; Subscription&nbsp;management&nbsp;and&nbsp;archives:&lt;br&gt;<br>
+&lt;a&nbsp;href=&quot;https://sympa-roc.inria.fr/wws/info/caml-list&quot;&nbsp;target=&quot;_blank&quot;&gt;https://sympa-roc.inria.fr/wws/info/caml-list&lt;/a&gt;&lt;br&gt;<br>
+Beginner&#39;s&nbsp;list:&nbsp;&lt;a&nbsp;href=&quot;http://groups.yahoo.com/group/ocaml_beginners&quot;&nbsp;target=&quot;_blank&quot;&gt;http://groups.yahoo.com/group/ocaml_beginners&lt;/a&gt;&lt;br&gt;<br>
+Bug&nbsp;reports:&nbsp;&lt;a&nbsp;href=&quot;http://caml.inria.fr/bin/caml-bugs&quot;&nbsp;target=&quot;_blank&quot;&gt;http://caml.inria.fr/bin/caml-bugs&lt;/a&gt;&lt;br&gt;<br>
+&lt;br&gt;<br>
+&lt;/div&gt;&lt;/div&gt;&lt;/blockquote&gt;&lt;/div&gt;&lt;br&gt;&lt;/div&gt;<br>
+
+</tt>

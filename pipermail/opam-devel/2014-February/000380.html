@@ -1,0 +1,128 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [opam-devel] How to manage a package manager (Was: Re: [opam]	Build clarification (#1149))
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20How%20to%20manage%20a%20package%20manager%20%28Was%3A%20Re%3A%20%5Bopam%5D%0A%09Build%20clarification%20%28%231149%29%29&In-Reply-To=%3C59E2A1E2-2C41-4DCA-A628-9DE417D7B610%40recoil.org%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000379.html">
+   <LINK REL="Next"  HREF="000381.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[opam-devel] How to manage a package manager (Was: Re: [opam]	Build clarification (#1149))</H1>
+    <B>Anil Madhavapeddy</B> 
+    <A HREF="mailto:opam-devel%40lists.ocaml.org?Subject=Re%3A%20%5Bopam-devel%5D%20How%20to%20manage%20a%20package%20manager%20%28Was%3A%20Re%3A%20%5Bopam%5D%0A%09Build%20clarification%20%28%231149%29%29&In-Reply-To=%3C59E2A1E2-2C41-4DCA-A628-9DE417D7B610%40recoil.org%3E"
+       TITLE="[opam-devel] How to manage a package manager (Was: Re: [opam]	Build clarification (#1149))">anil at recoil.org
+       </A><BR>
+    <I>Sat Feb  1 14:30:47 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000379.html">[opam-devel] How to manage a package manager (Was: Re: [opam] Build clarification (#1149))
+</A></li>
+        <LI>Next message: <A HREF="000381.html">[opam-devel] How to manage a package manager (Was: Re: [opam] Build clarification (#1149))
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#380">[ date ]</a>
+              <a href="thread.html#380">[ thread ]</a>
+              <a href="subject.html#380">[ subject ]</a>
+              <a href="author.html#380">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>
+On 1 Feb 2014, at 15:12, Roberto Di Cosmo &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>&gt; wrote:
+
+&gt;<i> On Sat, Feb 01, 2014 at 02:53:06PM +0100, Anil Madhavapeddy wrote:
+</I>&gt;&gt;<i> On 1 Feb 2014, at 14:40, Roberto Di Cosmo &lt;<A HREF="http://lists.ocaml.org/listinfo/opam-devel">roberto at dicosmo.org</A>&gt; wrote:
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;&gt;<i> This is a very tricky interaction to get right, 
+</I>&gt;&gt;&gt;<i> 
+</I>&gt;&gt;&gt;<i> Really? I would like to know more about this; please add the factual elements
+</I>&gt;&gt;&gt;<i> to #1150
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> I think the overall problem element is obvious: the opam binary within the
+</I>&gt;&gt;<i> opam installation will be picked up very suddenly during package installation
+</I>&gt;&gt;<i> and upgrades.
+</I>&gt;&gt;<i> 
+</I>&gt;&gt;<i> Rather than me listing why every single feature of OPAM would potentially break
+</I>&gt;&gt;<i> (consider the 'repo upgrade' step that OPAM 1.0 -&gt; 1.1 does), I would again
+</I>&gt;&gt;<i> suggest that you provide a strong motivation for why you want the feature in the
+</I>&gt;&gt;<i> first place.
+</I>&gt;<i> 
+</I>&gt;<i> Sorry, I really do not understand what you mean. On my side, I do believe I made
+</I>&gt;<i> my point clear enough, and I see no point in continuing this exchange.
+</I>
+Let me go back to your original point, which I agree with:
+
+&gt;<i> That's why one needs a clear, and simple, mechanism to ensure a smooth
+</I>&gt;<i> transition when incompatibilities arrive (and there will be more, and
+</I>&gt;<i> unexpected ones, you can bet on it). 
+</I>
+My point is that the user originally obtains their version of OPAM via their
+OS package manager (Homebrew, apt, BSD ports, Yum, etc).  All of these managers
+provide a mechanism to warn the user of any upgrade steps that need to happen
+when upgrading their distribution, and so is an ideal way to update OPAM
+itself in the event of incompatible future changes.
+
+In contrast, `opam update` is part of a *development* workflow, not a system
+upgrade path.  I do that when I want to recompile some part of my working
+trees to a new package set, and often follow it up with an upgrade (via -u).
+
+If you mix these things up, then it violates a lot of expectations from the
+user side, and can lead to the annoying situation where you are forced to deal
+with a distribution upgrade when you were expecting to just alter some local
+code.  Furthermore, it is quite common to destroy and reinitialize ~/.opam
+or set a new OPAMROOT to test for a clean install, and this would subsequently
+downgrade OPAM (or worse, cause an error if your shell path cache becomes
+invalidated).
+
+We've already seen this problem in action with a number of tools such as
+Merlin or ocp-index that really ought to be installed system-wide and not
+within OPAM (since a code update could result in the editor tool being
+recompiled or downgraded).  Another example is the Mirage command-line tool,
+which uses libraries shared with development code.
+
+To summarise, this feature continues to blur the divide between a system tool
+(OPAM, Merlin, ocp-index) from a development tool, and should not be
+encouraged. I would like to see better support for managing system tools
+within OPAM, but I think prioritising upstream integration of them should
+be encouraged first.  OPAM is a developer supplement to make source-based
+development easier, not a complete replacement for an existing OS package
+manager.
+
+I hope that's clearer.  There are many negative reasons for upgrading OPAM
+using OPAM, and I've still not seen a good reason for not focussing on
+better upstream package manager (and hence external dependency) integration
+before anything else.
+
+-anil
+</PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000379.html">[opam-devel] How to manage a package manager (Was: Re: [opam] Build clarification (#1149))
+</A></li>
+	<LI>Next message: <A HREF="000381.html">[opam-devel] How to manage a package manager (Was: Re: [opam] Build clarification (#1149))
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#380">[ date ]</a>
+              <a href="thread.html#380">[ thread ]</a>
+              <a href="subject.html#380">[ subject ]</a>
+              <a href="author.html#380">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/opam-devel">More information about the opam-devel
+mailing list</a><br>
+</body></html>

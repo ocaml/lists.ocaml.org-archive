@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Bigarray typing problem
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bigarray%20typing%20problem&In-Reply-To=%3CCAAxsn%3DFjEKS1rqA902XbxjMp%2Bp89FU9b4xXwrtZuXxX7Zio1Ww%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000016.html">
+   <LINK REL="Next"  HREF="000018.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Bigarray typing problem</H1>
+    <B>Jeremy Yallop</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Bigarray%20typing%20problem&In-Reply-To=%3CCAAxsn%3DFjEKS1rqA902XbxjMp%2Bp89FU9b4xXwrtZuXxX7Zio1Ww%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Bigarray typing problem">yallop at gmail.com
+       </A><BR>
+    <I>Thu Dec  5 11:08:38 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000016.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+        <LI>Next message: <A HREF="000018.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#17">[ date ]</a>
+              <a href="thread.html#17">[ thread ]</a>
+              <a href="subject.html#17">[ subject ]</a>
+              <a href="author.html#17">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi Daniel,
+
+On 4 December 2013 18:13, Daniel B&#252;nzli &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">daniel.buenzli at erratique.ch</A>&gt; wrote:
+&gt;<i> Suppose I have a C function like this that takes a 256 element array prototyped like this:
+</I>&gt;<i>
+</I>&gt;<i>   void write (Uint16 *a);
+</I>&gt;<i>
+</I>&gt;<i> I would like to expose it as
+</I>&gt;<i>
+</I>&gt;<i>   val write : (int, Bigarray.int16_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t -&gt; unit
+</I>&gt;<i>
+</I>&gt;<i> tried something along
+</I>&gt;<i>
+</I>&gt;<i>   let write = foreign &quot;write&quot; (ptr uint16_t @-&gt; returning void)
+</I>&gt;<i>   let write a = write (bigarray_start array1 a)
+</I>&gt;<i>
+</I>&gt;<i> But it fails on the second line with (for the parenthised expression) :
+</I>&gt;<i>
+</I>&gt;<i>   Error: This expression has type int Ctypes.ptr
+</I>&gt;<i>   but an expression was expected of type Unsigned.uint16 Ctypes.ptr
+</I>
+Right: this is by design, although I'm not certain that it's the best
+possible design to use.  The intention is to have the ctypes Bigarray
+interface imitate the design of Bigarray itself, with a distinction
+between storage behaviour and read/write type.  For instance, using
+the type in question,
+
+   ((int, Bigarray.int16_unsigned_elt, Bigarray.c_layout) Bigarray.Array1.t)
+
+the Bigarray modules stores the elements as 16-bit integers, but
+exposes them (through indexing functions etc.) as ints.  Ctypes does
+the same: when you ask for a pointer into the bigarray you get back a
+pointer that gives you an int when you dereference it, but behaves as
+a pointer to 16-bit integers for purposes of arithmetic etc.:
+
+    # let ba = Array1.create int16_unsigned c_layout 5;;
+    val ba : (int, int16_unsigned_elt, c_layout) Array1.t = &lt;abstr&gt;
+    # let p = bigarray_start array1 ba;;
+    val p : int ptr = (int16_t*) 0xe5cb40
+
+The type of p indicates that dereferencing gives you an int, but the
+way the value of p is printed indicates that it's treated as a pointer
+into an array of 16-bit integers.  (There's a bug relating to
+signedness -- the value should be &quot;(uint16_t*) 0xe5cb40&quot;, but that's a
+separate issue.  I'll note it on the issue tracker.).  You can see
+that pointer arithmetic (for example) behaves correctly by accessing
+bigarray elements through both the array and the pointer:
+
+   # for i = 0 to 4 do ba.{i} &lt;- i done;;
+   - : unit = ()
+   # for i = 0 to 4 do Printf.printf &quot;%d &quot; !@(p +@ i) done;;
+   0 1 2 3 4 - : unit = ()
+
+Similarly,
+
+   # sizeof (reference_type p);;
+   - : int = 2
+
+&gt;<i> It seems to me that bigarray_start has the wrong type, it should map to a pointer of the *storage* type of the bigarray, not the type used to read/write the bigarray.
+</I>
+That would be a reasonable approach as well.  I suppose it depends on
+whether you want a bigarray-like interface or simply an interface that
+accesses bigarray-managed memory.
+
+I've tried changing the interface so that bigarray_start etc. return
+pointers to storage types rather than to read/write types.  You can
+find it on the bigarray-kinds branch on my repository:
+
+   <A HREF="https://github.com/yallop/ocaml-ctypes/commit/0d15800310">https://github.com/yallop/ocaml-ctypes/commit/0d15800310</A>
+
+(It appears to work, but it's only lightly tested and not polished.
+It may be possible to simplify the types.)
+
+The main changes are:
+
+   * there's now a family of bigarray_kind values -- ba_float32,
+ba_float64, etc. -- that correspond to the kind values in the Bigarray
+module.  These should be used in place of Bigarray.kind values in the
+ctypes Bigarray interface.
+
+   * the type of bigarray_class now includes an extra field for the
+ctypes equivalent of the storage type
+
+   * bigarray_start and array_of_bigarray now take an additional
+argument of type bigarray_kind to indicate the storage type of the
+bigarray
+
+With these changes in place you have the behaviour you were expecting:
+
+   # let write = foreign &quot;write&quot; (ptr uint16_t @-&gt; returning void);;
+   val write : Unsigned.uint16 ptr -&gt; unit = &lt;fun&gt;
+   # let write a = write (bigarray_start array1 ba_int16_unsigned a);;
+   val write : (int, int16_unsigned_elt, c_layout) Array1.t -&gt; unit = &lt;fun&gt;
+
+As I said, I'm not sure which interface is preferable overall.
+Perhaps it's worth providing both.
+
+Jeremy.
+</PRE>
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000016.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+	<LI>Next message: <A HREF="000018.html">[ocaml-ctypes] Bigarray typing problem
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#17">[ date ]</a>
+              <a href="thread.html#17">[ thread ]</a>
+              <a href="subject.html#17">[ subject ]</a>
+              <a href="author.html#17">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

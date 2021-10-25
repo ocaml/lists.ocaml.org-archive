@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-ctypes] Foreign function interface support
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCANE7k9d0B1deaZVt67s5G18cZFRd%2Bh02bqkZLTC1%3DBo3NSfosA%40mail.gmail.com%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000069.html">
+   <LINK REL="Next"  HREF="000071.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-ctypes] Foreign function interface support</H1>
+    <B>Pavel Zaichenkov</B> 
+    <A HREF="mailto:ctypes%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-ctypes%5D%20Foreign%20function%20interface%20support&In-Reply-To=%3CCANE7k9d0B1deaZVt67s5G18cZFRd%2Bh02bqkZLTC1%3DBo3NSfosA%40mail.gmail.com%3E"
+       TITLE="[ocaml-ctypes] Foreign function interface support">zaichenkov at gmail.com
+       </A><BR>
+    <I>Tue Mar  4 01:54:19 GMT 2014</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000069.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+        <LI>Next message: <A HREF="000071.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#70">[ date ]</a>
+              <a href="thread.html#70">[ thread ]</a>
+              <a href="subject.html#70">[ subject ]</a>
+              <a href="author.html#70">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Hi Anil,
+
+It fails for both OS X and Ubuntu.
+
+Regarding Ubuntu. How would you pass &quot;-Wl,--no-as-needed&quot; to
+corebuild? hello (ncurses) example doesn't work on Ubuntu, so this
+could be the case. I want to try it also for minisat library, which is
+available from the repository.
+
+Although I don't know what is wrong with it in OS X.
+
+Btw, I get &quot;Unbound value returning_checking_errno&quot; error for datetime
+example in both systems.
+
+Thanks for your help.
+
+
+Pavel
+
+On 2 March 2014 13:53, Anil Madhavapeddy &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">anil at recoil.org</A>&gt; wrote:
+&gt;<i> Hi Pavel (CCing the ctypes mailing list as well).
+</I>&gt;<i>
+</I>&gt;<i> When linking the program, ctypes needs to know how to open the shared
+</I>&gt;<i> library.  One way to do this is by specifying the &quot;-lpicosat&quot; in the
+</I>&gt;<i> link options, as you've done below.
+</I>&gt;<i>
+</I>&gt;<i> Unfortunately, the Ubuntu linker has a mode where it decides to not
+</I>&gt;<i> link in the library if it's not explicitly referenced in the application,
+</I>&gt;<i> so you also need to pass the &quot;-Wl,--no-as-needed&quot; on Ubuntu.
+</I>&gt;<i>
+</I>&gt;<i> However, before going further, the below link line should have worked
+</I>&gt;<i> on MacOS X.  Could you confirm whether it only fails on Ubuntu, or if
+</I>&gt;<i> it also doesn't work on MacOS X?
+</I>&gt;<i>
+</I>&gt;<i> -anil
+</I>&gt;<i>
+</I>&gt;<i> On 2 Mar 2014, at 07:25, Pavel Zaichenkov &lt;<A HREF="http://lists.ocaml.org/listinfo/ctypes">zaichenkov at gmail.com</A>&gt; wrote:
+</I>&gt;<i>
+</I>&gt;&gt;<i> Hi,
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I would be very grateful if someone can help me to create OCaml
+</I>&gt;&gt;<i> bindings for PicoSAT SAT solver (<A HREF="http://fmv.jku.at/picosat/">http://fmv.jku.at/picosat/</A>). I used
+</I>&gt;&gt;<i> the version 936 that is available in Ubuntu repository.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I started with studying the corresponding chapter in RWC book
+</I>&gt;&gt;<i> (<A HREF="https://realworldocaml.org/v1/en/html/foreign-function-interface.html">https://realworldocaml.org/v1/en/html/foreign-function-interface.html</A>)
+</I>&gt;&gt;<i> and came up with the following picosat.ml file (a minimal working
+</I>&gt;&gt;<i> example):
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> open Ctypes
+</I>&gt;&gt;<i> type picosat = unit ptr
+</I>&gt;&gt;<i> let picosat : picosat typ = ptr void
+</I>&gt;&gt;<i> open Foreign
+</I>&gt;&gt;<i> let init = foreign &quot;picosat_init&quot; (void @-&gt; returning void)
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> This one is a simple program that shouldn't throw an error if binding
+</I>&gt;&gt;<i> actually works:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> open Picosat
+</I>&gt;&gt;<i> let _ = init ()
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> The example is compiled using the command from the guide:
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> corebuild -pkg ctypes.foreign -lflags -cclib,lpicosat test.native
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Command executes successfully, however execution of test.native throws
+</I>&gt;&gt;<i> an exception &quot;undefined symbol: picosat_init&quot;.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> I have tried to perform this on two platforms that I need to support:
+</I>&gt;&gt;<i> OS X and Ubuntu. I am pretty sure that headers and library itself are
+</I>&gt;&gt;<i> installed and are seen in the system path, as I managed to run an
+</I>&gt;&gt;<i> example on C using the library. I also checked the library and
+</I>&gt;&gt;<i> corresponding symbol names inside the library using &quot;readelf -Ws&quot;.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Since there is enough evidence that library itself exists and can be
+</I>&gt;&gt;<i> successfully linked, I am out of ideas what I miss here and why this
+</I>&gt;&gt;<i> binding doesn't work. Are there any suggestions?
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Thanks.
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> Pavel
+</I>&gt;&gt;<i>
+</I>&gt;&gt;<i> --
+</I>&gt;&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/ctypes">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I>&gt;&gt;<i>
+</I>&gt;<i>
+</I>&gt;<i> --
+</I>&gt;<i> You received this message because you are subscribed to the Google Groups &quot;ocaml-core&quot; group.
+</I>&gt;<i> To unsubscribe from this group and stop receiving emails from it, send an email to <A HREF="http://lists.ocaml.org/listinfo/ctypes">ocaml-core+unsubscribe at googlegroups.com.</A>
+</I>&gt;<i> For more options, visit <A HREF="https://groups.google.com/groups/opt_out.">https://groups.google.com/groups/opt_out.</A>
+</I></PRE>
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000069.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+	<LI>Next message: <A HREF="000071.html">[ocaml-ctypes] Foreign function interface support
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#70">[ date ]</a>
+              <a href="thread.html#70">[ thread ]</a>
+              <a href="subject.html#70">[ subject ]</a>
+              <a href="author.html#70">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/ctypes">More information about the Ctypes
+mailing list</a><br>
+</body></html>

@@ -1,0 +1,166 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<HTML>
+ <HEAD>
+   <TITLE> [ocaml-platform] on the need and design of OCaml namespaces
+   </TITLE>
+   <LINK REL="Index" HREF="index.html" >
+   <LINK REL="made" HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512D3148.8010805%40inria.fr%3E">
+   <META NAME="robots" CONTENT="index,nofollow">
+   <style type="text/css">
+       pre {
+           white-space: pre-wrap;       /* css-2.1, curent FF, Opera, Safari */
+           }
+   </style>
+   <META http-equiv="Content-Type" content="text/html; charset=us-ascii">
+   <LINK REL="Previous"  HREF="000165.html">
+   <LINK REL="Next"  HREF="000160.html">
+ </HEAD>
+ <BODY BGCOLOR="#ffffff">
+   <H1>[ocaml-platform] on the need and design of OCaml namespaces</H1>
+    <B>Didier Remy</B> 
+    <A HREF="mailto:platform%40lists.ocaml.org?Subject=Re%3A%20%5Bocaml-platform%5D%20on%20the%20need%20and%20design%20of%20OCaml%20namespaces&In-Reply-To=%3C512D3148.8010805%40inria.fr%3E"
+       TITLE="[ocaml-platform] on the need and design of OCaml namespaces">Didier.Remy at inria.fr
+       </A><BR>
+    <I>Tue Feb 26 22:03:52 GMT 2013</I>
+    <P><UL>
+        <LI>Previous message: <A HREF="000165.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+        <LI>Next message: <A HREF="000160.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#157">[ date ]</a>
+              <a href="thread.html#157">[ thread ]</a>
+              <a href="subject.html#157">[ subject ]</a>
+              <a href="author.html#157">[ author ]</a>
+         </LI>
+       </UL>
+    <HR>  
+<!--beginarticle-->
+<PRE>Yaron,
+
+&gt;&gt;<i> Do you really need this level of granularity?  I'd like to think of
+</I>&gt;&gt;<i> modules as the smallest compilation unit.  Can you give us examples of what
+</I>&gt;&gt;<i> you'd like to do with value manipulation?
+</I>&gt;<i>
+</I>&gt;<i> I think we do.  What we want is essentially the same thing that we
+</I>&gt;<i> need to do when OCaml opens Pervasives by default.  We simply have
+</I>&gt;<i> another module that we wish to open by default.
+</I>
+This is quite different than cherry-picking values from a module.  Also open
+is a bit misleading here, because it must behaves like an include.  While
+open brings all subcomponents in scope but does not evaluate them, include
+must evaluate (use) all the definitions and binds them in the current
+structure.
+
+This is quite different from what happens when building namespaces: when a
+new definition shadows an older one in a namespace, the older definition
+will not be visible by the linker and will not be evaluated.
+
+&quot;Include-on-open&quot; (called flat-acccess by Gabriel) is doable as Gabriel
+explained, and would generalize the behavior of pervasives, but it is
+another mechanism than just building a namespace (because it also _uses_ a
+module).
+
+&gt;<i> There are two reasons for this: the first is to open at the top-level
+</I>&gt;<i> some constructors and values that are very commonly useful.  Much as
+</I>&gt;<i> pervasives has None and Some from option available everywhere, we have
+</I>&gt;<i> Ok and Error from Result.t available everywhere.
+</I>
+Fine.
+
+&gt;<i> Another reason is to shadow values from other modules.  Core.Std hides
+</I>&gt;<i> various values from Pervasives that we view as harmful.  For example,
+</I>&gt;<i> we hide ==, and instead expose phys_equal.  (We think == is too
+</I>&gt;<i> confusing to people from other languages.)
+</I>
+This example is different I think, and perhaps another solution could be used.
+My understanding is that you wish to have your own version of stdlib, say
+stdlib_minus_plus.
+
+Why don't you create a new module stdlib_minus_plus that includes stdlib
+with a restricted safe interface (so that bindings &quot;minus&quot; will be evaluated
+but not visible) and then add your own safer definitions &quot;plus&quot;, bind the
+resulting module to some namespace Core#stdlib and then use your own version
+of Core#stdlib instead of the original stdlib?
+
+It seems that you wish Core.std to be only a diff against the original
+stdlib and not a patched copy. Is this the case? Why it is important?
+
+&gt;<i> Similarly, Async hides blocking operations that are available in
+</I>&gt;<i> Core.Std, like print_string, so when you write:
+</I>&gt;<i>
+</I>&gt;<i>     open Core.Std
+</I>&gt;<i>     open Async.Std
+</I>&gt;<i>
+</I>&gt;<i> those problematic values are hidden from.
+</I>
+Isn't this fragile? for example, what happens if the user mistakenly writes
+these two lines in the other order? If Async.Std _must_ hide values of
+Core.Std for safety reasons (for instance to avoid blocking), why is it not
+returning a patched copy of Core.Std with these values overridden instead of
+relying on the user to open modules in the right order?
+
+&gt;<i> think, to make every single file that uses Core have to change from:
+</I>&gt;<i>
+</I>&gt;<i>     open Core.Std
+</I>&gt;<i> to
+</I>&gt;<i>     open namespace Core.Std
+</I>&gt;<i>     open Core.Std.Common
+</I>&gt;<i>
+</I>&gt;<i> or whatever it would need to be.
+</I>
+I don't see what you mean here.
+
+     Didier
+</PRE>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!--endarticle-->
+    <HR>
+    <P><UL>
+        <!--threads-->
+	<LI>Previous message: <A HREF="000165.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+	<LI>Next message: <A HREF="000160.html">[ocaml-platform] on the need and design of OCaml namespaces
+</A></li>
+         <LI> <B>Messages sorted by:</B> 
+              <a href="date.html#157">[ date ]</a>
+              <a href="thread.html#157">[ thread ]</a>
+              <a href="subject.html#157">[ subject ]</a>
+              <a href="author.html#157">[ author ]</a>
+         </LI>
+       </UL>
+
+<hr>
+<a href="http://lists.ocaml.org/listinfo/platform">More information about the Platform
+mailing list</a><br>
+</body></html>

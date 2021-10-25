@@ -1,0 +1,2046 @@
+From daniel.buenzli at erratique.ch  Sun Sep 11 01:43:48 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Sun, 11 Sep 2016 02:43:48 +0200
+Subject: [ocaml-platform] Toying with package installs and documentation
+Message-ID: <466D723F58A8482CB48BEF5019035E65@erratique.ch>
+
+Hello,  
+
+I took the excuse of providing a story for odoc at the OPAM level to toy and move a bit on the idea of simplifying package management by using the information OCaml stores in build artefacts and using OPAM files as the pivotal package metadata format. 
+
+In order to have a good comparison point for odoc generation I implemented a best-effort ocamldoc path which does per-package ocamldoc set generation (details [1]). It works pretty well in practice on quite a few packages, including the ocaml one. It also doesn't work at all on others. You can try it on your own opam switch by invoking: 
+
+ opam pin add -kgit opkg https://github.com/dbuenzli/opkg.git
+ opkg ocamldoc 
+ opkg doc 
+
+Do this in a 4.03 switch as the 4.02.* line was sadly systematically broken from a doc generation point of view. API docs can be found here http://erratique.ch/software/opkg/doc/ (or in `opkg doc opkg` of course).
+
+Here's a sample rendering done on a random selection of packages:
+
+http://erratique.ch/tmp/opkg-ocamldoc/var/cache/opkg/ocamldoc/
+For ex. http://erratique.ch/tmp/opkg-ocamldoc/var/cache/opkg/ocamldoc/bos/index.html
+ 
+
+Other, simple but handy, commands you may want to try are:
+
+ opgk guess-deps _build # Good hint that a brighter build future exists
+ opkg changes bos 
+ opkg readme bos
+ opkg homepage bos
+ opkg issues bos
+ opkg online-doc bos 
+ opkg doc bos
+
+If you want to know more about current packaging conventions, they are described in `opkg help packaging`. Note that they do not depend on the packages being OPAM managed (the OPAM file format is however reused). Using a software packager with a minimally decent release process like `topkg` implements them by default without the developer having anything special to do.
+
+Comments on this list welcome -- please do not file issues for now as the whole thing is very wip and moving, a lot of design details are not yet determined some of which will need time to mature.
+
+Daniel
+
+[1] 
+Restricting generation to packages allows to avoid cross package name overwrites and outrageous generation times for the final link step. Given a package we just fish for the mlis installed in its (sub)libdir. We then look for a corresponding cmi at the same place and find out the digests of the cmis it imports. By looking up opkg's global index of compilation object digests their install location can be found and is used to generate the list of `-I` ocamldoc needs to compile the mli to an odoc file. Sometimes it works, sometimes it fails, for various different reasons. 
+
+
+From pc1.faidherbe at gmail.com  Sun Sep 25 09:17:26 2016
+From: pc1.faidherbe at gmail.com (Eric DETREZ)
+Date: Sun, 25 Sep 2016 10:17:26 +0200
+Subject: [ocaml-platform] problems with ocaml-top
+Message-ID: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+
+Hello
+
+I tried to install ocaml-top (I use debian jessie)
+When I launch it from terminal : /home/ericd13/.opam/system/bin
+i get a lot of warnings (deprecated pp_open_tbox tabulation boxes are not
+suported anymore)
+The console gets a message :
+(ocaml-top:28826): GLib-CRITICAL **: Source ID 2108 was not found when
+attempting to remove it
+
+But Ocaml is version 4.03.0 (the one OPAM installed)
+
+If I launch it from thunar it's version 4.01.0
+
+-- 
+Eric D?trez
+Math PC*
+Option Info MP*
+Python PCSI
+Lyc?e Faidherbe, Lille
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160925/f4bb0d14/attachment.html>
+
+From agarwal1975 at gmail.com  Mon Sep 26 16:21:26 2016
+From: agarwal1975 at gmail.com (Ashish Agarwal)
+Date: Mon, 26 Sep 2016 11:21:26 -0400
+Subject: [ocaml-platform] problems with ocaml-top
+In-Reply-To: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+References: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+Message-ID: <CAMu2m2J6BU0g2L60TVd+t4z6JxrdBUkb4gP3KFFjB9FP+ON+7A@mail.gmail.com>
+
+The last release of ocaml-top is from Jan 2014. The OCaml ecosystem has
+evolved a lot since then, so perhaps it just doesn't work with the latest
+OCaml.
+
+I'm not familiar with ocaml-top. From reading its webpage, I think you
+might find the following tools useful: utop, merlin, tuareg, and
+ocp-indent. These are all widely used and actively maintained.
+
+On Sun, Sep 25, 2016 at 4:17 AM, Eric DETREZ <pc1.faidherbe at gmail.com>
+wrote:
+
+> Hello
+>
+> I tried to install ocaml-top (I use debian jessie)
+> When I launch it from terminal : /home/ericd13/.opam/system/bin
+> i get a lot of warnings (deprecated pp_open_tbox tabulation boxes are not
+> suported anymore)
+> The console gets a message :
+> (ocaml-top:28826): GLib-CRITICAL **: Source ID 2108 was not found when
+> attempting to remove it
+>
+> But Ocaml is version 4.03.0 (the one OPAM installed)
+>
+> If I launch it from thunar it's version 4.01.0
+>
+> --
+> Eric D?trez
+> Math PC*
+> Option Info MP*
+> Python PCSI
+> Lyc?e Faidherbe, Lille
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160926/6a379a32/attachment.html>
+
+From daniel.buenzli at erratique.ch  Tue Sep 27 03:08:22 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Tue, 27 Sep 2016 04:08:22 +0200
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+Message-ID: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+
+Hello,  
+
+Nowadays I consider it a lost cause when I file an issue on the opam-repository. 
+
+I think this is an issue.
+
+I perfectly understand that from the point of view of repo maintainers the amount of issues (136 now) doesn't entice them to go through the backlog to try to fix or close them. However I believe that if we try to limit the backlog or tag them more appropriately there may be a better chance that issues do not simply get ignored.
+
+Going through the least recently updated issues: 
+
+https://github.com/ocaml/opam-repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+
+here are a few things that come to mind: 
+
+1. Kill that `request for package` tag. Being a developer-oriented package system I don't think the opam repository is the place to ask for packaging, people should ask upstream (I don't say this didn't make sense when opam was a baby). 
+2. Kill too open ended questions with the `question` tag. 
+3. Go through the `bug` tag. It seems a lot of old things can be closed. 
+4. There seem to be a lot of old install glitches that I'm sure are no longer relevant.
+5. There are a few open issues where people say that the problem is solved, they should be closed...
+
+I think we should walk up from the oldest issues and whenever things are are unclear tag them with `scheduled for closure` and comment that without any further feedback in 7 days, the issue will be closed. Also in general it would be nice to introduce tags to distinguish between repo organisation issues like [1] (may be long lived) and end-user repo install failures like [2] (should be short lived).
+
+Daniel
+
+[1] https://github.com/ocaml/opam-repository/issues/6864
+[2] https://github.com/ocaml/opam-repository/issues/7448
+ 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+From louis.gesbert at ocamlpro.com  Tue Sep 27 06:48:25 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 27 Sep 2016 07:48:25 +0200
+Subject: [ocaml-platform] problems with ocaml-top
+In-Reply-To: <CAMu2m2J6BU0g2L60TVd+t4z6JxrdBUkb4gP3KFFjB9FP+ON+7A@mail.gmail.com>
+References: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+ <CAMu2m2J6BU0g2L60TVd+t4z6JxrdBUkb4gP3KFFjB9FP+ON+7A@mail.gmail.com>
+Message-ID: <2325245.ZdlW831OW6@maitake>
+
+On lundi 26 septembre 2016 11:21:26 CEST Ashish Agarwal wrote:
+> The last release of ocaml-top is from Jan 2014. The OCaml ecosystem has
+> evolved a lot since then, so perhaps it just doesn't work with the latest
+> OCaml.
+> 
+> I'm not familiar with ocaml-top. From reading its webpage, I think you
+> might find the following tools useful: utop, merlin, tuareg, and
+> ocp-indent. These are all widely used and actively maintained.
+> 
+
+These are all command-line tools and/or helpers for full-blown editors, so the 
+scope is quite different from that of ocaml-top, which is a simple GUI 
+coupling a text editor with a toplevel (with simplicity and lab sessions in 
+mind).
+
+A much closer successor would be the yet unreleased LearnOCaml [1], although 
+it provides much more than just editor+toplevel. It's in part derived from the 
+platform that was put in place for the OCaml MOOC.
+
+I'll try to find the time for a quick update of ocaml-top, though, it can be 
+useful and there is no direct equivalent. It mainly suffers from being based 
+on (labl)GTK, which is a pain...
+
+[1] https://github.com/OCamlPro/learn-ocaml
+
+> On Sun, Sep 25, 2016 at 4:17 AM, Eric DETREZ <pc1.faidherbe at gmail.com>
+> 
+> wrote:
+> > Hello
+> > 
+> > I tried to install ocaml-top (I use debian jessie)
+> > When I launch it from terminal : /home/ericd13/.opam/system/bin
+> > i get a lot of warnings (deprecated pp_open_tbox tabulation boxes are not
+> > suported anymore)
+> > The console gets a message :
+> > (ocaml-top:28826): GLib-CRITICAL **: Source ID 2108 was not found when
+> > attempting to remove it
+> > 
+> > But Ocaml is version 4.03.0 (the one OPAM installed)
+> > 
+> > If I launch it from thunar it's version 4.01.0
+> > 
+> > --
+> > Eric D?trez
+> > Math PC*
+> > Option Info MP*
+> > Python PCSI
+> > Lyc?e Faidherbe, Lille
+> > 
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+
+
+From louis.gesbert at ocamlpro.com  Tue Sep 27 07:00:50 2016
+From: louis.gesbert at ocamlpro.com (Louis Gesbert)
+Date: Tue, 27 Sep 2016 08:00:50 +0200
+Subject: [ocaml-platform] problems with ocaml-top
+In-Reply-To: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+References: <CAO42ici82JTvL-xp3ZY0C+GSnyuLv5FL+nFBW_qc52X1iB0cYw@mail.gmail.com>
+Message-ID: <36880034.SBCJDYkh4Q@maitake>
+
+You should probably have directed this to the ocaml-top bug tracker [1], but 
+I'll answer here.
+
+[1] https://github.com/OCamlPro/ocaml-top/issues
+
+On dimanche 25 septembre 2016 10:17:26 CEST Eric DETREZ wrote:
+> Hello
+> 
+> I tried to install ocaml-top (I use debian jessie)
+> When I launch it from terminal : /home/ericd13/.opam/system/bin
+> i get a lot of warnings (deprecated pp_open_tbox tabulation boxes are not
+> suported anymore)
+
+Ok, this is just from the built-in .ocamlinit file, shouldn't be difficult to 
+fix. You can safely ignore these warnings for now.
+
+> The console gets a message :
+> (ocaml-top:28826): GLib-CRITICAL **: Source ID 2108 was not found when
+> attempting to remove it
+
+This is from GTK. In my experience, almost all GTK applications spam the 
+console with warnings and errors when run from a terminal. If the GUI doesn't 
+show bugs it's probably safe to ignore them...
+
+> But Ocaml is version 4.03.0 (the one OPAM installed)
+> 
+> If I launch it from thunar it's version 4.01.0
+
+ocaml-top will simply launch the `ocaml` executable it finds from the PATH, so 
+if you run it from a terminal where opam was properly initialised, it will use 
+the one from opam, but otherwise might fall back to the one that was installed 
+system-wide. You can add the argument `-ocaml /path/to/ocaml` (e.g. `ocaml-top 
+-ocaml ~/.opam/4.02.3/bin/ocaml`) to make sure of the one that is used.
+
+I'll try to find the time to release a new version in order to fix the first 
+point.
+
+Best,
+Louis Gesbert -- OCamlPro
+
+From dra-news at metastack.com  Tue Sep 27 09:25:41 2016
+From: dra-news at metastack.com (David Allsopp)
+Date: Tue, 27 Sep 2016 08:25:41 +0000
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+Message-ID: <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+
+Daniel B?nzli wrote:
+> Nowadays I consider it a lost cause when I file an issue on the opam-
+> repository.
+> 
+> I think this is an issue.
+> 
+> I perfectly understand that from the point of view of repo maintainers the
+> amount of issues (136 now) doesn't entice them to go through the backlog
+> to try to fix or close them. However I believe that if we try to limit the
+> backlog or tag them more appropriately there may be a better chance that
+> issues do not simply get ignored.
+> 
+> Going through the least recently updated issues:
+> 
+> https://github.com/ocaml/opam-
+> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> 
+> here are a few things that come to mind:
+> 
+> 1. Kill that `request for package` tag. Being a developer-oriented package
+> system I don't think the opam repository is the place to ask for
+> packaging, people should ask upstream (I don't say this didn't make sense
+> when opam was a baby).
+> 2. Kill too open ended questions with the `question` tag.
+> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+
+Agreed - I was briefly involved with Git-for-Windows. I disliked hugely the way the principal maintainer runs that project, but one thing which was very impressive was his rapid triage of issues. For standard FAQ questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ link (number 1 would be advice either to contact upstream or a pointer to the packaging instructions; number 2 would either link to the manual or a general FAQ to open an issue on the appropriate docs repository; etc.) and immediately *close* the issue. It doesn't prevent the poster from commenting a little further, but it removes a "pointless" issue from the list as quickly as possible. Also, if an issue was woefully lacking in required information, the issue was closed, rather than requesting further information and leaving it open. The OP can always re-open the issue having supplied further details (or start a fresh one).
+
+If your issue survives that process, his next stage was tag it and determine who was going to fix it - if it a maintainer volunteers, it's assigned; otherwise if you don't agree to fix it, it's closed at once (happens with feature requests more than bugs, obviously).
+
+Finally, about once a month, he'd go through old issues and ping them for status - and close anything which seemed not to be making progress.
+
+It seems to me that for opam-repository a ruthless model would work well! Or, as we can see, you can't see the wood for them trees...
+
+> 4. There seem to be a lot of old install glitches that I'm sure are no
+> longer relevant.
+> 5. There are a few open issues where people say that the problem is
+> solved, they should be closed...
+>
+> I think we should walk up from the oldest issues and whenever things are
+> are unclear tag them with `scheduled for closure` and comment that without
+> any further feedback in 7 days, the issue will be closed. Also in general
+> it would be nice to introduce tags to distinguish between repo
+> organisation issues like [1] (may be long lived) and end-user repo install
+> failures like [2] (should be short lived).
+
+Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+
+
+David
+
+From thomas at gazagnaire.org  Tue Sep 27 09:48:34 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Tue, 27 Sep 2016 09:48:34 +0100
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+Message-ID: <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+
+>> Nowadays I consider it a lost cause when I file an issue on the opam-
+>> repository.
+>> 
+>> I think this is an issue.
+>> 
+>> I perfectly understand that from the point of view of repo maintainers the
+>> amount of issues (136 now) doesn't entice them to go through the backlog
+>> to try to fix or close them. However I believe that if we try to limit the
+>> backlog or tag them more appropriately there may be a better chance that
+>> issues do not simply get ignored.
+>> 
+>> Going through the least recently updated issues:
+>> 
+>> https://github.com/ocaml/opam-
+>> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+>> 
+>> here are a few things that come to mind:
+>> 
+>> 1. Kill that `request for package` tag. Being a developer-oriented package
+>> system I don't think the opam repository is the place to ask for
+>> packaging, people should ask upstream (I don't say this didn't make sense
+>> when opam was a baby).
+>> 2. Kill too open ended questions with the `question` tag.
+>> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+> 
+> Agreed - I was briefly involved with Git-for-Windows. I disliked hugely the way the principal maintainer runs that project, but one thing which was very impressive was his rapid triage of issues. For standard FAQ questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ link (number 1 would be advice either to contact upstream or a pointer to the packaging instructions; number 2 would either link to the manual or a general FAQ to open an issue on the appropriate docs repository; etc.) and immediately *close* the issue. It doesn't prevent the poster from commenting a little further, but it removes a "pointless" issue from the list as quickly as possible. Also, if an issue was woefully lacking in required information, the issue was closed, rather than requesting further information and leaving it open. The OP can always re-open the issue having supplied further details (or start a fresh one).
+> 
+> If your issue survives that process, his next stage was tag it and determine who was going to fix it - if it a maintainer volunteers, it's assigned; otherwise if you don't agree to fix it, it's closed at once (happens with feature requests more than bugs, obviously).
+> 
+> Finally, about once a month, he'd go through old issues and ping them for status - and close anything which seemed not to be making progress.
+> 
+> It seems to me that for opam-repository a ruthless model would work well! Or, as we can see, you can't see the wood for them trees...
+> 
+>> 4. There seem to be a lot of old install glitches that I'm sure are no
+>> longer relevant.
+>> 5. There are a few open issues where people say that the problem is
+>> solved, they should be closed...
+>> 
+>> I think we should walk up from the oldest issues and whenever things are
+>> are unclear tag them with `scheduled for closure` and comment that without
+>> any further feedback in 7 days, the issue will be closed. Also in general
+>> it would be nice to introduce tags to distinguish between repo
+>> organisation issues like [1] (may be long lived) and end-user repo install
+>> failures like [2] (should be short lived).
+> 
+> Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+
+I agree, I rarely look at the issue tracker and its current state makes me quite sad (these two are maybe related). Any help to triage these issues would be greatly appreciated. I will make a quick first scan to close the obvious ones.
+
+Thomas
+
+
+From gabriel.scherer at gmail.com  Tue Sep 27 15:55:36 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Tue, 27 Sep 2016 10:55:36 -0400
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+Message-ID: <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+
+>
+> Perhaps what is needed is a somewhat tedious day with maintainers in the
+> same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+
+
+Maybe for another time, but have opam-repository maintainers and
+contributors considered having an actual get-together event? Given the
+current distribution, Cambridge or London could be good starting points.
+(I'm personally stuck on the wrong side of the Atlantic before January, but
+in general terms I would consider attending such an event. There would also
+be interesting discussions to be had regarding opam 2.0 migration and
+Conex.)
+
+On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org>
+wrote:
+
+> >> Nowadays I consider it a lost cause when I file an issue on the opam-
+> >> repository.
+> >>
+> >> I think this is an issue.
+> >>
+> >> I perfectly understand that from the point of view of repo maintainers
+> the
+> >> amount of issues (136 now) doesn't entice them to go through the backlog
+> >> to try to fix or close them. However I believe that if we try to limit
+> the
+> >> backlog or tag them more appropriately there may be a better chance that
+> >> issues do not simply get ignored.
+> >>
+> >> Going through the least recently updated issues:
+> >>
+> >> https://github.com/ocaml/opam-
+> >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> >>
+> >> here are a few things that come to mind:
+> >>
+> >> 1. Kill that `request for package` tag. Being a developer-oriented
+> package
+> >> system I don't think the opam repository is the place to ask for
+> >> packaging, people should ask upstream (I don't say this didn't make
+> sense
+> >> when opam was a baby).
+> >> 2. Kill too open ended questions with the `question` tag.
+> >> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+> >
+> > Agreed - I was briefly involved with Git-for-Windows. I disliked hugely
+> the way the principal maintainer runs that project, but one thing which was
+> very impressive was his rapid triage of issues. For standard FAQ questions,
+> "we" (i.e. a maintainer) should comment with the appropriate FAQ link
+> (number 1 would be advice either to contact upstream or a pointer to the
+> packaging instructions; number 2 would either link to the manual or a
+> general FAQ to open an issue on the appropriate docs repository; etc.) and
+> immediately *close* the issue. It doesn't prevent the poster from
+> commenting a little further, but it removes a "pointless" issue from the
+> list as quickly as possible. Also, if an issue was woefully lacking in
+> required information, the issue was closed, rather than requesting further
+> information and leaving it open. The OP can always re-open the issue having
+> supplied further details (or start a fresh one).
+> >
+> > If your issue survives that process, his next stage was tag it and
+> determine who was going to fix it - if it a maintainer volunteers, it's
+> assigned; otherwise if you don't agree to fix it, it's closed at once
+> (happens with feature requests more than bugs, obviously).
+> >
+> > Finally, about once a month, he'd go through old issues and ping them
+> for status - and close anything which seemed not to be making progress.
+> >
+> > It seems to me that for opam-repository a ruthless model would work
+> well! Or, as we can see, you can't see the wood for them trees...
+> >
+> >> 4. There seem to be a lot of old install glitches that I'm sure are no
+> >> longer relevant.
+> >> 5. There are a few open issues where people say that the problem is
+> >> solved, they should be closed...
+> >>
+> >> I think we should walk up from the oldest issues and whenever things are
+> >> are unclear tag them with `scheduled for closure` and comment that
+> without
+> >> any further feedback in 7 days, the issue will be closed. Also in
+> general
+> >> it would be nice to introduce tags to distinguish between repo
+> >> organisation issues like [1] (may be long lived) and end-user repo
+> install
+> >> failures like [2] (should be short lived).
+> >
+> > Perhaps what is needed is a somewhat tedious day with maintainers in the
+> same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+>
+> I agree, I rarely look at the issue tracker and its current state makes me
+> quite sad (these two are maybe related). Any help to triage these issues
+> would be greatly appreciated. I will make a quick first scan to close the
+> obvious ones.
+>
+> Thomas
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160927/4a4e8a9b/attachment.html>
+
+From ivg at ieee.org  Tue Sep 27 16:42:04 2016
+From: ivg at ieee.org (Ivan Gotovchits)
+Date: Tue, 27 Sep 2016 11:42:04 -0400
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+Message-ID: <CALdWJ+wX-3hcSi54heWDL=sTGp+BjXqAx9uzm2vgUS+PGwEoLw@mail.gmail.com>
+
+Probably, we can all help maintainers, by reviewing our own issues, and
+probably closing them.
+For this we need to substitute USER with our github log in the following
+link:
+
+   https://github.com/ocaml/opam-repository/issues/created_by/USER
+
+Regards,
+Ivan
+
+On Tue, Sep 27, 2016 at 10:55 AM, Gabriel Scherer <gabriel.scherer at gmail.com
+> wrote:
+
+> Perhaps what is needed is a somewhat tedious day with maintainers in the
+>> same (virtual) place, so that (brief) discussions can take place
+>> immediately, to control the backlog?
+>
+>
+> Maybe for another time, but have opam-repository maintainers and
+> contributors considered having an actual get-together event? Given the
+> current distribution, Cambridge or London could be good starting points.
+> (I'm personally stuck on the wrong side of the Atlantic before January, but
+> in general terms I would consider attending such an event. There would also
+> be interesting discussions to be had regarding opam 2.0 migration and
+> Conex.)
+>
+> On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org>
+> wrote:
+>
+>> >> Nowadays I consider it a lost cause when I file an issue on the opam-
+>> >> repository.
+>> >>
+>> >> I think this is an issue.
+>> >>
+>> >> I perfectly understand that from the point of view of repo maintainers
+>> the
+>> >> amount of issues (136 now) doesn't entice them to go through the
+>> backlog
+>> >> to try to fix or close them. However I believe that if we try to limit
+>> the
+>> >> backlog or tag them more appropriately there may be a better chance
+>> that
+>> >> issues do not simply get ignored.
+>> >>
+>> >> Going through the least recently updated issues:
+>> >>
+>> >> https://github.com/ocaml/opam-
+>> >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+>> >>
+>> >> here are a few things that come to mind:
+>> >>
+>> >> 1. Kill that `request for package` tag. Being a developer-oriented
+>> package
+>> >> system I don't think the opam repository is the place to ask for
+>> >> packaging, people should ask upstream (I don't say this didn't make
+>> sense
+>> >> when opam was a baby).
+>> >> 2. Kill too open ended questions with the `question` tag.
+>> >> 3. Go through the `bug` tag. It seems a lot of old things can be
+>> closed.
+>> >
+>> > Agreed - I was briefly involved with Git-for-Windows. I disliked hugely
+>> the way the principal maintainer runs that project, but one thing which was
+>> very impressive was his rapid triage of issues. For standard FAQ questions,
+>> "we" (i.e. a maintainer) should comment with the appropriate FAQ link
+>> (number 1 would be advice either to contact upstream or a pointer to the
+>> packaging instructions; number 2 would either link to the manual or a
+>> general FAQ to open an issue on the appropriate docs repository; etc.) and
+>> immediately *close* the issue. It doesn't prevent the poster from
+>> commenting a little further, but it removes a "pointless" issue from the
+>> list as quickly as possible. Also, if an issue was woefully lacking in
+>> required information, the issue was closed, rather than requesting further
+>> information and leaving it open. The OP can always re-open the issue having
+>> supplied further details (or start a fresh one).
+>> >
+>> > If your issue survives that process, his next stage was tag it and
+>> determine who was going to fix it - if it a maintainer volunteers, it's
+>> assigned; otherwise if you don't agree to fix it, it's closed at once
+>> (happens with feature requests more than bugs, obviously).
+>> >
+>> > Finally, about once a month, he'd go through old issues and ping them
+>> for status - and close anything which seemed not to be making progress.
+>> >
+>> > It seems to me that for opam-repository a ruthless model would work
+>> well! Or, as we can see, you can't see the wood for them trees...
+>> >
+>> >> 4. There seem to be a lot of old install glitches that I'm sure are no
+>> >> longer relevant.
+>> >> 5. There are a few open issues where people say that the problem is
+>> >> solved, they should be closed...
+>> >>
+>> >> I think we should walk up from the oldest issues and whenever things
+>> are
+>> >> are unclear tag them with `scheduled for closure` and comment that
+>> without
+>> >> any further feedback in 7 days, the issue will be closed. Also in
+>> general
+>> >> it would be nice to introduce tags to distinguish between repo
+>> >> organisation issues like [1] (may be long lived) and end-user repo
+>> install
+>> >> failures like [2] (should be short lived).
+>> >
+>> > Perhaps what is needed is a somewhat tedious day with maintainers in
+>> the same (virtual) place, so that (brief) discussions can take place
+>> immediately, to control the backlog?
+>>
+>> I agree, I rarely look at the issue tracker and its current state makes
+>> me quite sad (these two are maybe related). Any help to triage these issues
+>> would be greatly appreciated. I will make a quick first scan to close the
+>> obvious ones.
+>>
+>> Thomas
+>>
+>> _______________________________________________
+>> Platform mailing list
+>> Platform at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/platform
+>>
+>
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160927/ac8c9cf5/attachment-0001.html>
+
+From gabriel.scherer at gmail.com  Wed Sep 28 03:03:39 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Tue, 27 Sep 2016 22:03:39 -0400
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <CALdWJ+wX-3hcSi54heWDL=sTGp+BjXqAx9uzm2vgUS+PGwEoLw@mail.gmail.com>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+ <CALdWJ+wX-3hcSi54heWDL=sTGp+BjXqAx9uzm2vgUS+PGwEoLw@mail.gmail.com>
+Message-ID: <CAPFanBEjFmsa=yyPgwbNquDJ_Vdk_PLPc=_rAoaZsKTObphXGA@mail.gmail.com>
+
+A crisp related quote from Russ Albery on Debian's bug tracker, in the
+September 22nd Linux Weekly News edition:
+
+Debian's bug system is a tool we use to improve the distribution, not a
+> user support channel.  We should not retain bugs that do not help us
+> achieve that.  It would be great if it could also be a user support
+> channel, but this is just unachievable for a volunteer-maintained
+> distribution like Debian, and we should avoid creating the impression that
+> we promise to do this.
+>
+>
+http://lwn.net/Articles/700987/
+
+On Tue, Sep 27, 2016 at 11:42 AM, Ivan Gotovchits <ivg at ieee.org> wrote:
+
+> Probably, we can all help maintainers, by reviewing our own issues, and
+> probably closing them.
+> For this we need to substitute USER with our github log in the following
+> link:
+>
+>    https://github.com/ocaml/opam-repository/issues/created_by/USER
+>
+> Regards,
+> Ivan
+>
+> On Tue, Sep 27, 2016 at 10:55 AM, Gabriel Scherer <
+> gabriel.scherer at gmail.com> wrote:
+>
+>> Perhaps what is needed is a somewhat tedious day with maintainers in the
+>>> same (virtual) place, so that (brief) discussions can take place
+>>> immediately, to control the backlog?
+>>
+>>
+>> Maybe for another time, but have opam-repository maintainers and
+>> contributors considered having an actual get-together event? Given the
+>> current distribution, Cambridge or London could be good starting points.
+>> (I'm personally stuck on the wrong side of the Atlantic before January, but
+>> in general terms I would consider attending such an event. There would also
+>> be interesting discussions to be had regarding opam 2.0 migration and
+>> Conex.)
+>>
+>> On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org
+>> > wrote:
+>>
+>>> >> Nowadays I consider it a lost cause when I file an issue on the opam-
+>>> >> repository.
+>>> >>
+>>> >> I think this is an issue.
+>>> >>
+>>> >> I perfectly understand that from the point of view of repo
+>>> maintainers the
+>>> >> amount of issues (136 now) doesn't entice them to go through the
+>>> backlog
+>>> >> to try to fix or close them. However I believe that if we try to
+>>> limit the
+>>> >> backlog or tag them more appropriately there may be a better chance
+>>> that
+>>> >> issues do not simply get ignored.
+>>> >>
+>>> >> Going through the least recently updated issues:
+>>> >>
+>>> >> https://github.com/ocaml/opam-
+>>> >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+>>> >>
+>>> >> here are a few things that come to mind:
+>>> >>
+>>> >> 1. Kill that `request for package` tag. Being a developer-oriented
+>>> package
+>>> >> system I don't think the opam repository is the place to ask for
+>>> >> packaging, people should ask upstream (I don't say this didn't make
+>>> sense
+>>> >> when opam was a baby).
+>>> >> 2. Kill too open ended questions with the `question` tag.
+>>> >> 3. Go through the `bug` tag. It seems a lot of old things can be
+>>> closed.
+>>> >
+>>> > Agreed - I was briefly involved with Git-for-Windows. I disliked
+>>> hugely the way the principal maintainer runs that project, but one thing
+>>> which was very impressive was his rapid triage of issues. For standard FAQ
+>>> questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ
+>>> link (number 1 would be advice either to contact upstream or a pointer to
+>>> the packaging instructions; number 2 would either link to the manual or a
+>>> general FAQ to open an issue on the appropriate docs repository; etc.) and
+>>> immediately *close* the issue. It doesn't prevent the poster from
+>>> commenting a little further, but it removes a "pointless" issue from the
+>>> list as quickly as possible. Also, if an issue was woefully lacking in
+>>> required information, the issue was closed, rather than requesting further
+>>> information and leaving it open. The OP can always re-open the issue having
+>>> supplied further details (or start a fresh one).
+>>> >
+>>> > If your issue survives that process, his next stage was tag it and
+>>> determine who was going to fix it - if it a maintainer volunteers, it's
+>>> assigned; otherwise if you don't agree to fix it, it's closed at once
+>>> (happens with feature requests more than bugs, obviously).
+>>> >
+>>> > Finally, about once a month, he'd go through old issues and ping them
+>>> for status - and close anything which seemed not to be making progress.
+>>> >
+>>> > It seems to me that for opam-repository a ruthless model would work
+>>> well! Or, as we can see, you can't see the wood for them trees...
+>>> >
+>>> >> 4. There seem to be a lot of old install glitches that I'm sure are no
+>>> >> longer relevant.
+>>> >> 5. There are a few open issues where people say that the problem is
+>>> >> solved, they should be closed...
+>>> >>
+>>> >> I think we should walk up from the oldest issues and whenever things
+>>> are
+>>> >> are unclear tag them with `scheduled for closure` and comment that
+>>> without
+>>> >> any further feedback in 7 days, the issue will be closed. Also in
+>>> general
+>>> >> it would be nice to introduce tags to distinguish between repo
+>>> >> organisation issues like [1] (may be long lived) and end-user repo
+>>> install
+>>> >> failures like [2] (should be short lived).
+>>> >
+>>> > Perhaps what is needed is a somewhat tedious day with maintainers in
+>>> the same (virtual) place, so that (brief) discussions can take place
+>>> immediately, to control the backlog?
+>>>
+>>> I agree, I rarely look at the issue tracker and its current state makes
+>>> me quite sad (these two are maybe related). Any help to triage these issues
+>>> would be greatly appreciated. I will make a quick first scan to close the
+>>> obvious ones.
+>>>
+>>> Thomas
+>>>
+>>> _______________________________________________
+>>> Platform mailing list
+>>> Platform at lists.ocaml.org
+>>> http://lists.ocaml.org/listinfo/platform
+>>>
+>>
+>>
+>> _______________________________________________
+>> Platform mailing list
+>> Platform at lists.ocaml.org
+>> http://lists.ocaml.org/listinfo/platform
+>>
+>>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160927/25e3263b/attachment.html>
+
+From gabriel.scherer at gmail.com  Wed Sep 28 15:23:52 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 28 Sep 2016 10:23:52 -0400
+Subject: [ocaml-platform] Maintainer notifications for opam-builder -- and
+	other opam-builder enhancements
+Message-ID: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+
+Hi platform,
+
+During Fabrice's opam-builder presentation at the OCaml workshop there were
+some ideas of minor or major improvements floating around. I just sent a
+pull request for improving the colors of the HTML report -- including for
+example Yaron Minsky's suggestion to remove the distinction between the
+shades of green -- see
+
+  https://github.com/OCamlPro/opam-builder/issues/26
+  https://github.com/OCamlPro/opam-builder/pull/27
+
+(in the issue, Fabrice gives instruction on how to test the HTML report
+generation without first doing a full build of the opam repository, which
+were very helpful to me and could help others wishing to make other changes
+to the reporting logic of opam-builder.)
+
+I started a discussion on what would be a good way to notify package
+maintainers, on which feedback could be useful -- I'm also interested in
+the opinion of the current opam-repository maintainers for example, which
+have more experience than I have working with upstream packagers.
+
+  https://github.com/OCamlPro/opam-builder/issues/28
+
+In general I would encourage anyone to help improve opam-builder. We
+already have a few suggested features in the issue tracket (for example
+Alain Frisch gave feedback tracked in
+https://github.com/OCamlPro/opam-builder/issues/17 ), but ideas for
+improvements can easily be very open-ended while the resources to implement
+those changes seem fairly scarce, so I think focusing on small things first
+and actually implementing them could be very productive.
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160928/4a7216a9/attachment.html>
+
+From thomas at gazagnaire.org  Wed Sep 28 19:18:43 2016
+From: thomas at gazagnaire.org (Thomas Gazagnaire)
+Date: Wed, 28 Sep 2016 19:18:43 +0100
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+Message-ID: <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+
+> In general I would encourage anyone to help improve opam-builder. We already have a few suggested features in the issue tracket (for example Alain Frisch gave feedback tracked in https://github.com/OCamlPro/opam-builder/issues/17 ), but ideas for improvements can easily be very open-ended while the resources to implement those changes seem fairly scarce, so I think focusing on small things first and actually implementing them could be very productive.
+
+Is there any hope to change the license? As a repository maintainer, I use/maintain/publish a lots of CI scripts and I also work on related topics, so AGPL make it impossible for me to contribute.
+
+Best,
+Thomas
+
+
+From gabriel.scherer at gmail.com  Wed Sep 28 19:35:00 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 28 Sep 2016 14:35:00 -0400
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+Message-ID: <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+
+I don't follow, why would AGPL be a danger for your CI scripts or other
+works on related topics? I'm not a lawyer, but the AGPL text (
+https://www.gnu.org/licenses/agpl.html ) does not seem to imply that CI
+scripts or "related topic" works would be affected by opam-builder's use of
+the AGPL:
+
+The "Corresponding Source" for a work in object code form means all the
+> source code needed to generate, install, and (for an executable work) run
+> the object code and to modify the work, including scripts to control those
+> activities. However, it does not include the work's System Libraries, or
+> general-purpose tools or generally available free programs which are used
+> unmodified in performing those activities but which are not part of the
+> work. For example, Corresponding Source includes interface definition files
+> associated with source files for the work, and the source code for shared
+> libraries and dynamically linked subprograms that the work is specifically
+> designed to require, such as by intimate data communication or control flow
+> between those subprograms and other parts of the work.
+>
+
+This description of "Source code" (to be distributed when you deploy
+opam-builder on a service) includes "script to control those activities",
+so you may argue that for example Docker files used to administrate an
+opam-builder instance would have to be included -- which seems a reasonable
+degree of invasiveness to me. I see nothing that could affect CI scripts
+related to opam-repository in general, or your other works in the area:
+they are not "specifically designed to require" interaction with
+opam-builder, or are they?
+
+And, in any case, any AGPL-related restriction might arguably prevent you
+from running opam-builder on your own server, but I see even less how they
+could prevent you from contributing patches to the software itself,
+intended to take effect on Fabrice's instances -- that's the way I've been
+considering contribution to opam-builder so far, although others are of
+course warmly welcome to run their own instances if they want.
+
+
+On Wed, Sep 28, 2016 at 2:18 PM, Thomas Gazagnaire <thomas at gazagnaire.org>
+wrote:
+
+> > In general I would encourage anyone to help improve opam-builder. We
+> already have a few suggested features in the issue tracket (for example
+> Alain Frisch gave feedback tracked in https://github.com/OCamlPro/
+> opam-builder/issues/17 ), but ideas for improvements can easily be very
+> open-ended while the resources to implement those changes seem fairly
+> scarce, so I think focusing on small things first and actually implementing
+> them could be very productive.
+>
+> Is there any hope to change the license? As a repository maintainer, I
+> use/maintain/publish a lots of CI scripts and I also work on related
+> topics, so AGPL make it impossible for me to contribute.
+>
+> Best,
+> Thomas
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160928/6639efec/attachment.html>
+
+From anil at recoil.org  Wed Sep 28 19:53:20 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Wed, 28 Sep 2016 19:53:20 +0100
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+	and other opam-builder enhancements
+In-Reply-To: <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+Message-ID: <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+
+On 28 Sep 2016, at 19:35, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> 
+> And, in any case, any AGPL-related restriction might arguably prevent you from running opam-builder on your own server
+
+...and OPAM was explicitly designed to support installation behind firewalls, which is what we do at work at Docker.
+
+> but I see even less how they could prevent you from contributing patches to the software itself, intended to take effect on Fabrice's instances -- that's the way I've been considering contribution to opam-builder so far, although others are of course warmly welcome to run their own instances if they want.
+
+This isn't very useful for our purposes without access to our internal remotes and code.
+
+There is quite a comprehensive library driving opam-builder that could contribute to the OPAM tooling ecosystem, but cannot currently be extricated from the server software itself: https://github.com/OCamlPro/opam-builder/tree/master/libs/copam
+
+Like Thomas, I'm also unfortunately unable to contribute to software that is restrictively licensed enough that it is not compatible with the mainline OPAM license of LGPLv2. This is not to say that I do not appreciate the efforts that go into it, and I hope it continues to be hosted and maintained by OCamlPro.  I hope a clear separation continues to be maintained between OPAM and OPAM-builder, since code really shouldn't get mixed up as long as the licenses diverge...
+
+regards,
+Anil
+
+From gabriel.scherer at gmail.com  Wed Sep 28 20:06:11 2016
+From: gabriel.scherer at gmail.com (Gabriel Scherer)
+Date: Wed, 28 Sep 2016 15:06:11 -0400
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+Message-ID: <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+
+If one of your point is that it would be nice to move some of the
+opam-builder logic to become independent pieces of the ecosystem (or
+benefit opam directly), then I would agree -- and of course anything moved
+into OPAM would need to be made available under OPAM's license, and more
+generally stuff distributed as libraries would better not use AGPL. There
+was some discussion during the workshop on how much of opam-builder's cool
+incremental stuff could be done with opam (in particular opam 2.0), or
+could be made available to opam users directly.
+
+That said, this goes well beyond the form of small improvements I had in
+mind when starting this thread, which are purely about making opam-builder,
+as a service, more useful to the open-source opam community.
+
+(I now understand the other point, which is that companies with internal
+opam repositories would want to run internal opam-builder instances, and
+that the AGPL license may prevent these internal deployments because of
+internal company policies.)
+
+Note that I'm also in general interested in the ability to deploy separate
+opam-builder instances; for instance, I wonder how much work it would be
+for the Coq community, which is starting to use opam, to deploy their own
+opam-builder for their repositories.
+
+On Wed, Sep 28, 2016 at 2:53 PM, Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> On 28 Sep 2016, at 19:35, Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+> >
+> > And, in any case, any AGPL-related restriction might arguably prevent
+> you from running opam-builder on your own server
+>
+> ...and OPAM was explicitly designed to support installation behind
+> firewalls, which is what we do at work at Docker.
+>
+> > but I see even less how they could prevent you from contributing patches
+> to the software itself, intended to take effect on Fabrice's instances --
+> that's the way I've been considering contribution to opam-builder so far,
+> although others are of course warmly welcome to run their own instances if
+> they want.
+>
+> This isn't very useful for our purposes without access to our internal
+> remotes and code.
+>
+> There is quite a comprehensive library driving opam-builder that could
+> contribute to the OPAM tooling ecosystem, but cannot currently be
+> extricated from the server software itself: https://github.com/OCamlPro/op
+> am-builder/tree/master/libs/copam
+>
+> Like Thomas, I'm also unfortunately unable to contribute to software that
+> is restrictively licensed enough that it is not compatible with the
+> mainline OPAM license of LGPLv2. This is not to say that I do not
+> appreciate the efforts that go into it, and I hope it continues to be
+> hosted and maintained by OCamlPro.  I hope a clear separation continues to
+> be maintained between OPAM and OPAM-builder, since code really shouldn't
+> get mixed up as long as the licenses diverge...
+>
+> regards,
+> Anil
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160928/3b35f8dc/attachment-0001.html>
+
+From fabrice.le_fessant at ocamlpro.com  Wed Sep 28 21:12:08 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Wed, 28 Sep 2016 20:12:08 +0000
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+Message-ID: <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+
+ The AGPL license cannot harm OPAM, as, as an owner of opam-builder's code,
+OCamlPro is allowed to redistribute opam-builder's code under whatever
+licence, including inserting parts of it in OPAM under the current OPAM
+license (LGPLv2+EXN). Note also that the patch on OPAM used by opam-builder
+is not under AGPL, but already under OPAM's license.
+
+Anyway, I think we should not diverge from the original topics, which is
+how we could improve the current opam-builder hosted at OCamlPro to be more
+useful for maintainers. I will rebuild an archive of result files
+(including lint files this time), so that contributors can easily change
+the display without actually running the whole system.
+
+A related topics is the large number of opened issues being discussed on
+opam-repository, maybe we could also use references to opam-builder (and
+OWS) to close issues that are duplicates of problems already shown on these
+websites ? (this together with FAQ items could make it easier to triage
+issues as for git-on-windows)
+--Fabrice
+
+
+
+On Wed, Sep 28, 2016 at 9:06 PM Gabriel Scherer <gabriel.scherer at gmail.com>
+wrote:
+
+> If one of your point is that it would be nice to move some of the
+> opam-builder logic to become independent pieces of the ecosystem (or
+> benefit opam directly), then I would agree -- and of course anything moved
+> into OPAM would need to be made available under OPAM's license, and more
+> generally stuff distributed as libraries would better not use AGPL. There
+> was some discussion during the workshop on how much of opam-builder's cool
+> incremental stuff could be done with opam (in particular opam 2.0), or
+> could be made available to opam users directly.
+>
+> That said, this goes well beyond the form of small improvements I had in
+> mind when starting this thread, which are purely about making opam-builder,
+> as a service, more useful to the open-source opam community.
+>
+> (I now understand the other point, which is that companies with internal
+> opam repositories would want to run internal opam-builder instances, and
+> that the AGPL license may prevent these internal deployments because of
+> internal company policies.)
+>
+> Note that I'm also in general interested in the ability to deploy separate
+> opam-builder instances; for instance, I wonder how much work it would be
+> for the Coq community, which is starting to use opam, to deploy their own
+> opam-builder for their repositories.
+>
+>
+> On Wed, Sep 28, 2016 at 2:53 PM, Anil Madhavapeddy <anil at recoil.org>
+> wrote:
+>
+>> On 28 Sep 2016, at 19:35, Gabriel Scherer <gabriel.scherer at gmail.com>
+>> wrote:
+>> >
+>> > And, in any case, any AGPL-related restriction might arguably prevent
+>> you from running opam-builder on your own server
+>>
+>> ...and OPAM was explicitly designed to support installation behind
+>> firewalls, which is what we do at work at Docker.
+>>
+>> > but I see even less how they could prevent you from contributing
+>> patches to the software itself, intended to take effect on Fabrice's
+>> instances -- that's the way I've been considering contribution to
+>> opam-builder so far, although others are of course warmly welcome to run
+>> their own instances if they want.
+>>
+>> This isn't very useful for our purposes without access to our internal
+>> remotes and code.
+>>
+>> There is quite a comprehensive library driving opam-builder that could
+>> contribute to the OPAM tooling ecosystem, but cannot currently be
+>> extricated from the server software itself:
+>> https://github.com/OCamlPro/opam-builder/tree/master/libs/copam
+>>
+>> Like Thomas, I'm also unfortunately unable to contribute to software that
+>> is restrictively licensed enough that it is not compatible with the
+>> mainline OPAM license of LGPLv2. This is not to say that I do not
+>> appreciate the efforts that go into it, and I hope it continues to be
+>> hosted and maintained by OCamlPro.  I hope a clear separation continues to
+>> be maintained between OPAM and OPAM-builder, since code really shouldn't
+>> get mixed up as long as the licenses diverge...
+>>
+>> regards,
+>> Anil
+>
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160928/82e35cae/attachment.html>
+
+From anil at recoil.org  Thu Sep 29 15:58:48 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Thu, 29 Sep 2016 15:58:48 +0100
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+Message-ID: <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+
+There have been a couple of informal get-togethers in Cambridge, and we're happy to host more of course.
+
+However, in this instance what the opam-repository needs is fairly simple curation and labelling. Thomas has been working on a GitHub PR library that should be open sourced soon that will help us tag issues more automatically, so we can do a sweep through opam-repository when this is done.
+
+In general, the Debian philosophy elsewhere in the thread is correct -- we do not have the resources to be a user support channel, but should keep issues open that are real breakage that can be actioned in the repository.  Thoughts on where feature requests should go are welcome...
+
+regards,
+Anil
+
+> On 27 Sep 2016, at 15:55, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> 
+> Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> 
+> Maybe for another time, but have opam-repository maintainers and contributors considered having an actual get-together event? Given the current distribution, Cambridge or London could be good starting points. (I'm personally stuck on the wrong side of the Atlantic before January, but in general terms I would consider attending such an event. There would also be interesting discussions to be had regarding opam 2.0 migration and Conex.)
+> 
+> On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> >> Nowadays I consider it a lost cause when I file an issue on the opam-
+> >> repository.
+> >>
+> >> I think this is an issue.
+> >>
+> >> I perfectly understand that from the point of view of repo maintainers the
+> >> amount of issues (136 now) doesn't entice them to go through the backlog
+> >> to try to fix or close them. However I believe that if we try to limit the
+> >> backlog or tag them more appropriately there may be a better chance that
+> >> issues do not simply get ignored.
+> >>
+> >> Going through the least recently updated issues:
+> >>
+> >> https://github.com/ocaml/opam-
+> >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> >>
+> >> here are a few things that come to mind:
+> >>
+> >> 1. Kill that `request for package` tag. Being a developer-oriented package
+> >> system I don't think the opam repository is the place to ask for
+> >> packaging, people should ask upstream (I don't say this didn't make sense
+> >> when opam was a baby).
+> >> 2. Kill too open ended questions with the `question` tag.
+> >> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+> >
+> > Agreed - I was briefly involved with Git-for-Windows. I disliked hugely the way the principal maintainer runs that project, but one thing which was very impressive was his rapid triage of issues. For standard FAQ questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ link (number 1 would be advice either to contact upstream or a pointer to the packaging instructions; number 2 would either link to the manual or a general FAQ to open an issue on the appropriate docs repository; etc.) and immediately *close* the issue. It doesn't prevent the poster from commenting a little further, but it removes a "pointless" issue from the list as quickly as possible. Also, if an issue was woefully lacking in required information, the issue was closed, rather than requesting further information and leaving it open. The OP can always re-open the issue having supplied further details (or start a fresh one).
+> >
+> > If your issue survives that process, his next stage was tag it and determine who was going to fix it - if it a maintainer volunteers, it's assigned; otherwise if you don't agree to fix it, it's closed at once (happens with feature requests more than bugs, obviously).
+> >
+> > Finally, about once a month, he'd go through old issues and ping them for status - and close anything which seemed not to be making progress.
+> >
+> > It seems to me that for opam-repository a ruthless model would work well! Or, as we can see, you can't see the wood for them trees...
+> >
+> >> 4. There seem to be a lot of old install glitches that I'm sure are no
+> >> longer relevant.
+> >> 5. There are a few open issues where people say that the problem is
+> >> solved, they should be closed...
+> >>
+> >> I think we should walk up from the oldest issues and whenever things are
+> >> are unclear tag them with `scheduled for closure` and comment that without
+> >> any further feedback in 7 days, the issue will be closed. Also in general
+> >> it would be nice to introduce tags to distinguish between repo
+> >> organisation issues like [1] (may be long lived) and end-user repo install
+> >> failures like [2] (should be short lived).
+> >
+> > Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> 
+> I agree, I rarely look at the issue tracker and its current state makes me quite sad (these two are maybe related). Any help to triage these issues would be greatly appreciated. I will make a quick first scan to close the obvious ones.
+> 
+> Thomas
+> 
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+> 
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+
+
+From Fabrice.Le_fessant at inria.fr  Fri Sep 30 10:10:31 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Fri, 30 Sep 2016 09:10:31 +0000
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+ <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+Message-ID: <CAHvkLrOXMNX9NPNOUmO9cSpJHUt8PFx++LsR4WeCkX4pzeNSsg@mail.gmail.com>
+
+Maybe it would make sense for some heavy industrial users of OCaml to
+devote one engineer part-time (one or two days a week, for example) to the
+maintenance of the opam-repository ? There are already people from
+different organizations contributing, but mostly on their spare time, so
+they cannot really spend a lot of time understanding, for every broken
+package, how to fix the problem. Having engineers, officially dedicated to
+that task by their organizations, would help a lot. Do you think it would
+be possible ? I think that the Haskell community as such an engineer
+working full-time at maintaining the stability of one of their repositories
+(Hackage ? Stackage ?).
+
+On Thu, Sep 29, 2016 at 4:59 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> There have been a couple of informal get-togethers in Cambridge, and we're
+> happy to host more of course.
+>
+> However, in this instance what the opam-repository needs is fairly simple
+> curation and labelling. Thomas has been working on a GitHub PR library that
+> should be open sourced soon that will help us tag issues more
+> automatically, so we can do a sweep through opam-repository when this is
+> done.
+>
+> In general, the Debian philosophy elsewhere in the thread is correct -- we
+> do not have the resources to be a user support channel, but should keep
+> issues open that are real breakage that can be actioned in the repository.
+> Thoughts on where feature requests should go are welcome...
+>
+> regards,
+> Anil
+>
+> > On 27 Sep 2016, at 15:55, Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+> >
+> > Perhaps what is needed is a somewhat tedious day with maintainers in the
+> same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+> >
+> > Maybe for another time, but have opam-repository maintainers and
+> contributors considered having an actual get-together event? Given the
+> current distribution, Cambridge or London could be good starting points.
+> (I'm personally stuck on the wrong side of the Atlantic before January, but
+> in general terms I would consider attending such an event. There would also
+> be interesting discussions to be had regarding opam 2.0 migration and
+> Conex.)
+> >
+> > On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <
+> thomas at gazagnaire.org> wrote:
+> > >> Nowadays I consider it a lost cause when I file an issue on the opam-
+> > >> repository.
+> > >>
+> > >> I think this is an issue.
+> > >>
+> > >> I perfectly understand that from the point of view of repo
+> maintainers the
+> > >> amount of issues (136 now) doesn't entice them to go through the
+> backlog
+> > >> to try to fix or close them. However I believe that if we try to
+> limit the
+> > >> backlog or tag them more appropriately there may be a better chance
+> that
+> > >> issues do not simply get ignored.
+> > >>
+> > >> Going through the least recently updated issues:
+> > >>
+> > >> https://github.com/ocaml/opam-
+> > >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> > >>
+> > >> here are a few things that come to mind:
+> > >>
+> > >> 1. Kill that `request for package` tag. Being a developer-oriented
+> package
+> > >> system I don't think the opam repository is the place to ask for
+> > >> packaging, people should ask upstream (I don't say this didn't make
+> sense
+> > >> when opam was a baby).
+> > >> 2. Kill too open ended questions with the `question` tag.
+> > >> 3. Go through the `bug` tag. It seems a lot of old things can be
+> closed.
+> > >
+> > > Agreed - I was briefly involved with Git-for-Windows. I disliked
+> hugely the way the principal maintainer runs that project, but one thing
+> which was very impressive was his rapid triage of issues. For standard FAQ
+> questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ
+> link (number 1 would be advice either to contact upstream or a pointer to
+> the packaging instructions; number 2 would either link to the manual or a
+> general FAQ to open an issue on the appropriate docs repository; etc.) and
+> immediately *close* the issue. It doesn't prevent the poster from
+> commenting a little further, but it removes a "pointless" issue from the
+> list as quickly as possible. Also, if an issue was woefully lacking in
+> required information, the issue was closed, rather than requesting further
+> information and leaving it open. The OP can always re-open the issue having
+> supplied further details (or start a fresh one).
+> > >
+> > > If your issue survives that process, his next stage was tag it and
+> determine who was going to fix it - if it a maintainer volunteers, it's
+> assigned; otherwise if you don't agree to fix it, it's closed at once
+> (happens with feature requests more than bugs, obviously).
+> > >
+> > > Finally, about once a month, he'd go through old issues and ping them
+> for status - and close anything which seemed not to be making progress.
+> > >
+> > > It seems to me that for opam-repository a ruthless model would work
+> well! Or, as we can see, you can't see the wood for them trees...
+> > >
+> > >> 4. There seem to be a lot of old install glitches that I'm sure are no
+> > >> longer relevant.
+> > >> 5. There are a few open issues where people say that the problem is
+> > >> solved, they should be closed...
+> > >>
+> > >> I think we should walk up from the oldest issues and whenever things
+> are
+> > >> are unclear tag them with `scheduled for closure` and comment that
+> without
+> > >> any further feedback in 7 days, the issue will be closed. Also in
+> general
+> > >> it would be nice to introduce tags to distinguish between repo
+> > >> organisation issues like [1] (may be long lived) and end-user repo
+> install
+> > >> failures like [2] (should be short lived).
+> > >
+> > > Perhaps what is needed is a somewhat tedious day with maintainers in
+> the same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+> >
+> > I agree, I rarely look at the issue tracker and its current state makes
+> me quite sad (these two are maybe related). Any help to triage these issues
+> would be greatly appreciated. I will make a quick first scan to close the
+> obvious ones.
+> >
+> > Thomas
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+>
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160930/d6c3df6d/attachment.html>
+
+From anil at recoil.org  Fri Sep 30 10:46:08 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 30 Sep 2016 10:46:08 +0100
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <CAHvkLrOXMNX9NPNOUmO9cSpJHUt8PFx++LsR4WeCkX4pzeNSsg@mail.gmail.com>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+ <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+ <CAHvkLrOXMNX9NPNOUmO9cSpJHUt8PFx++LsR4WeCkX4pzeNSsg@mail.gmail.com>
+Message-ID: <81F57877-33D9-4828-B71F-A05598137979@recoil.org>
+
+The top 4 out of 6 contributors to opam-repository work at Docker according to the GitHub states [1], and we spend a significant amount of time maintaining the general coherence of the repository and responding to PRs, and working on CI infrastructure for OPAM (depext, ocaml-ci-scripts, and soon some more pieces).  In the top 20, I see around 10 people associated with OCaml Labs working on opam-repository.
+
+Did you have a concrete suggestion in your below mail for other contributors?  In general we should make it easier for power users to contribute to the OPAM repository, as we will have an increased burden of support when code signing lands (as it requires a quorum among committers).
+
+[1] https://github.com/ocaml/opam-repository/graphs/contributors
+
+Anil
+
+> On 30 Sep 2016, at 10:10, Fabrice Le Fessant <Fabrice.Le_fessant at inria.fr> wrote:
+> 
+> Maybe it would make sense for some heavy industrial users of OCaml to devote one engineer part-time (one or two days a week, for example) to the maintenance of the opam-repository ? There are already people from different organizations contributing, but mostly on their spare time, so they cannot really spend a lot of time understanding, for every broken package, how to fix the problem. Having engineers, officially dedicated to that task by their organizations, would help a lot. Do you think it would be possible ? I think that the Haskell community as such an engineer working full-time at maintaining the stability of one of their repositories (Hackage ? Stackage ?).
+> 
+> On Thu, Sep 29, 2016 at 4:59 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+> There have been a couple of informal get-togethers in Cambridge, and we're happy to host more of course.
+> 
+> However, in this instance what the opam-repository needs is fairly simple curation and labelling. Thomas has been working on a GitHub PR library that should be open sourced soon that will help us tag issues more automatically, so we can do a sweep through opam-repository when this is done.
+> 
+> In general, the Debian philosophy elsewhere in the thread is correct -- we do not have the resources to be a user support channel, but should keep issues open that are real breakage that can be actioned in the repository.  Thoughts on where feature requests should go are welcome...
+> 
+> regards,
+> Anil
+> 
+> > On 27 Sep 2016, at 15:55, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> >
+> > Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> >
+> > Maybe for another time, but have opam-repository maintainers and contributors considered having an actual get-together event? Given the current distribution, Cambridge or London could be good starting points. (I'm personally stuck on the wrong side of the Atlantic before January, but in general terms I would consider attending such an event. There would also be interesting discussions to be had regarding opam 2.0 migration and Conex.)
+> >
+> > On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> > >> Nowadays I consider it a lost cause when I file an issue on the opam-
+> > >> repository.
+> > >>
+> > >> I think this is an issue.
+> > >>
+> > >> I perfectly understand that from the point of view of repo maintainers the
+> > >> amount of issues (136 now) doesn't entice them to go through the backlog
+> > >> to try to fix or close them. However I believe that if we try to limit the
+> > >> backlog or tag them more appropriately there may be a better chance that
+> > >> issues do not simply get ignored.
+> > >>
+> > >> Going through the least recently updated issues:
+> > >>
+> > >> https://github.com/ocaml/opam-
+> > >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> > >>
+> > >> here are a few things that come to mind:
+> > >>
+> > >> 1. Kill that `request for package` tag. Being a developer-oriented package
+> > >> system I don't think the opam repository is the place to ask for
+> > >> packaging, people should ask upstream (I don't say this didn't make sense
+> > >> when opam was a baby).
+> > >> 2. Kill too open ended questions with the `question` tag.
+> > >> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+> > >
+> > > Agreed - I was briefly involved with Git-for-Windows. I disliked hugely the way the principal maintainer runs that project, but one thing which was very impressive was his rapid triage of issues. For standard FAQ questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ link (number 1 would be advice either to contact upstream or a pointer to the packaging instructions; number 2 would either link to the manual or a general FAQ to open an issue on the appropriate docs repository; etc.) and immediately *close* the issue. It doesn't prevent the poster from commenting a little further, but it removes a "pointless" issue from the list as quickly as possible. Also, if an issue was woefully lacking in required information, the issue was closed, rather than requesting further information and leaving it open. The OP can always re-open the issue having supplied further details (or start a fresh one).
+> > >
+> > > If your issue survives that process, his next stage was tag it and determine who was going to fix it - if it a maintainer volunteers, it's assigned; otherwise if you don't agree to fix it, it's closed at once (happens with feature requests more than bugs, obviously).
+> > >
+> > > Finally, about once a month, he'd go through old issues and ping them for status - and close anything which seemed not to be making progress.
+> > >
+> > > It seems to me that for opam-repository a ruthless model would work well! Or, as we can see, you can't see the wood for them trees...
+> > >
+> > >> 4. There seem to be a lot of old install glitches that I'm sure are no
+> > >> longer relevant.
+> > >> 5. There are a few open issues where people say that the problem is
+> > >> solved, they should be closed...
+> > >>
+> > >> I think we should walk up from the oldest issues and whenever things are
+> > >> are unclear tag them with `scheduled for closure` and comment that without
+> > >> any further feedback in 7 days, the issue will be closed. Also in general
+> > >> it would be nice to introduce tags to distinguish between repo
+> > >> organisation issues like [1] (may be long lived) and end-user repo install
+> > >> failures like [2] (should be short lived).
+> > >
+> > > Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> >
+> > I agree, I rarely look at the issue tracker and its current state makes me quite sad (these two are maybe related). Any help to triage these issues would be greatly appreciated. I will make a quick first scan to close the obvious ones.
+> >
+> > Thomas
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> 
+> _______________________________________________
+> Platform mailing list
+> Platform at lists.ocaml.org
+> http://lists.ocaml.org/listinfo/platform
+
+
+From Fabrice.Le_fessant at inria.fr  Fri Sep 30 11:56:38 2016
+From: Fabrice.Le_fessant at inria.fr (Fabrice Le Fessant)
+Date: Fri, 30 Sep 2016 10:56:38 +0000
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <81F57877-33D9-4828-B71F-A05598137979@recoil.org>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+ <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+ <CAHvkLrOXMNX9NPNOUmO9cSpJHUt8PFx++LsR4WeCkX4pzeNSsg@mail.gmail.com>
+ <81F57877-33D9-4828-B71F-A05598137979@recoil.org>
+Message-ID: <CAHvkLrPxr5LcSe6qgmGWYx8Zo52kubQLCKzVzAmdAdectZG5tQ@mail.gmail.com>
+
+> The top 4 out of 6 contributors to opam-repository work at Docker
+according to the GitHub states [1], and we spend a significant amount of
+time maintaining the general coherence of the repository and responding to
+PRs, and working on CI infrastructure for OPAM (depext, ocaml-ci-scripts,
+and soon some more pieces).  In the top 20, I see around 10 people
+associated with OCaml Labs working on opam-repository.
+
+As I said, there are already a lot of people contributing, but I think it's
+a very different job from fixing packages on a daily basis. The task of
+such an engineer would not be to work on the infrastructure, or
+comment/accept/reject pull-requests, but to fix all broken packages, one
+after the other, probably, of course, with some priorities (as Gabriel is
+doing on his spare time using opam-builder).
+
+> Did you have a concrete suggestion in your below mail for other
+contributors?  In general we should make it easier for power users to
+contribute to the OPAM repository, as we will have an increased burden of
+support when code signing lands (as it requires a quorum among committers).
+
+I think my suggestion was pretty concrete: if there are companies relying
+on the opam-repository for their developments, they could assign one of
+their engineers to such a task, and make it official, so that it will
+reassure users on the future of the repository, and enable us to coordinate
+with these engineers. I had the feeling that such a solution is easier for
+many companies, compared to contracting OCamlPro to do such a task (i.e.
+using their internal resources is easier than giving money to another
+company).
+
+On Fri, Sep 30, 2016 at 11:46 AM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> The top 4 out of 6 contributors to opam-repository work at Docker
+> according to the GitHub states [1], and we spend a significant amount of
+> time maintaining the general coherence of the repository and responding to
+> PRs, and working on CI infrastructure for OPAM (depext, ocaml-ci-scripts,
+> and soon some more pieces).  In the top 20, I see around 10 people
+> associated with OCaml Labs working on opam-repository.
+>
+> Did you have a concrete suggestion in your below mail for other
+> contributors?  In general we should make it easier for power users to
+> contribute to the OPAM repository, as we will have an increased burden of
+> support when code signing lands (as it requires a quorum among committers).
+>
+> [1] https://github.com/ocaml/opam-repository/graphs/contributors
+>
+> Anil
+>
+> > On 30 Sep 2016, at 10:10, Fabrice Le Fessant <
+> Fabrice.Le_fessant at inria.fr> wrote:
+> >
+> > Maybe it would make sense for some heavy industrial users of OCaml to
+> devote one engineer part-time (one or two days a week, for example) to the
+> maintenance of the opam-repository ? There are already people from
+> different organizations contributing, but mostly on their spare time, so
+> they cannot really spend a lot of time understanding, for every broken
+> package, how to fix the problem. Having engineers, officially dedicated to
+> that task by their organizations, would help a lot. Do you think it would
+> be possible ? I think that the Haskell community as such an engineer
+> working full-time at maintaining the stability of one of their repositories
+> (Hackage ? Stackage ?).
+> >
+> > On Thu, Sep 29, 2016 at 4:59 PM Anil Madhavapeddy <anil at recoil.org>
+> wrote:
+> > There have been a couple of informal get-togethers in Cambridge, and
+> we're happy to host more of course.
+> >
+> > However, in this instance what the opam-repository needs is fairly
+> simple curation and labelling. Thomas has been working on a GitHub PR
+> library that should be open sourced soon that will help us tag issues more
+> automatically, so we can do a sweep through opam-repository when this is
+> done.
+> >
+> > In general, the Debian philosophy elsewhere in the thread is correct --
+> we do not have the resources to be a user support channel, but should keep
+> issues open that are real breakage that can be actioned in the repository.
+> Thoughts on where feature requests should go are welcome...
+> >
+> > regards,
+> > Anil
+> >
+> > > On 27 Sep 2016, at 15:55, Gabriel Scherer <gabriel.scherer at gmail.com>
+> wrote:
+> > >
+> > > Perhaps what is needed is a somewhat tedious day with maintainers in
+> the same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+> > >
+> > > Maybe for another time, but have opam-repository maintainers and
+> contributors considered having an actual get-together event? Given the
+> current distribution, Cambridge or London could be good starting points.
+> (I'm personally stuck on the wrong side of the Atlantic before January, but
+> in general terms I would consider attending such an event. There would also
+> be interesting discussions to be had regarding opam 2.0 migration and
+> Conex.)
+> > >
+> > > On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <
+> thomas at gazagnaire.org> wrote:
+> > > >> Nowadays I consider it a lost cause when I file an issue on the
+> opam-
+> > > >> repository.
+> > > >>
+> > > >> I think this is an issue.
+> > > >>
+> > > >> I perfectly understand that from the point of view of repo
+> maintainers the
+> > > >> amount of issues (136 now) doesn't entice them to go through the
+> backlog
+> > > >> to try to fix or close them. However I believe that if we try to
+> limit the
+> > > >> backlog or tag them more appropriately there may be a better chance
+> that
+> > > >> issues do not simply get ignored.
+> > > >>
+> > > >> Going through the least recently updated issues:
+> > > >>
+> > > >> https://github.com/ocaml/opam-
+> > > >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> > > >>
+> > > >> here are a few things that come to mind:
+> > > >>
+> > > >> 1. Kill that `request for package` tag. Being a developer-oriented
+> package
+> > > >> system I don't think the opam repository is the place to ask for
+> > > >> packaging, people should ask upstream (I don't say this didn't make
+> sense
+> > > >> when opam was a baby).
+> > > >> 2. Kill too open ended questions with the `question` tag.
+> > > >> 3. Go through the `bug` tag. It seems a lot of old things can be
+> closed.
+> > > >
+> > > > Agreed - I was briefly involved with Git-for-Windows. I disliked
+> hugely the way the principal maintainer runs that project, but one thing
+> which was very impressive was his rapid triage of issues. For standard FAQ
+> questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ
+> link (number 1 would be advice either to contact upstream or a pointer to
+> the packaging instructions; number 2 would either link to the manual or a
+> general FAQ to open an issue on the appropriate docs repository; etc.) and
+> immediately *close* the issue. It doesn't prevent the poster from
+> commenting a little further, but it removes a "pointless" issue from the
+> list as quickly as possible. Also, if an issue was woefully lacking in
+> required information, the issue was closed, rather than requesting further
+> information and leaving it open. The OP can always re-open the issue having
+> supplied further details (or start a fresh one).
+> > > >
+> > > > If your issue survives that process, his next stage was tag it and
+> determine who was going to fix it - if it a maintainer volunteers, it's
+> assigned; otherwise if you don't agree to fix it, it's closed at once
+> (happens with feature requests more than bugs, obviously).
+> > > >
+> > > > Finally, about once a month, he'd go through old issues and ping
+> them for status - and close anything which seemed not to be making progress.
+> > > >
+> > > > It seems to me that for opam-repository a ruthless model would work
+> well! Or, as we can see, you can't see the wood for them trees...
+> > > >
+> > > >> 4. There seem to be a lot of old install glitches that I'm sure are
+> no
+> > > >> longer relevant.
+> > > >> 5. There are a few open issues where people say that the problem is
+> > > >> solved, they should be closed...
+> > > >>
+> > > >> I think we should walk up from the oldest issues and whenever
+> things are
+> > > >> are unclear tag them with `scheduled for closure` and comment that
+> without
+> > > >> any further feedback in 7 days, the issue will be closed. Also in
+> general
+> > > >> it would be nice to introduce tags to distinguish between repo
+> > > >> organisation issues like [1] (may be long lived) and end-user repo
+> install
+> > > >> failures like [2] (should be short lived).
+> > > >
+> > > > Perhaps what is needed is a somewhat tedious day with maintainers in
+> the same (virtual) place, so that (brief) discussions can take place
+> immediately, to control the backlog?
+> > >
+> > > I agree, I rarely look at the issue tracker and its current state
+> makes me quite sad (these two are maybe related). Any help to triage these
+> issues would be greatly appreciated. I will make a quick first scan to
+> close the obvious ones.
+> > >
+> > > Thomas
+> > >
+> > > _______________________________________________
+> > > Platform mailing list
+> > > Platform at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/platform
+> > >
+> > > _______________________________________________
+> > > Platform mailing list
+> > > Platform at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/platform
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+>
+>
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160930/6376cd5b/attachment.html>
+
+From anil at recoil.org  Fri Sep 30 14:36:53 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 30 Sep 2016 14:36:53 +0100
+Subject: [ocaml-platform] Improving the opam-repository issue tracker
+In-Reply-To: <CAHvkLrPxr5LcSe6qgmGWYx8Zo52kubQLCKzVzAmdAdectZG5tQ@mail.gmail.com>
+References: <413B2BB52EF840C39310439E3232BA2C@erratique.ch>
+ <E51C5B015DBD1348A1D85763337FB6D9013520DA75@Remus.metastack.local>
+ <F7EA6F2B-3C5C-4E5B-8E60-E8A580EBA135@gazagnaire.org>
+ <CAPFanBFcbTnmZ9sak-CRTe-6rTpFfmjMdo9kDVnbPXiPn2CUAw@mail.gmail.com>
+ <BB1A2255-52F4-4352-8309-F9A84CF61955@recoil.org>
+ <CAHvkLrOXMNX9NPNOUmO9cSpJHUt8PFx++LsR4WeCkX4pzeNSsg@mail.gmail.com>
+ <81F57877-33D9-4828-B71F-A05598137979@recoil.org>
+ <CAHvkLrPxr5LcSe6qgmGWYx8Zo52kubQLCKzVzAmdAdectZG5tQ@mail.gmail.com>
+Message-ID: <14C8D0CB-E949-4BFA-A1A4-148694D32439@recoil.org>
+
+On 30 Sep 2016, at 11:56, Fabrice Le Fessant <Fabrice.Le_fessant at inria.fr> wrote:
+> 
+> > The top 4 out of 6 contributors to opam-repository work at Docker according to the GitHub states [1], and we spend a significant amount of time maintaining the general coherence of the repository and responding to PRs, and working on CI infrastructure for OPAM (depext, ocaml-ci-scripts, and soon some more pieces).  In the top 20, I see around 10 people associated with OCaml Labs working on opam-repository.
+> 
+> As I said, there are already a lot of people contributing, but I think it's a very different job from fixing packages on a daily basis. The task of such an engineer would not be to work on the infrastructure, or comment/accept/reject pull-requests, but to fix all broken packages, one after the other, probably, of course, with some priorities (as Gabriel is doing on his spare time using opam-builder).
+
+It is indeed a different job, but if you look at the contributions then you'll notice that it's not just Gabriel doing such maintenance tasks.  Most of the maintainers have done passes at various points to jump past various constraints (camlp4, ppx ast incompat, etc), and this is an ongoing part of the responsibilities of maintaining the OPAM repository.  Some of the bigger merges like Core updates from JS involve quite a lot of manual testing and constraint updating as well, as do adding depexts for new OS distributions and similar tasks, or maintaining support for less popular distributions such as OpenBSD.
+
+So to directly address your implication that the current maintainers aren't doing repository maintenance and only doing dumb merges: it simply isn't true.
+
+What is true is that we need more automation to assist with this process as the repository grows.  OPAM builder is a very positive step in the right direction, but is unfortunately hampered by being contributed to the OPAM community under a different and more restrictive license (for whatever reason) -- and this makes it difficult for the existing OPAM repository maintainers to contribute to.
+
+> > Did you have a concrete suggestion in your below mail for other contributors?  In general we should make it easier for power users to contribute to the OPAM repository, as we will have an increased burden of support when code signing lands (as it requires a quorum among committers).
+> 
+> I think my suggestion was pretty concrete:
+
+I meant whether you had suggestions for other companies who are relying on opam-repository.  As I pointed out earlier, a significant chunk of existing opam-repository maintenance is _already_ conducted by companies relying on opam-repository for their developments (e.g. a large number of packages come from Jane Street who invest heavily in automation, and Docker has a number of developers in the top 5 contributors).
+
+Personally I think that this is the wrong approach -- as maintainers, we should be investing heavily in leveraging the automation infrastructure available to us and reducing the manual burden of triage, and not trying to find more people to do work that could be scripted and automated.
+
+I'm investigating a few options on the CI front for Windows at the moment, where this will be essential given the vast number of incompatibilities, and will report back to this list with the results as soon as I get a clearer view of what is needed.
+
+> if there are companies relying on the opam-repository for their developments, they could assign one of their engineers to such a task, and make it official, so that it will reassure users on the future of the repository, and enable us to coordinate with these engineers. I had the feeling that such a solution is easier for many companies, compared to contracting OCamlPro to do such a task (i.e. using their internal resources is easier than giving money to another company).
+
+If by "us" you mean OCamlPro, then I've made my concerns very clear several times: releasing automation support for OPAM under a different license from the main OPAM repository makes it very difficult to work together when all the other efforts are under a more liberal LGPLv2 license.  Your alternative seems to be for commercial users to pay for OCamlPro engineers to continue to build more libraries under the alternative AGPLv3 license, which sounds like vendor lockin to me. This is a perfectly valid business model for OCamlPro, but not one which I wish to subscribe to right now :-)
+
+regards,
+Anil
+
+
+
+> 
+> On Fri, Sep 30, 2016 at 11:46 AM Anil Madhavapeddy <anil at recoil.org> wrote:
+> The top 4 out of 6 contributors to opam-repository work at Docker according to the GitHub states [1], and we spend a significant amount of time maintaining the general coherence of the repository and responding to PRs, and working on CI infrastructure for OPAM (depext, ocaml-ci-scripts, and soon some more pieces).  In the top 20, I see around 10 people associated with OCaml Labs working on opam-repository.
+> 
+> Did you have a concrete suggestion in your below mail for other contributors?  In general we should make it easier for power users to contribute to the OPAM repository, as we will have an increased burden of support when code signing lands (as it requires a quorum among committers).
+> 
+> [1] https://github.com/ocaml/opam-repository/graphs/contributors
+> 
+> Anil
+> 
+> > On 30 Sep 2016, at 10:10, Fabrice Le Fessant <Fabrice.Le_fessant at inria.fr> wrote:
+> >
+> > Maybe it would make sense for some heavy industrial users of OCaml to devote one engineer part-time (one or two days a week, for example) to the maintenance of the opam-repository ? There are already people from different organizations contributing, but mostly on their spare time, so they cannot really spend a lot of time understanding, for every broken package, how to fix the problem. Having engineers, officially dedicated to that task by their organizations, would help a lot. Do you think it would be possible ? I think that the Haskell community as such an engineer working full-time at maintaining the stability of one of their repositories (Hackage ? Stackage ?).
+> >
+> > On Thu, Sep 29, 2016 at 4:59 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+> > There have been a couple of informal get-togethers in Cambridge, and we're happy to host more of course.
+> >
+> > However, in this instance what the opam-repository needs is fairly simple curation and labelling. Thomas has been working on a GitHub PR library that should be open sourced soon that will help us tag issues more automatically, so we can do a sweep through opam-repository when this is done.
+> >
+> > In general, the Debian philosophy elsewhere in the thread is correct -- we do not have the resources to be a user support channel, but should keep issues open that are real breakage that can be actioned in the repository.  Thoughts on where feature requests should go are welcome...
+> >
+> > regards,
+> > Anil
+> >
+> > > On 27 Sep 2016, at 15:55, Gabriel Scherer <gabriel.scherer at gmail.com> wrote:
+> > >
+> > > Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> > >
+> > > Maybe for another time, but have opam-repository maintainers and contributors considered having an actual get-together event? Given the current distribution, Cambridge or London could be good starting points. (I'm personally stuck on the wrong side of the Atlantic before January, but in general terms I would consider attending such an event. There would also be interesting discussions to be had regarding opam 2.0 migration and Conex.)
+> > >
+> > > On Tue, Sep 27, 2016 at 4:48 AM, Thomas Gazagnaire <thomas at gazagnaire.org> wrote:
+> > > >> Nowadays I consider it a lost cause when I file an issue on the opam-
+> > > >> repository.
+> > > >>
+> > > >> I think this is an issue.
+> > > >>
+> > > >> I perfectly understand that from the point of view of repo maintainers the
+> > > >> amount of issues (136 now) doesn't entice them to go through the backlog
+> > > >> to try to fix or close them. However I believe that if we try to limit the
+> > > >> backlog or tag them more appropriately there may be a better chance that
+> > > >> issues do not simply get ignored.
+> > > >>
+> > > >> Going through the least recently updated issues:
+> > > >>
+> > > >> https://github.com/ocaml/opam-
+> > > >> repository/issues?q=is%3Aopen+is%3Aissue+sort%3Aupdated-asc
+> > > >>
+> > > >> here are a few things that come to mind:
+> > > >>
+> > > >> 1. Kill that `request for package` tag. Being a developer-oriented package
+> > > >> system I don't think the opam repository is the place to ask for
+> > > >> packaging, people should ask upstream (I don't say this didn't make sense
+> > > >> when opam was a baby).
+> > > >> 2. Kill too open ended questions with the `question` tag.
+> > > >> 3. Go through the `bug` tag. It seems a lot of old things can be closed.
+> > > >
+> > > > Agreed - I was briefly involved with Git-for-Windows. I disliked hugely the way the principal maintainer runs that project, but one thing which was very impressive was his rapid triage of issues. For standard FAQ questions, "we" (i.e. a maintainer) should comment with the appropriate FAQ link (number 1 would be advice either to contact upstream or a pointer to the packaging instructions; number 2 would either link to the manual or a general FAQ to open an issue on the appropriate docs repository; etc.) and immediately *close* the issue. It doesn't prevent the poster from commenting a little further, but it removes a "pointless" issue from the list as quickly as possible. Also, if an issue was woefully lacking in required information, the issue was closed, rather than requesting further information and leaving it open. The OP can always re-open the issue having supplied further details (or start a fresh one).
+> > > >
+> > > > If your issue survives that process, his next stage was tag it and determine who was going to fix it - if it a maintainer volunteers, it's assigned; otherwise if you don't agree to fix it, it's closed at once (happens with feature requests more than bugs, obviously).
+> > > >
+> > > > Finally, about once a month, he'd go through old issues and ping them for status - and close anything which seemed not to be making progress.
+> > > >
+> > > > It seems to me that for opam-repository a ruthless model would work well! Or, as we can see, you can't see the wood for them trees...
+> > > >
+> > > >> 4. There seem to be a lot of old install glitches that I'm sure are no
+> > > >> longer relevant.
+> > > >> 5. There are a few open issues where people say that the problem is
+> > > >> solved, they should be closed...
+> > > >>
+> > > >> I think we should walk up from the oldest issues and whenever things are
+> > > >> are unclear tag them with `scheduled for closure` and comment that without
+> > > >> any further feedback in 7 days, the issue will be closed. Also in general
+> > > >> it would be nice to introduce tags to distinguish between repo
+> > > >> organisation issues like [1] (may be long lived) and end-user repo install
+> > > >> failures like [2] (should be short lived).
+> > > >
+> > > > Perhaps what is needed is a somewhat tedious day with maintainers in the same (virtual) place, so that (brief) discussions can take place immediately, to control the backlog?
+> > >
+> > > I agree, I rarely look at the issue tracker and its current state makes me quite sad (these two are maybe related). Any help to triage these issues would be greatly appreciated. I will make a quick first scan to close the obvious ones.
+> > >
+> > > Thomas
+> > >
+> > > _______________________________________________
+> > > Platform mailing list
+> > > Platform at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/platform
+> > >
+> > > _______________________________________________
+> > > Platform mailing list
+> > > Platform at lists.ocaml.org
+> > > http://lists.ocaml.org/listinfo/platform
+> >
+> > _______________________________________________
+> > Platform mailing list
+> > Platform at lists.ocaml.org
+> > http://lists.ocaml.org/listinfo/platform
+> 
+
+
+From anil at recoil.org  Fri Sep 30 14:40:41 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 30 Sep 2016 14:40:41 +0100
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+	and other opam-builder enhancements
+In-Reply-To: <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+ <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+Message-ID: <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+
+On 28 Sep 2016, at 21:12, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+> 
+> 
+>  The AGPL license cannot harm OPAM, as, as an owner of opam-builder's code, OCamlPro is allowed to redistribute opam-builder's code under whatever licence, including inserting parts of it in OPAM under the current OPAM license (LGPLv2+EXN). 
+
+That is correct, but how does this fit in with the request for contributions that Gabriel issued?  External contributors presumably need to sign a CLA with OCamlPro to give them copyright retention over the source code so that you can dual license it.  Has Gabriel signed such a CLA for https://github.com/OCamlPro/opam-builder/pull/27, and are other contributors expected to do the same?
+
+> Note also that the patch on OPAM used by opam-builder is not under AGPL, but already under OPAM's license.
+
+I was referring to the copam library here: https://github.com/OCamlPro/opam-builder/tree/master/libs/copam
+which appears to be a standalone library and not a patch under OPAM. I haven't looked closely or built the opam-builder sources myself due to the licensing concerns, however.
+
+regards,
+Anil
+
+From fabrice.le_fessant at ocamlpro.com  Fri Sep 30 19:31:35 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Fri, 30 Sep 2016 18:31:35 +0000
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+ <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+ <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+Message-ID: <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+
+On Fri, Sep 30, 2016 at 3:40 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+
+> That is correct, but how does this fit in with the request for
+> contributions that Gabriel issued?  External contributors presumably need
+> to sign a CLA with OCamlPro to give them copyright retention over the
+> source code so that you can dual license it.  Has Gabriel signed such a CLA
+> for https://github.com/OCamlPro/opam-builder/pull/27, and are other
+> contributors expected to do the same?
+
+
+I don't understand the relationship between AGPL and the need for a CLA.
+Many free-software or open-source projects make their contributors sign a
+CLA (even Docker asks PRs to contain a sign-off), this is completely
+unrelated to using AGPL, BSD, or whatever. By the way, I didn't need to ask
+Gabriel to sign the CLA because his contribution, although significative by
+its impact, is not significative by the number of lines.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160930/dd1fc942/attachment.html>
+
+From daniel.buenzli at erratique.ch  Fri Sep 30 19:48:43 2016
+From: daniel.buenzli at erratique.ch (=?utf-8?Q?Daniel_B=C3=BCnzli?=)
+Date: Fri, 30 Sep 2016 20:48:43 +0200
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+ <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+ <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+ <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+Message-ID: <544E8ED0C7634FBD9A8F681BE5BB62D2@erratique.ch>
+
+On Friday 30 September 2016 at 20:31, Fabrice Le Fessant wrote:
+> I don't understand the relationship between AGPL and the need for a CLA. Many free-software or open-source projects make their contributors sign a CLA (even Docker asks PRs to contain a sign-off), 
+
+
+I don't know what docker uses, but a linux sign-off (http://developercertificate.org/) is very very very different from the CLA companies usually try to make you sign (which tend to be quite unfair toward contributors)...
+
+Daniel
+
+From anil at recoil.org  Fri Sep 30 20:03:02 2016
+From: anil at recoil.org (Anil Madhavapeddy)
+Date: Fri, 30 Sep 2016 20:03:02 +0100
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+	and other opam-builder enhancements
+In-Reply-To: <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+ <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+ <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+ <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+Message-ID: <8365B5F2-7CA5-4702-8CEC-BD0B5212AFC9@recoil.org>
+
+
+> On 30 Sep 2016, at 19:31, Fabrice Le Fessant <fabrice.le_fessant at ocamlpro.com> wrote:
+> 
+> On Fri, Sep 30, 2016 at 3:40 PM Anil Madhavapeddy <anil at recoil.org> wrote:
+> That is correct, but how does this fit in with the request for contributions that Gabriel issued?  External contributors presumably need to sign a CLA with OCamlPro to give them copyright retention over the source code so that you can dual license it.  Has Gabriel signed such a CLA for https://github.com/OCamlPro/opam-builder/pull/27, and are other contributors expected to do the same?
+> 
+> I don't understand the relationship between AGPL and the need for a CLA. Many free-software or open-source projects make their contributors sign a CLA (even Docker asks PRs to contain a sign-off), this is completely unrelated to using AGPL, BSD, or whatever.
+
+You stated that:
+
+> The AGPL license cannot harm OPAM, as, as an owner of opam-builder's code, OCamlPro is allowed to redistribute opam-builder's code under whatever licence,
+
+but this dual-licensing only holds as long as only OCamlPro employees (who presumably license their IPR to the company) are the sole contributors.  Otherwise patches will come in under the license that the original source code was published under (AGPLv3) and cannot be relicensed without agreement of all the contributors.  This is a similar process to the one we embarked on for opam-repository ages ago (CC0) and opam itself recently (LGPLv2+exception). 
+
+>  By the way, I didn't need to ask Gabriel to sign the CLA because his contribution, although significative by its impact, is not significative by the number of lines.
+
+I'm afraid I don't understand the legal subtleties here.  I'd be grateful if someone could point me to a guide that explains who judges the threshold of the lines of code required before the patch becomes significant.  And what happens if the patch contributor disagrees.  Dual licensing seems complex enough that the contributors should be aware of it...
+
+regards,
+Anil
+
+From fabrice.le_fessant at ocamlpro.com  Fri Sep 30 20:20:53 2016
+From: fabrice.le_fessant at ocamlpro.com (Fabrice Le Fessant)
+Date: Fri, 30 Sep 2016 19:20:53 +0000
+Subject: [ocaml-platform] Maintainer notifications for opam-builder --
+ and other opam-builder enhancements
+In-Reply-To: <544E8ED0C7634FBD9A8F681BE5BB62D2@erratique.ch>
+References: <CAPFanBG4D5QPpJ+_6tTxOApCQtNdCoh7jso8AY_Xbi2sH-ZGsw@mail.gmail.com>
+ <08CB5F26-50EC-45EC-BC50-2DB2B5EE94C5@gazagnaire.org>
+ <CAPFanBGnjqEVbgPX879+mZUYJQDBd1ND9OtZj2wFrjoF3mExig@mail.gmail.com>
+ <4636744F-0939-4D20-8581-AE5707DABB96@recoil.org>
+ <CAPFanBFmn2gJeHJW6p4zu=0jUqpf_hbc7WvCftPciG8o8D8xdw@mail.gmail.com>
+ <CAHvkLrNp+QFXPsQs+6Ui0sR2wVWhudHdYue5DC-38bpd3S0+wQ@mail.gmail.com>
+ <4C6AE492-62EC-4215-863C-4EECC53C4C15@recoil.org>
+ <CAHvkLrN6qB4PhWBmxtcPmYO4EOxjRToSiejwQ9Jr43a8270yFg@mail.gmail.com>
+ <544E8ED0C7634FBD9A8F681BE5BB62D2@erratique.ch>
+Message-ID: <CAHvkLrMNNfcozFfpYNYKurOOgHg377_sPmO1b2unW8KaUtyxtA@mail.gmail.com>
+
+On Fri, Sep 30, 2016 at 8:48 PM Daniel B?nzli <daniel.buenzli at erratique.ch>
+wrote:
+
+> I don't know what docker uses, but a linux sign-off (
+> http://developercertificate.org/) is very very very different from the
+> CLA companies usually try to make you sign
+
+
+Because they use BSD-like licenses, that allows them to redistribute your
+code as their own under a proprietary license, so yes, they don't need to
+ask for more (well, the Linux kernel is a different case as they use GPL
+and keeps everything GPL).
+
+
+> (which tend to be quite unfair toward contributors)...
+
+
+Most of the CLAs I have seen recently (probably copied from the same
+original one) are actually not so unfair, as they don't ask for the
+ownership of the code, but just a license to use and relicense the code.
+The only CLA I know that is different is the one used by the FSF, that is
+done to allow them to sue for license enfringements on your code.
+
+--Fabrice
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.ocaml.org/pipermail/platform/attachments/20160930/9ad0626c/attachment.html>
+
